@@ -54,25 +54,30 @@ tr:hover {
     width: 12%;
     min-width: 100px;
 }
-.job-table th:nth-child(2), .job-table td:nth-child(2) { /* Source Path */
-    width: 35%;
-    min-width: 200px;
+.job-table th:nth-child(2), .job-table td:nth-child(2) { /* Source */
+    width: 22%;
+    min-width: 150px;
     word-break: break-all;
 }
-.job-table th:nth-child(3), .job-table td:nth-child(3) { /* Status */
+.job-table th:nth-child(3), .job-table td:nth-child(3) { /* Destination */
+    width: 22%;
+    min-width: 150px;
+    word-break: break-all;
+}
+.job-table th:nth-child(4), .job-table td:nth-child(4) { /* Status */
     width: 8%;
     min-width: 70px;
 }
-.job-table th:nth-child(4), .job-table td:nth-child(4) { /* Schedule */
+.job-table th:nth-child(5), .job-table td:nth-child(5) { /* Schedule */
     width: 8%;
-    min-width: 70px;
+    min-width: 60px;
 }
-.job-table th:nth-child(5), .job-table td:nth-child(5) { /* History */
-    width: 10%;
-    min-width: 80px;
+.job-table th:nth-child(6), .job-table td:nth-child(6) { /* History */
+    width: 8%;
+    min-width: 60px;
 }
-.job-table th:nth-child(6), .job-table td:nth-child(6) { /* Actions */
-    width: 27%;
+.job-table th:nth-child(7), .job-table td:nth-child(7) { /* Actions */
+    width: 20%;
     min-width: 200px;
 }
 /* Deleted jobs table column widths */
@@ -107,13 +112,16 @@ tr:hover {
 .action-buttons {
     white-space: nowrap;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap; /* Prevent wrapping */
     gap: 2px;
 }
 .action-buttons .button {
     flex-shrink: 0;
     font-size: 14px;  /* Keep standard button font size */
     padding: 8px 16px;  /* Keep standard button padding */
+}
+.action-buttons form {
+    margin: 0; /* Remove form margins that can cause wrapping */
 }
 /* History link styling */
 .history-link {
@@ -229,6 +237,14 @@ input[type="checkbox"] {
     font-size: 12px;
     color: #888;
     line-height: 1.4;
+}
+
+/* Source/destination type labels */
+.source-type, .dest-type {
+    font-weight: bold;
+    color: #4a9eff;
+    font-size: 11px;
+    text-transform: uppercase;
 }
 /* Action forms (inline buttons) */
 .action-form {

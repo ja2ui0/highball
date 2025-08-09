@@ -92,7 +92,7 @@ class BackupHandler:
         }
     
     def _build_rsync_command(self, job_config, global_settings, job_name, dry_run):
-        """Build rsync command with all options"""
+        """Build rsync command with all options using new job structure"""
         rsync_cmd = [global_settings.get('rsync_path', '/usr/bin/rsync'), '-a']
         
         if dry_run:
@@ -112,12 +112,41 @@ class BackupHandler:
         for exclude in job_config.get('excludes', []):
             rsync_cmd.extend(['--exclude', exclude])
         
-        # Add source and destination
-        source = job_config['source']
-        dest = f"{global_settings.get('dest_host', '192.168.1.252')}::{job_name}"
+        # Determine source and destination from new structure
+        source = self._build_source_path(job_config)
+        dest = self._build_destination_path(job_config, job_name, global_settings)
+        
         rsync_cmd.extend([source, dest])
         
         return rsync_cmd
+    
+    def _build_source_path(self, job_config):
+        """Build source path from job configuration"""
+        # Check for new structure first
+        if 'source_type' in job_config:
+            source_config = job_config.get('source_config', {})
+            return source_config.get('source_string', '')
+        
+        # Fall back to legacy structure
+        return job_config.get('source', '')
+    
+    def _build_destination_path(self, job_config, job_name, global_settings):
+        """Build destination path from job configuration"""
+        # Check for new structure first
+        if 'dest_type' in job_config:
+            dest_type = job_config['dest_type']
+            dest_config = job_config.get('dest_config', {})
+            
+            if dest_type == 'local':
+                return dest_config.get('path', f'/backups/{job_name}')
+            elif dest_type == 'ssh':
+                return dest_config.get('dest_string', f"backup@localhost:/backups/{job_name}")
+            elif dest_type == 'rsyncd':
+                return dest_config.get('dest_string', f"rsync://localhost/{job_name}")
+        
+        # Fall back to legacy structure (rsync daemon to configured host)
+        dest_host = global_settings.get('dest_host', '192.168.1.252')
+        return f"{dest_host}::{job_name}"
     
     def _build_log_header(self, job_name, timestamp, mode_text, source, rsync_cmd, job_config):
         """Build log header with job details"""
