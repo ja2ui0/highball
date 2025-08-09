@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Backup Job - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Add New Backup Job</h1>
+        
+        <form method="post" action="/save-job">
+            <div class="form-group">
+                <label for="job_name">Job Name:</label>
+                <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos, etc.">
+            </div>
+            
+            <div class="form-group">
+                <label for="source">Source Path:</label>
+                <input type="text" id="source" name="source" required placeholder="/var/lib/docker/volumes/yetiData/_data/...">
+                <small style="color: #888;">Full path to the directory or files you want to backup</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="includes">Include Patterns (one per line):</label>
+                <textarea id="includes" name="includes" placeholder="Leave empty to include everything, or specify patterns like:
+**/*.jpg
+documents/**
+*.pdf"></textarea>
+                <small style="color: #888;">Use rsync patterns. Leave empty to include all files.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="excludes">Exclude Patterns (one per line):</label>
+                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude:
+*.tmp
+*.log
+cache/**
+.git/**"></textarea>
+                <small style="color: #888;">Use rsync patterns to exclude files/directories.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="schedule">Schedule:</label>
+                <select id="schedule" name="schedule">
+                    <option value="manual">Manual Only</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="enabled" value="true" checked> Enabled
+                </label>
+            </div>
+            
+            <input type="submit" value="Create Backup Job" class="button button-success">
+            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

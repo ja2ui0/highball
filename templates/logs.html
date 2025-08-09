@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logs - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+    <style>
+        .log-viewer {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border-radius: 4px;
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            white-space: pre-wrap;
+        }
+        
+        .log-controls {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #3a3a3a;
+            border-radius: 4px;
+        }
+        
+        .live-indicator {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .live-indicator.disconnected {
+            color: #ff0000;
+        }
+        
+        .auto-scroll {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>System Logs</h1>
+        
+        <div class="log-controls">
+            <h3>Log Sources</h3>
+            {{LOG_BUTTONS}}
+            
+            <div style="margin-top: 15px;">
+                <button id="toggleLive" class="button">Start Live Tail</button>
+                <button id="clearLogs" class="button button-warning">Clear Display</button>
+                <label class="auto-scroll">
+                    <input type="checkbox" id="autoScroll" checked> Auto-scroll to bottom
+                </label>
+                <span id="liveStatus" class="live-indicator">Disconnected</span>
+            </div>
+        </div>
+        
+        <h2>{{LOG_NAME}}</h2>
+        
+        <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let isLive = false;
+        const logContent = document.getElementById('logContent');
+        const toggleButton = document.getElementById('toggleLive');
+        const liveStatus = document.getElementById('liveStatus');
+        const autoScrollCheckbox = document.getElementById('autoScroll');
+        const logType = '{{LOG_TYPE}}';
+        
+        function scrollToBottom() {
+            if (autoScrollCheckbox.checked) {
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+        
+        function startLiveTail() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource(`/logs/stream?type=${logType}`);
+            
+            eventSource.onopen = function() {
+                isLive = true;
+                toggleButton.textContent = 'Stop Live Tail';
+                toggleButton.className = 'button button-danger';
+                liveStatus.textContent = 'Connected';
+                liveStatus.className = 'live-indicator';
+            };
+            
+            eventSource.onmessage = function(event) {
+                logContent.textContent += event.data + '\n';
+                scrollToBottom();
+            };
+            
+            eventSource.onerror = function() {
+                stopLiveTail();
+                liveStatus.textContent = 'Connection Error';
+                liveStatus.className = 'live-indicator disconnected';
+            };
+        }
+        
+        function stopLiveTail() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            isLive = false;
+            toggleButton.textContent = 'Start Live Tail';
+            toggleButton.className = 'button';
+            liveStatus.textContent = 'Disconnected';
+            liveStatus.className = 'live-indicator disconnected';
+        }
+        
+        toggleButton.addEventListener('click', function() {
+            if (isLive) {
+                stopLiveTail();
+            } else {
+                startLiveTail();
+            }
+        });
+        
+        document.getElementById('clearLogs').addEventListener('click', function() {
+            logContent.textContent = '';
+        });
+        
+        // Auto-scroll to bottom on page load
+        scrollToBottom();
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

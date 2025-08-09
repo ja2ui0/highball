@@ -1,0 +1,17 @@
+// Navigation component - loads automatically on every page
+document.addEventListener('DOMContentLoaded', function() {
+    const navHTML = `
+        <nav class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/add-job">Add Job</a>
+            <a href="/config">Config</a>
+            <a href="/logs">Logs</a>
+        </nav>
+    `;
+    
+    // Find the navigation placeholder and replace it
+    const navContainer = document.getElementById('navigation');
+    if (navContainer) {
+        navContainer.innerHTML = navHTML;
+    }
+});
