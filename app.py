@@ -78,6 +78,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/validate-ssh':
                 source = params.get('source', [''])[0]
                 self._handlers['dashboard'].validate_ssh_source(self, source)
+            elif path == '/validate-rsyncd':
+                hostname = params.get('hostname', [''])[0]
+                share = params.get('share', [''])[0]
+                self._handlers['dashboard'].validate_rsyncd_destination(self, hostname, share)
             else:
                 self._send_404()
         except Exception as e:
