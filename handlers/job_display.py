@@ -95,6 +95,51 @@ class JobDisplay:
         return rows
     
     @staticmethod
+    def build_edit_form_data(job_config):
+        """Build data for edit form display"""
+        # Assume new job structure (greenfield)
+        source_type = job_config.get('source_type', 'unknown')
+        dest_type = job_config.get('dest_type', 'unknown')
+        source_config = job_config.get('source_config', {})
+        dest_config = job_config.get('dest_config', {})
+        
+        # Build hidden fields for source/dest config
+        hidden_fields = JobDisplay._build_hidden_config_fields(source_type, source_config, dest_type, dest_config)
+        
+        # Build display strings (remove HTML tags for plain text display)
+        source_display = JobDisplay.format_source_display(job_config)
+        dest_display = JobDisplay.format_destination_display(job_config)
+        
+        # Clean up HTML for display
+        source_display = source_display.replace('<span class="source-type">', '').replace('</span>', '').replace('<br>', ' ').replace('/<wbr>', '/')
+        dest_display = dest_display.replace('<span class="dest-type">', '').replace('</span>', '').replace('<br>', ' ').replace('/<wbr>', '/')
+        
+        return {
+            'source_type': source_type,
+            'dest_type': dest_type,
+            'source_display': source_display,
+            'dest_display': dest_display,
+            'hidden_config_fields': hidden_fields
+        }
+    
+    @staticmethod
+    def _build_hidden_config_fields(source_type, source_config, dest_type, dest_config):
+        """Build hidden form fields for source/dest configuration"""
+        fields = []
+        
+        # Source config hidden fields
+        for key, value in source_config.items():
+            field_name = f"source_{source_type}_{key}"
+            fields.append(f'<input type="hidden" name="{html.escape(field_name)}" value="{html.escape(str(value))}">')
+        
+        # Dest config hidden fields  
+        for key, value in dest_config.items():
+            field_name = f"dest_{dest_type}_{key}"
+            fields.append(f'<input type="hidden" name="{html.escape(field_name)}" value="{html.escape(str(value))}">')
+        
+        return '\n'.join(fields)
+    
+    @staticmethod
     def format_source_display(job_config):
         """Format source for display in dashboard"""
         if 'source_type' in job_config:

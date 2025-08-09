@@ -122,6 +122,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
             elif path == '/save-config':
                 self._handlers['config'].save_config_from_form(self, form_data)
+            elif path == '/dismiss-warning':
+                self._handlers['dashboard'].dismiss_config_warning(self)
             else:
                 self._send_404()
         except Exception as e:
