@@ -7,7 +7,7 @@ services:
       - "8087:80"
     volumes:
       # Mount config directory for persistence
-      - backup-config:/config
+      - ./config:/config
       # Mount SSH keys (read-only for security)
       - ~/.ssh:/root/.ssh:ro
       # Mount Docker socket for container backups (optional)
@@ -43,6 +43,3 @@ services:
       - CONFIG_PATH=/config/config.yaml
     profiles:
       - dev
-volumes:
-  backup-config:
-    driver: local

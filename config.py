@@ -13,30 +13,96 @@ class BackupConfig:
         self.config = self.load_config()
     
     def load_config(self):
-        """Load config from YAML file"""
+        """Load config from YAML file with robust error handling"""
         if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
-                return yaml.safe_load(f)
+            try:
+                with open(self.config_file, 'r') as f:
+                    content = f.read().strip()
+                    
+                # Handle empty or whitespace-only files
+                if not content:
+                    return self._get_default_config()
+                    
+                config = yaml.safe_load(content)
+                
+                # Handle None result from yaml.safe_load
+                if config is None:
+                    return self._get_default_config()
+                    
+                # Validate config structure
+                if not isinstance(config, dict):
+                    self._backup_malformed_config("Config is not a valid dictionary")
+                    return self._get_default_config()
+                
+                return config
+                
+            except yaml.YAMLError as e:
+                # Handle invalid YAML - backup and use defaults
+                self._backup_malformed_config(f"YAML syntax error: {str(e)}")
+                return self._get_default_config()
+            except Exception as e:
+                # Handle other file reading errors
+                self._backup_malformed_config(f"File reading error: {str(e)}")
+                return self._get_default_config()
         else:
             # Config file doesn't exist - create directory if needed
             config_dir = os.path.dirname(self.config_file)
             if config_dir and not os.path.exists(config_dir):
                 os.makedirs(config_dir)
             
-            # Return empty structure if no config exists
-            return {
-                "global_settings": {
-                    "dest_host": "192.168.1.252",
-                    "rsync_path": "/usr/bin/rsync",
-                    "time_path": "/usr/bin/time",
-                    "notification": {
-                        "telegram_token": "",
-                        "telegram_chat_id": ""
-                    }
-                },
-                "backup_jobs": {},
-                "backup_logs": {}
+            return self._get_default_config()
+    
+    def _backup_malformed_config(self, error_reason):
+        """Backup malformed config file and log the issue"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{self.config_file}.malformed.{timestamp}"
+        
+        try:
+            # Copy the malformed file to backup location
+            import shutil
+            shutil.copy2(self.config_file, backup_path)
+            
+            # Log the issue (this will be visible in application logs)
+            print(f"WARNING: Malformed config detected - {error_reason}")
+            print(f"WARNING: Backed up malformed config to: {backup_path}")
+            print(f"WARNING: Using default configuration. Check the backup file and repair if needed.")
+            
+            # Store the warning in memory so the web interface can show it
+            self._config_warning = {
+                'message': f"Malformed config detected: {error_reason}",
+                'backup_path': backup_path,
+                'timestamp': timestamp
             }
+            
+        except Exception as backup_error:
+            print(f"ERROR: Could not backup malformed config: {str(backup_error)}")
+            # Still use defaults even if backup fails
+    
+    def get_config_warning(self):
+        """Get any config loading warnings for display in web interface"""
+        return getattr(self, '_config_warning', None)
+    
+    def clear_config_warning(self):
+        """Clear the config warning (after user acknowledges it)"""
+        if hasattr(self, '_config_warning'):
+            delattr(self, '_config_warning')
+    
+    def _get_default_config(self):
+        """Return default configuration structure"""
+        return {
+            "global_settings": {
+                "dest_host": "192.168.1.252",
+                "rsync_path": "/usr/bin/rsync",
+                "time_path": "/usr/bin/time",
+                "notification": {
+                    "telegram_token": "",
+                    "telegram_chat_id": ""
+                }
+            },
+            "backup_jobs": {},
+            "backup_logs": {}
+        }
     
     def save_config(self, config=None):
         """Save config to YAML file"""

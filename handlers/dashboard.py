@@ -3,7 +3,6 @@ Dashboard handler - coordinates job management operations
 Slim coordinator that delegates to specialized modules
 """
 import html
-from datetime import datetime
 from .job_manager import JobManager
 from .job_form_parser import JobFormParser
 from .job_validator import JobValidator
@@ -24,6 +23,21 @@ class DashboardHandler:
         logs = self.job_manager.get_job_logs()
         deleted_jobs = self.job_manager.get_deleted_jobs()
         
+        # Check for config warnings
+        config_warning = self.backup_config.get_config_warning()
+        warning_html = ""
+        if config_warning:
+            warning_html = f'''
+                <div class="alert alert-error">
+                    <strong>Configuration Warning:</strong> {html.escape(config_warning['message'])}<br>
+                    Malformed config backed up to: <code>{html.escape(config_warning['backup_path'])}</code><br>
+                    Using default configuration. Please check the backup file and repair if needed.
+                    <form method="post" action="/dismiss-warning" style="margin-top: 10px;">
+                        <input type="submit" value="Dismiss Warning" class="button button-warning">
+                    </form>
+                </div>
+            '''
+        
         # Generate display HTML
         job_rows = JobDisplay.build_job_rows(jobs, logs)
         deleted_rows = JobDisplay.build_deleted_job_rows(deleted_jobs)
@@ -31,11 +45,17 @@ class DashboardHandler:
         # Render template
         html_content = self.template_service.render_template(
             'dashboard.html',
+            config_warning=warning_html,
             job_rows=job_rows,
             deleted_rows=deleted_rows
         )
         
         self.template_service.send_html_response(handler, html_content)
+    
+    def dismiss_config_warning(self, handler):
+        """Dismiss config warning"""
+        self.backup_config.clear_config_warning()
+        self.template_service.send_redirect(handler, '/')
     
     def show_add_job_form(self, handler):
         """Show form to add new backup job"""
@@ -49,11 +69,18 @@ class DashboardHandler:
             self.template_service.send_error_response(handler, f"Job '{job_name}' not found")
             return
         
-        # Render edit form with job data (using legacy format for now)
+        # Get edit form data from display module
+        edit_data = JobDisplay.build_edit_form_data(job_config)
+        
+        # Render edit form
         html_content = self.template_service.render_template(
             'edit_job.html',
             job_name=html.escape(job_name),
-            source=html.escape(job_config.get('source', '')),
+            source_type=edit_data['source_type'],
+            dest_type=edit_data['dest_type'],
+            source_display=edit_data['source_display'],
+            dest_display=edit_data['dest_display'],
+            hidden_config_fields=edit_data['hidden_config_fields'],
             includes='\n'.join(job_config.get('includes', [])),
             excludes='\n'.join(job_config.get('excludes', [])),
             schedule=job_config.get('schedule', 'manual'),

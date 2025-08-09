@@ -11,42 +11,39 @@
         
         <h1>Edit Backup Job: {{JOB_NAME}}</h1>
         
+        <div class="alert alert-info">
+            <strong>Note:</strong> To change source/destination configuration, delete this job and create a new one with the desired settings.
+        </div>
+        
         <form method="post" action="/save-job">
             <input type="hidden" name="job_name" value="{{JOB_NAME}}">
+            <input type="hidden" name="source_type" value="{{SOURCE_TYPE}}">
+            <input type="hidden" name="dest_type" value="{{DEST_TYPE}}">
+            {{HIDDEN_CONFIG_FIELDS}}
             
             <div class="form-group">
-                <label for="source">Source Path:</label>
-                <input type="text" id="source" name="source" required value="{{SOURCE}}">
-                <div class="help-text">
-                    <strong>Local:</strong> /path/to/files OR <strong>Remote (SSH):</strong> user@hostname:/path/to/files
+                <label>Current Source:</label>
+                <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{SOURCE_DISPLAY}}
                 </div>
             </div>
             
-            <div class="form-group" id="ssh-options" style="display: none;">
-                <div style="background-color: #3a3a3a; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
-                    <h4 style="margin-top: 0; color: #4a9eff;">SSH Remote Source</h4>
-                    <p style="color: #e0e0e0;">
-                        This job uses SSH to access a remote source. Ensure passwordless SSH access is configured.
-                    </p>
+            <div class="form-group">
+                <label>Current Destination:</label>
+                <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{DEST_DISPLAY}}
                 </div>
             </div>
             
             <div class="form-group">
                 <label for="includes">Include Patterns (one per line):</label>
-                <textarea id="includes" name="includes" placeholder="Leave empty to include everything, or specify patterns like:
-**/*.jpg
-documents/**
-*.pdf">{{INCLUDES}}</textarea>
+                <textarea id="includes" name="includes" placeholder="Leave empty to include everything">{{INCLUDES}}</textarea>
                 <div class="help-text">Use rsync patterns. Leave empty to include all files.</div>
             </div>
             
             <div class="form-group">
                 <label for="excludes">Exclude Patterns (one per line):</label>
-                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude:
-*.tmp
-*.log
-cache/**
-.git/**">{{EXCLUDES}}</textarea>
+                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude">{{EXCLUDES}}</textarea>
                 <div class="help-text">Use rsync patterns to exclude files/directories.</div>
             </div>
             
@@ -59,7 +56,6 @@ cache/**
                     <option value="monthly">Monthly</option>
                 </select>
                 <script>
-                    // Set selected option
                     document.getElementById('schedule').value = '{{SCHEDULE}}';
                 </script>
             </div>
@@ -79,25 +75,5 @@ cache/**
             <input type="submit" value="Delete Job" class="button button-danger">
         </form>
     </div>
-    <script>
-        // Show SSH options when remote source is detected
-        function checkSSHSource() {
-            const source = document.getElementById('source').value;
-            const sshOptions = document.getElementById('ssh-options');
-            
-            // Check if source looks like user@host:/path
-            const isRemoteSource = /^[^@]+@[^:]+:/.test(source);
-            
-            if (isRemoteSource) {
-                sshOptions.style.display = 'block';
-            } else {
-                sshOptions.style.display = 'none';
-            }
-        }
-        
-        // Check on page load and input changes
-        document.addEventListener('DOMContentLoaded', checkSSHSource);
-        document.getElementById('source').addEventListener('input', checkSSHSource);
-    </script>
 </body>
 </html>
