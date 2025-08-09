@@ -3,10 +3,8 @@
 Configuration manager for backup system
 Handles loading/saving YAML config files
 """
-
 import os
 import yaml
-
 class BackupConfig:
     """Manages the backup configuration in YAML format"""
     

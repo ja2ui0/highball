@@ -2,10 +2,8 @@
 Template rendering service
 Handles loading and rendering HTML templates
 """
-
 import os
 import html
-
 class TemplateService:
     """Service for loading and rendering HTML templates"""
     

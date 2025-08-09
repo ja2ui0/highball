@@ -1,10 +1,9 @@
 """
 Dashboard handler for backup job management
 """
-
 import html
 from datetime import datetime
-
+from services.ssh_validator import SSHValidator
 class DashboardHandler:
     """Handles dashboard and backup job CRUD operations"""
     
@@ -61,27 +60,88 @@ class DashboardHandler:
         self.template_service.send_html_response(handler, html_content)
     
     def save_backup_job(self, handler, form_data):
-        """Save backup job from form data"""
+        """Save backup job from form data with SSH validation"""
         job_name = form_data.get('job_name', [''])[0].strip()
         if not job_name:
             self.template_service.send_error_response(handler, "Job name is required")
             return
+        
+        source = form_data.get('source', [''])[0].strip()
+        if not source:
+            self.template_service.send_error_response(handler, "Source path is required")
+            return
+        
+        # Validate SSH sources before creating job
+        if self._is_ssh_source(source):
+            validation_result = SSHValidator.validate_ssh_source(source)
+            if not validation_result['success']:
+                error_msg = f"SSH Validation Failed: {validation_result['message']}"
+                
+                if 'details' in validation_result:
+                    details = validation_result['details']
+                    error_msg += f"\n\nTroubleshooting:\n"
+                    
+                    if details.get('step') == 'ssh_connection':
+                        error_msg += f"- Test SSH connection: ssh {details['user']}@{details['hostname']}\n"
+                        error_msg += f"- Check SSH keys and authorized_keys\n"
+                        error_msg += f"- Verify hostname is reachable"
+                    
+                    elif details.get('step') == 'rsync_check':
+                        error_msg += f"- Install rsync on {details['hostname']}: apt/yum install rsync\n"
+                        error_msg += f"- Verify SSH connection works first"
+                    
+                    elif details.get('step') == 'path_validation':
+                        error_msg += f"- Check if path exists: ssh {details['user']}@{details['hostname']} 'ls -la {details['path']}'\n"
+                        error_msg += f"- Verify read permissions for {details['user']}\n"
+                        error_msg += f"- Check parent directory permissions"
+                
+                self.template_service.send_error_response(handler, error_msg)
+                return
         
         # Parse form data
         includes = self._parse_lines(form_data.get('includes', [''])[0])
         excludes = self._parse_lines(form_data.get('excludes', [''])[0])
         
         job_config = {
-            'source': form_data.get('source', [''])[0].strip(),
+            'source': source,
             'includes': includes,
             'excludes': excludes,
             'schedule': form_data.get('schedule', ['manual'])[0],
             'enabled': 'enabled' in form_data
         }
         
+        # Add SSH validation timestamp for remote sources
+        if self._is_ssh_source(source):
+            job_config['ssh_validated_at'] = datetime.now().isoformat()
+        
         # Save job
         self.backup_config.add_backup_job(job_name, job_config)
         self.template_service.send_redirect(handler, '/')
+    
+    def validate_ssh_source(self, handler, source):
+        """AJAX endpoint to validate SSH source"""
+        if not source:
+            self.template_service.send_json_response(handler, {
+                'success': False,
+                'message': 'No source provided'
+            })
+            return
+        
+        if not self._is_ssh_source(source):
+            self.template_service.send_json_response(handler, {
+                'success': False,
+                'message': 'Not an SSH source format'
+            })
+            return
+        
+        # Perform validation
+        result = SSHValidator.validate_ssh_source(source)
+        self.template_service.send_json_response(handler, result)
+    
+    def _is_ssh_source(self, source):
+        """Check if source is SSH format (user@host:/path)"""
+        import re
+        return bool(re.match(r'^[^@]+@[^:]+:.+', source))
     
     def delete_backup_job(self, handler, job_name):
         """Move backup job to deleted_jobs section"""

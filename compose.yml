@@ -8,6 +8,8 @@ services:
     volumes:
       # Mount config directory for persistence
       - backup-config:/config
+      # Mount SSH keys (read-only for security)
+      - ~/.ssh:/root/.ssh:ro
       # Mount Docker socket for container backups (optional)
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Mount source directories you want to back up
@@ -21,7 +23,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
   # Development service with live code mounting
   backup-manager-dev:
     build: .
@@ -36,11 +37,12 @@ services:
       - ./templates:/app/templates
       - ./static:/app/static
       - ./config:/config
+      # Mount SSH keys for development
+      - ~/.ssh:/root/.ssh:ro
     environment:
       - CONFIG_PATH=/config/config.yaml
     profiles:
       - dev
-
 volumes:
   backup-config:
     driver: local

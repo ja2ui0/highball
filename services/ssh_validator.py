@@ -2,11 +2,9 @@
 SSH validation service for remote backup sources
 Validates SSH connectivity and permissions before job creation
 """
-
 import subprocess
 import re
 from datetime import datetime
-
 class SSHValidator:
     """Validates SSH connections and remote paths for backup jobs"""
     
@@ -28,8 +26,9 @@ class SSHValidator:
     def validate_ssh_connection(user, hostname, timeout=10):
         """Test SSH connection to remote host"""
         try:
-            # Test basic SSH connectivity
+            # Test basic SSH connectivity with relaxed host key checking
             cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes', 
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
                    f'{user}@{hostname}', 'echo "SSH_OK"']
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -52,6 +51,7 @@ class SSHValidator:
             # Test both read access AND directory listing capability
             # rsync needs to be able to list contents, not just read the path
             cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes',
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
                    f'{user}@{hostname}', 
                    f'test -r "{path}" && ls -1 "{path}" >/dev/null 2>&1 && echo "PATH_OK"']
             
@@ -78,6 +78,7 @@ class SSHValidator:
         """Test if rsync is available on remote host"""
         try:
             cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes',
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
                    f'{user}@{hostname}', 'which rsync']
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)

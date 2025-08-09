@@ -1,13 +1,11 @@
 """
 Logs handler for viewing and streaming log files
 """
-
 import os
 import subprocess
 import time
 import html
 from services.template_service import TemplateService
-
 class LogsHandler:
     """Handles log viewing and streaming"""
     

@@ -19,8 +19,31 @@
             
             <div class="form-group">
                 <label for="source">Source Path:</label>
-                <input type="text" id="source" name="source" required placeholder="/var/lib/docker/volumes/yetiData/_data/...">
-                <small style="color: #888;">Full path to the directory or files you want to backup</small>
+                <input type="text" id="source" name="source" required placeholder="Local: /path/to/files OR Remote: user@hostname:/path/to/files">
+                <div class="help-text">
+                    <strong>Local:</strong> /var/lib/docker/volumes/data/_data/...<br>
+                    <strong>Remote (SSH):</strong> user@hostname:/path/to/files<br>
+                    <strong>Examples:</strong> root@yeti:/mnt/data/photos, backup@server:/home/docs
+                </div>
+            </div>
+            
+            <div class="form-group" id="ssh-options" style="display: none;">
+                <div style="background-color: #3a3a3a; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                    <h4 style="margin-top: 0; color: #4a9eff;">SSH Remote Source Detected</h4>
+                    <p style="margin-bottom: 10px; color: #e0e0e0;">
+                        <strong>Authentication:</strong> Uses SSH keys from your ~/.ssh directory<br>
+                        <strong>Requirements:</strong> Passwordless SSH access to the remote host<br>
+                        <strong>Command format:</strong> <code>rsync -av user@host:/source destination</code>
+                    </p>
+                    <div style="margin-bottom: 10px;">
+                        <button type="button" id="validate-ssh" class="button button-warning">Validate SSH Connection</button>
+                        <span id="validation-status" style="margin-left: 10px;"></span>
+                    </div>
+                    <div id="validation-details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px;"></div>
+                    <div style="background-color: #2d5016; padding: 10px; border-radius: 4px; border-left: 4px solid #52b788;">
+                        <strong>Note:</strong> SSH validation will test connectivity, rsync availability, and path access before allowing job creation.
+                    </div>
+                </div>
             </div>
             
             <div class="form-group">
@@ -29,7 +52,7 @@
 **/*.jpg
 documents/**
 *.pdf"></textarea>
-                <small style="color: #888;">Use rsync patterns. Leave empty to include all files.</small>
+                <div class="help-text">Use rsync patterns. Leave empty to include all files.</div>
             </div>
             
             <div class="form-group">
@@ -39,7 +62,7 @@ documents/**
 *.log
 cache/**
 .git/**"></textarea>
-                <small style="color: #888;">Use rsync patterns to exclude files/directories.</small>
+                <div class="help-text">Use rsync patterns to exclude files/directories.</div>
             </div>
             
             <div class="form-group">
@@ -62,5 +85,74 @@ cache/**
             <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
         </form>
     </div>
+    <script>
+        // Show SSH options when remote source is detected
+        document.getElementById('source').addEventListener('input', function() {
+            const source = this.value;
+            const sshOptions = document.getElementById('ssh-options');
+            
+            // Check if source looks like user@host:/path
+            const isRemoteSource = /^[^@]+@[^:]+:/.test(source);
+            
+            if (isRemoteSource) {
+                sshOptions.style.display = 'block';
+                // Reset validation status when source changes
+                document.getElementById('validation-status').innerHTML = '';
+                document.getElementById('validation-details').style.display = 'none';
+            } else {
+                sshOptions.style.display = 'none';
+            }
+        });
+        
+        // SSH validation
+        document.getElementById('validate-ssh').addEventListener('click', function() {
+            const source = document.getElementById('source').value;
+            const button = this;
+            const status = document.getElementById('validation-status');
+            const details = document.getElementById('validation-details');
+            
+            if (!source) {
+                status.innerHTML = '<span style="color: #dc3545;">Enter a source path first</span>';
+                return;
+            }
+            
+            // Show loading
+            button.disabled = true;
+            button.textContent = 'Validating...';
+            status.innerHTML = '<span style="color: #ffc107;">Testing SSH connection...</span>';
+            details.style.display = 'none';
+            
+            // Make validation request
+            fetch(`/validate-ssh?source=${encodeURIComponent(source)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        status.innerHTML = '<span style="color: #28a745;">[OK] SSH source validated</span>';
+                        if (data.details) {
+                            details.innerHTML = `
+                                <strong>Validation Results:</strong><br>
+                                - ${data.details.ssh_status}<br>
+                                - ${data.details.rsync_status}<br>
+                                - ${data.details.path_status}
+                            `;
+                            details.style.display = 'block';
+                        }
+                    } else {
+                        status.innerHTML = '<span style="color: #dc3545;">X Validation failed</span>';
+                        details.innerHTML = `<strong>Error:</strong><br>${data.message.replace(/\n/g, '<br>')}`;
+                        details.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    status.innerHTML = '<span style="color: #dc3545;">X Validation error</span>';
+                    details.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                    details.style.display = 'block';
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Validate SSH Connection';
+                });
+        });
+    </script>
 </body>
 </html>

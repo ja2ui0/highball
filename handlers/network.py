@@ -2,13 +2,11 @@
 Network scanning handler
 Scans for rsync daemons on the network
 """
-
 import subprocess
 import ipaddress
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from services.template_service import TemplateService
-
 class NetworkHandler:
     """Handles network scanning for rsync services"""
     
