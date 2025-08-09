@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Config Editor - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Configuration Editor</h1>
+        
+        <div class="alert alert-info">
+            <strong>Note:</strong> You can edit the configuration directly here or modify the config.yaml file manually.
+            Changes will take effect immediately.
+        </div>
+        
+        <form method="post" action="/save-config">
+            <div class="form-group">
+                <label for="config_text">Configuration (YAML format):</label>
+                <textarea id="config_text" name="config_text" style="height: 400px; font-family: 'Courier New', monospace;">{{CONFIG_TEXT}}</textarea>
+            </div>
+            
+            <input type="submit" value="Save Configuration" class="button button-success">
+            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+        </form>
+        
+        <h2>Quick Actions</h2>
+        <p>
+            <a href="/reload-config" class="button">Reload from File</a>
+            <a href="/backup-config" class="button button-warning">Download Backup</a>
+        </p>
+    </div>
+</body>
+</html>

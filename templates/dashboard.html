@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Backup Manager Dashboard</h1>
+        
+        <div style="margin-bottom: 20px;">
+            <button id="scanNetwork" class="button button-warning">Scan Network for Rsync Servers</button>
+            <input type="text" id="networkRange" placeholder="192.168.1.0/24" style="margin-left: 10px; width: 150px;">
+            <div id="scanResults" style="margin-top: 10px; display: none;">
+                <h3>Found Rsync Servers:</h3>
+                <div id="scanOutput" class="log-container" style="height: 200px;"></div>
+            </div>
+        </div>
+        
+        <h2>Backup Jobs</h2>
+        <table class="job-table">
+            <tr>
+                <th>Job Name</th>
+                <th>Source Path</th>
+                <th>Status</th>
+                <th>Schedule</th>
+                <th>History</th>
+                <th>Actions</th>
+            </tr>
+            {{JOB_ROWS}}
+        </table>
+        
+        <p style="margin-top: 20px;">
+            <a href="/add-job" class="button button-success">Add New Backup Job</a>
+        </p>
+        
+        <h2>Deleted Jobs</h2>
+        <table class="deleted-table">
+            <tr>
+                <th>Job Name</th>
+                <th>Source Path</th>
+                <th>Status</th>
+                <th>Deleted At</th>
+                <th>Actions</th>
+            </tr>
+            {{DELETED_ROWS}}
+        </table>
+        
+        <p style="margin-top: 10px; color: #888; font-size: 14px;">
+            <strong>Note:</strong> Deleted jobs are moved here and can be restored. Use "Purge" to permanently delete.
+        </p>
+    </div>
+
+    <script>
+        document.getElementById('scanNetwork').addEventListener('click', function() {
+            const button = this;
+            const networkRange = document.getElementById('networkRange').value || '192.168.1.0/24';
+            const resultsDiv = document.getElementById('scanResults');
+            const outputDiv = document.getElementById('scanOutput');
+            
+            // Disable button and show loading
+            button.disabled = true;
+            button.textContent = 'Scanning...';
+            resultsDiv.style.display = 'block';
+            outputDiv.textContent = 'Scanning network for rsync daemons...\n';
+            
+            // Start scan
+            fetch(`/scan-network?range=${encodeURIComponent(networkRange)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        outputDiv.textContent = `Error: ${data.error}`;
+                    } else {
+                        let output = `Scanned ${data.total_checked} addresses in ${data.network_range}\n`;
+                        output += `Found ${data.found_servers} rsync servers:\n\n`;
+                        
+                        if (data.servers.length > 0) {
+                            data.servers.forEach(server => {
+                                output += `Server: ${server.ip}\n`;
+                                server.modules.forEach(module => {
+                                    output += `  ${module.path}`;
+                                    if (module.description) {
+                                        output += ` - ${module.description}`;
+                                    }
+                                    output += '\n';
+                                });
+                                output += '\n';
+                            });
+                        } else {
+                            output += 'No rsync servers found.\n';
+                        }
+                        
+                        outputDiv.textContent = output;
+                    }
+                })
+                .catch(error => {
+                    outputDiv.textContent = `Error: ${error.message}`;
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Scan Network for Rsync Servers';
+                });
+        });
+    </script>
+</body>
+</html>

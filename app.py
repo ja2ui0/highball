@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Backup Manager Web Interface
+Clean, modular architecture
+"""
+
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+# Import our handlers
+from handlers.dashboard import DashboardHandler
+from handlers.config_handler import ConfigHandler
+from handlers.logs import LogsHandler
+from handlers.network import NetworkHandler
+from handlers.backup import BackupHandler
+from services.template_service import TemplateService
+from config import BackupConfig
+
+class BackupWebHandler(BaseHTTPRequestHandler):
+    """Main request router - delegates to specific handlers"""
+    
+    # Class-level services (shared across requests)
+    _backup_config = None
+    _template_service = None
+    _handlers = None
+    
+    @classmethod
+    def _initialize_services(cls):
+        """Initialize services once at startup"""
+        if cls._backup_config is None:
+            config_path = os.environ.get('CONFIG_PATH', '/config/config.yaml')
+            cls._backup_config = BackupConfig(config_path)
+            cls._template_service = TemplateService()
+            
+            # Initialize handlers
+            cls._handlers = {
+                'dashboard': DashboardHandler(cls._backup_config, cls._template_service),
+                'config': ConfigHandler(cls._backup_config, cls._template_service),
+                'logs': LogsHandler(cls._template_service),
+                'network': NetworkHandler(),
+                'backup': BackupHandler(cls._backup_config)
+            }
+    
+    def __init__(self, *args, **kwargs):
+        # Initialize services if not already done
+        self._initialize_services()
+        super().__init__(*args, **kwargs)
+    
+    def do_GET(self):
+        """Route GET requests to appropriate handlers"""
+        url_parts = urlparse(self.path)
+        path = url_parts.path
+        params = parse_qs(url_parts.query)
+        
+        try:
+            # Static files
+            if path.startswith('/static/'):
+                self._serve_static_file(path)
+                return
+            
+            # Route to handlers
+            if path in ['/', '/dashboard']:
+                self._handlers['dashboard'].show_dashboard(self)
+            elif path == '/add-job':
+                self._handlers['dashboard'].show_add_job_form(self)
+            elif path == '/edit-job':
+                job_name = params.get('name', [''])[0]
+                self._handlers['dashboard'].show_edit_job_form(self, job_name)
+            elif path == '/config':
+                self._handlers['config'].show_config_editor(self)
+            elif path == '/logs':
+                log_type = params.get('type', ['app'])[0]
+                self._handlers['logs'].show_logs(self, log_type)
+            elif path == '/logs/stream':
+                log_type = params.get('type', ['app'])[0]
+                self._handlers['logs'].stream_logs(self, log_type)
+            elif path == '/scan-network':
+                network_range = params.get('range', ['192.168.1.0/24'])[0]
+                self._handlers['network'].scan_network_for_rsyncd(self, network_range)
+            else:
+                self._send_404()
+        except Exception as e:
+            self._send_error_response(f"Server error: {str(e)}")
+    
+    def do_POST(self):
+        """Route POST requests to appropriate handlers"""
+        url_parts = urlparse(self.path)
+        path = url_parts.path
+        
+        # Read form data
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            form_data = parse_qs(post_data)
+        except Exception as e:
+            self._send_error_response(f"Invalid form data: {str(e)}")
+            return
+        
+        try:
+            # Route to handlers
+            if path == '/save-job':
+                self._handlers['dashboard'].save_backup_job(self, form_data)
+            elif path == '/delete-job':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['dashboard'].delete_backup_job(self, job_name)
+            elif path == '/restore-job':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['dashboard'].restore_backup_job(self, job_name)
+            elif path == '/purge-job':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['dashboard'].purge_backup_job(self, job_name)
+            elif path == '/run-backup':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
+            elif path == '/dry-run-backup':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
+            elif path == '/save-config':
+                self._handlers['config'].save_config_from_form(self, form_data)
+            else:
+                self._send_404()
+        except Exception as e:
+            self._send_error_response(f"Server error: {str(e)}")
+    
+    def _serve_static_file(self, path):
+        """Serve CSS/JS files"""
+        file_path = path[1:]  # Remove leading /
+        
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            # Set content type
+            if path.endswith('.css'):
+                content_type = 'text/css'
+            elif path.endswith('.js'):
+                content_type = 'application/javascript'
+            else:
+                content_type = 'text/plain'
+            
+            self.send_response(200)
+            self.send_header('Content-type', content_type)
+            self.end_headers()
+            self.wfile.write(content)
+        else:
+            self._send_404()
+    
+    def _send_404(self):
+        """Send 404 error"""
+        self.send_response(404)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b'<html><body><h1>404 Not Found</h1></body></html>')
+    
+    def _send_error_response(self, message):
+        """Send error page"""
+        import html
+        html_content = f"""
+        <html>
+        <head><title>Error</title></head>
+        <body>
+            <h1>Server Error</h1>
+            <p>{html.escape(message)}</p>
+            <a href="/">Back to Dashboard</a>
+        </body>
+        </html>
+        """
+        self.send_response(500)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(html_content.encode())
+
+def main():
+    """Start the web server"""
+    port = int(os.environ.get('PORT', 8080))
+    server = HTTPServer(('0.0.0.0', port), BackupWebHandler)
+    print(f"Backup Manager starting on 0.0.0.0:{port}")
+    print("Press Ctrl+C to stop")
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        server.server_close()
+
+if __name__ == '__main__':
+    main()

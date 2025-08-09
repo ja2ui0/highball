@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Backup Job - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Edit Backup Job: {{JOB_NAME}}</h1>
+        
+        <form method="post" action="/save-job">
+            <input type="hidden" name="job_name" value="{{JOB_NAME}}">
+            
+            <div class="form-group">
+                <label for="source">Source Path:</label>
+                <input type="text" id="source" name="source" required value="{{SOURCE}}">
+                <small style="color: #888;">Full path to the directory or files you want to backup</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="includes">Include Patterns (one per line):</label>
+                <textarea id="includes" name="includes" placeholder="Leave empty to include everything, or specify patterns like:
+**/*.jpg
+documents/**
+*.pdf">{{INCLUDES}}</textarea>
+                <small style="color: #888;">Use rsync patterns. Leave empty to include all files.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="excludes">Exclude Patterns (one per line):</label>
+                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude:
+*.tmp
+*.log
+cache/**
+.git/**">{{EXCLUDES}}</textarea>
+                <small style="color: #888;">Use rsync patterns to exclude files/directories.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="schedule">Schedule:</label>
+                <select id="schedule" name="schedule">
+                    <option value="manual">Manual Only</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+                <script>
+                    // Set selected option
+                    document.getElementById('schedule').value = '{{SCHEDULE}}';
+                </script>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="enabled" value="true" {{ENABLED_CHECKED}}> Enabled
+                </label>
+            </div>
+            
+            <input type="submit" value="Update Backup Job" class="button button-success">
+            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+        </form>
+        
+        <form method="post" action="/delete-job" style="margin-top: 20px;" onsubmit="return confirm('Are you sure you want to delete this backup job?')">
+            <input type="hidden" name="job_name" value="{{JOB_NAME}}">
+            <input type="submit" value="Delete Job" class="button button-danger">
+        </form>
+    </div>
+</body>
+</html>
