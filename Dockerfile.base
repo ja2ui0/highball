@@ -1,24 +1,19 @@
 FROM python:3.11-slim
-
 # Install all system dependencies (this is the slow part)
 RUN apt-get update && apt-get install -y \
     nginx \
     rsync \
+    openssh-client \
     time \
     curl \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
-
 # Install Python packages
 RUN pip install PyYAML
-
 # Create directories
 RUN mkdir -p /app /config
-
-# Create non-root user
+# Create non-root user (kept for potential future use)
 RUN useradd -r -s /bin/false backupuser
-
 # Set up nginx and supervisor log directories
 RUN chown -R www-data:www-data /var/log/nginx /var/lib/nginx
-
 # This base image is ready for our app

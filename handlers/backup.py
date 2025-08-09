@@ -2,11 +2,9 @@
 Backup execution handler
 Handles running backup jobs (dry-run and real)
 """
-
 import subprocess
 from datetime import datetime
 from services.template_service import TemplateService
-
 class BackupHandler:
     """Handles backup job execution"""
     
@@ -129,16 +127,12 @@ Backup Job: {job_name} ({mode_text})
 Time: {timestamp}
 Triggered by: {source}
 ========================================
-
 COMMAND EXECUTED:
 {' '.join(rsync_cmd)}
-
 SOURCE: {job_config['source']}
 DESTINATION: {job_config['source']} -> {job_name}
-
 INCLUDES: {job_config.get('includes', [])}
 EXCLUDES: {job_config.get('excludes', [])}
-
 ========================================
 {mode_text} OUTPUT:
 """

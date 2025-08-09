@@ -3,11 +3,9 @@
 Backup Manager Web Interface
 Clean, modular architecture
 """
-
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-
 # Import our handlers
 from handlers.dashboard import DashboardHandler
 from handlers.config_handler import ConfigHandler
@@ -16,7 +14,6 @@ from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
 from services.template_service import TemplateService
 from config import BackupConfig
-
 class BackupWebHandler(BaseHTTPRequestHandler):
     """Main request router - delegates to specific handlers"""
     
@@ -78,6 +75,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/scan-network':
                 network_range = params.get('range', ['192.168.1.0/24'])[0]
                 self._handlers['network'].scan_network_for_rsyncd(self, network_range)
+            elif path == '/validate-ssh':
+                source = params.get('source', [''])[0]
+                self._handlers['dashboard'].validate_ssh_source(self, source)
             else:
                 self._send_404()
         except Exception as e:
@@ -170,7 +170,6 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(html_content.encode())
-
 def main():
     """Start the web server"""
     port = int(os.environ.get('PORT', 8080))
@@ -183,6 +182,5 @@ def main():
     except KeyboardInterrupt:
         print("\nShutting down...")
         server.server_close()
-
 if __name__ == '__main__':
     main()

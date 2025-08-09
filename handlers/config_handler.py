@@ -1,10 +1,8 @@
 """
 Configuration handler for editing backup settings
 """
-
 import yaml
 from services.template_service import TemplateService
-
 class ConfigHandler:
     """Handles configuration editing"""
     
