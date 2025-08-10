@@ -2,8 +2,6 @@
 
 Multi-host backup orchestrator for rsync, rclone, restic, and more — all from one dashboard.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](#requirements)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED)](#quick-start-with-docker)
 [![Status](https://img.shields.io/badge/Status-Alpha-orange)](#roadmap)
 
