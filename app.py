@@ -4,58 +4,98 @@ Backup Manager Web Interface
 Clean, modular architecture
 """
 import os
+import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-# Import our handlers
+
+# Handlers
 from handlers.dashboard import DashboardHandler
 from handlers.config_handler import ConfigHandler
 from handlers.logs import LogsHandler
 from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
+from handlers.job_scheduler import JobSchedulerHandler
+
+# Services
 from services.template_service import TemplateService
+from services.scheduler_service import SchedulerService
+# NOTE: we import bootstrap_schedules lazily inside _initialize_services()
+# so a scheduler import error won't take down the whole UI.
+
 from config import BackupConfig
+
+
 class BackupWebHandler(BaseHTTPRequestHandler):
     """Main request router - delegates to specific handlers"""
-    
+
     # Class-level services (shared across requests)
     _backup_config = None
     _template_service = None
+    _scheduler_service = None
     _handlers = None
-    
+
     @classmethod
     def _initialize_services(cls):
-        """Initialize services once at startup"""
-        if cls._backup_config is None:
-            config_path = os.environ.get('CONFIG_PATH', '/config/config.yaml')
-            cls._backup_config = BackupConfig(config_path)
-            cls._template_service = TemplateService()
-            
-            # Initialize handlers
+        """Initialize services once at startup (idempotent & resilient)."""
+        needs_init = (
+            cls._backup_config is None
+            or cls._template_service is None
+            or cls._scheduler_service is None
+            or cls._handlers is None
+        )
+        if not needs_init:
+            return
+
+        # Core services
+        config_path = os.environ.get('CONFIG_PATH', '/config/config.yaml')
+        cls._backup_config = cls._backup_config or BackupConfig(config_path)
+        cls._template_service = cls._template_service or TemplateService()
+        if cls._scheduler_service is None:
+            cls._scheduler_service = SchedulerService()
+
+        # Register schedules (do not bring down UI if this fails)
+        try:
+            from services.schedule_loader import bootstrap_schedules
+            count = bootstrap_schedules(cls._backup_config, cls._scheduler_service)
+            print(f"Scheduled {count} backup job(s) from config.")
+        except Exception as e:
+            print(f"[SCHEDULER] disabled at startup: {e}")
+
+        # Build handler map last; if this throws, leave _handlers=None so we retry next request
+        try:
             cls._handlers = {
-                'dashboard': DashboardHandler(cls._backup_config, cls._template_service),
+                'dashboard': DashboardHandler(
+                    cls._backup_config,
+                    cls._template_service,
+                    cls._scheduler_service
+                ),
                 'config': ConfigHandler(cls._backup_config, cls._template_service),
                 'logs': LogsHandler(cls._template_service),
                 'network': NetworkHandler(),
-                'backup': BackupHandler(cls._backup_config)
+                'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
+                'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
             }
-    
+        except Exception:
+            cls._handlers = None
+            raise
+
     def __init__(self, *args, **kwargs):
         # Initialize services if not already done
         self._initialize_services()
         super().__init__(*args, **kwargs)
-    
+
     def do_GET(self):
         """Route GET requests to appropriate handlers"""
         url_parts = urlparse(self.path)
         path = url_parts.path
         params = parse_qs(url_parts.query)
-        
+
         try:
             # Static files
             if path.startswith('/static/'):
                 self._serve_static_file(path)
                 return
-            
+
             # Route to handlers
             if path in ['/', '/dashboard']:
                 self._handlers['dashboard'].show_dashboard(self)
@@ -82,25 +122,29 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 hostname = params.get('hostname', [''])[0]
                 share = params.get('share', [''])[0]
                 self._handlers['dashboard'].validate_rsyncd_destination(self, hostname, share)
+            elif path == '/jobs':
+                self._handlers['job_scheduler'].list_jobs(self)
             else:
                 self._send_404()
         except Exception as e:
+            traceback.print_exc()
             self._send_error_response(f"Server error: {str(e)}")
-    
+
     def do_POST(self):
         """Route POST requests to appropriate handlers"""
         url_parts = urlparse(self.path)
         path = url_parts.path
-        
+
         # Read form data
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             form_data = parse_qs(post_data)
         except Exception as e:
+            traceback.print_exc()
             self._send_error_response(f"Invalid form data: {str(e)}")
             return
-        
+
         try:
             # Route to handlers
             if path == '/save-job':
@@ -116,7 +160,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['dashboard'].purge_backup_job(self, job_name)
             elif path == '/run-backup':
                 job_name = form_data.get('job_name', [''])[0]
-                self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
+                # Real run
+                self._handlers['backup'].run_backup_job(self, job_name, dry_run=False)
             elif path == '/dry-run-backup':
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
@@ -124,19 +169,22 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['config'].save_config_from_form(self, form_data)
             elif path == '/dismiss-warning':
                 self._handlers['dashboard'].dismiss_config_warning(self)
+            elif path == '/schedule-job':
+                self._handlers['job_scheduler'].schedule_job(self, form_data)
             else:
                 self._send_404()
         except Exception as e:
+            traceback.print_exc()
             self._send_error_response(f"Server error: {str(e)}")
-    
+
     def _serve_static_file(self, path):
         """Serve CSS/JS files"""
         file_path = path[1:]  # Remove leading /
-        
+
         if os.path.exists(file_path):
             with open(file_path, 'rb') as f:
                 content = f.read()
-            
+
             # Set content type
             if path.endswith('.css'):
                 content_type = 'text/css'
@@ -144,21 +192,21 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 content_type = 'application/javascript'
             else:
                 content_type = 'text/plain'
-            
+
             self.send_response(200)
             self.send_header('Content-type', content_type)
             self.end_headers()
             self.wfile.write(content)
         else:
             self._send_404()
-    
+
     def _send_404(self):
         """Send 404 error"""
         self.send_response(404)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(b'<html><body><h1>404 Not Found</h1></body></html>')
-    
+
     def _send_error_response(self, message):
         """Send error page"""
         import html
@@ -176,17 +224,22 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(html_content.encode())
+
+
 def main():
     """Start the web server"""
     port = int(os.environ.get('PORT', 8080))
     server = HTTPServer(('0.0.0.0', port), BackupWebHandler)
     print(f"Backup Manager starting on 0.0.0.0:{port}")
     print("Press Ctrl+C to stop")
-    
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down...")
         server.server_close()
+
+
 if __name__ == '__main__':
     main()
+

@@ -1,0 +1,426 @@
+
+__init__.py
+
+# Services package
+
+README.md
+
+# services/
+
+Holds reusable logic with no web assumptions.
+
+- `ssh_validator.py`: check reachability, auth, rsync/ssh binaries.
+- `template_service.py`: shared template helpers.
+
+Future
+- `rclone_runner.py`
+- `restic_runner.py`
+- `rsync_runner.py`
+
+Rules
+- Pure functions where possible.
+- No flask/request objects here.
+- Return structured results (dicts with `ok`, `msg`, `data`).
+
+
+schedule_loader.py
+
+# services/schedule_loader.py
+"""
+Reads job schedules from config/config.yaml and registers them with SchedulerService.
+Supports: manual | hourly | daily | weekly | full crontab strings ("m h dom mon dow").
+"""
+
+from handlers.backup import BackupHandler
+
+SHORTHANDS = {
+    "hourly": "0 * * * *",
+    "daily": "0 3 * * *",     # sane default (3am)
+    "weekly": "0 3 * * 0",    # 3am Sundays
+}
+
+def _resolve_cron_string(s: str) -> str | None:
+    s = (s or "").strip().lower()
+    if not s or s == "manual":
+        return None
+    if s in SHORTHANDS:
+        return SHORTHANDS[s]
+    # crude check: treat anything with spaces like a crontab expr
+    if " " in s:
+        return s
+    return None
+
+def bootstrap_schedules(backup_config, scheduler_service) -> int:
+    """
+    Registers all enabled jobs that have a non-manual schedule.
+    Returns the number of jobs scheduled.
+    """
+    jobs = backup_config.config.get("backup_jobs", {}) or {}
+    g = backup_config.config.get("global_settings", {}) or {}
+    tz = g.get("scheduler_timezone", "UTC")
+    default_dry = bool(g.get("default_dry_run_on_schedule", True))
+
+    backup_handler = BackupHandler(backup_config)
+
+    scheduled = 0
+    for name, conf in jobs.items():
+        if not conf.get("enabled", False):
+            continue
+
+        cron_str = _resolve_cron_string(conf.get("schedule", "manual"))
+        if not cron_str:
+            continue
+
+        # per-job override; default to global default
+        dry = bool(conf.get("dry_run_on_schedule", default_dry))
+
+        # Register: run via the same path as UI, but headless (no HTTP handler)
+        # Use a stable job id so we could update/replace later if needed
+        job_id = f"backup:{name}"
+
+        def _run(job_name=name, dry_run=dry):
+            # source label tells your logs this was a scheduler trigger
+            backup_handler.run_backup_job(handler=None, job_name=job_name, dry_run=dry_run, source="schedule")
+
+        # Use crontab string directly
+        scheduler_service.add_crontab_job(
+            func=_run,
+            job_id=job_id,
+            crontab=cron_str,
+            timezone=tz,
+        )
+        scheduled += 1
+
+    return scheduled
+
+
+scheduler_service.py
+
+# services/scheduler_service.py
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import logging
+import atexit
+
+logger = logging.getLogger(__name__)
+
+class SchedulerService:
+    def __init__(self):
+        self.scheduler = BackgroundScheduler()
+        self.scheduler.start()
+        logger.info("SchedulerService started")
+        atexit.register(lambda: self.shutdown())
+
+    def add_cron_job(self, func, job_id, cron_expr, args=None, kwargs=None):
+        """Add or replace a job with explicit CronTrigger kwargs (minute, hour, etc.)."""
+        self.remove_job(job_id)
+        self.scheduler.add_job(
+            func,
+            CronTrigger(**cron_expr),
+            id=job_id,
+            args=args or [],
+            kwargs=kwargs or {},
+            replace_existing=True
+        )
+        logger.info(f"Added cron job {job_id} with schedule {cron_expr}")
+
+    def add_crontab_job(self, func, job_id, crontab: str, timezone: str | None = None, args=None, kwargs=None):
+        """Add or replace a job using a crontab string like '30 3 * * 1,3,5'."""
+        self.remove_job(job_id)
+        trigger = CronTrigger.from_crontab(crontab, timezone=timezone)
+        self.scheduler.add_job(
+            func,
+            trigger,
+            id=job_id,
+            args=args or [],
+            kwargs=kwargs or {},
+            replace_existing=True
+        )
+        logger.info(f"Added crontab job {job_id}: '{crontab}' tz={timezone or 'scheduler default'}")
+
+    def add_interval_job(self, func, job_id, seconds, args=None, kwargs=None):
+        """Add or replace a job on a fixed interval in seconds."""
+        self.remove_job(job_id)
+        self.scheduler.add_job(
+            func,
+            'interval',
+            seconds=seconds,
+            id=job_id,
+            args=args or [],
+            kwargs=kwargs or {},
+            replace_existing=True
+        )
+        logger.info(f"Added interval job {job_id} every {seconds} seconds")
+
+    def remove_job(self, job_id):
+        """Remove a job if it exists."""
+        try:
+            self.scheduler.remove_job(job_id)
+            logger.info(f"Removed job {job_id}")
+        except Exception:
+            pass  # No job to remove
+
+    def shutdown(self):
+        """Stop the scheduler."""
+        if self.scheduler.running:
+            self.scheduler.shutdown(wait=False)
+            logger.info("SchedulerService stopped")
+
+
+ssh_validator.py
+
+"""
+SSH validation service for remote backup sources
+Validates SSH connectivity and permissions before job creation
+"""
+import subprocess
+import re
+from datetime import datetime
+class SSHValidator:
+    """Validates SSH connections and remote paths for backup jobs"""
+    
+    @staticmethod
+    def parse_ssh_source(source):
+        """Parse SSH source into components"""
+        # Match pattern: user@hostname:/path
+        match = re.match(r'^([^@]+)@([^:]+):(.+)$', source)
+        if not match:
+            return None
+        
+        return {
+            'user': match.group(1),
+            'hostname': match.group(2), 
+            'path': match.group(3)
+        }
+    
+    @staticmethod
+    def validate_ssh_connection(user, hostname, timeout=10):
+        """Test SSH connection to remote host"""
+        try:
+            # Test basic SSH connectivity with relaxed host key checking
+            cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes', 
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                   f'{user}@{hostname}', 'echo "SSH_OK"']
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            
+            if result.returncode == 0 and 'SSH_OK' in result.stdout:
+                return {'success': True, 'message': 'SSH connection successful'}
+            else:
+                error_msg = result.stderr.strip() or 'Connection failed'
+                return {'success': False, 'message': f'SSH connection failed: {error_msg}'}
+                
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'message': 'SSH connection timed out'}
+        except Exception as e:
+            return {'success': False, 'message': f'SSH test error: {str(e)}'}
+    
+    @staticmethod
+    def validate_remote_path(user, hostname, path, timeout=10):
+        """Test if remote path exists and is accessible for rsync operations"""
+        try:
+            # Test both read access AND directory listing capability
+            # rsync needs to be able to list contents, not just read the path
+            cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes',
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                   f'{user}@{hostname}', 
+                   f'test -r "{path}" && ls -1 "{path}" >/dev/null 2>&1 && echo "PATH_OK"']
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            
+            if result.returncode == 0 and 'PATH_OK' in result.stdout:
+                return {'success': True, 'message': f'Remote path {path} is accessible and listable'}
+            else:
+                # More specific error messages
+                if 'Permission denied' in result.stderr:
+                    return {'success': False, 'message': f'Permission denied accessing {path}'}
+                elif 'No such file or directory' in result.stderr:
+                    return {'success': False, 'message': f'Remote path {path} does not exist'}
+                else:
+                    return {'success': False, 'message': f'Remote path {path} not accessible for backup operations'}
+                
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'message': 'Remote path test timed out'}
+        except Exception as e:
+            return {'success': False, 'message': f'Path test error: {str(e)}'}
+    
+    @staticmethod
+    def validate_rsync_capability(user, hostname, timeout=10):
+        """Test if rsync is available on remote host"""
+        try:
+            cmd = ['ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes',
+                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                   f'{user}@{hostname}', 'which rsync']
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            
+            if result.returncode == 0:
+                rsync_path = result.stdout.strip()
+                return {'success': True, 'message': f'rsync available at {rsync_path}'}
+            else:
+                return {'success': False, 'message': 'rsync not found on remote host'}
+                
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'message': 'rsync test timed out'}
+        except Exception as e:
+            return {'success': False, 'message': f'rsync test error: {str(e)}'}
+    
+    @classmethod
+    def validate_ssh_source(cls, source):
+        """Complete validation of SSH source"""
+        # Parse source
+        parsed = cls.parse_ssh_source(source)
+        if not parsed:
+            return {
+                'success': False,
+                'message': 'Invalid SSH source format. Use: user@hostname:/path'
+            }
+        
+        user = parsed['user']
+        hostname = parsed['hostname']
+        path = parsed['path']
+        
+        # Test SSH connection
+        ssh_result = cls.validate_ssh_connection(user, hostname)
+        if not ssh_result['success']:
+            return {
+                'success': False,
+                'message': f'SSH Connection Failed: {ssh_result["message"]}',
+                'details': {
+                    'step': 'ssh_connection',
+                    'user': user,
+                    'hostname': hostname
+                }
+            }
+        
+        # Test rsync availability
+        rsync_result = cls.validate_rsync_capability(user, hostname)
+        if not rsync_result['success']:
+            return {
+                'success': False,
+                'message': f'rsync Unavailable: {rsync_result["message"]}',
+                'details': {
+                    'step': 'rsync_check',
+                    'user': user,
+                    'hostname': hostname
+                }
+            }
+        
+        # Test path accessibility
+        path_result = cls.validate_remote_path(user, hostname, path)
+        if not path_result['success']:
+            return {
+                'success': False,
+                'message': f'Path Access Failed: {path_result["message"]}',
+                'details': {
+                    'step': 'path_validation',
+                    'user': user,
+                    'hostname': hostname,
+                    'path': path
+                }
+            }
+        
+        # All tests passed
+        return {
+            'success': True,
+            'message': f'SSH source validated successfully: {user}@{hostname}:{path}',
+            'details': {
+                'user': user,
+                'hostname': hostname,
+                'path': path,
+                'ssh_status': ssh_result['message'],
+                'rsync_status': rsync_result['message'],
+                'path_status': path_result['message']
+            }
+        }
+
+template_service.py
+
+"""
+Template rendering service
+Handles loading and rendering HTML templates
+"""
+import os
+import html
+class TemplateService:
+    """Service for loading and rendering HTML templates"""
+    
+    def load_template(self, template_name):
+        """Load HTML template from templates directory"""
+        template_path = f"templates/{template_name}"
+        if os.path.exists(template_path):
+            with open(template_path, 'r') as f:
+                return f.read()
+        else:
+            return self._error_template(template_name, template_path)
+    
+    def render_template(self, template_name, **kwargs):
+        """Load template and replace placeholders with values"""
+        template = self.load_template(template_name)
+        
+        # Replace all placeholders
+        for key, value in kwargs.items():
+            placeholder = f"{{{{{key.upper()}}}}}"
+            template = template.replace(placeholder, str(value))
+        
+        return template
+    
+    def _error_template(self, template_name, template_path):
+        """Return error template when template not found"""
+        available_templates = "Unknown"
+        if os.path.exists('templates/'):
+            available_templates = str(os.listdir('templates/'))
+        
+        return f"""
+        <html>
+        <head><title>Template Error</title></head>
+        <body>
+            <h1>Template Error</h1>
+            <p>Template {template_name} not found at {template_path}</p>
+            <p>Available templates: {available_templates}</p>
+            <a href="/">Back to Dashboard</a>
+        </body>
+        </html>
+        """
+    
+    @staticmethod
+    def send_html_response(handler, html_content):
+        """Send HTML response through request handler"""
+        handler.send_response(200)
+        handler.send_header('Content-type', 'text/html')
+        handler.end_headers()
+        handler.wfile.write(html_content.encode())
+    
+    @staticmethod
+    def send_redirect(handler, location):
+        """Send redirect response"""
+        handler.send_response(302)
+        handler.send_header('Location', location)
+        handler.end_headers()
+    
+    @staticmethod
+    def send_json_response(handler, data):
+        """Send JSON response"""
+        import json
+        handler.send_response(200)
+        handler.send_header('Content-type', 'application/json')
+        handler.end_headers()
+        handler.wfile.write(json.dumps(data).encode())
+    
+    @staticmethod
+    def send_error_response(handler, message, status_code=400):
+        """Send error response"""
+        html_content = f"""
+        <html>
+        <head><title>Error</title></head>
+        <body>
+            <h1>Error</h1>
+            <p>{html.escape(message)}</p>
+            <a href="/">Back to Dashboard</a>
+        </body>
+        </html>
+        """
+        handler.send_response(status_code)
+        handler.send_header('Content-type', 'text/html')
+        handler.end_headers()
+        handler.wfile.write(html_content.encode())

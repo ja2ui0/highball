@@ -1,0 +1,545 @@
+
+add_job.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Backup Job - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+    <script src="/static/add-job.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Add New Backup Job</h1>
+        
+        <form method="post" action="/save-job">
+            <div class="form-group">
+                <label for="job_name">Job Name:</label>
+                <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos">
+            </div>
+            
+            <div class="form-group">
+                <label for="source_type">Source Type:</label>
+                <select id="source_type" name="source_type" required onchange="showSourceFields()">
+                    <option value="">Select source...</option>
+                    <option value="local">Local Path</option>
+                    <option value="ssh">SSH Remote</option>
+                </select>
+            </div>
+            
+            <div id="source_local" style="display:none">
+                <label for="source_local_path">Local Path:</label>
+                <input type="text" name="source_local_path" placeholder="/var/lib/docker/volumes/data">
+            </div>
+            
+            <div id="source_ssh" style="display:none">
+                <label for="source_ssh_hostname">Hostname:</label>
+                <input type="text" name="source_ssh_hostname" placeholder="server">
+                
+                <label for="source_ssh_username">Username:</label>
+                <input type="text" name="source_ssh_username" placeholder="root">
+                
+                <label for="source_ssh_path">Path:</label>
+                <input type="text" name="source_ssh_path" placeholder="/mnt/data">
+                
+                <div class="help-text">
+                    <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
+                    <span id="source_validation_status"></span>
+                    <div id="source_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="dest_type">Destination Type:</label>
+                <select id="dest_type" name="dest_type" required onchange="showDestFields()">
+                    <option value="">Select destination...</option>
+                    <option value="local">Local Path</option>
+                    <option value="ssh">SSH Remote</option>
+                    <option value="rsyncd">Rsync Daemon</option>
+                </select>
+            </div>
+            
+            <div id="dest_local" style="display:none">
+                <label for="dest_local_path">Local Destination Path (on source system):</label>
+                <input type="text" name="dest_local_path" placeholder="/backups">
+                <div class="help-text" style="background-color: #3a3a3a; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                    <strong>Important:</strong> "Local" means local to the SOURCE system, not this container.<br>
+                    If source is SSH remote, destination will be created on that remote system.<br>
+                    If source is local to this container, destination must be a mounted volume.
+                </div>
+            </div>
+            
+            <div id="dest_ssh" style="display:none">
+                <label for="dest_ssh_hostname">Hostname:</label>
+                <input type="text" name="dest_ssh_hostname" placeholder="backup-server">
+                
+                <label for="dest_ssh_username">Username:</label>
+                <input type="text" name="dest_ssh_username" placeholder="backup">
+                
+                <label for="dest_ssh_path">Path:</label>
+                <input type="text" name="dest_ssh_path" placeholder="/backups">
+                
+                <div class="help-text">
+                    <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
+                    <span id="dest_ssh_validation_status"></span>
+                    <div id="dest_ssh_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                </div>
+            </div>
+            
+            <div id="dest_rsyncd" style="display:none">
+                <label for="dest_rsyncd_hostname">Hostname:</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" name="dest_rsyncd_hostname" placeholder="backup-server" style="flex: 1;">
+                    <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
+                </div>
+                <span id="discover_status"></span>
+                
+                <div id="share_selection" style="display: none; margin-top: 15px;">
+                    <label for="dest_rsyncd_share">Available Shares:</label>
+                    <select name="dest_rsyncd_share" id="dest_rsyncd_share">
+                        <option value="">Select a share...</option>
+                    </select>
+                </div>
+                
+                <div class="help-text">
+                    <div id="rsyncd_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="includes">Include Patterns (optional):</label>
+                <textarea name="includes" placeholder="**/*.jpg
+documents/**"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="excludes">Exclude Patterns (optional):</label>
+                <textarea name="excludes" placeholder="*.tmp
+*.log
+.git/**"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="schedule">Schedule:</label>
+                <select name="schedule">
+                    <option value="manual">Manual Only</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label><input type="checkbox" name="enabled" checked> Enabled</label>
+            </div>
+            
+            <input type="submit" value="Create Job" class="button button-success">
+            <a href="/" class="button">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>
+
+config_editor.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Config Editor - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Configuration Editor</h1>
+        
+        <div class="alert alert-info">
+            <strong>Note:</strong> You can edit the configuration directly here or modify the config.yaml file manually.
+            Changes will take effect immediately.
+        </div>
+        
+        <form method="post" action="/save-config">
+            <div class="form-group">
+                <label for="config_text">Configuration (YAML format):</label>
+                <textarea id="config_text" name="config_text" style="height: 400px; font-family: 'Courier New', monospace;">{{CONFIG_TEXT}}</textarea>
+            </div>
+            
+            <input type="submit" value="Save Configuration" class="button button-success">
+            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+        </form>
+        
+        <h2>Quick Actions</h2>
+        <p>
+            <a href="/reload-config" class="button">Reload from File</a>
+            <a href="/backup-config" class="button button-warning">Download Backup</a>
+        </p>
+    </div>
+</body>
+</html>
+
+dashboard.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Backup Manager Dashboard</h1>
+        
+        {{CONFIG_WARNING}}
+        
+        <div style="margin-bottom: 20px;">
+            <button id="scanNetwork" class="button button-warning">Scan Network for Rsync Servers</button>
+            <input type="text" id="networkRange" placeholder="192.168.1.0/24" style="margin-left: 10px; width: 150px;">
+            <div id="scanResults" style="margin-top: 10px; display: none;">
+                <h3>Found Rsync Servers:</h3>
+                <div id="scanOutput" class="log-container" style="height: 200px;"></div>
+            </div>
+        </div>
+        
+        <h2>Backup Jobs</h2>
+        <table class="job-table">
+            <tr>
+                <th>Job Name</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Status</th>
+                <th>Schedule</th>
+                <th>History</th>
+                <th>Actions</th>
+            </tr>
+            {{JOB_ROWS}}
+        </table>
+        
+        <p style="margin-top: 20px;">
+            <a href="/add-job" class="button button-success">Add New Backup Job</a>
+        </p>
+        
+        <h2>Deleted Jobs</h2>
+        <table class="deleted-table">
+            <tr>
+                <th>Job Name</th>
+                <th>Source Path</th>
+                <th>Status</th>
+                <th>Deleted At</th>
+                <th>Actions</th>
+            </tr>
+            {{DELETED_ROWS}}
+        </table>
+        
+        <p style="margin-top: 10px; color: #888; font-size: 14px;">
+            <strong>Note:</strong> Deleted jobs are moved here and can be restored. Use "Purge" to permanently delete.
+        </p>
+    </div>
+    <script>
+        document.getElementById('scanNetwork').addEventListener('click', function() {
+            const button = this;
+            const networkRange = document.getElementById('networkRange').value || '192.168.1.0/24';
+            const resultsDiv = document.getElementById('scanResults');
+            const outputDiv = document.getElementById('scanOutput');
+            
+            // Disable button and show loading
+            button.disabled = true;
+            button.textContent = 'Scanning...';
+            resultsDiv.style.display = 'block';
+            outputDiv.textContent = 'Scanning network for rsync daemons...\n';
+            
+            // Start scan
+            fetch(`/scan-network?range=${encodeURIComponent(networkRange)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        outputDiv.textContent = `Error: ${data.error}`;
+                    } else {
+                        let output = `Scanned ${data.total_checked} addresses in ${data.network_range}\n`;
+                        output += `Found ${data.found_servers} rsync servers:\n\n`;
+                        
+                        if (data.servers.length > 0) {
+                            data.servers.forEach(server => {
+                                output += `Server: ${server.ip}\n`;
+                                server.modules.forEach(module => {
+                                    output += `  ${module.path}`;
+                                    if (module.description) {
+                                        output += ` - ${module.description}`;
+                                    }
+                                    output += '\n';
+                                });
+                                output += '\n';
+                            });
+                        } else {
+                            output += 'No rsync servers found.\n';
+                        }
+                        
+                        outputDiv.textContent = output;
+                    }
+                })
+                .catch(error => {
+                    outputDiv.textContent = `Error: ${error.message}`;
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Scan Network for Rsync Servers';
+                });
+        });
+    </script>
+</body>
+</html>
+
+edit_job.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Backup Job - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Edit Backup Job: {{JOB_NAME}}</h1>
+        
+        <div class="alert alert-info">
+            <strong>Note:</strong> To change source/destination configuration, delete this job and create a new one with the desired settings.
+        </div>
+        
+        <form method="post" action="/save-job">
+            <input type="hidden" name="job_name" value="{{JOB_NAME}}">
+            <input type="hidden" name="source_type" value="{{SOURCE_TYPE}}">
+            <input type="hidden" name="dest_type" value="{{DEST_TYPE}}">
+            {{HIDDEN_CONFIG_FIELDS}}
+            
+            <div class="form-group">
+                <label>Current Source:</label>
+                <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{SOURCE_DISPLAY}}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Current Destination:</label>
+                <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{DEST_DISPLAY}}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="includes">Include Patterns (one per line):</label>
+                <textarea id="includes" name="includes" placeholder="Leave empty to include everything">{{INCLUDES}}</textarea>
+                <div class="help-text">Use rsync patterns. Leave empty to include all files.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="excludes">Exclude Patterns (one per line):</label>
+                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude">{{EXCLUDES}}</textarea>
+                <div class="help-text">Use rsync patterns to exclude files/directories.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="schedule">Schedule:</label>
+                <select id="schedule" name="schedule">
+                    <option value="manual">Manual Only</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+                <script>
+                    document.getElementById('schedule').value = '{{SCHEDULE}}';
+                </script>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="enabled" value="true" {{ENABLED_CHECKED}}> Enabled
+                </label>
+            </div>
+            
+            <input type="submit" value="Update Backup Job" class="button button-success">
+            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+        </form>
+        
+        <form method="post" action="/delete-job" style="margin-top: 20px;" onsubmit="return confirm('Are you sure you want to delete this backup job?')">
+            <input type="hidden" name="job_name" value="{{JOB_NAME}}">
+            <input type="submit" value="Delete Job" class="button button-danger">
+        </form>
+    </div>
+</body>
+</html>
+
+logs.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logs - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+    <style>
+        .log-viewer {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border-radius: 4px;
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            white-space: pre-wrap;
+        }
+        
+        .log-controls {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #3a3a3a;
+            border-radius: 4px;
+        }
+        
+        .live-indicator {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .live-indicator.disconnected {
+            color: #ff0000;
+        }
+        
+        .auto-scroll {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>System Logs</h1>
+        
+        <div class="log-controls">
+            <h3>Log Sources</h3>
+            {{LOG_BUTTONS}}
+            
+            <div style="margin-top: 15px;">
+                <button id="toggleLive" class="button">Start Live Tail</button>
+                <button id="clearLogs" class="button button-warning">Clear Display</button>
+                <label class="auto-scroll">
+                    <input type="checkbox" id="autoScroll" checked> Auto-scroll to bottom
+                </label>
+                <span id="liveStatus" class="live-indicator">Disconnected</span>
+            </div>
+        </div>
+        
+        <h2>{{LOG_NAME}}</h2>
+        
+        <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let isLive = false;
+        const logContent = document.getElementById('logContent');
+        const toggleButton = document.getElementById('toggleLive');
+        const liveStatus = document.getElementById('liveStatus');
+        const autoScrollCheckbox = document.getElementById('autoScroll');
+        const logType = '{{LOG_TYPE}}';
+        
+        function scrollToBottom() {
+            if (autoScrollCheckbox.checked) {
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+        
+        function startLiveTail() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource(`/logs/stream?type=${logType}`);
+            
+            eventSource.onopen = function() {
+                isLive = true;
+                toggleButton.textContent = 'Stop Live Tail';
+                toggleButton.className = 'button button-danger';
+                liveStatus.textContent = 'Connected';
+                liveStatus.className = 'live-indicator';
+            };
+            
+            eventSource.onmessage = function(event) {
+                logContent.textContent += event.data + '\n';
+                scrollToBottom();
+            };
+            
+            eventSource.onerror = function() {
+                stopLiveTail();
+                liveStatus.textContent = 'Connection Error';
+                liveStatus.className = 'live-indicator disconnected';
+            };
+        }
+        
+        function stopLiveTail() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            isLive = false;
+            toggleButton.textContent = 'Start Live Tail';
+            toggleButton.className = 'button';
+            liveStatus.textContent = 'Disconnected';
+            liveStatus.className = 'live-indicator disconnected';
+        }
+        
+        toggleButton.addEventListener('click', function() {
+            if (isLive) {
+                stopLiveTail();
+            } else {
+                startLiveTail();
+            }
+        });
+        
+        document.getElementById('clearLogs').addEventListener('click', function() {
+            logContent.textContent = '';
+        });
+        
+        // Auto-scroll to bottom on page load
+        scrollToBottom();
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>
+
+README.md
+
+# templates/
+
+Jinja-style pages. Keep logic minimal.
+
+Key pages
+- `dashboard.html`: summary and actions.
+- `add_job.html`, `edit_job.html`: job forms.
+- `job_display.html`: details and run controls (if present).
+- `config_editor.html`: config view/edit.
+- `logs.html`: log list and tail.
+
+Context shape
+- Pass simple dicts from handlers, e.g.:
+  - `jobs`: list of job dicts
+  - `hosts`: list of host dicts
+  - `flash`: list of notices/errors
+

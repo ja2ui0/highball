@@ -12,18 +12,21 @@ from services.template_service import TemplateService
 class BackupHandler:
     """Handles backup job execution"""
 
-    def __init__(self, backup_config):
+    def __init__(self, backup_config, scheduler_service=None):
         self.backup_config = backup_config
+        self.scheduler_service = scheduler_service  # not used here yet, but injected safely
 
     # ---------------------------
-    # Public entry point (async)
+    # Public entry points
     # ---------------------------
     def run_backup_job(self, handler, job_name, dry_run=True, source="manual"):
         """
-        Kick off a backup job in the background and immediately redirect.
+        Kick off a backup job in the background and (if handler is provided) redirect immediately.
+        When handler is None (scheduler/CLI), no HTTP responses are sent.
         """
         if job_name not in self.backup_config.config.get("backup_jobs", {}):
-            TemplateService.send_error_response(handler, f"Job '{job_name}' not found")
+            if handler is not None:
+                TemplateService.send_error_response(handler, f"Job '{job_name}' not found")
             return
 
         job_config = self.backup_config.config["backup_jobs"][job_name]
@@ -46,8 +49,15 @@ class BackupHandler:
         except Exception:
             pass
 
-        # Immediately redirect back to dashboard so the UI never blocks
-        TemplateService.send_redirect(handler, "/")
+        # Only redirect when serving an HTTP request
+        if handler is not None:
+            TemplateService.send_redirect(handler, "/")
+
+    def run_backup_job_headless(self, job_name, dry_run=True, source="scheduler"):
+        """
+        Convenience wrapper for scheduler/CLI use (no HTTP handler).
+        """
+        self.run_backup_job(handler=None, job_name=job_name, dry_run=dry_run, source=source)
 
     # ---------------------------
     # Background worker
@@ -101,7 +111,6 @@ class BackupHandler:
 
         try:
             if timeout is None:
-                # no timeout: call without the timeout kwarg
                 result = subprocess.run(exec_argv, capture_output=True, text=True)
             else:
                 result = subprocess.run(exec_argv, capture_output=True, text=True, timeout=timeout)
@@ -207,29 +216,94 @@ class BackupHandler:
         return exec_argv, log_cmd_str, source_str, dest_str
 
     def _build_source_path(self, job_config):
-        """Build source path from job configuration"""
-        # New structure
-        if "source_type" in job_config:
-            source_config = job_config.get("source_config", {})
-            return source_config.get("source_string", "")
-        # Legacy
-        return job_config.get("source", "")
+        """
+        Build the source path for rsync based on config fields.
+        Accepts:
+          - source_config.user / source_config.host / source_config.path
+          - source_config.username / source_config.hostname / source_config.path
+          - or flat source_string
+        """
+        sc = job_config.get("source_config", {})
+        # Allow either `user` or `username`
+        user = sc.get("user") or sc.get("username")
+        # Allow either `host` or `hostname`
+        host = sc.get("host") or sc.get("hostname")
+        path = sc.get("path")
+
+        if sc.get("source_string"):
+            return sc["source_string"]
+
+        if user and host and path:
+            return f"{user}@{host}:{path}"
+        elif host and path:
+            return f"{host}:{path}"
+        elif path:
+            return path
+        else:
+            raise ValueError("Invalid source_config: missing required fields for source path")
 
     def _build_destination_path(self, job_config, job_name, global_settings):
-        """Build destination path from job configuration"""
-        # New structure
-        if "dest_type" in job_config:
-            dest_type = job_config["dest_type"]
-            dest_config = job_config.get("dest_config", {})
+        """
+        Build destination path from job configuration.
 
-            if dest_type == "local":
-                return dest_config.get("path", f"/backups/{job_name}")
-            elif dest_type == "ssh":
-                return dest_config.get("dest_string", f"backup@localhost:/backups/{job_name}")
-            elif dest_type == "rsyncd":
-                return dest_config.get("dest_string", f"rsync://localhost/{job_name}")
+        Accepts either legacy or new-style keys:
+          - dest_config.dest_string                      (wins if present)
+          - dest_type: local | ssh | rsyncd
+          - dest_config:
+              # local
+              path
+              # ssh
+              user | username, host | hostname, path
+              # rsyncd
+              host | hostname, share
+              # optional knobs
+              protocol: 'rsync' | 'daemon'   (daemon => 'host::share')
+              double_colon: bool             (forces 'host::share' if True)
+        Falls back to global_settings.dest_host using 'host::job_name' for legacy.
+        """
+        dest_type = job_config.get("dest_type")
+        dest_config = job_config.get("dest_config", {}) or {}
 
-        # Legacy: rsync daemon to configured host
+        # Absolute override if provided
+        if dest_config.get("dest_string"):
+            return dest_config["dest_string"]
+
+        # Normalize common fields
+        user = dest_config.get("user") or dest_config.get("username")
+        host = dest_config.get("host") or dest_config.get("hostname")
+        path = dest_config.get("path")
+        share = dest_config.get("share") or job_name
+
+        # Modern types
+        if dest_type == "local":
+            return path or f"/backups/{job_name}"
+
+        if dest_type == "ssh":
+            # default path if none given
+            dest_path = path or f"/backups/{job_name}"
+            if host:
+                return f"{user + '@' if user else ''}{host}:{dest_path}"
+            # no host means treat as local path
+            return dest_path
+
+        if dest_type == "rsyncd":
+            # allow either rsync://host/share or host::share (daemon syntax)
+            use_double_colon = bool(dest_config.get("double_colon"))
+            protocol = (dest_config.get("protocol") or "rsync").lower()
+
+            if host:
+                if use_double_colon or protocol == "daemon":
+                    return f"{host}::{share}"
+                return f"rsync://{host}/{share}"
+
+            # no host provided — fall back to global dest_host if available
+            dest_host = global_settings.get("dest_host")
+            if dest_host:
+                return f"{dest_host}::{share}"
+            # ultimate fallback
+            return f"rsync://localhost/{share}"
+
+        # Legacy fallback when dest_type unspecified
         dest_host = global_settings.get("dest_host", "192.168.1.252")
         return f"{dest_host}::{job_name}"
 

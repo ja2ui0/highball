@@ -7,9 +7,12 @@ RUN apt-get update && apt-get install -y \
     time \
     curl \
     supervisor \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+# Copy Python dependencies first so they're cached unless they change
+COPY requirements.txt .
 # Install Python packages
-RUN pip install PyYAML
+RUN pip install --no-cache-dir -r requirements.txt
 # Create directories
 RUN mkdir -p /app /config
 # Create non-root user (kept for potential future use)
