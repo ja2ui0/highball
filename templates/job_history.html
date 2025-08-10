@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Job History - {{JOB_NAME}} - Backup Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Job History: {{JOB_NAME}}</h1>
+        
+        <div class="form-group">
+            <label>Last Run:</label>
+            <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                {{LAST_RUN}}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Status:</label>
+            <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                {{STATUS}}
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Message:</label>
+            <div style="background-color: #3a3a3a; padding: 12px; border-radius: 4px; font-family: monospace;">
+                {{MESSAGE}}
+            </div>
+        </div>
+        
+        <p>
+            <a href="/" class="button">Back to Dashboard</a>
+            <a href="/logs?type=backup-dry-run" class="button">View Logs</a>
+        </p>
+    </div>
+</body>
+</html>

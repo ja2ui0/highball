@@ -8,6 +8,7 @@ from .job_manager import JobManager
 from .job_form_parser import JobFormParser
 from .job_validator import JobValidator
 from .job_display import JobDisplay
+from services.ssh_validator import SSHValidator
 
 
 class DashboardHandler:
@@ -169,8 +170,33 @@ class DashboardHandler:
             return
 
         # Delegate to validator
-        result = JobValidator.validate_ssh_source(source)
+        result = SSHValidator.validate_ssh_source(source)
         self.template_service.send_json_response(handler, result)
+
+    def show_job_history(self, handler, job_name):
+        """Show job execution history"""
+        if not job_name:
+            self.template_service.send_error_response(handler, "Job name required")
+            return
+
+        job_config = self.job_manager.get_job(job_name)
+        if not job_config:
+            self.template_service.send_error_response(handler, f"Job '{job_name}' not found")
+            return
+
+        logs = self.job_manager.get_job_logs()
+        job_log = logs.get(job_name, {})
+
+        # Render history template
+        html_content = self.template_service.render_template(
+            'job_history.html',
+            job_name=html.escape(job_name),
+            last_run=job_log.get('last_run', 'Never'),
+            status=job_log.get('status', 'No runs'),
+            message=html.escape(job_log.get('message', 'No message'))
+        )
+
+        self.template_service.send_html_response(handler, html_content)
 
     def validate_rsyncd_destination(self, handler, hostname, share):
         """AJAX endpoint to validate rsyncd destination or discover shares"""
@@ -196,4 +222,3 @@ class DashboardHandler:
             result = JobValidator.validate_rsyncd_destination(hostname, share, source_config)
 
         self.template_service.send_json_response(handler, result)
-

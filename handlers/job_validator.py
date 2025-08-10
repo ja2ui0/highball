@@ -44,17 +44,6 @@ class JobValidator:
         }
     
     @staticmethod
-    def validate_ssh_source(source):
-        """Validate SSH source string"""
-        if not JobValidator.is_ssh_source(source):
-            return {
-                'success': False,
-                'message': 'Not an SSH source format'
-            }
-        
-        return SSHValidator.validate_ssh_source(source)
-    
-    @staticmethod
     def validate_rsyncd_destination(hostname, share, source_config=None):
         """Validate rsyncd destination from source perspective"""
         if not hostname or not share:

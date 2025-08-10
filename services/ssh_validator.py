@@ -5,6 +5,7 @@ Validates SSH connectivity and permissions before job creation
 import subprocess
 import re
 from datetime import datetime
+
 class SSHValidator:
     """Validates SSH connections and remote paths for backup jobs"""
     
@@ -94,11 +95,11 @@ class SSHValidator:
         except Exception as e:
             return {'success': False, 'message': f'rsync test error: {str(e)}'}
     
-    @classmethod
-    def validate_ssh_source(cls, source):
+    @staticmethod
+    def validate_ssh_source(source):
         """Complete validation of SSH source"""
         # Parse source
-        parsed = cls.parse_ssh_source(source)
+        parsed = SSHValidator.parse_ssh_source(source)
         if not parsed:
             return {
                 'success': False,
@@ -110,7 +111,7 @@ class SSHValidator:
         path = parsed['path']
         
         # Test SSH connection
-        ssh_result = cls.validate_ssh_connection(user, hostname)
+        ssh_result = SSHValidator.validate_ssh_connection(user, hostname)
         if not ssh_result['success']:
             return {
                 'success': False,
@@ -123,7 +124,7 @@ class SSHValidator:
             }
         
         # Test rsync availability
-        rsync_result = cls.validate_rsync_capability(user, hostname)
+        rsync_result = SSHValidator.validate_rsync_capability(user, hostname)
         if not rsync_result['success']:
             return {
                 'success': False,
@@ -136,7 +137,7 @@ class SSHValidator:
             }
         
         # Test path accessibility
-        path_result = cls.validate_remote_path(user, hostname, path)
+        path_result = SSHValidator.validate_remote_path(user, hostname, path)
         if not path_result['success']:
             return {
                 'success': False,

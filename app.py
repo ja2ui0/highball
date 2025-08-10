@@ -124,6 +124,13 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['dashboard'].validate_rsyncd_destination(self, hostname, share)
             elif path == '/jobs':
                 self._handlers['job_scheduler'].list_jobs(self)
+            elif path == '/history':
+                job_name = params.get('job', [''])[0]
+                self._handlers['dashboard'].show_job_history(self, job_name)
+            elif path == '/reload-config':
+                self._handlers['config'].reload_config(self)
+            elif path == '/backup-config':
+                self._handlers['config'].backup_config(self)
             else:
                 self._send_404()
         except Exception as e:
@@ -242,4 +249,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
