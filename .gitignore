@@ -1,0 +1,119 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+*.hypothesis/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+doc/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# pyproject
+poetry.lock
+
+# VS Code
+.vscode/
+.history/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# AI tool local-only configs
+.aider.conf.local.yml
+.continue/config.local.json
+
+# Ignore common secrets
+*.env
+.env.*
+secrets.*
+
+# --- Docker related ---
+# Local build artifacts and cache
+docker-compose.override.yml
+.docker/
+.dockerignore
+**/tmp/
+**/.tmp/
+**/cache/
+**/.cache/
+*.pid
+
+# Docker named volumes mounted locally
+volumes/
+data/
+logs/
+
+# --- Config directory handling ---
+# Ignore live bind-mounted configs but allow templates
+config/*
+!config/README.md
+!config/config.example.yaml
+

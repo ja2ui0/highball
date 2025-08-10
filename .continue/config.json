@@ -1,0 +1,19 @@
+{
+  "models": [
+    {
+      "title": "Qwen2.5-Coder-32B (LM Studio)",
+      "provider": "openai",
+      "model": "qwen2.5-coder-32b-instruct",
+      "apiBase": "http://127.0.0.1:1234/v1",
+      "apiKey": "dummy"
+    }
+  ],
+  "codebase": {
+    "index": {
+      "embedProvider": "local",
+      "chunkMethod": "symbols",
+      "exclude": [".git/", "__pycache__/", "node_modules/", "*.png", "*.jpg", "*.ico"]
+    }
+  }
+}
+
