@@ -4,6 +4,7 @@
     <title>Add Backup Job - Backup Manager</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/nav.js"></script>
+    <script src="/static/add-job.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,145 +15,126 @@
         <form method="post" action="/save-job">
             <div class="form-group">
                 <label for="job_name">Job Name:</label>
-                <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos, etc.">
+                <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos">
             </div>
             
             <div class="form-group">
-                <label for="source">Source Path:</label>
-                <input type="text" id="source" name="source" required placeholder="Local: /path/to/files OR Remote: user@hostname:/path/to/files">
+                <label for="source_type">Source Type:</label>
+                <select id="source_type" name="source_type" required onchange="showSourceFields()">
+                    <option value="">Select source...</option>
+                    <option value="local">Local Path</option>
+                    <option value="ssh">SSH Remote</option>
+                </select>
+            </div>
+            
+            <div id="source_local" style="display:none">
+                <label for="source_local_path">Local Path:</label>
+                <input type="text" name="source_local_path" placeholder="/var/lib/docker/volumes/data">
+            </div>
+            
+            <div id="source_ssh" style="display:none">
+                <label for="source_ssh_hostname">Hostname:</label>
+                <input type="text" name="source_ssh_hostname" placeholder="server">
+                
+                <label for="source_ssh_username">Username:</label>
+                <input type="text" name="source_ssh_username" placeholder="root">
+                
+                <label for="source_ssh_path">Path:</label>
+                <input type="text" name="source_ssh_path" placeholder="/mnt/data">
+                
                 <div class="help-text">
-                    <strong>Local:</strong> /var/lib/docker/volumes/data/_data/...<br>
-                    <strong>Remote (SSH):</strong> user@hostname:/path/to/files<br>
-                    <strong>Examples:</strong> root@yeti:/mnt/data/photos, backup@server:/home/docs
-                </div>
-            </div>
-            
-            <div class="form-group" id="ssh-options" style="display: none;">
-                <div style="background-color: #3a3a3a; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
-                    <h4 style="margin-top: 0; color: #4a9eff;">SSH Remote Source Detected</h4>
-                    <p style="margin-bottom: 10px; color: #e0e0e0;">
-                        <strong>Authentication:</strong> Uses SSH keys from your ~/.ssh directory<br>
-                        <strong>Requirements:</strong> Passwordless SSH access to the remote host<br>
-                        <strong>Command format:</strong> <code>rsync -av user@host:/source destination</code>
-                    </p>
-                    <div style="margin-bottom: 10px;">
-                        <button type="button" id="validate-ssh" class="button button-warning">Validate SSH Connection</button>
-                        <span id="validation-status" style="margin-left: 10px;"></span>
-                    </div>
-                    <div id="validation-details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px;"></div>
-                    <div style="background-color: #2d5016; padding: 10px; border-radius: 4px; border-left: 4px solid #52b788;">
-                        <strong>Note:</strong> SSH validation will test connectivity, rsync availability, and path access before allowing job creation.
-                    </div>
+                    <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
+                    <span id="source_validation_status"></span>
+                    <div id="source_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
                 </div>
             </div>
             
             <div class="form-group">
-                <label for="includes">Include Patterns (one per line):</label>
-                <textarea id="includes" name="includes" placeholder="Leave empty to include everything, or specify patterns like:
-**/*.jpg
-documents/**
-*.pdf"></textarea>
-                <div class="help-text">Use rsync patterns. Leave empty to include all files.</div>
+                <label for="dest_type">Destination Type:</label>
+                <select id="dest_type" name="dest_type" required onchange="showDestFields()">
+                    <option value="">Select destination...</option>
+                    <option value="local">Local Path</option>
+                    <option value="ssh">SSH Remote</option>
+                    <option value="rsyncd">Rsync Daemon</option>
+                </select>
+            </div>
+            
+            <div id="dest_local" style="display:none">
+                <label for="dest_local_path">Local Destination Path (on source system):</label>
+                <input type="text" name="dest_local_path" placeholder="/backups">
+                <div class="help-text" style="background-color: #3a3a3a; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                    <strong>Important:</strong> "Local" means local to the SOURCE system, not this container.<br>
+                    If source is SSH remote, destination will be created on that remote system.<br>
+                    If source is local to this container, destination must be a mounted volume.
+                </div>
+            </div>
+            
+            <div id="dest_ssh" style="display:none">
+                <label for="dest_ssh_hostname">Hostname:</label>
+                <input type="text" name="dest_ssh_hostname" placeholder="backup-server">
+                
+                <label for="dest_ssh_username">Username:</label>
+                <input type="text" name="dest_ssh_username" placeholder="backup">
+                
+                <label for="dest_ssh_path">Path:</label>
+                <input type="text" name="dest_ssh_path" placeholder="/backups">
+                
+                <div class="help-text">
+                    <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
+                    <span id="dest_ssh_validation_status"></span>
+                    <div id="dest_ssh_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                </div>
+            </div>
+            
+            <div id="dest_rsyncd" style="display:none">
+                <label for="dest_rsyncd_hostname">Hostname:</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" name="dest_rsyncd_hostname" placeholder="backup-server" style="flex: 1;">
+                    <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
+                </div>
+                <span id="discover_status"></span>
+                
+                <div id="share_selection" style="display: none; margin-top: 15px;">
+                    <label for="dest_rsyncd_share">Available Shares:</label>
+                    <select name="dest_rsyncd_share" id="dest_rsyncd_share">
+                        <option value="">Select a share...</option>
+                    </select>
+                </div>
+                
+                <div class="help-text">
+                    <div id="rsyncd_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                </div>
             </div>
             
             <div class="form-group">
-                <label for="excludes">Exclude Patterns (one per line):</label>
-                <textarea id="excludes" name="excludes" placeholder="Patterns to exclude:
-*.tmp
+                <label for="includes">Include Patterns (optional):</label>
+                <textarea name="includes" placeholder="**/*.jpg
+documents/**"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="excludes">Exclude Patterns (optional):</label>
+                <textarea name="excludes" placeholder="*.tmp
 *.log
-cache/**
 .git/**"></textarea>
-                <div class="help-text">Use rsync patterns to exclude files/directories.</div>
             </div>
             
             <div class="form-group">
                 <label for="schedule">Schedule:</label>
-                <select id="schedule" name="schedule">
+                <select name="schedule">
                     <option value="manual">Manual Only</option>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
                 </select>
             </div>
             
             <div class="form-group">
-                <label>
-                    <input type="checkbox" name="enabled" value="true" checked> Enabled
-                </label>
+                <label><input type="checkbox" name="enabled" checked> Enabled</label>
             </div>
             
-            <input type="submit" value="Create Backup Job" class="button button-success">
-            <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
+            <input type="submit" value="Create Job" class="button button-success">
+            <a href="/" class="button">Cancel</a>
         </form>
     </div>
-    <script>
-        // Show SSH options when remote source is detected
-        document.getElementById('source').addEventListener('input', function() {
-            const source = this.value;
-            const sshOptions = document.getElementById('ssh-options');
-            
-            // Check if source looks like user@host:/path
-            const isRemoteSource = /^[^@]+@[^:]+:/.test(source);
-            
-            if (isRemoteSource) {
-                sshOptions.style.display = 'block';
-                // Reset validation status when source changes
-                document.getElementById('validation-status').innerHTML = '';
-                document.getElementById('validation-details').style.display = 'none';
-            } else {
-                sshOptions.style.display = 'none';
-            }
-        });
-        
-        // SSH validation
-        document.getElementById('validate-ssh').addEventListener('click', function() {
-            const source = document.getElementById('source').value;
-            const button = this;
-            const status = document.getElementById('validation-status');
-            const details = document.getElementById('validation-details');
-            
-            if (!source) {
-                status.innerHTML = '<span style="color: #dc3545;">Enter a source path first</span>';
-                return;
-            }
-            
-            // Show loading
-            button.disabled = true;
-            button.textContent = 'Validating...';
-            status.innerHTML = '<span style="color: #ffc107;">Testing SSH connection...</span>';
-            details.style.display = 'none';
-            
-            // Make validation request
-            fetch(`/validate-ssh?source=${encodeURIComponent(source)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        status.innerHTML = '<span style="color: #28a745;">[OK] SSH source validated</span>';
-                        if (data.details) {
-                            details.innerHTML = `
-                                <strong>Validation Results:</strong><br>
-                                - ${data.details.ssh_status}<br>
-                                - ${data.details.rsync_status}<br>
-                                - ${data.details.path_status}
-                            `;
-                            details.style.display = 'block';
-                        }
-                    } else {
-                        status.innerHTML = '<span style="color: #dc3545;">X Validation failed</span>';
-                        details.innerHTML = `<strong>Error:</strong><br>${data.message.replace(/\n/g, '<br>')}`;
-                        details.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    status.innerHTML = '<span style="color: #dc3545;">X Validation error</span>';
-                    details.innerHTML = `<strong>Error:</strong> ${error.message}`;
-                    details.style.display = 'block';
-                })
-                .finally(() => {
-                    button.disabled = false;
-                    button.textContent = 'Validate SSH Connection';
-                });
-        });
-    </script>
 </body>
 </html>
