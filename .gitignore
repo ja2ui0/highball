@@ -117,3 +117,7 @@ config/*
 !config/README.md
 !config/config.example.yaml
 
+# Ignore AI tool configs
+.continue/
+.aider.conf.yml
+
