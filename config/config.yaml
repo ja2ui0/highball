@@ -1,5 +1,47 @@
-backup_jobs: {}
-backup_logs: {}
+backup_jobs:
+  retro:
+    dest_config:
+      dest_string: rsync://nuc/retro
+      hostname: nuc
+      share: retro
+    dest_type: rsyncd
+    enabled: true
+    excludes: []
+    includes: []
+    schedule: manual
+    source: root@yeti:/mnt/data/archive/retro
+    source_config:
+      hostname: yeti
+      path: /mnt/data/archive/retro
+      source_string: root@yeti:/mnt/data/archive/retro
+      username: root
+    source_ssh_validated_at: '2025-08-10T02:37:36.935129'
+    source_type: ssh
+backup_logs:
+  retro:
+    last_run: '2025-08-10T02:37:42.208659'
+    message: Dry run completed with return code 1 (triggered by manual)
+    status: error-dry-run
+deleted_jobs:
+  retro:
+    deleted_at: '2025-08-10T02:17:02.611241'
+    dest_config:
+      dest_string: rsync://nuc/retro
+      hostname: nuc
+      share: retro
+    dest_type: rsyncd
+    enabled: true
+    excludes: []
+    includes: []
+    schedule: manual
+    source: root@yeti:/mnt/data/archive/retro
+    source_config:
+      hostname: yeti
+      path: /mnt/data/archive/retro
+      source_string: root@yeti:/mnt/data/archive/retro
+      username: root
+    source_ssh_validated_at: '2025-08-10T02:10:57.048398'
+    source_type: ssh
 global_settings:
   dest_host: 192.168.1.252
   notification:

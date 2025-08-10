@@ -3,6 +3,7 @@ Dashboard handler - coordinates job management operations
 Slim coordinator that delegates to specialized modules
 """
 import html
+from urllib.parse import urlparse, parse_qs
 from .job_manager import JobManager
 from .job_form_parser import JobFormParser
 from .job_validator import JobValidator
@@ -170,7 +171,26 @@ class DashboardHandler:
         self.template_service.send_json_response(handler, result)
     
     def validate_rsyncd_destination(self, handler, hostname, share):
-        """AJAX endpoint to validate rsyncd destination"""
-        # Delegate to validator
-        result = JobValidator.validate_rsyncd_destination(hostname, share)
+        """AJAX endpoint to validate rsyncd destination or discover shares"""
+        # Try to get source config from query params for better validation
+        url_parts = urlparse(handler.path)
+        params = parse_qs(url_parts.query)
+        
+        source_config = None
+        source_hostname = params.get('source_hostname', [''])[0]
+        source_username = params.get('source_username', [''])[0]
+        
+        if source_hostname and source_username:
+            source_config = {
+                'hostname': source_hostname,
+                'username': source_username
+            }
+        
+        # If share is "dummy", this is a discovery request
+        if share == "dummy":
+            result = JobValidator.discover_rsyncd_shares(hostname, source_config)
+        else:
+            # This is a validation request for a specific share
+            result = JobValidator.validate_rsyncd_destination(hostname, share, source_config)
+        
         self.template_service.send_json_response(handler, result)
