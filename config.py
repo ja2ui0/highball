@@ -93,6 +93,13 @@ class BackupConfig:
         return {
             "global_settings": {
                 "scheduler_timezone": "UTC",
+                "default_schedule_times": {
+                    "hourly": "0 * * * *",     # top of every hour
+                    "daily": "0 3 * * *",      # 3am daily
+                    "weekly": "0 3 * * 0"      # 3am Sundays
+                },
+                "enable_conflict_avoidance": True,  # wait for conflicting jobs before running
+                "conflict_check_interval": 300,     # seconds between conflict checks (5 minutes)
                 "notification": {
                     "telegram_token": "",
                     "telegram_chat_id": ""

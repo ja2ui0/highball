@@ -60,6 +60,38 @@ class BackupHandler:
         Convenience wrapper for scheduler/CLI use (no HTTP handler).
         """
         self.run_backup_job(handler=None, job_name=job_name, dry_run=dry_run, source=source)
+    
+    def run_backup_job_with_conflict_check(self, handler, job_name, dry_run=True, source="schedule"):
+        """
+        Run backup job with runtime conflict detection and avoidance.
+        Will wait for conflicting jobs to finish before running.
+        """
+        from services.job_conflict_manager import RuntimeConflictManager
+        import time
+        
+        if job_name not in self.backup_config.config.get("backup_jobs", {}):
+            if handler is not None:
+                TemplateService.send_error_response(handler, f"Job '{job_name}' not found")
+            return
+
+        job_config = self.backup_config.config["backup_jobs"][job_name]
+        conflict_manager = RuntimeConflictManager(self.backup_config)
+        
+        # Wait for any conflicting jobs to finish
+        while conflict_manager.has_conflicting_jobs_running(job_name, job_config):
+            check_interval = conflict_manager.get_conflict_check_interval()
+            print(f"INFO: Job '{job_name}' waiting {check_interval} seconds for conflicting jobs to finish")
+            time.sleep(check_interval)
+        
+        # Register this job as running
+        conflict_manager.register_running_job(job_name)
+        
+        try:
+            # Run the actual backup job
+            self.run_backup_job(handler, job_name, dry_run, source)
+        finally:
+            # Always unregister the job, even if it fails
+            conflict_manager.unregister_running_job(job_name)
 
     # ---------------------------
     # Background worker

@@ -12,8 +12,8 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation)  
-**Services**: `job_logger.py` (logging), `ssh_validator.py`, `scheduler_service.py`
+**Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer)  
+**Services**: `job_logger.py` (logging), `ssh_validator.py`, `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts)
 
 ## Data Storage
 
@@ -22,6 +22,14 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 - `/var/log/highball/job_status.yaml` - last-run status per job  
 - `/var/log/highball/jobs/{job_name}.log` - detailed execution logs
 - `/var/log/highball/job_validation.yaml` - SSH validation timestamps
+- `/var/log/highball/running_jobs.txt` - currently running jobs for conflict detection
+
+## Features
+
+**Job Management**: Full CRUD with renaming, validation, cron scheduling  
+**Smart Scheduling**: Configurable default times, runtime conflict detection, automatic job queuing
+**Logging**: Per-job execution logs, status tracking, SSH validation state  
+**UI**: Real-time validation, share discovery, job history with log viewing
 
 ## Development
 
@@ -38,6 +46,12 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 ```yaml
 global_settings:
   scheduler_timezone: "America/Denver"
+  default_schedule_times:
+    hourly: "0 * * * *"     # configurable default times
+    daily: "0 3 * * *" 
+    weekly: "0 3 * * 0"
+  enable_conflict_avoidance: true  # wait for conflicting jobs before running
+  conflict_check_interval: 300     # seconds between conflict checks
   notification:
     telegram_token: ""
     telegram_chat_id: ""
@@ -48,7 +62,7 @@ backup_jobs:
     source_config: {hostname, username, path}
     dest_type: "ssh|local|rsyncd" 
     dest_config: {hostname, share}  # must specify explicit destinations
-    schedule: "daily|weekly|hourly|cron"
+    schedule: "daily|weekly|hourly|cron_pattern"
     enabled: true
 
 deleted_jobs:  # user can manually restore to backup_jobs

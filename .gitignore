@@ -121,3 +121,6 @@ config/*
 .continue/
 .aider.conf.yml
 
+# Test artifacts
+tests/
+

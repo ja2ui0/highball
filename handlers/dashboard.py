@@ -185,7 +185,7 @@ class DashboardHandler:
         from services.scheduler_service import SchedulerService
         from handlers.backup import BackupHandler
         
-        cron_str = _resolve_cron_string(job_config.get('schedule', 'manual'))
+        cron_str = _resolve_cron_string(job_config.get('schedule', 'manual'), self.backup_config)
         if not cron_str:
             return
         
@@ -202,7 +202,7 @@ class DashboardHandler:
         job_id = f"backup:{job_name}"
         
         def _run(job_name=job_name, dry_run=dry):
-            backup_handler.run_backup_job(handler=None, job_name=job_name, dry_run=dry_run, source="schedule")
+            backup_handler.run_backup_job_with_conflict_check(handler=None, job_name=job_name, dry_run=dry_run, source="schedule")
         
         # Remove existing job and add new one
         scheduler.remove_job(job_id)
