@@ -3,12 +3,14 @@ Job CRUD operations
 Handles creating, updating, deleting, and restoring backup jobs
 """
 from datetime import datetime
+from services.job_logger import JobLogger
 
 class JobManager:
     """Manages backup job CRUD operations"""
     
     def __init__(self, backup_config):
         self.backup_config = backup_config
+        self.job_logger = JobLogger()
     
     def create_job(self, job_name, job_config):
         """Create a new backup job"""
@@ -28,7 +30,7 @@ class JobManager:
     
     def get_job_logs(self):
         """Get backup job logs"""
-        return self.backup_config.config.get('backup_logs', {})
+        return self.job_logger.get_job_logs()
     
     def delete_job(self, job_name):
         """Soft delete a backup job (move to deleted_jobs)"""
@@ -74,9 +76,7 @@ class JobManager:
         del self.backup_config.config['deleted_jobs'][job_name]
         
         # Also remove logs
-        backup_logs = self.backup_config.config.get('backup_logs', {})
-        if job_name in backup_logs:
-            del self.backup_config.config['backup_logs'][job_name]
+        self.job_logger.remove_job_logs(job_name)
         
         self.backup_config.save_config()
         return True

@@ -26,10 +26,6 @@ class LogsHandler:
             'name': 'Supervisor',
             'file': '/var/log/supervisor/supervisord.log'
         },
-        'backup-dry-run': {
-            'name': 'Backup Dry Run',
-            'file': '/tmp/backup-dry-run.log'
-        }
     }
     
     def __init__(self, template_service):
@@ -37,17 +33,29 @@ class LogsHandler:
     
     def show_logs(self, handler, log_type='app'):
         """Show logs viewer with live tailing capability"""
-        # Validate log type
-        if log_type not in self.LOG_TYPES:
-            log_type = 'app'
+        from urllib.parse import urlparse, parse_qs
         
-        current_log = self.LOG_TYPES[log_type]
+        # Check if this is a job log request
+        url_parts = urlparse(handler.path)
+        params = parse_qs(url_parts.query)
+        job_name = params.get('job', [''])[0]
         
-        # Generate log type buttons
-        log_buttons = self._generate_log_buttons(log_type)
-        
-        # Get current log content
-        log_content = self._read_log_file(current_log['file'])
+        if job_name:
+            # Show job-specific log
+            log_file = f'/var/log/highball/jobs/{job_name}.log'
+            log_name = f'Job: {job_name}'
+            log_content = self._read_log_file(log_file)
+            log_buttons = f'<a href="/logs" class="button">Back to System Logs</a>'
+        else:
+            # Show system logs
+            # Validate log type
+            if log_type not in self.LOG_TYPES:
+                log_type = 'app'
+            
+            current_log = self.LOG_TYPES[log_type]
+            log_name = current_log['name']
+            log_content = self._read_log_file(current_log['file'])
+            log_buttons = self._generate_log_buttons(log_type)
         
         # Render template
         html_content = self.template_service.render_template(
@@ -55,7 +63,7 @@ class LogsHandler:
             log_buttons=log_buttons,
             log_content=html.escape(log_content),
             log_type=log_type,
-            log_name=current_log['name']
+            log_name=log_name
         )
         
         self.template_service.send_html_response(handler, html_content)

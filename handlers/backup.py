@@ -7,6 +7,7 @@ from datetime import datetime
 import threading
 import shlex  # for safe logging/remote command quoting
 from services.template_service import TemplateService
+from services.job_logger import JobLogger
 
 
 class BackupHandler:
@@ -15,6 +16,7 @@ class BackupHandler:
     def __init__(self, backup_config, scheduler_service=None):
         self.backup_config = backup_config
         self.scheduler_service = scheduler_service  # not used here yet, but injected safely
+        self.job_logger = JobLogger()
 
     # ---------------------------
     # Public entry points
@@ -45,7 +47,7 @@ class BackupHandler:
             "Dry run started" if dry_run else "Backup started"
         ) + f" (triggered by {source})"
         try:
-            self.backup_config.log_backup_run(job_name, "started", started_msg)
+            self.job_logger.log_job_status(job_name, "started", started_msg)
         except Exception:
             pass
 
@@ -74,9 +76,11 @@ class BackupHandler:
             else:
                 status = "completed" if result["success"] else "error"
                 message = f'Backup completed with return code {result["return_code"]}'
-            self.backup_config.log_backup_run(job_name, status, message)
+            self.job_logger.log_job_status(job_name, status, message)
+            self.job_logger.log_job_execution(job_name, result["log_content"])
         except Exception as e:
-            self.backup_config.log_backup_run(job_name, "error", str(e))
+            self.job_logger.log_job_status(job_name, "error", str(e))
+            self.job_logger.log_job_execution(job_name, f"ERROR: {str(e)}", "ERROR")
 
     # ---------------------------
     # Rsync execution
@@ -130,11 +134,9 @@ class BackupHandler:
             success = False
             result = type("Result", (), {"returncode": -1})()
 
-        # Write to log file (same files you already used)
-        log_file = "/tmp/backup-dry-run.log" if dry_run else f"/tmp/backup-{job_name}.log"
+        # Log detailed execution to job logger
         try:
-            with open(log_file, "a") as f:
-                f.write(log_content)
+            self.job_logger.log_job_execution(job_name, log_content)
         except Exception:
             pass
 
@@ -149,8 +151,8 @@ class BackupHandler:
         Build the command to execute and a pretty log string.
         Returns (exec_argv, log_cmd_str, src_display, dst_display).
         """
-        rsync_bin = global_settings.get("rsync_path", "/usr/bin/rsync")
-        ssh_bin = global_settings.get("ssh_path", "/usr/bin/ssh")
+        rsync_bin = self._discover_binary_path("rsync", "/usr/bin/rsync")
+        ssh_bin = self._discover_binary_path("ssh", "/usr/bin/ssh")
 
         # Base rsync command + flags
         rsync_cmd = [rsync_bin, "-a"]
@@ -296,16 +298,11 @@ class BackupHandler:
                     return f"{host}::{share}"
                 return f"rsync://{host}/{share}"
 
-            # no host provided — fall back to global dest_host if available
-            dest_host = global_settings.get("dest_host")
-            if dest_host:
-                return f"{dest_host}::{share}"
-            # ultimate fallback
-            return f"rsync://localhost/{share}"
+            # no host provided - destination must be explicitly configured
+            raise ValueError(f"rsyncd destination requires explicit hostname for job '{job_name}'")
 
-        # Legacy fallback when dest_type unspecified
-        dest_host = global_settings.get("dest_host", "192.168.1.252")
-        return f"{dest_host}::{job_name}"
+        # dest_type unspecified - destination must be explicitly configured
+        raise ValueError(f"Destination type must be specified for job '{job_name}'")
 
     def _build_log_header(
         self,
@@ -334,4 +331,14 @@ EXCLUDES: {job_config.get('excludes', [])}
 ========================================
 {mode_text} OUTPUT:
 """
+    
+    def _discover_binary_path(self, binary_name, fallback_path):
+        """Discover binary path using 'which' command with fallback"""
+        try:
+            result = subprocess.run(['which', binary_name], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return fallback_path
 

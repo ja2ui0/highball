@@ -5,6 +5,7 @@ Handles validating backup job configurations and connections
 import subprocess
 import re
 from datetime import datetime
+from services.job_logger import JobLogger
 
 class JobValidator:
     """Validates backup job configurations and connections"""
@@ -35,7 +36,8 @@ class JobValidator:
         elif parsed_job['dest_type'] == 'rsyncd':
             hostname = parsed_job['dest_config']['hostname']
             share = parsed_job['dest_config']['share']
-            rsyncd_validation = JobValidator.validate_rsyncd_destination(hostname, share)
+            source_config = parsed_job.get('source_config') if parsed_job['source_type'] == 'ssh' else None
+            rsyncd_validation = JobValidator.validate_rsyncd_destination(hostname, share, source_config)
             if not rsyncd_validation['success']:
                 errors.append(f"rsyncd validation failed: {rsyncd_validation['message']}")
         
@@ -310,11 +312,10 @@ class JobValidator:
         return bool(re.match(r'^[^@]+@[^:]+:.+', source))
     
     @staticmethod
-    def add_validation_timestamps(job_config, source_type, dest_type):
-        """Add validation timestamps to job config"""
+    def add_validation_timestamps(job_name, source_type, dest_type):
+        """Add validation timestamps to job logger state"""
+        job_logger = JobLogger()
         if source_type == 'ssh':
-            job_config['source_ssh_validated_at'] = datetime.now().isoformat()
-        if dest_type == 'ssh':
-            job_config['dest_ssh_validated_at'] = datetime.now().isoformat()
-        
-        return job_config
+            job_logger.log_ssh_validation(job_name, datetime.now().isoformat())
+        # Note: dest_ssh_validated_at not implemented yet in job_logger
+        # Can be added if needed

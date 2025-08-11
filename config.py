@@ -92,16 +92,13 @@ class BackupConfig:
         """Return default configuration structure"""
         return {
             "global_settings": {
-                "dest_host": "192.168.1.252",
-                "rsync_path": "/usr/bin/rsync",
-                "time_path": "/usr/bin/time",
+                "scheduler_timezone": "UTC",
                 "notification": {
                     "telegram_token": "",
                     "telegram_chat_id": ""
                 }
             },
-            "backup_jobs": {},
-            "backup_logs": {}
+            "backup_jobs": {}
         }
     
     def save_config(self, config=None):
@@ -151,17 +148,3 @@ class BackupConfig:
         self.config['global_settings'].update(settings)
         self.save_config()
     
-    def log_backup_run(self, job_name, status, message=""):
-        """Log a backup run"""
-        if 'backup_logs' not in self.config:
-            self.config['backup_logs'] = {}
-        
-        from datetime import datetime
-        timestamp = datetime.now().isoformat()
-        
-        self.config['backup_logs'][job_name] = {
-            'last_run': timestamp,
-            'status': status,
-            'message': message
-        }
-        self.save_config()

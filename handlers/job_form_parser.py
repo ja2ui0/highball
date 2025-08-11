@@ -89,7 +89,16 @@ class JobFormParser:
         # Parse additional options
         includes = JobFormParser.parse_lines(form_data.get('includes', [''])[0])
         excludes = JobFormParser.parse_lines(form_data.get('excludes', [''])[0])
+        
+        # Handle schedule - if 'cron' is selected, use the cron_pattern field
         schedule = form_data.get('schedule', ['manual'])[0]
+        if schedule == 'cron':
+            cron_pattern = form_data.get('cron_pattern', [''])[0].strip()
+            if cron_pattern:
+                schedule = cron_pattern
+            else:
+                return {'valid': False, 'error': 'Cron pattern is required when Custom Cron Pattern is selected'}
+        
         enabled = 'enabled' in form_data
         
         return {
