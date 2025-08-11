@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Logs - Backup Manager</title>
+    <title>Inspect System - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/nav.js"></script>
+    <script src="/static/network-scan.js"></script>
     <style>
         .log-viewer {
             background-color: #1a1a1a;
@@ -43,7 +44,20 @@
     <div class="container">
         <div id="navigation"></div>
         
-        <h1>System Logs</h1>
+        <h1>Inspect System</h1>
+        
+        <div class="config-section">
+            <h3>Network Scanner</h3>
+            <p>Scan your network for available rsync servers and their modules.</p>
+            <div class="flex-row">
+                <input type="text" id="networkRange" placeholder="192.168.1.0/24" class="w-150">
+                <button id="scanNetwork" class="button button-warning">Scan Network for Rsync Servers</button>
+            </div>
+            <div id="scanResults" class="hidden mt-15">
+                <h4>Found Rsync Servers:</h4>
+                <div id="scanOutput" class="log-container" style="height: 200px;"></div>
+            </div>
+        </div>
         
         <div class="log-controls">
             <h3>Log Sources</h3>
