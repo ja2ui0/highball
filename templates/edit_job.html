@@ -157,6 +157,15 @@ documents/**">{{INCLUDES}}</textarea>
                 </label>
             </div>
             
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="respect_conflicts" value="true" {{CONFLICTS_CHECKED}}> Wait for conflicting jobs (recommended)
+                </label>
+                <div class="help-text">
+                    When enabled, this job will wait for other jobs using the same source or destination to finish before running.
+                </div>
+            </div>
+            
             <input type="submit" value="Update Backup Job" class="button button-success">
             <a href="/" class="button" style="background-color: #6c757d;">Cancel</a>
         </form>

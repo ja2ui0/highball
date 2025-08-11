@@ -43,7 +43,7 @@ class DashboardHandler:
 
         # Generate display HTML
         job_rows = JobDisplay.build_job_rows(jobs, logs)
-        deleted_rows = JobDisplay.build_deleted_job_rows(deleted_jobs)
+        deleted_rows = JobDisplay.build_deleted_job_rows(deleted_jobs, self.job_manager)
 
         # Render template
         html_content = self.template_service.render_template(
@@ -111,7 +111,8 @@ class DashboardHandler:
             excludes='\n'.join(job_config.get('excludes', [])),
             schedule_type=schedule_type,
             cron_pattern=cron_pattern,
-            enabled_checked='checked' if job_config.get('enabled', True) else ''
+            enabled_checked='checked' if job_config.get('enabled', True) else '',
+            conflicts_checked='checked' if job_config.get('respect_conflicts', True) else ''
         )
 
         self.template_service.send_html_response(handler, html_content)
@@ -146,6 +147,7 @@ class DashboardHandler:
             'excludes': parsed_job['excludes'],
             'schedule': parsed_job['schedule'],
             'enabled': parsed_job['enabled'],
+            'respect_conflicts': parsed_job.get('respect_conflicts', True),  # Default to True
             # Keep legacy source field for backward compatibility
             'source': parsed_job['source_config']['source_string']
         }

@@ -55,14 +55,16 @@ class JobDisplay:
         return rows
     
     @staticmethod
-    def build_deleted_job_rows(deleted_jobs):
+    def build_deleted_job_rows(deleted_jobs, job_manager):
         """Build HTML rows for deleted jobs table"""
         if not deleted_jobs:
             return '<tr><td colspan="5" style="text-align: center; color: #888;">No deleted jobs</td></tr>'
         
         rows = ""
         for job_name, job_config in deleted_jobs.items():
-            deleted_at = JobDisplay.format_timestamp(job_config.get('deleted_at', 'Unknown'))
+            # Get deletion time from job manager logs
+            deletion_time = job_manager.get_job_deletion_time(job_name)
+            deleted_at = JobDisplay.format_timestamp(deletion_time) if deletion_time else 'Unknown'
             
             # Handle both new and legacy job structures
             if 'source_type' in job_config:

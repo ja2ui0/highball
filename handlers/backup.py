@@ -82,8 +82,11 @@ class BackupHandler:
         wait_start_time = None
         total_wait_time = 0
         
-        # Wait for any conflicting jobs to finish
-        while conflict_manager.has_conflicting_jobs_running(job_name, job_config):
+        # Check if this job should respect conflicts (default to True if not specified)
+        should_respect_conflicts = job_config.get('respect_conflicts', True)
+        
+        # Wait for any conflicting jobs to finish (if enabled for this job)
+        while should_respect_conflicts and conflict_manager.has_conflicting_jobs_running(job_name, job_config):
             if wait_start_time is None:
                 wait_start_time = time.time()
                 running_jobs = conflict_manager.get_running_jobs()

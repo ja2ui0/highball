@@ -117,6 +117,14 @@ h1, h2 {
     background-color: var(--warning-hover);
 }
 
+.button-secondary {
+    background-color: #6c757d;
+}
+
+.button-secondary:hover {
+    background-color: #5a6268;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: var(--space-xxl);
@@ -359,6 +367,66 @@ tr:hover {
     white-space: pre-wrap;
 }
 
+/* =============================================================================
+   UTILITY CLASSES (for template cleanup)
+   ============================================================================= */
+
+/* Display utilities (commonly needed) */
+.hidden { display: none; }
+.flex-row { display: flex; gap: 10px; align-items: center; }
+.flex-1 { flex: 1; }
+
+/* Config management specific styles */
+.config-section {
+    background: var(--bg-secondary);
+    padding: var(--space-xxl);
+    margin: var(--space-xxl) 0;
+    border-radius: var(--radius-lg);
+    border-left: 4px solid var(--accent-primary);
+}
+
+.config-section h3 {
+    margin-top: 0;
+    color: var(--accent-primary);
+}
+
+.config-nav {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 15px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+/* Validation details (used in forms) */
+.validation-details {
+    background-color: #2a2a2a;
+    padding: 10px;
+    border-radius: var(--radius);
+    margin-top: 10px;
+    font-family: monospace;
+    font-size: var(--font-sm);
+}
+
+/* Large textarea (config editor) */
+.textarea-config {
+    height: 400px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Common margin utilities */
+.mt-10 { margin-top: 10px; }
+.mt-15 { margin-top: 15px; }
+.mt-20 { margin-top: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.ml-10 { margin-left: 10px; }
+
+/* Width utilities for specific inputs */
+.w-150 { width: 150px; }
+
+/* Secondary background color alias */
+.bg-light { background-color: var(--bg-secondary); }
+
 /* Responsive design */
 @media (max-width: 768px) {
     .container {
@@ -377,5 +445,10 @@ tr:hover {
     .button {
         padding: 6px var(--space-lg);
         font-size: var(--font-sm);
+    }
+    
+    .flex-row {
+        flex-direction: column;
+        gap: var(--space-md);
     }
 }

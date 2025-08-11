@@ -105,7 +105,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 job_name = params.get('name', [''])[0]
                 self._handlers['dashboard'].show_edit_job_form(self, job_name)
             elif path == '/config':
-                self._handlers['config'].show_config_editor(self)
+                self._handlers['config'].show_config_manager(self)
+            elif path == '/config/raw':
+                self._handlers['config'].show_raw_editor(self)
             elif path == '/logs':
                 log_type = params.get('type', ['app'])[0]
                 self._handlers['logs'].show_logs(self, log_type)
@@ -173,7 +175,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
             elif path == '/save-config':
-                self._handlers['config'].save_config_from_form(self, form_data)
+                self._handlers['config'].save_structured_config(self, form_data)
+            elif path == '/save-config/raw':
+                self._handlers['config'].save_raw_config(self, form_data)
             elif path == '/dismiss-warning':
                 self._handlers['dashboard'].dismiss_config_warning(self)
             elif path == '/schedule-job':

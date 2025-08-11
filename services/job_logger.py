@@ -15,6 +15,7 @@ class JobLogger:
         self.jobs_dir = os.path.join(self.log_dir, "jobs")
         self.status_file = os.path.join(self.log_dir, "job_status.yaml")
         self.validation_file = os.path.join(self.log_dir, "job_validation.yaml")
+        self.deleted_jobs_file = os.path.join(self.log_dir, "deleted_jobs.yaml")
         self._ensure_log_directories()
     
     def _ensure_log_directories(self):
@@ -159,3 +160,73 @@ class JobLogger:
                 yaml.dump(validation_data, f, default_flow_style=False, indent=2)
         except IOError as e:
             print(f"ERROR: Could not save job validation file: {e}")
+    
+    def log_job_deletion(self, job_name, job_config):
+        """Log job deletion to deleted jobs tracking file"""
+        deleted_data = self._load_deleted_jobs_file()
+        
+        # Store job config with deletion timestamp
+        job_config_copy = job_config.copy()
+        job_config_copy['deleted_at'] = datetime.now().isoformat()
+        deleted_data[job_name] = job_config_copy
+        
+        self._save_deleted_jobs_file(deleted_data)
+        
+        # Also log the deletion as a status entry
+        self.log_job_status(job_name, "deleted", f"Job deleted and moved to deletion log")
+    
+    def get_deleted_jobs(self):
+        """Get all deleted jobs from log file"""
+        return self._load_deleted_jobs_file()
+    
+    def restore_deleted_job(self, job_name):
+        """Remove job from deleted jobs log (when restoring)"""
+        deleted_data = self._load_deleted_jobs_file()
+        if job_name in deleted_data:
+            job_config = deleted_data[job_name].copy()
+            job_config.pop('deleted_at', None)  # Remove deletion timestamp
+            del deleted_data[job_name]
+            self._save_deleted_jobs_file(deleted_data)
+            
+            # Log the restoration
+            self.log_job_status(job_name, "restored", "Job restored from deletion log")
+            return job_config
+        return None
+    
+    def purge_deleted_job(self, job_name):
+        """Permanently remove job from deleted jobs log"""
+        deleted_data = self._load_deleted_jobs_file()
+        if job_name in deleted_data:
+            del deleted_data[job_name]
+            self._save_deleted_jobs_file(deleted_data)
+            
+            # Log the purge (final status entry)
+            self.log_job_status(job_name, "purged", "Job permanently deleted from all logs")
+            return True
+        return False
+    
+    def _load_deleted_jobs_file(self):
+        """Load deleted jobs from YAML file"""
+        if not os.path.exists(self.deleted_jobs_file):
+            return {}
+        
+        try:
+            with open(self.deleted_jobs_file, 'r') as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                
+                deleted_data = yaml.safe_load(content)
+                return deleted_data if deleted_data else {}
+                
+        except (yaml.YAMLError, IOError) as e:
+            print(f"WARNING: Could not load deleted jobs file: {e}")
+            return {}
+    
+    def _save_deleted_jobs_file(self, deleted_data):
+        """Save deleted jobs to YAML file"""
+        try:
+            with open(self.deleted_jobs_file, 'w') as f:
+                yaml.dump(deleted_data, f, default_flow_style=False, indent=2)
+        except IOError as e:
+            print(f"ERROR: Could not save deleted jobs file: {e}")

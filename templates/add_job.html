@@ -45,7 +45,7 @@
                 <div class="help-text">
                     <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
                     <span id="source_validation_status"></span>
-                    <div id="source_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                    <div id="source_validation_details" class="validation-details hidden"></div>
                 </div>
             </div>
             
@@ -82,14 +82,14 @@
                 <div class="help-text">
                     <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
                     <span id="dest_ssh_validation_status"></span>
-                    <div id="dest_ssh_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                    <div id="dest_ssh_validation_details" class="validation-details hidden"></div>
                 </div>
             </div>
             
             <div id="dest_rsyncd" style="display:none">
                 <label for="dest_rsyncd_hostname">Hostname:</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" name="dest_rsyncd_hostname" placeholder="backup-server" style="flex: 1;">
+                <div class="flex-row">
+                    <input type="text" name="dest_rsyncd_hostname" placeholder="backup-server" class="flex-1">
                     <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
                 </div>
                 <span id="discover_status"></span>
@@ -102,7 +102,7 @@
                 </div>
                 
                 <div class="help-text">
-                    <div id="rsyncd_validation_details" style="display: none; background-color: #2a2a2a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px;"></div>
+                    <div id="rsyncd_validation_details" class="validation-details hidden"></div>
                 </div>
             </div>
             
@@ -130,7 +130,7 @@ documents/**"></textarea>
                 </select>
             </div>
             
-            <div id="cron_field" style="display:none; margin-top: 10px;">
+            <div id="cron_field" class="hidden mt-10">
                 <label for="cron_pattern">Cron Pattern:</label>
                 <input type="text" name="cron_pattern" placeholder="0 3 * * *" 
                        title="Format: minute hour day month weekday">
@@ -141,6 +141,13 @@ documents/**"></textarea>
             
             <div class="form-group">
                 <label><input type="checkbox" name="enabled" checked> Enabled</label>
+            </div>
+            
+            <div class="form-group">
+                <label><input type="checkbox" name="respect_conflicts" checked> Wait for conflicting jobs (recommended)</label>
+                <div class="help-text">
+                    When enabled, this job will wait for other jobs using the same source or destination to finish before running.
+                </div>
             </div>
             
             <input type="submit" value="Create Job" class="button button-success">

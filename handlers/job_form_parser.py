@@ -100,6 +100,7 @@ class JobFormParser:
                 return {'valid': False, 'error': 'Cron pattern is required when Custom Cron Pattern is selected'}
         
         enabled = 'enabled' in form_data
+        respect_conflicts = 'respect_conflicts' in form_data
         
         return {
             'valid': True,
@@ -111,7 +112,8 @@ class JobFormParser:
             'includes': includes,
             'excludes': excludes,
             'schedule': schedule,
-            'enabled': enabled
+            'enabled': enabled,
+            'respect_conflicts': respect_conflicts
         }
     
     @staticmethod

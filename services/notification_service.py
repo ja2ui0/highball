@@ -113,9 +113,10 @@ class NotificationService:
     
     def is_telegram_enabled(self):
         """Check if Telegram notifications are configured"""
+        telegram_config = self.notification_config.get("telegram", {})
         return bool(
-            self.notification_config.get("telegram_token") and 
-            self.notification_config.get("telegram_chat_id")
+            telegram_config.get("token") and 
+            telegram_config.get("chat_id")
         )
     
     def is_email_enabled(self):
@@ -131,8 +132,9 @@ class NotificationService:
     def _send_telegram(self, title, message, notification_type):
         """Send notification via Telegram Bot API"""
         try:
-            token = self.notification_config["telegram_token"]
-            chat_id = self.notification_config["telegram_chat_id"]
+            telegram_config = self.notification_config["telegram"]
+            token = telegram_config["token"]
+            chat_id = telegram_config["chat_id"]
             
             # Format message with emoji based on type
             emoji_map = {
@@ -235,10 +237,10 @@ class NotificationManager:
         """Get template configuration for notifications"""
         return {
             "notification": {
-                "telegram_token": "",  # Bot token from @BotFather
-                "telegram_chat_id": "",  # Chat ID where notifications will be sent
-                "notify_on_success": False,  # Set to true to get success notifications
-                "delay_notification_threshold": 300,  # Seconds before sending delay notifications
+                "telegram": {
+                    "token": "",  # Bot token from @BotFather
+                    "chat_id": "",  # Chat ID where notifications will be sent
+                },
                 "email": {
                     "smtp_server": "smtp.gmail.com",  # SMTP server hostname
                     "smtp_port": 587,  # SMTP port (587 for TLS, 465 for SSL, 25 for plain)
@@ -248,6 +250,7 @@ class NotificationManager:
                     "to_email": "admin@example.com",  # Recipient email address
                     "username": "your-email@gmail.com",  # SMTP authentication username
                     "password": "your-app-password"  # SMTP authentication password
-                }
+                },
+                "notify_on_success": False,  # Set to true to get success notifications
             }
         }

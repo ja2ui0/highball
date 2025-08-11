@@ -38,15 +38,17 @@ class JobManager:
         if job_name not in jobs:
             return False
         
-        # Move to deleted section with timestamp
+        # Move to deleted section (without deleted_at in config)
         job_config = jobs[job_name].copy()
-        job_config['deleted_at'] = datetime.now().isoformat()
+        
+        # Log the deletion with timestamp to job logger
+        self.job_logger.log_job_deletion(job_name, job_config)
         
         # Create deleted_jobs section if needed
         if 'deleted_jobs' not in self.backup_config.config:
             self.backup_config.config['deleted_jobs'] = {}
         
-        # Move job
+        # Move job to deleted section (clean config, no deleted_at)
         self.backup_config.config['deleted_jobs'][job_name] = job_config
         del self.backup_config.config['backup_jobs'][job_name]
         self.backup_config.save_config()
@@ -58,9 +60,11 @@ class JobManager:
         if job_name not in deleted_jobs:
             return False
         
-        # Remove deletion timestamp and restore
+        # Get clean job config (no deleted_at since it's not in config anymore)
         job_config = deleted_jobs[job_name].copy()
-        job_config.pop('deleted_at', None)
+        
+        # Log the restoration
+        self.job_logger.log_job_status(job_name, "restored", "Job restored from deleted jobs")
         
         self.backup_config.config['backup_jobs'][job_name] = job_config
         del self.backup_config.config['deleted_jobs'][job_name]
@@ -73,6 +77,9 @@ class JobManager:
         if job_name not in deleted_jobs:
             return False
         
+        # Log the purge
+        self.job_logger.log_job_status(job_name, "purged", "Job permanently deleted")
+        
         del self.backup_config.config['deleted_jobs'][job_name]
         
         # Also remove logs
@@ -80,3 +87,10 @@ class JobManager:
         
         self.backup_config.save_config()
         return True
+    
+    def get_job_deletion_time(self, job_name):
+        """Get deletion timestamp for a job from logs"""
+        deleted_jobs_log = self.job_logger.get_deleted_jobs()
+        if job_name in deleted_jobs_log:
+            return deleted_jobs_log[job_name].get('deleted_at')
+        return None
