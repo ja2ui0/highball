@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     supervisor \
     tzdata \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 # Copy Python dependencies first so they're cached unless they change
 COPY requirements.txt .

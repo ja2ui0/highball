@@ -23,14 +23,15 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 - `/var/log/highball/jobs/{job_name}.log` - detailed execution logs
 - `/var/log/highball/job_validation.yaml` - SSH validation timestamps
 - `/var/log/highball/running_jobs.txt` - currently running jobs for conflict detection
+- `/var/log/highball/deleted_jobs.yaml` - deleted job tracking with timestamps (separate from config)
 
 ## Features
 
-**Job Management**: Full CRUD with renaming, validation, cron scheduling  
-**Smart Scheduling**: Configurable default times, runtime conflict detection, automatic job queuing
-**Logging**: Per-job execution logs, status tracking, SSH validation state, conflict delay tracking
-**Notifications**: Telegram/email alerts for delays, failures, and successes (configurable)
-**UI**: Real-time validation, share discovery, job history with log viewing
+**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings  
+**Smart Scheduling**: Configurable default times (hourly/daily/weekly/monthly), runtime conflict detection, automatic job queuing
+**Logging**: Per-job execution logs, status tracking, SSH validation state, conflict delay tracking, live log streaming
+**Notifications**: Method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications
+**UI**: Real-time validation, share discovery, job history with live log viewing, structured config forms + raw YAML editor
 
 ## Development
 
@@ -39,7 +40,7 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 ## Commands
 
-**Run**: `./build.sh && docker-compose up -d`  
+**Run**: `./build.sh` or `./rr` (rebuild and restart)
 **Debug**: `docker logs -f backup-manager`
 **Test Notifications**: `./test_notifications.py`
 
@@ -47,26 +48,32 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 ```yaml
 global_settings:
-  scheduler_timezone: "America/Denver"
+  scheduler_timezone: "UTC"  # default UTC, configurable
   default_schedule_times:
-    hourly: "0 * * * *"     # configurable default times
-    daily: "0 3 * * *" 
-    weekly: "0 3 * * 0"
+    hourly: "0 * * * *"     # top of every hour
+    daily: "0 3 * * *"      # 3am daily
+    weekly: "0 3 * * 0"     # 3am Sundays
+    monthly: "0 3 1 * *"    # 3am first of month
   enable_conflict_avoidance: true  # wait for conflicting jobs before running
   conflict_check_interval: 300     # seconds between conflict checks
   delay_notification_threshold: 300  # send notification after this many seconds delay
   notification:
-    telegram_token: ""              # from @BotFather
-    telegram_chat_id: ""            # chat ID for notifications
-    notify_on_success: false        # send notifications for successful jobs
+    telegram:
+      enabled: false              # enable/disable telegram notifications
+      notify_on_success: false    # send telegram notifications for successful jobs
+      token: ""                   # bot token from @BotFather
+      chat_id: ""                 # chat ID for notifications
     email:
-      smtp_server: "smtp.gmail.com" # SMTP server hostname
-      smtp_port: 587                # 587 for TLS, 465 for SSL
-      use_tls: true                 # use TLS encryption
-      from_email: ""                # sender email address
-      to_email: ""                  # recipient email address
-      username: ""                  # SMTP authentication username
-      password: ""                  # SMTP authentication password
+      enabled: false              # enable/disable email notifications
+      notify_on_success: false    # send email notifications for successful jobs
+      smtp_server: ""             # SMTP server hostname
+      smtp_port: 587              # 587 for TLS, 465 for SSL
+      use_tls: true               # use TLS encryption (mutually exclusive with SSL)
+      use_ssl: false              # use SSL encryption
+      from_email: ""              # sender email address
+      to_email: ""                # recipient email address
+      username: ""                # SMTP authentication username
+      password: ""                # SMTP authentication password
 
 backup_jobs:
   job_name:
@@ -74,8 +81,9 @@ backup_jobs:
     source_config: {hostname, username, path}
     dest_type: "ssh|local|rsyncd" 
     dest_config: {hostname, share}  # must specify explicit destinations
-    schedule: "daily|weekly|hourly|cron_pattern"
+    schedule: "daily|weekly|hourly|monthly|cron_pattern"
     enabled: true
+    respect_conflicts: true     # wait for conflicting jobs (default: true)
 
 deleted_jobs:  # user can manually restore to backup_jobs
   job_name: {...}

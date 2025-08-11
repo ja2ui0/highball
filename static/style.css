@@ -429,6 +429,16 @@ tr:hover {
 .mt-20 { margin-top: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .ml-10 { margin-left: 10px; }
+.ml-20 { margin-left: 20px; }
+
+/* Config method settings containers */
+.method-settings {
+    margin-left: var(--space-xxl);
+    padding: var(--space-lg);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    border-left: 2px solid var(--accent-primary);
+}
 
 /* Width utilities for specific inputs */
 .w-150 { width: 150px; }
