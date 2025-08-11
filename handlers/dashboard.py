@@ -8,7 +8,6 @@ from .job_manager import JobManager
 from .job_form_parser import JobFormParser
 from .job_validator import JobValidator
 from .job_display import JobDisplay
-from services.ssh_validator import SSHValidator
 
 
 class DashboardHandler:
@@ -169,6 +168,9 @@ class DashboardHandler:
             })
             return
 
+        # Import here to avoid circular import
+        from services.ssh_validator import SSHValidator
+        
         # Delegate to validator
         result = SSHValidator.validate_ssh_source(source)
         self.template_service.send_json_response(handler, result)

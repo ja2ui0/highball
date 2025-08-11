@@ -2,6 +2,7 @@
 Configuration handler for editing backup settings
 """
 import yaml
+from datetime import datetime
 from services.template_service import TemplateService
 
 class ConfigHandler:
@@ -71,12 +72,9 @@ class ConfigHandler:
                 f"Failed to reload config: {str(e)}"
             )
 
-    def backup_config(self, handler):
+    def download_config_backup(self, handler):
         """Download configuration backup"""
         try:
-            import json
-            from datetime import datetime
-            
             config_text = yaml.dump(
                 self.backup_config.config, 
                 default_flow_style=False, 

@@ -5,7 +5,6 @@ Handles validating backup job configurations and connections
 import subprocess
 import re
 from datetime import datetime
-from services.ssh_validator import SSHValidator
 
 class JobValidator:
     """Validates backup job configurations and connections"""
@@ -17,6 +16,7 @@ class JobValidator:
         
         # Validate source
         if parsed_job['source_type'] == 'ssh':
+            from services.ssh_validator import SSHValidator
             source_validation = SSHValidator.validate_ssh_source(
                 parsed_job['source_config']['source_string']
             )
@@ -25,6 +25,7 @@ class JobValidator:
         
         # Validate destination
         if parsed_job['dest_type'] == 'ssh':
+            from services.ssh_validator import SSHValidator
             dest_validation = SSHValidator.validate_ssh_source(
                 parsed_job['dest_config']['dest_string']
             )

@@ -130,7 +130,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/reload-config':
                 self._handlers['config'].reload_config(self)
             elif path == '/backup-config':
-                self._handlers['config'].backup_config(self)
+                self._handlers['config'].download_config_backup(self)
             else:
                 self._send_404()
         except Exception as e:
