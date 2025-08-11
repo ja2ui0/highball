@@ -70,7 +70,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                     cls._scheduler_service
                 ),
                 'config': ConfigHandler(cls._backup_config, cls._template_service),
-                'logs': LogsHandler(cls._template_service),
+                'logs': LogsHandler(cls._template_service, cls._backup_config),
                 'network': NetworkHandler(),
                 'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),

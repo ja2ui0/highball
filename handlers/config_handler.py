@@ -35,23 +35,28 @@ class ConfigHandler:
             HOURLY_DEFAULT=default_schedule_times.get('hourly', '0 * * * *'),
             DAILY_DEFAULT=default_schedule_times.get('daily', '0 3 * * *'), 
             WEEKLY_DEFAULT=default_schedule_times.get('weekly', '0 3 * * 0'),
+            MONTHLY_DEFAULT=default_schedule_times.get('monthly', '0 3 1 * *'),
             
             # Telegram settings
+            TELEGRAM_ENABLED='checked' if telegram_config.get('enabled', False) else '',
+            TELEGRAM_SETTINGS_CLASS='' if telegram_config.get('enabled', False) else 'hidden',
+            TELEGRAM_NOTIFY_SUCCESS='checked' if telegram_config.get('notify_on_success', False) else '',
             TELEGRAM_TOKEN=telegram_config.get('token', ''),
             TELEGRAM_CHAT_ID=telegram_config.get('chat_id', ''),
             
             # Email settings
+            EMAIL_ENABLED='checked' if email_config.get('enabled', False) else '',
+            EMAIL_SETTINGS_CLASS='' if email_config.get('enabled', False) else 'hidden',
+            EMAIL_NOTIFY_SUCCESS='checked' if email_config.get('notify_on_success', False) else '',
             EMAIL_SMTP_SERVER=email_config.get('smtp_server', ''),
             EMAIL_SMTP_PORT=str(email_config.get('smtp_port', 587)),
-            EMAIL_USE_TLS='checked' if email_config.get('use_tls', True) else '',
-            EMAIL_USE_SSL='checked' if email_config.get('use_ssl', False) else '',
+            EMAIL_TLS_CHECKED='checked' if email_config.get('use_tls', True) and not email_config.get('use_ssl', False) else '',
+            EMAIL_SSL_CHECKED='checked' if email_config.get('use_ssl', False) else '',
+            EMAIL_NONE_CHECKED='checked' if not email_config.get('use_tls', True) and not email_config.get('use_ssl', False) else '',
             EMAIL_FROM=email_config.get('from_email', ''),
             EMAIL_TO=email_config.get('to_email', ''),
             EMAIL_USERNAME=email_config.get('username', ''),
-            EMAIL_PASSWORD=email_config.get('password', ''),
-            
-            # Notification settings
-            NOTIFY_ON_SUCCESS='checked' if notification_config.get('notify_on_success', False) else ''
+            EMAIL_PASSWORD=email_config.get('password', '')
         )
         
         self.template_service.send_html_response(handler, html_content)
@@ -93,22 +98,30 @@ class ConfigHandler:
             default_schedule_times['hourly'] = form_data.get('hourly_default', ['0 * * * *'])[0]
             default_schedule_times['daily'] = form_data.get('daily_default', ['0 3 * * *'])[0]
             default_schedule_times['weekly'] = form_data.get('weekly_default', ['0 3 * * 0'])[0]
+            default_schedule_times['monthly'] = form_data.get('monthly_default', ['0 3 1 * *'])[0]
             
             # Notification settings
             notification_config = global_settings.setdefault('notification', {})
-            notification_config['notify_on_success'] = 'notify_on_success' in form_data
             
             # Telegram settings
             telegram_config = notification_config.setdefault('telegram', {})
+            telegram_config['enabled'] = 'enable_telegram' in form_data
+            telegram_config['notify_on_success'] = 'telegram_notify_success' in form_data
             telegram_config['token'] = form_data.get('telegram_token', [''])[0]
             telegram_config['chat_id'] = form_data.get('telegram_chat_id', [''])[0]
             
             # Email settings
             email_config = notification_config.setdefault('email', {})
+            email_config['enabled'] = 'enable_email' in form_data
+            email_config['notify_on_success'] = 'email_notify_success' in form_data
             email_config['smtp_server'] = form_data.get('email_smtp_server', [''])[0]
             email_config['smtp_port'] = int(form_data.get('email_smtp_port', ['587'])[0])
-            email_config['use_tls'] = 'email_use_tls' in form_data
-            email_config['use_ssl'] = 'email_use_ssl' in form_data
+            
+            # Handle encryption radio buttons
+            encryption_choice = form_data.get('email_encryption', ['none'])[0]
+            email_config['use_tls'] = encryption_choice == 'tls'
+            email_config['use_ssl'] = encryption_choice == 'ssl'
+            
             email_config['from_email'] = form_data.get('email_from', [''])[0]
             email_config['to_email'] = form_data.get('email_to', [''])[0]
             email_config['username'] = form_data.get('email_username', [''])[0]

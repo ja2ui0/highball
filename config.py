@@ -96,17 +96,22 @@ class BackupConfig:
                 "default_schedule_times": {
                     "hourly": "0 * * * *",     # top of every hour
                     "daily": "0 3 * * *",      # 3am daily
-                    "weekly": "0 3 * * 0"      # 3am Sundays
+                    "weekly": "0 3 * * 0",     # 3am Sundays
+                    "monthly": "0 3 1 * *"     # 3am first of month
                 },
                 "enable_conflict_avoidance": True,  # wait for conflicting jobs before running
                 "conflict_check_interval": 300,     # seconds between conflict checks (5 minutes)
                 "delay_notification_threshold": 300,  # seconds delay before sending notification (5 minutes)
                 "notification": {
                     "telegram": {
+                        "enabled": False,          # enable/disable telegram notifications
+                        "notify_on_success": False,# send telegram notifications for successful jobs
                         "token": "",               # Bot token from @BotFather
                         "chat_id": ""              # Chat ID for notifications
                     },
                     "email": {
+                        "enabled": False,          # enable/disable email notifications
+                        "notify_on_success": False,# send email notifications for successful jobs
                         "smtp_server": "",         # e.g. smtp.gmail.com
                         "smtp_port": 587,          # 587 for TLS, 465 for SSL, 25 for plain
                         "use_tls": True,           # use TLS encryption
@@ -115,8 +120,7 @@ class BackupConfig:
                         "to_email": "",            # recipient email address  
                         "username": "",            # SMTP authentication username
                         "password": ""             # SMTP authentication password
-                    },
-                    "notify_on_success": False     # send notifications for successful jobs
+                    }
                 }
             },
             "backup_jobs": {}

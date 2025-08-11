@@ -87,10 +87,7 @@ class NotificationService:
         self.send_notification(title, message, "error")
     
     def send_job_success_notification(self, job_name, duration_seconds, dry_run=False):
-        """Send notification for successful job completion (if enabled)"""
-        if not self.notification_config.get("notify_on_success", False):
-            return
-        
+        """Send notification for successful job completion (if enabled per method)"""
         mode = "dry run" if dry_run else "backup"
         title = f"✅ Job Completed: {job_name}"
         
@@ -105,24 +102,56 @@ class NotificationService:
             f"Duration: {duration_str}"
         )
         
-        self.send_notification(title, message, "success")
+        # Send to methods that have success notifications enabled
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}"
+        
+        providers_attempted = []
+        providers_successful = []
+        
+        # Check Telegram success notifications
+        if self.is_telegram_enabled():
+            telegram_config = self.notification_config.get("telegram", {})
+            if telegram_config.get("notify_on_success", False):
+                providers_attempted.append("telegram")
+                if self._send_telegram(title, formatted_message, "success"):
+                    providers_successful.append("telegram")
+        
+        # Check Email success notifications
+        if self.is_email_enabled():
+            email_config = self.notification_config.get("email", {})
+            if email_config.get("notify_on_success", False):
+                providers_attempted.append("email")
+                if self._send_email(title, formatted_message, "success"):
+                    providers_successful.append("email")
+        
+        if providers_attempted:
+            success_ratio = f"{len(providers_successful)}/{len(providers_attempted)}"
+            if providers_successful:
+                print(f"INFO: Success notification sent via {success_ratio} providers: {', '.join(providers_successful)}")
+            else:
+                print(f"WARNING: Success notification failed via all {len(providers_attempted)} providers: {', '.join(providers_attempted)}")
+        else:
+            print(f"INFO: Success notifications disabled for job '{job_name}' - skipped")
     
     def is_notifications_enabled(self):
         """Check if any notification provider is enabled"""
         return self.is_telegram_enabled() or self.is_email_enabled()
     
     def is_telegram_enabled(self):
-        """Check if Telegram notifications are configured"""
+        """Check if Telegram notifications are configured and enabled"""
         telegram_config = self.notification_config.get("telegram", {})
         return bool(
+            telegram_config.get("enabled", False) and
             telegram_config.get("token") and 
             telegram_config.get("chat_id")
         )
     
     def is_email_enabled(self):
-        """Check if email notifications are configured"""
+        """Check if email notifications are configured and enabled"""
         email_config = self.notification_config.get("email", {})
         return bool(
+            email_config.get("enabled", False) and
             email_config.get("smtp_server") and
             email_config.get("smtp_port") and
             email_config.get("from_email") and

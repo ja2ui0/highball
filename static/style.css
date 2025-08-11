@@ -382,7 +382,7 @@ tr:hover {
     padding: var(--space-xxl);
     margin: var(--space-xxl) 0;
     border-radius: var(--radius-lg);
-    border-left: 4px solid var(--accent-primary);
+    border-left: 2px solid var(--border);
 }
 
 .config-section h3 {
@@ -412,6 +412,15 @@ tr:hover {
 .textarea-config {
     height: 400px;
     font-family: 'Courier New', monospace;
+}
+
+/* Log controls styling */
+.log-section {
+    margin-top: var(--space-xl);
+}
+
+.auto-scroll {
+    margin-left: 10px;
 }
 
 /* Common margin utilities */

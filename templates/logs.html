@@ -49,13 +49,19 @@
             <h3>Log Sources</h3>
             {{LOG_BUTTONS}}
             
-            <div style="margin-top: 15px;">
+            <div class="log-section">
+                <label for="jobSelect">Job Logs:</label>
+                <select id="jobSelect" onchange="viewJobLog()">
+                    {{JOB_DROPDOWN}}
+                </select>
+            </div>
+            
+            <div class="log-section">
                 <button id="toggleLive" class="button">Start Live Tail</button>
                 <button id="clearLogs" class="button button-warning">Clear Display</button>
                 <label class="auto-scroll">
                     <input type="checkbox" id="autoScroll" checked> Auto-scroll to bottom
                 </label>
-                <span id="liveStatus" class="live-indicator">Disconnected</span>
             </div>
         </div>
         
@@ -69,7 +75,6 @@
         let isLive = false;
         const logContent = document.getElementById('logContent');
         const toggleButton = document.getElementById('toggleLive');
-        const liveStatus = document.getElementById('liveStatus');
         const autoScrollCheckbox = document.getElementById('autoScroll');
         const logType = '{{LOG_TYPE}}';
         
@@ -79,19 +84,31 @@
             }
         }
         
+        function viewJobLog() {
+            const jobSelect = document.getElementById('jobSelect');
+            const jobName = jobSelect.value;
+            if (jobName) {
+                window.location.href = `/logs?job=${encodeURIComponent(jobName)}`;
+            }
+        }
+        
         function startLiveTail() {
             if (eventSource) {
                 eventSource.close();
             }
             
+            // Update button immediately to show connecting state
+            isLive = true;
+            toggleButton.textContent = 'Connecting...';
+            toggleButton.className = 'button button-warning';
+            toggleButton.disabled = true;
+            
             eventSource = new EventSource(`/logs/stream?type=${logType}`);
             
             eventSource.onopen = function() {
-                isLive = true;
                 toggleButton.textContent = 'Stop Live Tail';
                 toggleButton.className = 'button button-danger';
-                liveStatus.textContent = 'Connected';
-                liveStatus.className = 'live-indicator';
+                toggleButton.disabled = false;
             };
             
             eventSource.onmessage = function(event) {
@@ -100,9 +117,8 @@
             };
             
             eventSource.onerror = function() {
+                console.error('EventSource error occurred');
                 stopLiveTail();
-                liveStatus.textContent = 'Connection Error';
-                liveStatus.className = 'live-indicator disconnected';
             };
         }
         
@@ -113,9 +129,7 @@
             }
             isLive = false;
             toggleButton.textContent = 'Start Live Tail';
-            toggleButton.className = 'button';
-            liveStatus.textContent = 'Disconnected';
-            liveStatus.className = 'live-indicator disconnected';
+            toggleButton.className = 'button button-success';
         }
         
         toggleButton.addEventListener('click', function() {

@@ -11,22 +11,12 @@
         
         <h1>Configuration Manager</h1>
         
-        <div class="config-nav">
-            <strong>Current View:</strong> Structured Forms
-            <br><br>
-            <a href="/config/raw" class="button">Switch to Raw YAML Editor</a>
-        </div>
-        
-        <div class="alert alert-info">
-            <strong>Note:</strong> Changes made here will update your configuration immediately. 
-            Use the Raw YAML Editor for advanced configuration options not covered in these forms.
-        </div>
         
         <form method="post" action="/save-config">
             
             <!-- Global Settings -->
             <div class="config-section">
-                <h3>⚙️ Global Settings</h3>
+                <h3>Global Settings</h3>
                 
                 <div class="flex-row">
                     <div class="form-group flex-1">
@@ -64,56 +54,67 @@
             
             <!-- Schedule Defaults -->
             <div class="config-section">
-                <h3>📅 Default Schedule Times</h3>
+                <h3>Default Schedule Times</h3>
                 <p>These are the default times used when you select "Daily", "Weekly", or "Hourly" schedules.</p>
                 
-                <div class="flex-row">
-                    <div class="form-group flex-1">
-                        <label for="hourly_default">Hourly Default:</label>
-                        <input type="text" id="hourly_default" name="hourly_default" 
-                               value="{{HOURLY_DEFAULT}}" placeholder="0 * * * *">
-                        <div class="help-text">Cron pattern for hourly jobs (default: top of every hour)</div>
-                    </div>
-                    
-                    <div class="form-group flex-1">
-                        <label for="daily_default">Daily Default:</label>
-                        <input type="text" id="daily_default" name="daily_default" 
-                               value="{{DAILY_DEFAULT}}" placeholder="0 3 * * *">
-                        <div class="help-text">Cron pattern for daily jobs (default: 3:00 AM)</div>
-                    </div>
-                    
-                    <div class="form-group flex-1">
-                        <label for="weekly_default">Weekly Default:</label>
-                        <input type="text" id="weekly_default" name="weekly_default" 
-                               value="{{WEEKLY_DEFAULT}}" placeholder="0 3 * * 0">
-                        <div class="help-text">Cron pattern for weekly jobs (default: Sunday 3:00 AM)</div>
-                    </div>
+                <div class="form-group">
+                    <label for="hourly_default">Hourly Default:</label>
+                    <input type="text" id="hourly_default" name="hourly_default" 
+                           value="{{HOURLY_DEFAULT}}" placeholder="0 * * * *">
+                    <div class="help-text">Default ("0 * * * *" aka: top of every hour)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="daily_default">Daily Default:</label>
+                    <input type="text" id="daily_default" name="daily_default" 
+                           value="{{DAILY_DEFAULT}}" placeholder="0 3 * * *">
+                    <div class="help-text">Default ("0 3 * * *" aka: 3:00 AM daily)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="weekly_default">Weekly Default:</label>
+                    <input type="text" id="weekly_default" name="weekly_default" 
+                           value="{{WEEKLY_DEFAULT}}" placeholder="0 3 * * 0">
+                    <div class="help-text">Default ("0 3 * * 0" aka: Sunday 3:00 AM)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="monthly_default">Monthly Default:</label>
+                    <input type="text" id="monthly_default" name="monthly_default" 
+                           value="{{MONTHLY_DEFAULT}}" placeholder="0 3 1 * *">
+                    <div class="help-text">Default ("0 3 1 * *" aka: first of month 3:00 AM)</div>
                 </div>
             </div>
             
             <!-- Notification Settings -->
             <div class="config-section">
-                <h3>🔔 Notification Settings</h3>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="notify_on_success" {{NOTIFY_ON_SUCCESS}}> 
-                        Send notifications for successful jobs
-                    </label>
-                    <div class="help-text">Get notified when backup jobs complete successfully (in addition to failures and delays)</div>
-                </div>
+                <h3>Notification Settings</h3>
                 
                 <!-- Telegram Settings -->
-                <h4>📱 Telegram</h4>
-                <div class="flex-row">
-                    <div class="form-group flex-1">
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable_telegram" name="enable_telegram" {{TELEGRAM_ENABLED}} onchange="toggleTelegramSettings()"> 
+                        Enable Telegram notifications
+                    </label>
+                </div>
+                
+                <div id="telegramSettings" class="{{TELEGRAM_SETTINGS_CLASS}}">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="telegram_notify_success" {{TELEGRAM_NOTIFY_SUCCESS}}> 
+                            Notify on successful jobs via Telegram
+                        </label>
+                        <div class="help-text">Get Telegram notifications when backup jobs complete successfully (in addition to failures and delays)</div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="telegram_token">Bot Token:</label>
                         <input type="text" id="telegram_token" name="telegram_token" 
                                value="{{TELEGRAM_TOKEN}}" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
                         <div class="help-text">Get from @BotFather on Telegram</div>
                     </div>
                     
-                    <div class="form-group flex-1">
+                    <div class="form-group">
                         <label for="telegram_chat_id">Chat ID:</label>
                         <input type="text" id="telegram_chat_id" name="telegram_chat_id" 
                                value="{{TELEGRAM_CHAT_ID}}" placeholder="-1001234567890">
@@ -122,9 +123,23 @@
                 </div>
                 
                 <!-- Email Settings -->
-                <h4>📧 Email</h4>
-                <div class="flex-row">
-                    <div class="form-group flex-1">
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable_email" name="enable_email" {{EMAIL_ENABLED}} onchange="toggleEmailSettings()"> 
+                        Enable email notifications
+                    </label>
+                </div>
+                
+                <div id="emailSettings" class="{{EMAIL_SETTINGS_CLASS}}">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="email_notify_success" {{EMAIL_NOTIFY_SUCCESS}}> 
+                            Notify on successful jobs via email
+                        </label>
+                        <div class="help-text">Get email notifications when backup jobs complete successfully (in addition to failures and delays)</div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="email_smtp_server">SMTP Server:</label>
                         <input type="text" id="email_smtp_server" name="email_smtp_server" 
                                value="{{EMAIL_SMTP_SERVER}}" placeholder="smtp.gmail.com">
@@ -136,46 +151,43 @@
                                value="{{EMAIL_SMTP_PORT}}" placeholder="587">
                         <div class="help-text">587 for TLS, 465 for SSL, 25 for plain</div>
                     </div>
-                </div>
-                
-                <div class="flex-row">
+                    
                     <div class="form-group">
-                        <label>
-                            <input type="checkbox" name="email_use_tls" {{EMAIL_USE_TLS}}> Use TLS Encryption
-                        </label>
+                        <label>Encryption:</label>
+                        <div class="flex-row">
+                            <label>
+                                <input type="radio" name="email_encryption" value="tls" {{EMAIL_TLS_CHECKED}}> TLS
+                            </label>
+                            <label>
+                                <input type="radio" name="email_encryption" value="ssl" {{EMAIL_SSL_CHECKED}}> SSL
+                            </label>
+                            <label>
+                                <input type="radio" name="email_encryption" value="none" {{EMAIL_NONE_CHECKED}}> None
+                            </label>
+                        </div>
+                        <div class="help-text">Choose one encryption method</div>
                     </div>
                     
                     <div class="form-group">
-                        <label>
-                            <input type="checkbox" name="email_use_ssl" {{EMAIL_USE_SSL}}> Use SSL Encryption
-                        </label>
-                        <div class="help-text">Use either TLS or SSL, not both</div>
-                    </div>
-                </div>
-                
-                <div class="flex-row">
-                    <div class="form-group flex-1">
                         <label for="email_from">From Email:</label>
                         <input type="email" id="email_from" name="email_from" 
                                value="{{EMAIL_FROM}}" placeholder="backup@yourcompany.com">
                     </div>
                     
-                    <div class="form-group flex-1">
+                    <div class="form-group">
                         <label for="email_to">To Email:</label>
                         <input type="email" id="email_to" name="email_to" 
                                value="{{EMAIL_TO}}" placeholder="admin@yourcompany.com">
                     </div>
-                </div>
-                
-                <div class="flex-row">
-                    <div class="form-group flex-1">
+                    
+                    <div class="form-group">
                         <label for="email_username">SMTP Username:</label>
                         <input type="text" id="email_username" name="email_username" 
                                value="{{EMAIL_USERNAME}}" placeholder="your.email@gmail.com">
                         <div class="help-text">Usually your email address</div>
                     </div>
                     
-                    <div class="form-group flex-1">
+                    <div class="form-group">
                         <label for="email_password">SMTP Password:</label>
                         <input type="password" id="email_password" name="email_password" 
                                value="{{EMAIL_PASSWORD}}" placeholder="your-app-password">
@@ -192,7 +204,7 @@
         </form>
         
         <div class="config-section">
-            <h3>🔧 Advanced Options</h3>
+            <h3>Advanced Options</h3>
             <p>
                 <a href="/config/raw" class="button">Edit Raw YAML</a>
                 <a href="/reload-config" class="button">Reload from File</a>
@@ -200,5 +212,33 @@
             </p>
         </div>
     </div>
+    
+    <script>
+        function toggleTelegramSettings() {
+            const checkbox = document.getElementById('enable_telegram');
+            const settings = document.getElementById('telegramSettings');
+            if (checkbox.checked) {
+                settings.classList.remove('hidden');
+            } else {
+                settings.classList.add('hidden');
+            }
+        }
+        
+        function toggleEmailSettings() {
+            const checkbox = document.getElementById('enable_email');
+            const settings = document.getElementById('emailSettings');
+            if (checkbox.checked) {
+                settings.classList.remove('hidden');
+            } else {
+                settings.classList.add('hidden');
+            }
+        }
+        
+        // Initialize settings visibility on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleTelegramSettings();
+            toggleEmailSettings();
+        });
+    </script>
 </body>
 </html>

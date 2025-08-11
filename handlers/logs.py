@@ -28,8 +28,9 @@ class LogsHandler:
         },
     }
     
-    def __init__(self, template_service):
+    def __init__(self, template_service, backup_config=None):
         self.template_service = template_service
+        self.backup_config = backup_config
     
     def show_logs(self, handler, log_type='app'):
         """Show logs viewer with live tailing capability"""
@@ -57,35 +58,35 @@ class LogsHandler:
             log_content = self._read_log_file(current_log['file'])
             log_buttons = self._generate_log_buttons(log_type)
         
+        # Generate job dropdown
+        job_dropdown = self._generate_job_dropdown(job_name)
+        
         # Render template
         html_content = self.template_service.render_template(
             'logs.html',
             log_buttons=log_buttons,
             log_content=html.escape(log_content),
             log_type=log_type,
-            log_name=log_name
+            log_name=log_name,
+            job_dropdown=job_dropdown
         )
         
         self.template_service.send_html_response(handler, html_content)
     
     def stream_logs(self, handler, log_type='app'):
         """Stream logs in real-time using Server-Sent Events"""
-        log_file = self.LOG_TYPES.get(log_type, self.LOG_TYPES['app'])['file']
-        
         # Set SSE headers
         handler.send_response(200)
         handler.send_header('Content-type', 'text/event-stream')
         handler.send_header('Cache-Control', 'no-cache')
         handler.send_header('Connection', 'keep-alive')
+        handler.send_header('X-Accel-Buffering', 'no')  # Tell nginx not to buffer
         handler.end_headers()
         
-        try:
-            if os.path.exists(log_file):
-                self._tail_log_file(handler, log_file)
-            else:
-                self._send_sse_message(handler, f"Log file {log_file} not found")
-        except Exception as e:
-            self._send_sse_message(handler, f"Error streaming logs: {str(e)}")
+        # Send a simple test message and close
+        message = f"data: TEST: Streaming works for {log_type}\n\n"
+        handler.wfile.write(message.encode())
+        handler.wfile.flush()
     
     def _generate_log_buttons(self, current_log_type):
         """Generate HTML for log type selection buttons"""
@@ -94,6 +95,22 @@ class LogsHandler:
             active_class = "button-success" if log_type == current_log_type else ""
             buttons += f'<a href="/logs?type={log_type}" class="button {active_class}">{info["name"]}</a>\n'
         return buttons
+    
+    def _generate_job_dropdown(self, selected_job=None):
+        """Generate HTML for job log selection dropdown"""
+        if not self.backup_config:
+            return '<option value="">No jobs configured</option>'
+        
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        if not jobs:
+            return '<option value="">No jobs configured</option>'
+        
+        options = '<option value="">Select a job...</option>\n'
+        for job_name in sorted(jobs.keys()):
+            selected = 'selected' if job_name == selected_job else ''
+            options += f'<option value="{html.escape(job_name)}" {selected}>{html.escape(job_name)}</option>\n'
+        
+        return options
     
     def _read_log_file(self, log_file):
         """Read last 100 lines of log file"""
@@ -109,28 +126,67 @@ class LogsHandler:
     
     def _tail_log_file(self, handler, log_file):
         """Tail log file and send updates via SSE"""
-        process = subprocess.Popen(
-            ['tail', '-f', log_file], 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE,
-            universal_newlines=True
-        )
-        
         try:
+            # Send a few recent lines first
+            with open(log_file, 'r') as f:
+                lines = f.readlines()
+                recent_lines = lines[-5:] if len(lines) > 5 else lines
+                for line in recent_lines:
+                    self._send_sse_message(handler, line.strip())
+        except Exception as e:
+            self._send_sse_message(handler, f"ERROR: Could not read log file - {str(e)}")
+            return
+        
+        # Start streaming new lines
+        self._send_sse_message(handler, "--- Live tail started ---")
+        
+        process = None
+        try:
+            process = subprocess.Popen(
+                ['tail', '-f', log_file], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=0  # Unbuffered
+            )
+            
             while True:
                 output = process.stdout.readline()
                 if output:
                     self._send_sse_message(handler, output.strip())
+                elif process.poll() is not None:
+                    # Process ended
+                    self._send_sse_message(handler, "ERROR: Tail process ended")
+                    break
                 else:
+                    # No output, small sleep to prevent busy loop
                     time.sleep(0.1)
-        except Exception:
-            # Client disconnected or other error
+                    
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected - normal for streaming
             pass
+        except Exception as e:
+            try:
+                self._send_sse_message(handler, f"ERROR: Tail failed - {str(e)}")
+            except:
+                pass
         finally:
-            process.terminate()
+            if process:
+                process.terminate()
+                try:
+                    process.wait(timeout=1)
+                except:
+                    process.kill()
     
     def _send_sse_message(self, handler, message):
         """Send Server-Sent Event message"""
-        data = f"data: {html.escape(message)}\n\n"
-        handler.wfile.write(data.encode())
-        handler.wfile.flush()
+        try:
+            data = f"data: {html.escape(message)}\n\n"
+            handler.wfile.write(data.encode())
+            handler.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected - re-raise so caller can handle
+            raise
+        except Exception as e:
+            # Other write errors - re-raise with context
+            raise ConnectionError(f"Failed to send message: {str(e)}")
