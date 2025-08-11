@@ -440,6 +440,14 @@ tr:hover {
     border-left: 2px solid var(--accent-primary);
 }
 
+/* Config note styling for job forms */
+.config-note {
+    background: var(--bg-tertiary);
+    padding: var(--space-lg);
+    border-radius: var(--radius);
+    margin-top: var(--space-sm);
+}
+
 /* Width utilities for specific inputs */
 .w-150 { width: 150px; }
 

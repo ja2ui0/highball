@@ -62,8 +62,10 @@ class DashboardHandler:
 
     def show_add_job_form(self, handler):
         """Show form to add new backup job"""
-        template = self.template_service.load_template('add_job.html')
-        self.template_service.send_html_response(handler, template)
+        # Use shared template with default values for new job
+        template_vars = self._get_job_form_template_vars()
+        html_content = self.template_service.render_template('job_form.html', **template_vars)
+        self.template_service.send_html_response(handler, html_content)
 
     def show_edit_job_form(self, handler, job_name):
         """Show form to edit existing backup job"""
@@ -72,49 +74,9 @@ class DashboardHandler:
             self.template_service.send_error_response(handler, f"Job '{job_name}' not found")
             return
 
-        # Parse current configuration
-        source_config = job_config.get('source_config', {})
-        dest_config = job_config.get('dest_config', {})
-        source_type = job_config.get('source_type', 'ssh')
-        dest_type = job_config.get('dest_type', 'rsyncd')
-        
-        # Parse schedule - detect if it's a cron pattern
-        schedule = job_config.get('schedule', 'manual')
-        schedule_type = schedule
-        cron_pattern = ''
-        
-        # Check if it's a cron pattern (has spaces and not in known types)
-        if ' ' in schedule and schedule not in ['manual', 'hourly', 'daily', 'weekly']:
-            schedule_type = 'cron'
-            cron_pattern = schedule
-
-        # Render edit form with full field population
-        html_content = self.template_service.render_template(
-            'edit_job.html',
-            job_name=html.escape(job_name),
-            source_type=source_type,
-            dest_type=dest_type,
-            # Source fields
-            source_local_path=source_config.get('path', ''),
-            source_ssh_hostname=source_config.get('hostname', ''),
-            source_ssh_username=source_config.get('username', ''),
-            source_ssh_path=source_config.get('path', ''),
-            # Dest fields
-            dest_local_path=dest_config.get('path', ''),
-            dest_ssh_hostname=dest_config.get('hostname', ''),
-            dest_ssh_username=dest_config.get('username', ''),
-            dest_ssh_path=dest_config.get('path', ''),
-            dest_rsyncd_hostname=dest_config.get('hostname', ''),
-            dest_rsyncd_share=dest_config.get('share', ''),
-            # Patterns and schedule
-            includes='\n'.join(job_config.get('includes', [])),
-            excludes='\n'.join(job_config.get('excludes', [])),
-            schedule_type=schedule_type,
-            cron_pattern=cron_pattern,
-            enabled_checked='checked' if job_config.get('enabled', True) else '',
-            conflicts_checked='checked' if job_config.get('respect_conflicts', True) else ''
-        )
-
+        # Use shared template with populated values for editing
+        template_vars = self._get_job_form_template_vars(job_name, job_config)
+        html_content = self.template_service.render_template('job_form.html', **template_vars)
         self.template_service.send_html_response(handler, html_content)
 
     def save_backup_job(self, handler, form_data):
@@ -307,3 +269,108 @@ class DashboardHandler:
             result = JobValidator.validate_rsyncd_destination(hostname, share, source_config)
 
         self.template_service.send_json_response(handler, result)
+
+    def _get_job_form_template_vars(self, job_name=None, job_config=None):
+        """Generate template variables for shared job form"""
+        is_edit = job_name is not None and job_config is not None
+        
+        if is_edit:
+            # Parse configuration for editing
+            source_config = job_config.get('source_config', {})
+            dest_config = job_config.get('dest_config', {})
+            source_type = job_config.get('source_type', 'ssh')
+            dest_type = job_config.get('dest_type', 'rsyncd')
+            
+            # Parse schedule - detect if it's a cron pattern
+            schedule = job_config.get('schedule', 'manual')
+            schedule_type = schedule
+            cron_pattern = ''
+            
+            # Check if it's a cron pattern (has spaces and not in known types)
+            if ' ' in schedule and schedule not in ['manual', 'hourly', 'daily', 'weekly', 'monthly']:
+                schedule_type = 'cron'
+                cron_pattern = schedule
+            
+            # For rsyncd share selection in edit mode
+            share_selection_class = '' if dest_type == 'rsyncd' and dest_config.get('share') else 'hidden'
+            share_label = 'Share'
+            share_options = f'<option value="{html.escape(dest_config.get("share", ""))}" selected>{html.escape(dest_config.get("share", ""))}</option>'
+        else:
+            # Default values for new job
+            source_config = {}
+            dest_config = {}
+            source_type = ''
+            dest_type = ''
+            schedule_type = 'manual'
+            cron_pattern = ''
+            job_name = ''
+            
+            # For rsyncd share selection in add mode
+            share_selection_class = 'hidden'
+            share_label = 'Available Shares'
+            share_options = ''
+        
+        return {
+            # Form metadata
+            'PAGE_TITLE': 'Edit Backup Job' if is_edit else 'Add Backup Job',
+            'FORM_TITLE': f'Edit Backup Job: {html.escape(job_name)}' if is_edit else 'Add New Backup Job',
+            'SUBMIT_BUTTON_TEXT': 'Update Backup Job' if is_edit else 'Create Job',
+            'HIDDEN_FIELDS': f'<input type="hidden" name="original_job_name" value="{html.escape(job_name)}">' if is_edit else '',
+            'DELETE_FORM': self._get_delete_form_html(job_name) if is_edit else '',
+            
+            # Job fields
+            'JOB_NAME': html.escape(job_name) if is_edit else '',
+            
+            # Source type selection
+            'SOURCE_LOCAL_SELECTED': 'selected' if source_type == 'local' else '',
+            'SOURCE_SSH_SELECTED': 'selected' if source_type == 'ssh' else '',
+            
+            # Source fields
+            'SOURCE_LOCAL_PATH': source_config.get('path', ''),
+            'SOURCE_SSH_HOSTNAME': source_config.get('hostname', ''),
+            'SOURCE_SSH_USERNAME': source_config.get('username', ''),
+            'SOURCE_SSH_PATH': source_config.get('path', ''),
+            
+            # Dest type selection  
+            'DEST_LOCAL_SELECTED': 'selected' if dest_type == 'local' else '',
+            'DEST_SSH_SELECTED': 'selected' if dest_type == 'ssh' else '',
+            'DEST_RSYNCD_SELECTED': 'selected' if dest_type == 'rsyncd' else '',
+            
+            # Dest fields
+            'DEST_LOCAL_PATH': dest_config.get('path', ''),
+            'DEST_SSH_HOSTNAME': dest_config.get('hostname', ''),
+            'DEST_SSH_USERNAME': dest_config.get('username', ''),
+            'DEST_SSH_PATH': dest_config.get('path', ''),
+            'DEST_RSYNCD_HOSTNAME': dest_config.get('hostname', ''),
+            'DEST_RSYNCD_SHARE': dest_config.get('share', ''),
+            
+            # Share selection
+            'SHARE_SELECTION_CLASS': share_selection_class,
+            'SHARE_LABEL': share_label,
+            'SHARE_OPTIONS': share_options,
+            
+            # Patterns
+            'INCLUDES': '\n'.join(job_config.get('includes', [])) if is_edit else '',
+            'EXCLUDES': '\n'.join(job_config.get('excludes', [])) if is_edit else '',
+            
+            # Schedule selection
+            'SCHEDULE_MANUAL_SELECTED': 'selected' if schedule_type == 'manual' else '',
+            'SCHEDULE_HOURLY_SELECTED': 'selected' if schedule_type == 'hourly' else '',
+            'SCHEDULE_DAILY_SELECTED': 'selected' if schedule_type == 'daily' else '',
+            'SCHEDULE_WEEKLY_SELECTED': 'selected' if schedule_type == 'weekly' else '',
+            'SCHEDULE_MONTHLY_SELECTED': 'selected' if schedule_type == 'monthly' else '',
+            'SCHEDULE_CRON_SELECTED': 'selected' if schedule_type == 'cron' else '',
+            'CRON_PATTERN': cron_pattern,
+            
+            # Checkboxes
+            'ENABLED_CHECKED': 'checked' if (is_edit and job_config.get('enabled', True)) or (not is_edit) else '',
+            'CONFLICTS_CHECKED': 'checked' if (is_edit and job_config.get('respect_conflicts', True)) or (not is_edit) else ''
+        }
+    
+    def _get_delete_form_html(self, job_name):
+        """Generate delete form HTML for edit mode"""
+        return f'''
+        <form method="post" action="/delete-job" class="mt-20" onsubmit="return confirm('Are you sure you want to delete this backup job?')">
+            <input type="hidden" name="job_name" value="{html.escape(job_name)}">
+            <input type="submit" value="Delete Job" class="button button-danger">
+        </form>'''

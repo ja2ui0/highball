@@ -17,7 +17,8 @@ def _resolve_cron_string(s: str, backup_config) -> str | None:
     default_times = global_settings.get("default_schedule_times", {
         "hourly": "0 * * * *",
         "daily": "0 3 * * *", 
-        "weekly": "0 3 * * 0"
+        "weekly": "0 3 * * 0",
+        "monthly": "0 3 1 * *"
     })
     
     if s in default_times:

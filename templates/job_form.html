@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Add Backup Job - Backup Manager</title>
+    <title>{{PAGE_TITLE}} - Backup Manager</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/nav.js"></script>
     <script src="/static/add-job.js"></script>
@@ -10,37 +10,39 @@
     <div class="container">
         <div id="navigation"></div>
         
-        <h1>Add New Backup Job</h1>
+        <h1>{{FORM_TITLE}}</h1>
         
         <form method="post" action="/save-job">
+            {{HIDDEN_FIELDS}}
+            
             <div class="form-group">
                 <label for="job_name">Job Name:</label>
-                <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos">
+                <input type="text" id="job_name" name="job_name" required value="{{JOB_NAME}}" placeholder="e.g., documents, photos">
             </div>
             
             <div class="form-group">
                 <label for="source_type">Source Type:</label>
                 <select id="source_type" name="source_type" required onchange="showSourceFields()">
                     <option value="">Select source...</option>
-                    <option value="local">Local Path</option>
-                    <option value="ssh">SSH Remote</option>
+                    <option value="local" {{SOURCE_LOCAL_SELECTED}}>Local Path</option>
+                    <option value="ssh" {{SOURCE_SSH_SELECTED}}>SSH Remote</option>
                 </select>
             </div>
             
-            <div id="source_local" style="display:none">
+            <div id="source_local" class="hidden">
                 <label for="source_local_path">Local Path:</label>
-                <input type="text" name="source_local_path" placeholder="/var/lib/docker/volumes/data">
+                <input type="text" name="source_local_path" value="{{SOURCE_LOCAL_PATH}}" placeholder="/var/lib/docker/volumes/data">
             </div>
             
-            <div id="source_ssh" style="display:none">
+            <div id="source_ssh" class="hidden">
                 <label for="source_ssh_hostname">Hostname:</label>
-                <input type="text" name="source_ssh_hostname" placeholder="server">
+                <input type="text" name="source_ssh_hostname" value="{{SOURCE_SSH_HOSTNAME}}" placeholder="server">
                 
                 <label for="source_ssh_username">Username:</label>
-                <input type="text" name="source_ssh_username" placeholder="root">
+                <input type="text" name="source_ssh_username" value="{{SOURCE_SSH_USERNAME}}" placeholder="root">
                 
                 <label for="source_ssh_path">Path:</label>
-                <input type="text" name="source_ssh_path" placeholder="/mnt/data">
+                <input type="text" name="source_ssh_path" value="{{SOURCE_SSH_PATH}}" placeholder="/mnt/data">
                 
                 <div class="help-text">
                     <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
@@ -53,31 +55,31 @@
                 <label for="dest_type">Destination Type:</label>
                 <select id="dest_type" name="dest_type" required onchange="showDestFields()">
                     <option value="">Select destination...</option>
-                    <option value="local">Local Path</option>
-                    <option value="ssh">SSH Remote</option>
-                    <option value="rsyncd">Rsync Daemon</option>
+                    <option value="local" {{DEST_LOCAL_SELECTED}}>Local Path</option>
+                    <option value="ssh" {{DEST_SSH_SELECTED}}>SSH Remote</option>
+                    <option value="rsyncd" {{DEST_RSYNCD_SELECTED}}>Rsync Daemon</option>
                 </select>
             </div>
             
-            <div id="dest_local" style="display:none">
+            <div id="dest_local" class="hidden">
                 <label for="dest_local_path">Local Destination Path (on source system):</label>
-                <input type="text" name="dest_local_path" placeholder="/backups">
-                <div class="help-text" style="background-color: #3a3a3a; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                <input type="text" name="dest_local_path" value="{{DEST_LOCAL_PATH}}" placeholder="/backups">
+                <div class="help-text config-note">
                     <strong>Important:</strong> "Local" means local to the SOURCE system, not this container.<br>
                     If source is SSH remote, destination will be created on that remote system.<br>
                     If source is local to this container, destination must be a mounted volume.
                 </div>
             </div>
             
-            <div id="dest_ssh" style="display:none">
+            <div id="dest_ssh" class="hidden">
                 <label for="dest_ssh_hostname">Hostname:</label>
-                <input type="text" name="dest_ssh_hostname" placeholder="backup-server">
+                <input type="text" name="dest_ssh_hostname" value="{{DEST_SSH_HOSTNAME}}" placeholder="backup-server">
                 
                 <label for="dest_ssh_username">Username:</label>
-                <input type="text" name="dest_ssh_username" placeholder="backup">
+                <input type="text" name="dest_ssh_username" value="{{DEST_SSH_USERNAME}}" placeholder="backup">
                 
                 <label for="dest_ssh_path">Path:</label>
-                <input type="text" name="dest_ssh_path" placeholder="/backups">
+                <input type="text" name="dest_ssh_path" value="{{DEST_SSH_PATH}}" placeholder="/backups">
                 
                 <div class="help-text">
                     <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
@@ -86,18 +88,19 @@
                 </div>
             </div>
             
-            <div id="dest_rsyncd" style="display:none">
+            <div id="dest_rsyncd" class="hidden">
                 <label for="dest_rsyncd_hostname">Hostname:</label>
                 <div class="flex-row">
-                    <input type="text" name="dest_rsyncd_hostname" placeholder="backup-server" class="flex-1">
+                    <input type="text" name="dest_rsyncd_hostname" value="{{DEST_RSYNCD_HOSTNAME}}" placeholder="backup-server" class="flex-1">
                     <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
                 </div>
                 <span id="discover_status"></span>
                 
-                <div id="share_selection" style="display: none; margin-top: 15px;">
-                    <label for="dest_rsyncd_share">Available Shares:</label>
+                <div id="share_selection" class="{{SHARE_SELECTION_CLASS}} mt-15">
+                    <label for="dest_rsyncd_share">{{SHARE_LABEL}}:</label>
                     <select name="dest_rsyncd_share" id="dest_rsyncd_share">
                         <option value="">Select a share...</option>
+                        {{SHARE_OPTIONS}}
                     </select>
                 </div>
                 
@@ -109,61 +112,74 @@
             <div class="form-group">
                 <label for="includes">Include Patterns (optional):</label>
                 <textarea name="includes" placeholder="**/*.jpg
-documents/**"></textarea>
+documents/**">{{INCLUDES}}</textarea>
             </div>
             
             <div class="form-group">
                 <label for="excludes">Exclude Patterns (optional):</label>
                 <textarea name="excludes" placeholder="*.tmp
 *.log
-.git/**"></textarea>
+.git/**">{{EXCLUDES}}</textarea>
             </div>
             
             <div class="form-group">
                 <label for="schedule">Schedule:</label>
                 <select id="schedule" name="schedule" onchange="showCronField()">
-                    <option value="manual">Manual Only</option>
-                    <option value="hourly">Hourly</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="cron">Custom Cron Pattern</option>
+                    <option value="manual" {{SCHEDULE_MANUAL_SELECTED}}>Manual Only</option>
+                    <option value="hourly" {{SCHEDULE_HOURLY_SELECTED}}>Hourly</option>
+                    <option value="daily" {{SCHEDULE_DAILY_SELECTED}}>Daily</option>
+                    <option value="weekly" {{SCHEDULE_WEEKLY_SELECTED}}>Weekly</option>
+                    <option value="monthly" {{SCHEDULE_MONTHLY_SELECTED}}>Monthly</option>
+                    <option value="cron" {{SCHEDULE_CRON_SELECTED}}>Custom Cron Pattern</option>
                 </select>
             </div>
             
             <div id="cron_field" class="hidden mt-10">
                 <label for="cron_pattern">Cron Pattern:</label>
-                <input type="text" name="cron_pattern" placeholder="0 3 * * *" 
+                <input type="text" name="cron_pattern" value="{{CRON_PATTERN}}" placeholder="0 3 * * *" 
                        title="Format: minute hour day month weekday">
                 <div class="help-text">
-                    Examples: "0 3 * * *" (daily 3am), "0 */6 * * *" (every 6 hours), "0 3 * * 0" (weekly Sunday 3am)
+                    Examples: "0 3 * * *" (daily 3am), "0 */6 * * *" (every 6 hours), "0 3 * * 0" (weekly Sunday 3am), "0 3 1 * *" (monthly 1st 3am)
                 </div>
             </div>
             
             <div class="form-group">
-                <label><input type="checkbox" name="enabled" checked> Enabled</label>
+                <label>
+                    <input type="checkbox" name="enabled" value="true" {{ENABLED_CHECKED}}> Enabled
+                </label>
             </div>
             
             <div class="form-group">
-                <label><input type="checkbox" name="respect_conflicts" checked> Wait for conflicting jobs (recommended)</label>
+                <label>
+                    <input type="checkbox" name="respect_conflicts" value="true" {{CONFLICTS_CHECKED}}> Wait for conflicting jobs (recommended)
+                </label>
                 <div class="help-text">
                     When enabled, this job will wait for other jobs using the same source or destination to finish before running.
                 </div>
             </div>
             
-            <input type="submit" value="Create Job" class="button button-success">
+            <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
             <a href="/" class="button">Cancel</a>
         </form>
+        
+        {{DELETE_FORM}}
     </div>
     
     <script>
+        // Initialize form display based on current values
+        document.addEventListener('DOMContentLoaded', function() {
+            showSourceFields();
+            showDestFields();
+            showCronField();
+        });
+        
         function showCronField() {
             const schedule = document.getElementById('schedule').value;
             const cronField = document.getElementById('cron_field');
             if (schedule === 'cron') {
-                cronField.style.display = 'block';
+                cronField.classList.remove('hidden');
             } else {
-                cronField.style.display = 'none';
+                cronField.classList.add('hidden');
             }
         }
     </script>
