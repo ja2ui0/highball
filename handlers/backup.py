@@ -3,6 +3,7 @@ Backup execution handler
 Handles running backup jobs (dry-run and real) with async execution
 """
 import subprocess
+import time
 from datetime import datetime
 import threading
 import shlex  # for safe logging/remote command quoting
@@ -77,11 +78,37 @@ class BackupHandler:
         job_config = self.backup_config.config["backup_jobs"][job_name]
         conflict_manager = RuntimeConflictManager(self.backup_config)
         
+        # Track conflict delay for logging and notifications
+        wait_start_time = None
+        total_wait_time = 0
+        
         # Wait for any conflicting jobs to finish
         while conflict_manager.has_conflicting_jobs_running(job_name, job_config):
+            if wait_start_time is None:
+                wait_start_time = time.time()
+                running_jobs = conflict_manager.get_running_jobs()
+                conflicting_resources = self._get_conflicting_resources(job_config, running_jobs, conflict_manager)
+                print(f"INFO: Job '{job_name}' delayed due to resource conflicts with: {', '.join(running_jobs)}")
+                print(f"INFO: Conflicting resources: {conflicting_resources}")
+                
+                # Log initial conflict detection
+                conflict_msg = f"Job delayed waiting for conflicting jobs: {', '.join(running_jobs)}"
+                self.job_logger.log_job_status(job_name, "waiting-conflict", conflict_msg)
+            
             check_interval = conflict_manager.get_conflict_check_interval()
             print(f"INFO: Job '{job_name}' waiting {check_interval} seconds for conflicting jobs to finish")
             time.sleep(check_interval)
+        
+        # Calculate total wait time and log if there was a delay
+        if wait_start_time is not None:
+            total_wait_time = time.time() - wait_start_time
+            delay_msg = f"Job waited {total_wait_time:.1f} seconds due to resource conflicts before starting"
+            print(f"INFO: {delay_msg}")
+            self.job_logger.log_job_status(job_name, "conflict-resolved", delay_msg)
+            
+            # Send notification if delay was significant (configurable threshold)
+            if total_wait_time > self._get_delay_notification_threshold():
+                self._send_delay_notification(job_name, total_wait_time, source)
         
         # Register this job as running
         conflict_manager.register_running_job(job_name)
@@ -100,19 +127,47 @@ class BackupHandler:
         """
         Runs in a daemon thread: builds command, executes, logs results.
         """
+        start_time = time.time()
+        
         try:
             result = self._execute_rsync(job_name, job_config, global_settings, dry_run, trigger_source)
+            duration = time.time() - start_time
+            
             if dry_run:
                 status = "completed-dry-run" if result["success"] else "error-dry-run"
                 message = f'Dry run completed with return code {result["return_code"]} (triggered by {trigger_source})'
             else:
                 status = "completed" if result["success"] else "error"
                 message = f'Backup completed with return code {result["return_code"]}'
+            
             self.job_logger.log_job_status(job_name, status, message)
             self.job_logger.log_job_execution(job_name, result["log_content"])
+            
+            # Send notifications
+            try:
+                from services.notification_service import NotificationService
+                notifier = NotificationService(self.backup_config)
+                
+                if result["success"]:
+                    notifier.send_job_success_notification(job_name, duration, dry_run)
+                else:
+                    error_msg = f'Return code {result["return_code"]}'
+                    notifier.send_job_failure_notification(job_name, error_msg, dry_run)
+            except Exception as notify_error:
+                print(f"WARNING: Failed to send job completion notification: {str(notify_error)}")
+                
         except Exception as e:
+            duration = time.time() - start_time
             self.job_logger.log_job_status(job_name, "error", str(e))
             self.job_logger.log_job_execution(job_name, f"ERROR: {str(e)}", "ERROR")
+            
+            # Send failure notification
+            try:
+                from services.notification_service import NotificationService
+                notifier = NotificationService(self.backup_config)
+                notifier.send_job_failure_notification(job_name, str(e), dry_run)
+            except Exception as notify_error:
+                print(f"WARNING: Failed to send job failure notification: {str(notify_error)}")
 
     # ---------------------------
     # Rsync execution
@@ -373,4 +428,46 @@ EXCLUDES: {job_config.get('excludes', [])}
         except Exception:
             pass
         return fallback_path
+    
+    def _get_conflicting_resources(self, job_config, running_jobs, conflict_manager):
+        """Get description of conflicting resources"""
+        job_sources, job_destinations = conflict_manager.get_job_resources(job_config)
+        
+        conflicts = []
+        for running_job in running_jobs:
+            if running_job in self.backup_config.config.get("backup_jobs", {}):
+                running_config = self.backup_config.config["backup_jobs"][running_job]
+                running_sources, running_destinations = conflict_manager.get_job_resources(running_config)
+                
+                shared_sources = job_sources.intersection(running_sources)
+                shared_destinations = job_destinations.intersection(running_destinations)
+                
+                if shared_sources:
+                    conflicts.append(f"shared sources: {', '.join(shared_sources)}")
+                if shared_destinations:
+                    conflicts.append(f"shared destinations: {', '.join(shared_destinations)}")
+        
+        return "; ".join(conflicts) if conflicts else "unknown resource conflict"
+    
+    def _get_delay_notification_threshold(self):
+        """Get minimum delay time before sending notification (in seconds)"""
+        global_settings = self.backup_config.config.get("global_settings", {})
+        return global_settings.get("delay_notification_threshold", 300)  # Default 5 minutes
+    
+    def _send_delay_notification(self, job_name, delay_seconds, source):
+        """Send notification about job delay"""
+        try:
+            from services.notification_service import NotificationService
+            from services.job_conflict_manager import RuntimeConflictManager
+            
+            notifier = NotificationService(self.backup_config)
+            conflict_manager = RuntimeConflictManager(self.backup_config)
+            
+            delay_minutes = delay_seconds / 60
+            running_jobs = conflict_manager.get_running_jobs()
+            
+            notifier.send_job_delay_notification(job_name, delay_minutes, running_jobs, source)
+            print(f"INFO: Sent delay notification for job '{job_name}' (delayed {delay_minutes:.1f} minutes)")
+        except Exception as e:
+            print(f"WARNING: Failed to send delay notification for job '{job_name}': {str(e)}")
 

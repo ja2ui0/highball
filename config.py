@@ -100,9 +100,21 @@ class BackupConfig:
                 },
                 "enable_conflict_avoidance": True,  # wait for conflicting jobs before running
                 "conflict_check_interval": 300,     # seconds between conflict checks (5 minutes)
+                "delay_notification_threshold": 300,  # seconds delay before sending notification (5 minutes)
                 "notification": {
                     "telegram_token": "",
-                    "telegram_chat_id": ""
+                    "telegram_chat_id": "",
+                    "notify_on_success": False,  # send notifications for successful jobs
+                    "email": {
+                        "smtp_server": "",         # e.g. smtp.gmail.com
+                        "smtp_port": 587,          # 587 for TLS, 465 for SSL, 25 for plain
+                        "use_tls": True,           # use TLS encryption
+                        "use_ssl": False,          # use SSL encryption (alternative to TLS)
+                        "from_email": "",          # sender email address
+                        "to_email": "",            # recipient email address  
+                        "username": "",            # SMTP authentication username
+                        "password": ""             # SMTP authentication password
+                    }
                 }
             },
             "backup_jobs": {}
