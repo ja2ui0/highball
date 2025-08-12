@@ -314,6 +314,15 @@ tr:hover {
     margin-bottom: var(--space-xxxl);
     padding: var(--space-xl) 0;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+}
+
+.nav-logo {
+    height: 24px;
+    width: 24px;
+    margin-right: var(--space-lg);
+    border-radius: var(--radius);
 }
 
 .nav a {
@@ -412,15 +421,35 @@ tr:hover {
 .textarea-config {
     height: 400px;
     font-family: 'Courier New', monospace;
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Log viewer styles */
+.log-viewer {
+    background-color: #1a1a1a;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 15px;
+    border-radius: 4px;
+    height: 500px;
+    overflow-y: auto;
+    border: 1px solid #555;
+    white-space: pre-wrap;
+}
+
+.log-controls {
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: #3a3a3a;
+    border-radius: 4px;
 }
 
 /* Log controls styling */
 .log-section {
     margin-top: var(--space-xl);
-}
-
-.auto-scroll {
-    margin-left: 10px;
 }
 
 /* Common margin utilities */

@@ -2,7 +2,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     const navHTML = `
         <nav class="nav">
-            <a href="/">Dashboard</a>
+            <img src="/favicon.ico" alt="Highball" class="nav-logo">
+            <a href="/">Highball</a>
             <a href="/add-job">Add Job</a>
             <a href="/config">Config</a>
             <a href="/logs">Inspect</a>

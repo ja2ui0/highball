@@ -90,11 +90,12 @@
             
             <div id="dest_rsyncd" class="hidden">
                 <label for="dest_rsyncd_hostname">Hostname:</label>
-                <div class="flex-row">
-                    <input type="text" name="dest_rsyncd_hostname" value="{{DEST_RSYNCD_HOSTNAME}}" placeholder="backup-server" class="flex-1">
+                <input type="text" name="dest_rsyncd_hostname" value="{{DEST_RSYNCD_HOSTNAME}}" placeholder="backup-server">
+                
+                <div class="mt-10">
                     <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
+                    <span id="discover_status"></span>
                 </div>
-                <span id="discover_status"></span>
                 
                 <div id="share_selection" class="{{SHARE_SELECTION_CLASS}} mt-15">
                     <label for="dest_rsyncd_share">{{SHARE_LABEL}}:</label>

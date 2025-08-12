@@ -95,6 +95,11 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             if path.startswith('/static/'):
                 self._serve_static_file(path)
                 return
+            
+            # Favicon
+            if path == '/favicon.ico':
+                self._serve_favicon()
+                return
 
             # Route to handlers
             if path in ['/', '/dashboard']:
@@ -203,6 +208,19 @@ class BackupWebHandler(BaseHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header('Content-type', content_type)
+            self.end_headers()
+            self.wfile.write(content)
+        else:
+            self._send_404()
+
+    def _serve_favicon(self):
+        """Serve favicon.ico from root directory"""
+        if os.path.exists('favicon.ico'):
+            with open('favicon.ico', 'rb') as f:
+                content = f.read()
+
+            self.send_response(200)
+            self.send_header('Content-type', 'image/x-icon')
             self.end_headers()
             self.wfile.write(content)
         else:

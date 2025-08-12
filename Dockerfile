@@ -2,6 +2,7 @@ FROM backup-manager-base:latest
 WORKDIR /app
 # Copy application files (fast - just file copies)
 COPY *.py /app/
+COPY favicon.ico /app/
 COPY handlers/ /app/handlers/
 COPY services/ /app/services/
 COPY templates/ /app/templates/
