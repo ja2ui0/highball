@@ -33,6 +33,11 @@ class JobFormData:
     dest_rsyncd_hostname: str = ""
     dest_rsyncd_share: str = ""
     
+    # Restic destination configuration (minimal set)
+    restic_repo_type: str = ""
+    restic_repo_location: str = ""
+    restic_password: str = ""
+    
     # Schedule configuration
     schedule_type: str = "manual"
     cron_pattern: str = ""
@@ -94,6 +99,7 @@ class JobFormData:
             'DEST_LOCAL_SELECTED': 'selected' if self.dest_type == 'local' else '',
             'DEST_SSH_SELECTED': 'selected' if self.dest_type == 'ssh' else '',
             'DEST_RSYNCD_SELECTED': 'selected' if self.dest_type == 'rsyncd' else '',
+            'DEST_RESTIC_SELECTED': 'selected' if self.dest_type == 'restic' else '',
             
             # Dest fields
             'DEST_LOCAL_PATH': self.dest_local_path,
@@ -102,6 +108,11 @@ class JobFormData:
             'DEST_SSH_PATH': self.dest_ssh_path,
             'DEST_RSYNCD_HOSTNAME': self.dest_rsyncd_hostname,
             'DEST_RSYNCD_SHARE': self.dest_rsyncd_share,
+            
+            # Restic dest fields (minimal set)
+            'RESTIC_REPO_TYPE': self.restic_repo_type,
+            'RESTIC_REPO_LOCATION': self.restic_repo_location,
+            'RESTIC_PASSWORD': self.restic_password,
             
             # Share selection
             'SHARE_SELECTION_CLASS': share_selection_class,
@@ -175,6 +186,11 @@ class JobFormDataBuilder:
             dest_rsyncd_hostname=dest_config.get('hostname', ''),
             dest_rsyncd_share=dest_config.get('share', ''),
             
+            # Restic destination (only populate if dest_type is restic)
+            restic_repo_type=dest_config.get('repo_type', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_repo_location=dest_config.get('repo_location', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_password=dest_config.get('password', '') if job_config.get('dest_type') == 'restic' else '',
+            
             # Schedule
             schedule_type=schedule_type,
             cron_pattern=cron_pattern,
@@ -195,3 +211,10 @@ class JobFormDataBuilder:
             is_edit=False,
             # All other fields use their default values
         )
+    
+    @staticmethod
+    def should_show_restic_option(backup_config):
+        """Check if Restic option should be available in UI (implicit enablement)"""
+        # Show Restic if any jobs use it OR if explicitly creating a Restic job
+        jobs = backup_config.get_backup_jobs()
+        return any(job.get('dest_type') == 'restic' for job in jobs.values())

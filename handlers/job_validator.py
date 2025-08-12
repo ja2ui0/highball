@@ -41,6 +41,12 @@ class JobValidator:
             if not rsyncd_validation['success']:
                 errors.append(f"rsyncd validation failed: {rsyncd_validation['message']}")
         
+        elif parsed_job['dest_type'] == 'restic':
+            from handlers.restic_validator import ResticValidator
+            restic_validation = ResticValidator.validate_restic_destination(parsed_job)
+            if not restic_validation['success']:
+                errors.append(f"Restic validation failed: {restic_validation['message']}")
+        
         return {
             'valid': len(errors) == 0,
             'errors': errors

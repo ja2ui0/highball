@@ -14,24 +14,31 @@
     /* Accent Colors */
     --accent-primary: #4a9eff;
     --accent-hover: #357abd;
+    --accent-text: #ffffff;
     
     /* Status Colors */
     --success: #28a745;
     --success-hover: #218838;
+    --success-text: #ffffff;
     --warning: #ffc107;
     --warning-hover: #e0a800;
+    --warning-text: #212529;
     --danger: #dc3545;
     --danger-hover: #c82333;
+    --danger-text: #ffffff;
     
     /* Border */
     --border: #555555;
+    
+    /* Effects */
+    --shadow-color: rgba(0,0,0,0.3);
+    --accent-glow: rgba(74, 158, 255, 0.3);
     
     /* Additional semantic colors */
     --terminal-bg: #1a1a1a;
     --terminal-text: #00ff00;
     --secondary-bg: #6c757d;
     --secondary-bg-hover: #5a6268;
-    --warning-text: #212529;
     
     /* Table and container colors */
     --table-row-even: #404040;

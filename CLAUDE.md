@@ -1,6 +1,6 @@
 # Highball - Backup Manager
 
-Web-based rsync backup orchestration with scheduling and monitoring.
+Web-based backup orchestration with scheduling and monitoring. Supports rsync, with Restic provider scaffolded (not yet functional).
 
 ## Architecture
 
@@ -12,8 +12,8 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer)  
-**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (template generation)
+**Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic planning - scaffold), `restic_validator.py`, `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
+**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (template generation), `restic_runner.py` (command planning - scaffold)
 **Static Assets**: `job-form.js` (consolidated form handling), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
 ## Data Storage
@@ -39,7 +39,8 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 **Conventions**: PEP 8, dataclasses for structured data, pathlib for file operations, external static assets (no inline JS/CSS), emoji-free interfaces
 **Modern Patterns**: Type hints throughout, consolidated YAML operations, CSS utility classes, cached validation, error handling with fallbacks
-**Extensions**: New engines via `services/<engine>_runner.py` + update `job_validator.py`
+**Extensions**: New engines via `services/<engine>_runner.py` + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update `job_validator.py` (see Restic scaffold example)
+**Modular Parsing**: All destination types use dedicated form parsers with consistent interface - `JobFormParser` delegates to specialized parsers
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers` for modern Python patterns
 
 ## Theming System
@@ -63,6 +64,8 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 **CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables
 **Error Handling**: Comprehensive exception handling with graceful degradation and user-friendly error messages
 **Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
+**Restic Scaffold**: Complete modular architecture for Restic backup provider with command planning abstraction, implicit enablement, and 202 planning responses - ready for template/execution implementation (see `RESTIC_SCAFFOLD.md`)
+**Form Parser Architecture**: Fully modular form parsing with dedicated parsers for each destination type (`LocalFormParser`, `SSHFormParser`, `RsyncdFormParser`, `ResticFormParser`) - eliminates code duplication and establishes clean extension pattern
 
 ## Commands
 
@@ -106,8 +109,8 @@ backup_jobs:
   job_name:
     source_type: "ssh|local"
     source_config: {hostname, username, path}
-    dest_type: "ssh|local|rsyncd" 
-    dest_config: {hostname, share}  # must specify explicit destinations
+    dest_type: "ssh|local|rsyncd|restic"  # restic scaffolded but not functional
+    dest_config: {hostname, share} | {repo_type, repo_location, password}  # explicit destinations
     schedule: "daily|weekly|hourly|monthly|cron_pattern"
     enabled: true
     respect_conflicts: true     # wait for conflicting jobs (default: true)

@@ -26,7 +26,7 @@
     /* Layout */
     --radius: 4px;
     --radius-lg: 8px;
-    --shadow: 0 2px 10px rgba(0,0,0,0.3);
+    --shadow: 0 2px 10px var(--shadow-color);
 }
 
 /* =============================================================================
@@ -71,7 +71,7 @@ h2 {
     margin: var(--space-xs);
     text-decoration: none;
     background-color: var(--accent-primary);
-    color: var(--text-primary);
+    color: var(--accent-text);
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
@@ -85,6 +85,7 @@ h2 {
 
 .button-success {
     background-color: var(--success);
+    color: var(--success-text);
 }
 
 .button-success:hover {
@@ -93,6 +94,7 @@ h2 {
 
 .button-danger {
     background-color: var(--danger);
+    color: var(--danger-text);
 }
 
 .button-danger:hover {
@@ -108,13 +110,6 @@ h2 {
     background-color: var(--warning-hover);
 }
 
-.button-secondary {
-    background-color: var(--secondary-bg);
-}
-
-.button-secondary:hover {
-    background-color: var(--secondary-bg-hover);
-}
 
 /* Forms */
 .form-group {
@@ -149,7 +144,7 @@ textarea:focus,
 select:focus {
     border-color: var(--accent-primary);
     outline: none;
-    box-shadow: 0 0 5px rgba(74, 158, 255, 0.3);
+    box-shadow: 0 0 5px var(--accent-glow);
 }
 
 textarea {

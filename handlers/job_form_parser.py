@@ -14,75 +14,61 @@ class JobFormParser:
         if not job_name:
             return {'valid': False, 'error': 'Job name is required'}
         
-        # Source parsing
+        # Source parsing (delegated to modular parsers)
         source_type = form_data.get('source_type', [''])[0]
         if not source_type:
             return {'valid': False, 'error': 'Source type is required'}
         
         if source_type == 'local':
-            path = form_data.get('source_local_path', [''])[0].strip()
-            if not path:
-                return {'valid': False, 'error': 'Local source path is required'}
-            source_config = {'source_string': path, 'path': path}
+            from handlers.local_form_parser import LocalFormParser
+            source_result = LocalFormParser.parse_local_source(form_data)
+            if not source_result['valid']:
+                return source_result
+            source_config = source_result['config']
             
         elif source_type == 'ssh':
-            hostname = form_data.get('source_ssh_hostname', [''])[0].strip()
-            username = form_data.get('source_ssh_username', [''])[0].strip()
-            path = form_data.get('source_ssh_path', [''])[0].strip()
+            from handlers.ssh_form_parser import SSHFormParser
+            source_result = SSHFormParser.parse_ssh_source(form_data)
+            if not source_result['valid']:
+                return source_result
+            source_config = source_result['config']
             
-            if not all([hostname, username, path]):
-                return {'valid': False, 'error': 'SSH source requires hostname, username, and path'}
-            
-            source_string = f"{username}@{hostname}:{path}"
-            source_config = {
-                'source_string': source_string,
-                'hostname': hostname,
-                'username': username,
-                'path': path
-            }
         else:
             return {'valid': False, 'error': f'Unknown source type: {source_type}'}
         
-        # Destination parsing
+        # Destination parsing (delegated to modular parsers)
         dest_type = form_data.get('dest_type', [''])[0]
         if not dest_type:
             return {'valid': False, 'error': 'Destination type is required'}
         
         if dest_type == 'local':
-            path = form_data.get('dest_local_path', [''])[0].strip()
-            if not path:
-                return {'valid': False, 'error': 'Local destination path is required'}
-            dest_config = {'dest_string': path, 'path': path}
+            from handlers.local_form_parser import LocalFormParser
+            dest_result = LocalFormParser.parse_local_destination(form_data)
+            if not dest_result['valid']:
+                return dest_result
+            dest_config = dest_result['config']
             
         elif dest_type == 'ssh':
-            hostname = form_data.get('dest_ssh_hostname', [''])[0].strip()
-            username = form_data.get('dest_ssh_username', [''])[0].strip()
-            path = form_data.get('dest_ssh_path', [''])[0].strip()
-            
-            if not all([hostname, username, path]):
-                return {'valid': False, 'error': 'SSH destination requires hostname, username, and path'}
-            
-            dest_string = f"{username}@{hostname}:{path}"
-            dest_config = {
-                'dest_string': dest_string,
-                'hostname': hostname,
-                'username': username,
-                'path': path
-            }
+            from handlers.ssh_form_parser import SSHFormParser
+            dest_result = SSHFormParser.parse_ssh_destination(form_data)
+            if not dest_result['valid']:
+                return dest_result
+            dest_config = dest_result['config']
             
         elif dest_type == 'rsyncd':
-            hostname = form_data.get('dest_rsyncd_hostname', [''])[0].strip()
-            share = form_data.get('dest_rsyncd_share', [''])[0].strip()
+            from handlers.rsyncd_form_parser import RsyncdFormParser
+            rsyncd_result = RsyncdFormParser.parse_rsyncd_destination(form_data)
+            if not rsyncd_result['valid']:
+                return rsyncd_result
+            dest_config = rsyncd_result['config']
             
-            if not all([hostname, share]):
-                return {'valid': False, 'error': 'rsyncd destination requires hostname and share'}
+        elif dest_type == 'restic':
+            from handlers.restic_form_parser import ResticFormParser
+            restic_result = ResticFormParser.parse_restic_destination(form_data)
+            if not restic_result['valid']:
+                return restic_result
+            dest_config = restic_result['config']
             
-            dest_string = f"rsync://{hostname}/{share}"
-            dest_config = {
-                'dest_string': dest_string,
-                'hostname': hostname,
-                'share': share
-            }
         else:
             return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
         

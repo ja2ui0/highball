@@ -15,6 +15,7 @@ from handlers.logs import LogsHandler
 from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
 from handlers.job_scheduler import JobSchedulerHandler
+from handlers.restic_handler import ResticHandler
 
 # Services
 from services.template_service import TemplateService
@@ -74,6 +75,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'network': NetworkHandler(),
                 'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
+                'restic': ResticHandler(cls._backup_config),
             }
         except Exception:
             cls._handlers = None
@@ -126,6 +128,15 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 hostname = params.get('hostname', [''])[0]
                 share = params.get('share', [''])[0]
                 self._handlers['dashboard'].validate_rsyncd_destination(self, hostname, share)
+            elif path == '/validate-restic':
+                job_name = params.get('job', [''])[0]
+                self._handlers['restic'].validate_restic_job(self, job_name)
+            elif path == '/check-restic-binary':
+                job_name = params.get('job', [''])[0]
+                self._handlers['restic'].check_restic_binary(self, job_name)
+            elif path == '/restic-repo-info':
+                job_name = params.get('job', [''])[0]
+                self._handlers['restic'].get_repository_info(self, job_name)
             elif path == '/jobs':
                 self._handlers['job_scheduler'].list_jobs(self)
             elif path == '/history':
@@ -176,6 +187,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/dry-run-backup':
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
+            elif path == '/plan-restic-backup':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['restic'].plan_backup(self, job_name)
             elif path == '/save-config':
                 self._handlers['config'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':

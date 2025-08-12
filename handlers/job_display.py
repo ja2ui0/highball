@@ -180,6 +180,10 @@ class JobDisplay:
                 hostname = dest_config.get('hostname', 'unknown')
                 share = dest_config.get('share', 'unknown')
                 return f'<span class="dest-type">rsyncd:</span><br>{JobDisplay.format_source_path(f"rsync://{hostname}/{share}")}'
+            elif dest_type == 'restic':
+                repo_type = dest_config.get('repo_type', 'unknown')
+                repo_location = dest_config.get('repo_location', 'unknown')
+                return f'<span class="dest-type">Restic:</span><br>{JobDisplay.format_source_path(f"{repo_type}:{repo_location}")}'
         
         # Fall back to legacy format - assume rsyncd to configured host
         return f'<span class="dest-type">rsyncd:</span><br>Default destination'

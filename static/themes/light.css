@@ -14,23 +14,40 @@
     /* Accent Colors */
     --accent-primary: #3b82c4;
     --accent-hover: #316da7;
+    --accent-text: #ffffff;
 
     /* Status Colors */
     --success: #4caf7a;
     --success-hover: #3f8e66;
+    --success-text: #ffffff;
     --warning: #d4a93b;
     --warning-hover: #b48e30;
+    --warning-text: #212529;
     --danger: #c76969;
     --danger-hover: #aa5656;
+    --danger-text: #ffffff;
 
     /* Border */
     --border: #d1d1d6;
+
+    /* Effects */
+    --shadow-color: rgba(0,0,0,0.3);
+    --accent-glow: rgba(74, 158, 255, 0.3);
 
     /* Additional semantic colors */
     --terminal-bg: #f6f7f9;
     --terminal-text: #065f46;
     --secondary-bg: #eef0f4;
     --secondary-bg-hover: #e2e6ec;
-    --warning-text: #1c1c1e;
+
+    /* Table and container colors */
+    --table-row-even: #404040;
+    --code-bg: #2a2a2a;
+    
+    /* Alert background colors */
+    --alert-success-bg: #2d5016;
+    --alert-error-bg: #5a1a1a;
+    --alert-info-bg: #0c4a5a;
+}
 }
 
