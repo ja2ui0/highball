@@ -1,0 +1,35 @@
+:root {
+    /* Backgrounds */
+    --bg-primary: #e1e2e7;
+    --bg-secondary: #d0d1d6;
+    --bg-tertiary: #c4c6cd;
+    --bg-quaternary: #b5b6be;
+
+    /* Text */
+    --text-primary: #3760bf;
+    --text-secondary: #1f2335;
+    --text-muted: #4c505e;
+
+    /* Accents */
+    --accent-primary: #2e7de9;
+    --accent-hover: #1b61c2;
+
+    /* Status */
+    --success: #587539;
+    --success-hover: #40542a;
+    --warning: #8c6c3e;
+    --warning-hover: #6e552e;
+    --danger: #f52a65;
+    --danger-hover: #d32054;
+
+    /* Border */
+    --border: #d0d1d6;
+
+    /* Additional semantic */
+    --terminal-bg: #e1e2e7;
+    --terminal-text: #587539;
+    --secondary-bg: #c4c6cd;
+    --secondary-bg-hover: #b5b6be;
+    --warning-text: #1f2335;
+}
+

@@ -1,0 +1,33 @@
+:root {
+  /* Backgrounds (dark0/bg0, bg1–bg3) */
+  --bg-primary: #282828;      /* dark0 */
+  --bg-secondary: #3c3836;    /* bg1 */
+  --bg-tertiary: #504945;     /* bg2 */
+  --bg-quaternary: #665c54;   /* bg3 */
+
+  /* Text (light1/light2/gray) */
+  --text-primary: #ebdbb2;    /* light1 */
+  --text-secondary: #d5c4a1;  /* light2 */
+  --text-muted: #928374;      /* gray */
+
+  /* Accent (blue) */
+  --accent-primary: #83a598;  /* blue */
+  --accent-hover: #458588;    /* blue (darker) */
+
+  /* Status */
+  --success: #b8bb26;         /* green */
+  --success-hover: #98971a;   /* green (darker) */
+  --warning: #fabd2f;         /* yellow */
+  --warning-hover: #d79921;   /* yellow (darker) */
+  --danger: #fb4934;          /* red */
+  --danger-hover: #cc241d;    /* red (darker) */
+
+  /* Border / misc */
+  --border: #3c3836;          /* bg1 */
+  --terminal-bg: #282828;     /* match dark0 */
+  --terminal-text: #b8bb26;   /* green, good contrast */
+  --secondary-bg: #504945;    /* bg2 */
+  --secondary-bg-hover: #665c54; /* bg3 */
+  --warning-text: #282828;    /* readable on yellow */
+}
+
