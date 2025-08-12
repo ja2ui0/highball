@@ -6,4 +6,3 @@ pydantic
 validators
 croniter
 notifiers
-sh

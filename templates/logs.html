@@ -71,11 +71,8 @@
             </div>
             
             <div class="log-section">
-                <button id="toggleLive" class="button">Start Live Tail</button>
+                <button id="refreshLogs" class="button">Refresh</button>
                 <button id="clearLogs" class="button button-warning">Clear Display</button>
-                <label class="auto-scroll">
-                    <input type="checkbox" id="autoScroll" checked> Auto-scroll to bottom
-                </label>
             </div>
         </div>
         
@@ -85,96 +82,33 @@
     </div>
 
     <script>
-        let eventSource = null;
-        let isLive = false;
         const logContent = document.getElementById('logContent');
-        const toggleButton = document.getElementById('toggleLive');
-        const autoScrollCheckbox = document.getElementById('autoScroll');
-        const logType = '{{LOG_TYPE}}';
-        
-        function scrollToBottom() {
-            if (autoScrollCheckbox.checked) {
-                logContent.scrollTop = logContent.scrollHeight;
-            }
-        }
+        const refreshButton = document.getElementById('refreshLogs');
+        const clearButton = document.getElementById('clearLogs');
         
         function viewJobLog() {
             const jobSelect = document.getElementById('jobSelect');
             const jobName = jobSelect.value;
             if (jobName) {
                 window.location.href = `/logs?job=${encodeURIComponent(jobName)}`;
-            }
-        }
-        
-        function startLiveTail() {
-            if (eventSource) {
-                eventSource.close();
-            }
-            
-            // Update button immediately to show connecting state
-            isLive = true;
-            toggleButton.textContent = 'Connecting...';
-            toggleButton.className = 'button button-warning';
-            toggleButton.disabled = true;
-            
-            // Handle job log streaming vs system log streaming
-            let streamUrl;
-            if (logType.startsWith('job:')) {
-                const jobName = logType.substring(4); // Remove 'job:' prefix
-                streamUrl = `/logs/stream?job=${encodeURIComponent(jobName)}`;
             } else {
-                streamUrl = `/logs/stream?type=${logType}`;
+                // Return to system logs
+                window.location.href = '/logs';
             }
-            eventSource = new EventSource(streamUrl);
-            
-            eventSource.onopen = function() {
-                toggleButton.textContent = 'Stop Live Tail';
-                toggleButton.className = 'button button-danger';
-                toggleButton.disabled = false;
-            };
-            
-            eventSource.onmessage = function(event) {
-                logContent.textContent += event.data + '\n';
-                scrollToBottom();
-            };
-            
-            eventSource.onerror = function() {
-                console.error('EventSource error occurred');
-                stopLiveTail();
-            };
         }
         
-        function stopLiveTail() {
-            if (eventSource) {
-                eventSource.close();
-                eventSource = null;
-            }
-            isLive = false;
-            toggleButton.textContent = 'Start Live Tail';
-            toggleButton.className = 'button button-success';
+        function refreshLogs() {
+            // Reload the current page to refresh log content
+            window.location.reload();
         }
         
-        toggleButton.addEventListener('click', function() {
-            if (isLive) {
-                stopLiveTail();
-            } else {
-                startLiveTail();
-            }
-        });
-        
-        document.getElementById('clearLogs').addEventListener('click', function() {
+        function clearLogs() {
             logContent.textContent = '';
-        });
+        }
         
-        // Auto-scroll to bottom on page load
-        scrollToBottom();
-        
-        // Clean up on page unload
-        window.addEventListener('beforeunload', function() {
-            if (eventSource) {
-                eventSource.close();
-            }
-        });
+        // Event listeners
+        refreshButton.addEventListener('click', refreshLogs);
+        clearButton.addEventListener('click', clearLogs);
     </script>
 </body>
 </html>

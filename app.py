@@ -111,9 +111,6 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/logs':
                 log_type = params.get('type', ['app'])[0]
                 self._handlers['logs'].show_logs(self, log_type)
-            elif path == '/logs/stream':
-                log_type = params.get('type', ['app'])[0]
-                self._handlers['logs'].stream_logs(self, log_type)
             elif path == '/scan-network':
                 network_range = params.get('range', ['192.168.1.0/24'])[0]
                 self._handlers['network'].scan_network_for_rsyncd(self, network_range)
