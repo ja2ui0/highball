@@ -4,6 +4,7 @@
     <title>Configuration Manager - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/nav.js"></script>
+    <script src="/static/config-manager.js"></script>
 </head>
 <body>
     <div class="container">
@@ -209,32 +210,5 @@
         </div>
     </div>
     
-    <script>
-        function toggleTelegramSettings() {
-            const checkbox = document.getElementById('enable_telegram');
-            const settings = document.getElementById('telegramSettings');
-            if (checkbox.checked) {
-                settings.classList.remove('hidden');
-            } else {
-                settings.classList.add('hidden');
-            }
-        }
-        
-        function toggleEmailSettings() {
-            const checkbox = document.getElementById('enable_email');
-            const settings = document.getElementById('emailSettings');
-            if (checkbox.checked) {
-                settings.classList.remove('hidden');
-            } else {
-                settings.classList.add('hidden');
-            }
-        }
-        
-        // Initialize settings visibility on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            toggleTelegramSettings();
-            toggleEmailSettings();
-        });
-    </script>
 </body>
 </html>

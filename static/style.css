@@ -454,6 +454,12 @@ tr:hover {
 /* Secondary background color alias */
 .bg-light { background-color: var(--bg-secondary); }
 
+/* Status message styling for forms */
+.status-success { color: var(--success); font-weight: bold; }
+.status-error { color: var(--danger); font-weight: bold; }
+.status-warning { color: var(--warning); font-weight: bold; }
+.status-info { color: var(--text-secondary); }
+
 /* Responsive design */
 @media (max-width: 768px) {
     .container {

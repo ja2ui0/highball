@@ -1,2 +1,7 @@
 PyYAML
 apscheduler
+pathlib
+dataclasses
+pydantic
+validators
+croniter
