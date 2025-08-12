@@ -1,49 +1,24 @@
 """
 Notification service for backup job alerts and status updates
-Refactored with dataclasses and modern patterns, emoji-free
+Modern implementation using notifiers library with extensible backend
 """
-import requests
-import smtplib
 from datetime import datetime
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from dataclasses import dataclass, field
+from typing import Dict, Any, List, Optional
+from notifiers import get_notifier
 
 
 @dataclass
-class NotificationConfig:
-    """Base configuration for notification providers"""
+class NotificationProvider:
+    """Base notification provider configuration"""
+    provider_name: str
     enabled: bool = False
     notify_on_success: bool = False
-
-
-@dataclass
-class TelegramConfig(NotificationConfig):
-    """Telegram notification configuration"""
-    token: str = ""
-    chat_id: str = ""
+    config: Dict[str, Any] = field(default_factory=dict)
     
     def is_valid(self) -> bool:
-        return self.enabled and bool(self.token and self.chat_id)
-
-
-@dataclass
-class EmailConfig(NotificationConfig):
-    """Email notification configuration"""
-    smtp_server: str = ""
-    smtp_port: int = 587
-    use_tls: bool = True
-    use_ssl: bool = False
-    from_email: str = ""
-    to_email: str = ""
-    username: str = ""
-    password: str = ""
-    
-    def is_valid(self) -> bool:
-        return (self.enabled and 
-                bool(self.smtp_server and self.smtp_port and 
-                     self.from_email and self.to_email))
+        """Check if provider configuration is valid"""
+        return self.enabled and bool(self.config)
 
 
 @dataclass
@@ -54,43 +29,88 @@ class NotificationResult:
     error_message: Optional[str] = None
 
 
+class NotificationProviderFactory:
+    """Factory for creating notification providers from config"""
+    
+    @staticmethod
+    def create_telegram_provider(config: Dict[str, Any]) -> NotificationProvider:
+        """Create Telegram provider from configuration"""
+        telegram_config = config.get("telegram", {})
+        
+        # Build notifiers-compatible config
+        provider_config = {}
+        if telegram_config.get("token") and telegram_config.get("chat_id"):
+            provider_config = {
+                "token": telegram_config["token"],
+                "chat_id": telegram_config["chat_id"],
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True
+            }
+        
+        return NotificationProvider(
+            provider_name="telegram",
+            enabled=telegram_config.get("enabled", False),
+            notify_on_success=telegram_config.get("notify_on_success", False),
+            config=provider_config
+        )
+    
+    @staticmethod
+    def create_email_provider(config: Dict[str, Any]) -> NotificationProvider:
+        """Create Email provider from configuration"""
+        email_config = config.get("email", {})
+        
+        # Build notifiers-compatible config
+        provider_config = {}
+        if all(email_config.get(key) for key in ["smtp_server", "from_email", "to_email"]):
+            provider_config = {
+                "to": email_config["to_email"],
+                "from": email_config["from_email"],
+                "subject": "Highball: {title}",  # Template for dynamic subject
+                "host": email_config["smtp_server"],
+                "port": email_config.get("smtp_port", 587),
+                "tls": email_config.get("use_tls", True),
+                "ssl": email_config.get("use_ssl", False),
+                "username": email_config.get("username", ""),
+                "password": email_config.get("password", "")
+            }
+        
+        return NotificationProvider(
+            provider_name="email",
+            enabled=email_config.get("enabled", False),
+            notify_on_success=email_config.get("notify_on_success", False),
+            config=provider_config
+        )
+    
+    @staticmethod
+    def create_all_providers(notification_config: Dict[str, Any]) -> List[NotificationProvider]:
+        """Create all providers from notification configuration"""
+        providers = []
+        
+        # Current providers (keeping frontend unchanged)
+        providers.append(NotificationProviderFactory.create_telegram_provider(notification_config))
+        providers.append(NotificationProviderFactory.create_email_provider(notification_config))
+        
+        # Future providers can be easily added here:
+        # providers.append(NotificationProviderFactory.create_slack_provider(notification_config))
+        # providers.append(NotificationProviderFactory.create_discord_provider(notification_config))
+        # providers.append(NotificationProviderFactory.create_sms_provider(notification_config))
+        
+        return providers
+
+
 class NotificationService:
-    """Handles notifications for backup events - modernized and emoji-free"""
+    """Modern notification service using notifiers library"""
     
     def __init__(self, backup_config):
         self.backup_config = backup_config
         self.global_settings = backup_config.config.get("global_settings", {})
         self.notification_config = self.global_settings.get("notification", {})
         
-        # Initialize typed configs
-        self.telegram = self._build_telegram_config()
-        self.email = self._build_email_config()
-    
-    def _build_telegram_config(self) -> TelegramConfig:
-        """Build typed Telegram configuration"""
-        config = self.notification_config.get("telegram", {})
-        return TelegramConfig(
-            enabled=config.get("enabled", False),
-            notify_on_success=config.get("notify_on_success", False),
-            token=config.get("token", ""),
-            chat_id=config.get("chat_id", "")
-        )
-    
-    def _build_email_config(self) -> EmailConfig:
-        """Build typed Email configuration"""
-        config = self.notification_config.get("email", {})
-        return EmailConfig(
-            enabled=config.get("enabled", False),
-            notify_on_success=config.get("notify_on_success", False),
-            smtp_server=config.get("smtp_server", ""),
-            smtp_port=config.get("smtp_port", 587),
-            use_tls=config.get("use_tls", True),
-            use_ssl=config.get("use_ssl", False),
-            from_email=config.get("from_email", ""),
-            to_email=config.get("to_email", ""),
-            username=config.get("username", ""),
-            password=config.get("password", "")
-        )
+        # Initialize providers using factory
+        self.providers = {
+            p.provider_name: p 
+            for p in NotificationProviderFactory.create_all_providers(self.notification_config)
+        }
     
     def send_notification(self, title: str, message: str, notification_type: str = "info"):
         """Send notification via all configured providers"""
@@ -142,7 +162,7 @@ class NotificationService:
     
     def is_notifications_enabled(self) -> bool:
         """Check if any notification provider is enabled"""
-        return self.telegram.is_valid() or self.email.is_valid()
+        return any(provider.is_valid() for provider in self.providers.values())
     
     def test_notifications(self) -> bool:
         """Test all configured notification providers"""
@@ -152,6 +172,14 @@ class NotificationService:
         print("Testing notification providers...")
         self.send_notification(test_title, test_message, "info")
         return self.is_notifications_enabled()
+    
+    def get_available_providers(self) -> List[str]:
+        """Get list of available provider names for future frontend expansion"""
+        return list(self.providers.keys())
+    
+    def get_enabled_providers(self) -> List[str]:
+        """Get list of currently enabled provider names"""
+        return [name for name, provider in self.providers.items() if provider.is_valid()]
     
     def _format_message(self, message: str) -> str:
         """Add timestamp to message"""
@@ -169,13 +197,10 @@ class NotificationService:
         """Send to all enabled providers"""
         results = []
         
-        if self.telegram.is_valid():
-            success, error = self._send_telegram(title, message, notification_type)
-            results.append(NotificationResult("telegram", success, error))
-        
-        if self.email.is_valid():
-            success, error = self._send_email(title, message, notification_type)
-            results.append(NotificationResult("email", success, error))
+        for provider in self.providers.values():
+            if provider.is_valid():
+                success, error = self._send_via_provider(provider, title, message, notification_type)
+                results.append(NotificationResult(provider.provider_name, success, error))
         
         return results
     
@@ -183,20 +208,20 @@ class NotificationService:
         """Send to providers that have success notifications enabled"""
         results = []
         
-        if self.telegram.is_valid() and self.telegram.notify_on_success:
-            success, error = self._send_telegram(title, message, "success")
-            results.append(NotificationResult("telegram", success, error))
-        
-        if self.email.is_valid() and self.email.notify_on_success:
-            success, error = self._send_email(title, message, "success")
-            results.append(NotificationResult("email", success, error))
+        for provider in self.providers.values():
+            if provider.is_valid() and provider.notify_on_success:
+                success, error = self._send_via_provider(provider, title, message, "success")
+                results.append(NotificationResult(provider.provider_name, success, error))
         
         return results
     
-    def _send_telegram(self, title: str, message: str, notification_type: str) -> tuple[bool, Optional[str]]:
-        """Send notification via Telegram Bot API"""
+    def _send_via_provider(self, provider: NotificationProvider, title: str, 
+                          message: str, notification_type: str) -> tuple[bool, Optional[str]]:
+        """Send notification via specific provider using notifiers library"""
         try:
-            # Format message without emojis
+            notifier = get_notifier(provider.provider_name)
+            
+            # Format message with type prefix (no emojis)
             prefixes = {
                 "info": "[INFO]",
                 "success": "[SUCCESS]", 
@@ -204,59 +229,29 @@ class NotificationService:
                 "error": "[ERROR]"
             }
             prefix = prefixes.get(notification_type, "[INFO]")
-            formatted_text = f"{prefix} **{title}**\n\n{message}"
             
-            url = f"https://api.telegram.org/bot{self.telegram.token}/sendMessage"
-            data = {
-                "chat_id": self.telegram.chat_id,
-                "text": formatted_text,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            }
+            # Prepare notification content
+            if provider.provider_name == "telegram":
+                # Telegram supports markdown formatting
+                formatted_text = f"{prefix} **{title}**\n\n{message}"
+                notifier.notify(message=formatted_text, **provider.config)
             
-            response = requests.post(url, json=data, timeout=10)
+            elif provider.provider_name == "email":
+                # Email needs subject and body
+                email_config = provider.config.copy()
+                email_config["subject"] = f"Highball: {title}"
+                email_config["message"] = f"Highball Backup Manager\n\n{message}"
+                notifier.notify(**email_config)
             
-            if response.status_code == 200:
-                return True, None
             else:
-                return False, f"Telegram API error {response.status_code}: {response.text}"
-                
-        except Exception as e:
-            return False, f"Failed to send Telegram notification: {str(e)}"
-    
-    def _send_email(self, title: str, message: str, notification_type: str) -> tuple[bool, Optional[str]]:
-        """Send notification via email SMTP"""
-        try:
-            # Create message
-            msg = MIMEMultipart()
-            msg['From'] = self.email.from_email
-            msg['To'] = self.email.to_email
-            msg['Subject'] = f"Highball: {title}"
-            
-            # Add body with plain text
-            body = f"Highball Backup Manager\n\n{message}"
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Connect to SMTP server
-            if self.email.use_ssl:
-                server = smtplib.SMTP_SSL(self.email.smtp_server, self.email.smtp_port)
-            else:
-                server = smtplib.SMTP(self.email.smtp_server, self.email.smtp_port)
-                if self.email.use_tls:
-                    server.starttls()
-            
-            # Authenticate if credentials provided
-            if self.email.username and self.email.password:
-                server.login(self.email.username, self.email.password)
-            
-            # Send email
-            server.send_message(msg)
-            server.quit()
+                # Generic provider (for future extensions)
+                formatted_text = f"{prefix} {title}\n\n{message}"
+                notifier.notify(message=formatted_text, **provider.config)
             
             return True, None
             
         except Exception as e:
-            return False, f"Failed to send email notification: {str(e)}"
+            return False, f"Failed to send {provider.provider_name} notification: {str(e)}"
     
     def _log_notification_results(self, results: List[NotificationResult]):
         """Log results of notification attempts"""
@@ -321,5 +316,27 @@ class NotificationManager:
                     "username": "",  # SMTP authentication username
                     "password": ""  # SMTP authentication password
                 }
+                # Future providers can be easily added here:
+                # "slack": {
+                #     "enabled": False,
+                #     "notify_on_success": False,
+                #     "webhook_url": "",
+                #     "channel": ""
+                # },
+                # "discord": {
+                #     "enabled": False,
+                #     "notify_on_success": False,
+                #     "webhook_url": ""
+                # }
             }
         }
+
+
+# Utility function for future provider expansion
+def get_supported_providers() -> List[str]:
+    """Get list of all providers supported by notifiers library"""
+    try:
+        from notifiers import all_providers
+        return [provider.name for provider in all_providers()]
+    except ImportError:
+        return ["telegram", "email"]  # Fallback if notifiers not available

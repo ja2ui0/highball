@@ -4,16 +4,17 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 ## Architecture
 
-**Flow**: `app.py` → `handlers/` → `services/` → `templates/`
-**Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging
+**Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
+**Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging, dataclass-driven configuration
 
-**Stack**: Python 3.11, APScheduler, PyYAML, Docker, rsync/SSH
+**Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
 
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
 **Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer)  
-**Services**: `job_logger.py` (logging), `ssh_validator.py`, `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (alerts)
+**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (template generation)
+**Static Assets**: `job-form.js` (consolidated form handling), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
 ## Data Storage
 
@@ -27,16 +28,30 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 ## Features
 
-**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings  
+**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings, consolidated templates
 **Smart Scheduling**: Configurable default times (hourly/daily/weekly/monthly), runtime conflict detection, automatic job queuing
-**Logging**: Per-job execution logs, status tracking, SSH validation state, conflict delay tracking, live log streaming
-**Notifications**: Method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications
-**UI**: Real-time validation, share discovery, job history with live log viewing, structured config forms + raw YAML editor
+**Logging**: Per-job execution logs, status tracking, SSH validation state with 30min caching, conflict delay tracking, live log streaming
+**Notifications**: Professional notification system using `notifiers` library backend, method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications (emoji-free, extensible to 25+ providers)
+**UI**: Real-time validation, share discovery, job history with live log viewing, structured config forms + raw YAML editor, network scanning
+**System Inspection**: Network rsync server discovery, live log streaming, comprehensive system monitoring
 
 ## Development
 
-**Conventions**: PEP 8, centralized validation in `job_validator.py`, stdlib preference
+**Conventions**: PEP 8, dataclasses for structured data, pathlib for file operations, external static assets (no inline JS/CSS), emoji-free interfaces
+**Modern Patterns**: Type hints throughout, consolidated YAML operations, CSS utility classes, cached validation, error handling with fallbacks
 **Extensions**: New engines via `services/<engine>_runner.py` + update `job_validator.py`
+**Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers` for modern Python patterns
+
+## Modern Architecture Notes
+
+**Template Consolidation**: Single `job_form.html` template with dataclass-driven variable generation (eliminates `edit_job.html` duplication)
+**JavaScript Modularity**: Consolidated `job-form.js` (replaces `add-job.js`), separate `config-manager.js`, `network-scan.js` for specific functionality
+**Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`)
+**File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
+**Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
+**CSS Architecture**: Semantic utility classes (`.status-success`, `.status-error`, `.method-settings`) replace inline styles
+**Error Handling**: Comprehensive exception handling with graceful degradation and user-friendly error messages
+**Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
 
 ## Commands
 
