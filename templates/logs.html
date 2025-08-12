@@ -117,7 +117,15 @@
             toggleButton.className = 'button button-warning';
             toggleButton.disabled = true;
             
-            eventSource = new EventSource(`/logs/stream?type=${logType}`);
+            // Handle job log streaming vs system log streaming
+            let streamUrl;
+            if (logType.startsWith('job:')) {
+                const jobName = logType.substring(4); // Remove 'job:' prefix
+                streamUrl = `/logs/stream?job=${encodeURIComponent(jobName)}`;
+            } else {
+                streamUrl = `/logs/stream?type=${logType}`;
+            }
+            eventSource = new EventSource(streamUrl);
             
             eventSource.onopen = function() {
                 toggleButton.textContent = 'Stop Live Tail';

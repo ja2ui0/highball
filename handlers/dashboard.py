@@ -99,6 +99,17 @@ class DashboardHandler:
         original_job_name = form_data.get('original_job_name', [''])[0]
         new_job_name = parsed_job['job_name']
         is_rename = original_job_name and original_job_name != new_job_name
+        
+        # Check for naming conflicts with deleted jobs (only for new jobs or renames)
+        if not original_job_name or is_rename:
+            deleted_jobs = self.job_manager.get_deleted_jobs()
+            if new_job_name in deleted_jobs:
+                self.template_service.send_error_response(
+                    handler, 
+                    f'Job name "{new_job_name}" conflicts with a deleted job. '
+                    f'Please restore the deleted job first, or choose a different name.'
+                )
+                return
 
         # Build job configuration
         job_config = {
