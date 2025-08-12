@@ -218,25 +218,9 @@ class ResticRunner:
             return TransportType.CONTAINER, None
     
     def _build_repository_url(self, dest_config: Dict) -> str:
-        """Build Restic repository URL from destination config"""
-        repo_type = dest_config.get('repo_type', 'local')
-        location = dest_config.get('repo_location', '/tmp/restic-repo')
-        
-        if repo_type == 'local':
-            return location
-        elif repo_type == 'sftp':
-            hostname = dest_config.get('repo_hostname', 'localhost')
-            path = dest_config.get('repo_path', '/backup')
-            user = dest_config.get('repo_username', 'backup')
-            return f"sftp:{user}@{hostname}:{path}"
-        elif repo_type == 's3':
-            bucket = dest_config.get('s3_bucket', 'my-backup-bucket')
-            prefix = dest_config.get('s3_prefix', '')
-            if prefix:
-                return f"s3:{bucket}/{prefix}"
-            return f"s3:{bucket}"
-        else:
-            return location
+        """Get Restic repository URL from destination config"""
+        # The form parser now builds the complete URI, so we just use it
+        return dest_config.get('repo_uri', dest_config.get('dest_string', '/tmp/restic-repo'))
     
     def _build_environment(self, dest_config: Dict) -> Dict[str, str]:
         """Build environment variables for Restic execution"""

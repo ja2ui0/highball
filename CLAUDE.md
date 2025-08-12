@@ -7,6 +7,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 **Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
 **Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging, dataclass-driven configuration
 
+**Prime Directive - One Job = One Source Path + One Destination**: Each backup job targets a single source path to a single destination repository. This deliberate design decision ensures simpler mental model, clearer conflict detection, better granular control, easier troubleshooting, and reduced complexity. Multiple source paths would require significant architecture changes and make the system more complex for users.
+
 **Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
 
 ## Key Components

@@ -136,6 +136,39 @@ All execution endpoints return HTTP 202 with structured plan payload instead of 
 - Performance monitoring and optimization
 - Multi-repository support
 
+#### 7. Advanced Retention and Maintenance
+**Enhanced retention policies**:
+- Granular time-bucketed retention (hourly, daily, weekly, monthly, yearly)
+- Repository maintenance policies with separate schedules
+- Automated prune and check operations
+- Repository health monitoring and alerts
+
+#### 8. Repository Lock Management
+**Lock detection and investigation**:
+- Repository lock detection and status reporting
+- Lock investigation tools (who, when, what process)
+- Stale lock detection and alerting
+- Manual lock removal with safety checks
+- Lock troubleshooting guidance and logs
+
+#### 9. Process Control and Performance (Low Priority)
+**System optimization features**:
+- CPU priority control (nice levels)
+- I/O priority control (ionice)
+- Resource usage monitoring
+- Backup performance optimization
+
+#### 10. Restore and Recovery Features
+**Roadmap for restore capabilities**:
+- Review and restore restic snapshots to source system
+- Review and restore restic snapshots to arbitrary path
+- Review and restore restic snapshots for download
+- Review and restore rsync targets to source system
+- Review and restore rsync targets to arbitrary path
+- Review and restore rsync targets for download
+- Unified restore interface across backup types
+- Restore progress tracking and validation
+
 ## Configuration Schema
 
 ### Minimal Restic Job
@@ -205,6 +238,84 @@ backup_jobs:
 - Consider `pexpect` for interactive SSH session management
 - JSON streaming parser for large restic output
 - Proper async/await patterns for long-running operations
+
+### rclone Requirements and Setup
+
+For rclone repository type, users must ensure rclone is available and configured on the source system:
+
+**Binary Installation:**
+- rclone binary must be installed on the source system where restic runs
+- Available via package managers: `apt install rclone`, `brew install rclone`, etc.
+- Or download from https://rclone.org/
+
+**Configuration Required:**
+- Users must run `rclone config` on source system to configure remotes
+- Configuration stored in `~/.config/rclone/rclone.conf`
+- Common remotes: Google Drive, Dropbox, OneDrive, S3-compatible services, etc.
+
+**Testing Setup:**
+- Verify with `rclone listremotes` to see configured remotes
+- Test access with `rclone lsd remote:` to list directories
+- Validate before using with restic backups
+
+**Documentation Needed:**
+- User guide for rclone setup and configuration
+- Common remote configuration examples
+- Troubleshooting guide for rclone connection issues
+
+## Simplified Form Architecture
+
+### Organic, Context-Aware Forms
+
+The Restic implementation uses **structured input → URI building** instead of raw URI input:
+
+**Form Design Principles:**
+- Show only relevant fields per repository type (no irrelevant options)
+- Build URIs programmatically from structured inputs (no regex parsing)
+- Display generated URI in help text for transparency
+- Make credentials optional where appropriate (e.g., REST servers may not require auth)
+- Store structured data for future secrets management
+
+**Repository Type Examples:**
+
+**REST Repository:**
+```
+Hostname: [backup.example.com] (required)
+Port: [8000] (optional, default 8000)
+Path: [/backups] (optional)
+Use HTTPS: [✓] (checkbox)
+Username: [] (optional)
+Password: [] (optional)
+
+Generated URI: rest:https://backup.example.com:8000/backups
+```
+
+**S3 Repository:**
+```
+Endpoint: [s3.amazonaws.com] (default)
+Bucket: [my-backup-bucket] (required)
+Prefix: [restic] (optional)
+AWS Access Key: [] (required)
+AWS Secret Key: [] (required)
+
+Generated URI: s3:s3.amazonaws.com/my-backup-bucket/restic
+```
+
+**rclone Repository:**
+```
+Remote Name: [gdrive] (required - from rclone config)
+Path: [backups] (optional, default: backups)
+
+Generated URI: rclone:gdrive:backups
+Note: Ensure rclone is configured on source system
+```
+
+**Architecture Benefits:**
+- No URI parsing complexity or regex validation
+- Eliminates user URI construction errors
+- Cleaner validation and error messages
+- Ready for future secrets encryption
+- Follows Backrest-style patterns
 
 ## Development Guidelines
 

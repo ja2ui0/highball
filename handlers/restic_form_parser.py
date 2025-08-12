@@ -9,55 +9,80 @@ class ResticFormParser:
     
     @staticmethod
     def parse_restic_destination(form_data):
-        """Parse Restic destination configuration from form data"""
+        """Parse Restic destination configuration from structured form data"""
         repo_type = form_data.get('restic_repo_type', [''])[0].strip()
-        repo_location = form_data.get('restic_repo_location', [''])[0].strip()
         password = form_data.get('restic_password', [''])[0].strip()
         
-        if not all([repo_type, repo_location, password]):
+        if not all([repo_type, password]):
             return {
                 'valid': False, 
-                'error': 'Restic requires repository type, location, and password'
+                'error': 'Restic requires repository type and password'
             }
         
-        dest_config = {
-            'dest_string': f"{repo_type}:{repo_location}",
-            'repo_type': repo_type,
-            'repo_location': repo_location,
-            'password': password
-        }
-        
-        # Add repository type specific fields
-        if repo_type == 'sftp':
-            sftp_result = ResticFormParser._parse_sftp_fields(form_data)
-            if not sftp_result['valid']:
-                return sftp_result
-            dest_config.update(sftp_result['config'])
+        # Build URI and config based on repository type
+        if repo_type == 'local':
+            # Local repository - just a path
+            path = form_data.get('restic_local_path', [''])[0].strip()
+            if not path:
+                return {'valid': False, 'error': 'Local repository requires path'}
+            
+            repo_uri = path
+            dest_config = {
+                'dest_string': repo_uri,
+                'repo_type': repo_type,
+                'repo_uri': repo_uri,
+                'password': password
+            }
+            
+        elif repo_type == 'rest':
+            uri_result = ResticFormParser._build_rest_uri(form_data)
+            if not uri_result['valid']:
+                return uri_result
+                
+            dest_config = uri_result['config']
+            dest_config.update({
+                'repo_type': repo_type,
+                'password': password
+            })
             
         elif repo_type == 's3':
-            s3_result = ResticFormParser._parse_s3_fields(form_data)
-            if not s3_result['valid']:
-                return s3_result
-            dest_config.update(s3_result['config'])
-        
-        # Add retention policy if provided
-        retention_result = ResticFormParser._parse_retention_policy(form_data)
-        if retention_result:
-            dest_config['retention_policy'] = retention_result
-        
-        # Auto-init flag
-        auto_init = form_data.get('restic_auto_init', [''])[0] == 'on'
-        dest_config['auto_init'] = auto_init
-        
-        # Tags
-        tags = ResticFormParser._parse_tags(form_data)
-        if tags:
-            dest_config['tags'] = tags
-        
-        # Exclude patterns
-        excludes = ResticFormParser._parse_exclude_patterns(form_data)
-        if excludes:
-            dest_config['exclude_patterns'] = excludes
+            uri_result = ResticFormParser._build_s3_uri(form_data)
+            if not uri_result['valid']:
+                return uri_result
+                
+            dest_config = uri_result['config']
+            dest_config.update({
+                'repo_type': repo_type,
+                'password': password
+            })
+            
+        elif repo_type == 'rclone':
+            uri_result = ResticFormParser._build_rclone_uri(form_data)
+            if not uri_result['valid']:
+                return uri_result
+                
+            dest_config = uri_result['config']
+            dest_config.update({
+                'repo_type': repo_type,
+                'password': password
+            })
+            
+        elif repo_type == 'sftp':
+            uri_result = ResticFormParser._build_sftp_uri(form_data)
+            if not uri_result['valid']:
+                return uri_result
+                
+            dest_config = uri_result['config']
+            dest_config.update({
+                'repo_type': repo_type,
+                'password': password
+            })
+            
+        else:
+            return {
+                'valid': False,
+                'error': f'Unknown repository type: {repo_type}'
+            }
         
         return {
             'valid': True,
@@ -65,100 +90,122 @@ class ResticFormParser:
         }
     
     @staticmethod
-    def _parse_sftp_fields(form_data):
-        """Parse SFTP repository specific fields"""
-        repo_hostname = form_data.get('restic_repo_hostname', [''])[0].strip()
-        repo_username = form_data.get('restic_repo_username', [''])[0].strip()
-        repo_path = form_data.get('restic_repo_path', [''])[0].strip()
+    def _build_rest_uri(form_data):
+        """Build REST repository URI from structured form data"""
+        hostname = form_data.get('restic_rest_hostname', [''])[0].strip()
+        port = form_data.get('restic_rest_port', ['8000'])[0].strip()
+        path = form_data.get('restic_rest_path', [''])[0].strip()
+        use_https = form_data.get('restic_rest_use_https', ['']) != ['']
+        username = form_data.get('restic_rest_username', [''])[0].strip()
+        password = form_data.get('restic_rest_password', [''])[0].strip()
         
-        if not all([repo_hostname, repo_username, repo_path]):
-            return {
-                'valid': False,
-                'error': 'SFTP repository requires hostname, username, and path'
-            }
+        if not hostname:
+            return {'valid': False, 'error': 'REST repository requires hostname'}
         
-        return {
-            'valid': True,
-            'config': {
-                'repo_hostname': repo_hostname,
-                'repo_username': repo_username,
-                'repo_path': repo_path
-            }
+        # Build URI components
+        scheme = 'https' if use_https else 'http'
+        port_str = f":{port}" if port and port != '80' and port != '443' else ''
+        path_str = f"/{path}" if path and not path.startswith('/') else path or ''
+        
+        # Build base URI
+        if username and password:
+            repo_uri = f"rest:{scheme}://{username}:{password}@{hostname}{port_str}{path_str}"
+        else:
+            repo_uri = f"rest:{scheme}://{hostname}{port_str}{path_str}"
+        
+        config = {
+            'dest_string': repo_uri,
+            'repo_uri': repo_uri,
+            'rest_hostname': hostname,
+            'rest_port': port,
+            'rest_path': path,
+            'rest_use_https': use_https
         }
+        
+        # Store credentials separately for future secrets handling
+        if username:
+            config['rest_username'] = username
+        if password:
+            config['rest_password'] = password
+            
+        return {'valid': True, 'config': config}
     
-    @staticmethod
-    def _parse_s3_fields(form_data):
-        """Parse S3 repository specific fields"""
-        s3_bucket = form_data.get('restic_s3_bucket', [''])[0].strip()
-        s3_prefix = form_data.get('restic_s3_prefix', [''])[0].strip()
+    @staticmethod 
+    def _build_s3_uri(form_data):
+        """Build S3 repository URI from structured form data"""
+        endpoint = form_data.get('restic_s3_endpoint', ['s3.amazonaws.com'])[0].strip()
+        bucket = form_data.get('restic_s3_bucket', [''])[0].strip()
+        prefix = form_data.get('restic_s3_prefix', [''])[0].strip()
         aws_access_key = form_data.get('restic_aws_access_key', [''])[0].strip()
         aws_secret_key = form_data.get('restic_aws_secret_key', [''])[0].strip()
         
-        if not s3_bucket:
-            return {
-                'valid': False,
-                'error': 'S3 repository requires bucket name'
-            }
+        if not bucket:
+            return {'valid': False, 'error': 'S3 repository requires bucket name'}
+        
+        if not all([aws_access_key, aws_secret_key]):
+            return {'valid': False, 'error': 'S3 repository requires AWS Access Key ID and Secret Access Key'}
+        
+        # Build S3 URI
+        if prefix:
+            repo_uri = f"s3:{endpoint}/{bucket}/{prefix}"
+        else:
+            repo_uri = f"s3:{endpoint}/{bucket}"
+            
+        config = {
+            'dest_string': repo_uri,
+            'repo_uri': repo_uri,
+            's3_endpoint': endpoint,
+            's3_bucket': bucket,
+            's3_prefix': prefix,
+            'aws_access_key': aws_access_key,
+            'aws_secret_key': aws_secret_key
+        }
+        
+        return {'valid': True, 'config': config}
+    
+    @staticmethod
+    def _build_rclone_uri(form_data):
+        """Build rclone repository URI from structured form data"""
+        remote = form_data.get('restic_rclone_remote', [''])[0].strip()
+        path = form_data.get('restic_rclone_path', [''])[0].strip()
+        
+        if not remote:
+            return {'valid': False, 'error': 'rclone repository requires remote name'}
+        
+        # Build rclone URI
+        if path:
+            repo_uri = f"rclone:{remote}:{path}"
+        else:
+            repo_uri = f"rclone:{remote}:"
+            
+        config = {
+            'dest_string': repo_uri,
+            'repo_uri': repo_uri,
+            'rclone_remote': remote,
+            'rclone_path': path
+        }
+        
+        return {'valid': True, 'config': config}
+    
+    @staticmethod
+    def _build_sftp_uri(form_data):
+        """Build SFTP repository URI from structured form data"""
+        hostname = form_data.get('restic_sftp_hostname', [''])[0].strip()
+        username = form_data.get('restic_sftp_username', [''])[0].strip() 
+        path = form_data.get('restic_sftp_path', [''])[0].strip()
+        
+        if not all([hostname, username, path]):
+            return {'valid': False, 'error': 'SFTP repository requires hostname, username, and path'}
+        
+        # Build SFTP URI
+        repo_uri = f"sftp:{username}@{hostname}:{path}"
         
         config = {
-            's3_bucket': s3_bucket,
-            's3_prefix': s3_prefix
+            'dest_string': repo_uri,
+            'repo_uri': repo_uri,
+            'sftp_hostname': hostname,
+            'sftp_username': username,
+            'sftp_path': path
         }
         
-        # Add AWS credentials if provided
-        if aws_access_key:
-            config['aws_access_key'] = aws_access_key
-        if aws_secret_key:
-            config['aws_secret_key'] = aws_secret_key
-        
-        return {
-            'valid': True,
-            'config': config
-        }
-    
-    @staticmethod
-    def _parse_retention_policy(form_data):
-        """Parse retention policy from form data"""
-        keep_daily = form_data.get('restic_keep_daily', [''])[0].strip()
-        keep_weekly = form_data.get('restic_keep_weekly', [''])[0].strip()
-        keep_monthly = form_data.get('restic_keep_monthly', [''])[0].strip()
-        keep_yearly = form_data.get('restic_keep_yearly', [''])[0].strip()
-        
-        retention_policy = {}
-        
-        try:
-            if keep_daily:
-                retention_policy['keep_daily'] = int(keep_daily)
-            if keep_weekly:
-                retention_policy['keep_weekly'] = int(keep_weekly)
-            if keep_monthly:
-                retention_policy['keep_monthly'] = int(keep_monthly)
-            if keep_yearly:
-                retention_policy['keep_yearly'] = int(keep_yearly)
-        except ValueError:
-            # Return None for invalid numbers - will be caught by validation
-            return None
-        
-        return retention_policy if retention_policy else None
-    
-    @staticmethod
-    def _parse_tags(form_data):
-        """Parse backup tags from form data"""
-        tags_string = form_data.get('restic_tags', [''])[0].strip()
-        if not tags_string:
-            return []
-        
-        # Split by comma and clean up
-        tags = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
-        return tags
-    
-    @staticmethod
-    def _parse_exclude_patterns(form_data):
-        """Parse exclude patterns from form data"""
-        excludes_string = form_data.get('restic_excludes', [''])[0].strip()
-        if not excludes_string:
-            return []
-        
-        # Split by newlines and clean up
-        patterns = [pattern.strip() for pattern in excludes_string.split('\n') if pattern.strip()]
-        return patterns
+        return {'valid': True, 'config': config}

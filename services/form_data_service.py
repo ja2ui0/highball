@@ -33,10 +33,36 @@ class JobFormData:
     dest_rsyncd_hostname: str = ""
     dest_rsyncd_share: str = ""
     
-    # Restic destination configuration (minimal set)
+    # Restic destination configuration (structured inputs)
     restic_repo_type: str = ""
-    restic_repo_location: str = ""
     restic_password: str = ""
+    
+    # Local repository field
+    restic_local_path: str = ""
+    
+    # REST repository fields
+    restic_rest_hostname: str = ""
+    restic_rest_port: str = "8000"
+    restic_rest_path: str = ""
+    restic_rest_use_https: bool = True
+    restic_rest_username: str = ""
+    restic_rest_password: str = ""
+    
+    # S3 repository fields  
+    restic_s3_endpoint: str = "s3.amazonaws.com"
+    restic_s3_bucket: str = ""
+    restic_s3_prefix: str = ""
+    restic_aws_access_key: str = ""
+    restic_aws_secret_key: str = ""
+    
+    # rclone repository fields
+    restic_rclone_remote: str = ""
+    restic_rclone_path: str = ""
+    
+    # SFTP repository fields
+    restic_sftp_hostname: str = ""
+    restic_sftp_username: str = ""
+    restic_sftp_path: str = ""
     
     # Schedule configuration
     schedule_type: str = "manual"
@@ -109,10 +135,37 @@ class JobFormData:
             'DEST_RSYNCD_HOSTNAME': self.dest_rsyncd_hostname,
             'DEST_RSYNCD_SHARE': self.dest_rsyncd_share,
             
-            # Restic dest fields (minimal set)
+            # Restic dest fields (structured)
             'RESTIC_REPO_TYPE': self.restic_repo_type,
-            'RESTIC_REPO_LOCATION': self.restic_repo_location,
             'RESTIC_PASSWORD': self.restic_password,
+            'RESTIC_LOCAL_PATH': self.restic_local_path,
+            
+            # REST fields
+            'RESTIC_REST_HOSTNAME': self.restic_rest_hostname,
+            'RESTIC_REST_PORT': self.restic_rest_port,
+            'RESTIC_REST_PATH': self.restic_rest_path,
+            'RESTIC_REST_USE_HTTPS_CHECKED': 'checked' if self.restic_rest_use_https else '',
+            'RESTIC_REST_USERNAME': self.restic_rest_username,
+            'RESTIC_REST_PASSWORD': self.restic_rest_password,
+            
+            # S3 fields
+            'RESTIC_S3_ENDPOINT': self.restic_s3_endpoint,
+            'RESTIC_S3_BUCKET': self.restic_s3_bucket,
+            'RESTIC_S3_PREFIX': self.restic_s3_prefix,
+            'RESTIC_AWS_ACCESS_KEY': self.restic_aws_access_key,
+            'RESTIC_AWS_SECRET_KEY': self.restic_aws_secret_key,
+            
+            # rclone fields
+            'RESTIC_RCLONE_REMOTE': self.restic_rclone_remote,
+            'RESTIC_RCLONE_PATH': self.restic_rclone_path,
+            
+            # SFTP fields
+            'RESTIC_SFTP_HOSTNAME': self.restic_sftp_hostname,
+            'RESTIC_SFTP_USERNAME': self.restic_sftp_username,
+            'RESTIC_SFTP_PATH': self.restic_sftp_path,
+            
+            # Restic option (conditional based on implicit enablement)
+            'RESTIC_OPTION': f'<option value="restic" {("selected" if self.dest_type == "restic" else "")}>Restic Repository</option>',
             
             # Share selection
             'SHARE_SELECTION_CLASS': share_selection_class,
@@ -188,8 +241,32 @@ class JobFormDataBuilder:
             
             # Restic destination (only populate if dest_type is restic)
             restic_repo_type=dest_config.get('repo_type', '') if job_config.get('dest_type') == 'restic' else '',
-            restic_repo_location=dest_config.get('repo_location', '') if job_config.get('dest_type') == 'restic' else '',
             restic_password=dest_config.get('password', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_local_path=dest_config.get('repo_uri', '') if job_config.get('dest_type') == 'restic' and dest_config.get('repo_type') == 'local' else '',
+            
+            # REST fields
+            restic_rest_hostname=dest_config.get('rest_hostname', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_rest_port=dest_config.get('rest_port', '8000') if job_config.get('dest_type') == 'restic' else '8000',
+            restic_rest_path=dest_config.get('rest_path', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_rest_use_https=dest_config.get('rest_use_https', True) if job_config.get('dest_type') == 'restic' else True,
+            restic_rest_username=dest_config.get('rest_username', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_rest_password=dest_config.get('rest_password', '') if job_config.get('dest_type') == 'restic' else '',
+            
+            # S3 fields
+            restic_s3_endpoint=dest_config.get('s3_endpoint', 's3.amazonaws.com') if job_config.get('dest_type') == 'restic' else 's3.amazonaws.com',
+            restic_s3_bucket=dest_config.get('s3_bucket', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_s3_prefix=dest_config.get('s3_prefix', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_aws_access_key=dest_config.get('aws_access_key', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_aws_secret_key=dest_config.get('aws_secret_key', '') if job_config.get('dest_type') == 'restic' else '',
+            
+            # rclone fields  
+            restic_rclone_remote=dest_config.get('rclone_remote', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_rclone_path=dest_config.get('rclone_path', '') if job_config.get('dest_type') == 'restic' else '',
+            
+            # SFTP fields
+            restic_sftp_hostname=dest_config.get('sftp_hostname', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_sftp_username=dest_config.get('sftp_username', '') if job_config.get('dest_type') == 'restic' else '',
+            restic_sftp_path=dest_config.get('sftp_path', '') if job_config.get('dest_type') == 'restic' else '',
             
             # Schedule
             schedule_type=schedule_type,

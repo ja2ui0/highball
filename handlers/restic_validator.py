@@ -23,16 +23,16 @@ class ResticValidator:
                 'message': 'Repository type is required'
             }
         
-        repo_location = dest_config.get('repo_location')
-        if not repo_location:
+        repo_uri = dest_config.get('repo_uri') or dest_config.get('dest_string')
+        if not repo_uri:
             return {
                 'success': False,
-                'message': 'Repository location is required'
+                'message': 'Repository URI is required'
             }
         
         # Validate repository type specific requirements
         if repo_type == 'sftp':
-            required_fields = ['repo_hostname', 'repo_username', 'repo_path']
+            required_fields = ['sftp_hostname', 'sftp_username', 'sftp_path']
             missing = [field for field in required_fields if not dest_config.get(field)]
             if missing:
                 return {
@@ -41,12 +41,30 @@ class ResticValidator:
                 }
         
         elif repo_type == 's3':
-            required_fields = ['s3_bucket']
+            required_fields = ['s3_bucket', 'aws_access_key', 'aws_secret_key']
             missing = [field for field in required_fields if not dest_config.get(field)]
             if missing:
                 return {
                     'success': False,
                     'message': f'S3 repository requires: {", ".join(missing)}'
+                }
+        
+        elif repo_type == 'rest':
+            required_fields = ['rest_hostname']
+            missing = [field for field in required_fields if not dest_config.get(field)]
+            if missing:
+                return {
+                    'success': False,
+                    'message': f'REST repository requires: {", ".join(missing)}'
+                }
+        
+        elif repo_type == 'rclone':
+            required_fields = ['rclone_remote']
+            missing = [field for field in required_fields if not dest_config.get(field)]
+            if missing:
+                return {
+                    'success': False,
+                    'message': f'rclone repository requires: {", ".join(missing)}'
                 }
         
         # Check for password
@@ -61,6 +79,12 @@ class ResticValidator:
             binary_check = ResticValidator.check_restic_binary(source_config)
             if not binary_check['success']:
                 return binary_check
+            
+            # For rclone repositories, also check rclone binary (similar to rsync pattern)
+            if repo_type == 'rclone':
+                rclone_check = ResticValidator.check_rclone_binary(source_config)
+                if not rclone_check['success']:
+                    return rclone_check
         
         # Build repository URL using ResticRunner
         runner = ResticRunner()
@@ -122,6 +146,59 @@ class ResticValidator:
             return {
                 'success': False,
                 'message': f'Binary check error: {str(e)}',
+                'tested_from': f'{username}@{hostname}'
+            }
+    
+    @staticmethod
+    def check_rclone_binary(source_config):
+        """Check if rclone binary is available on source system"""
+        hostname = source_config.get('hostname')
+        username = source_config.get('username')
+        
+        if not hostname or not username:
+            return {
+                'success': False,
+                'message': 'SSH source configuration required for rclone binary check'
+            }
+        
+        try:
+            # Check for rclone binary via SSH
+            ssh_cmd = [
+                'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                'which rclone && rclone version'
+            ]
+            
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                version_info = result.stdout.strip()
+                return {
+                    'success': True,
+                    'message': f'rclone binary found on {hostname}',
+                    'version': version_info,
+                    'tested_from': f'{username}@{hostname}'
+                }
+            else:
+                error_msg = result.stderr.strip() or 'rclone binary not found'
+                return {
+                    'success': False,
+                    'message': f'rclone not available on {hostname}: {error_msg}',
+                    'tested_from': f'{username}@{hostname}',
+                    'suggestion': 'Install rclone binary on source system and configure remotes'
+                }
+        
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'message': f'Connection timeout checking rclone on {hostname}',
+                'tested_from': f'{username}@{hostname}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'rclone binary check error: {str(e)}',
                 'tested_from': f'{username}@{hostname}'
             }
     
