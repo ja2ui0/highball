@@ -39,14 +39,18 @@ class LogsHandler:
         # Check if this is a job log request
         url_parts = urlparse(handler.path)
         params = parse_qs(url_parts.query)
-        job_name = params.get('job', [''])[0]
+        # If system=1 is present, force system logs (ignore job parameter)
+        force_system = params.get('system', [''])[0] == '1'
+        job_name = '' if force_system else params.get('job', [''])[0]
         
         if job_name:
             # Show job-specific log
             log_file = f'/var/log/highball/jobs/{job_name}.log'
             log_name = f'Job: {job_name}'
             log_content = self._read_log_file(log_file)
-            log_buttons = f'<a href="/logs" class="button">Back to System Logs</a>'
+            log_buttons = f'<a href="/logs?system=1" class="button">Back to System Logs</a>'
+            # Set log_type for JavaScript streaming detection
+            template_log_type = f'job:{job_name}'
         else:
             # Show system logs
             # Validate log type
@@ -57,6 +61,7 @@ class LogsHandler:
             log_name = current_log['name']
             log_content = self._read_log_file(current_log['file'])
             log_buttons = self._generate_log_buttons(log_type)
+            template_log_type = log_type
         
         # Generate job dropdown
         job_dropdown = self._generate_job_dropdown(job_name)
@@ -65,8 +70,8 @@ class LogsHandler:
         html_content = self.template_service.render_template(
             'logs.html',
             log_buttons=log_buttons,
-            log_content=html.escape(log_content),
-            log_type=log_type,
+            log_content=log_content,  # Remove double escaping
+            log_type=template_log_type,  # Use correct log_type for JavaScript
             log_name=log_name,
             job_dropdown=job_dropdown
         )
@@ -118,9 +123,14 @@ class LogsHandler:
             if os.path.exists(log_file):
                 with open(log_file, 'r') as f:
                     lines = f.readlines()
-                    return ''.join(lines[-100:]) if lines else 'No logs yet'
+                    return ''.join(lines[-100:]) if lines else 'No logs yet - job has not generated any log entries.'
             else:
-                return f"Log file {log_file} not found"
+                # More helpful message when log file doesn't exist
+                if '/jobs/' in log_file:
+                    job_name = os.path.basename(log_file).replace('.log', '')
+                    return f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
+                else:
+                    return f"Log file {log_file} not found"
         except Exception as e:
             return f"Error reading log: {str(e)}"
     
