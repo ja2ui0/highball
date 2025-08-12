@@ -1,23 +1,24 @@
 FROM python:3.11-slim
-# Install all system dependencies (this is the slow part)
-RUN apt-get update && apt-get install -y \
-    nginx \
-    rsync \
-    openssh-client \
-    time \
-    curl \
-    supervisor \
-    tzdata \
-    netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/*
-# Copy Python dependencies first so they're cached unless they change
-COPY requirements.txt .
-# Install Python packages
-RUN pip install --no-cache-dir -r requirements.txt
-# Create directories
-RUN mkdir -p /app /config
-# Create non-root user (kept for potential future use)
-RUN useradd -r -s /bin/false backupuser
-# Set up nginx and supervisor log directories
-RUN chown -R www-data:www-data /var/log/nginx /var/lib/nginx
-# This base image is ready for our app
+
+# Install system dependencies and Python packages in single layer for smaller image
+COPY requirements.txt /tmp/requirements.txt
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        nginx \
+        rsync \
+        restic \
+        rclone \
+        openssh-client \
+        curl \
+        supervisor \
+        tzdata \
+        netcat-openbsd && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/requirements.txt /root/.cache
+
+# Create directories and users in single layer
+RUN mkdir -p /app /config && \
+    useradd -r -s /bin/false backupuser && \
+    chown -R www-data:www-data /var/log/nginx /var/lib/nginx

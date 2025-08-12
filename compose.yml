@@ -23,23 +23,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-  # Development service with live code mounting
-  highball-dev:
-    build: .
-    image: highball:latest
-    container_name: highball-dev
-    ports:
-      - "8088:80"
-    volumes:
-      # Mount source code for live development
-      - ./app.py:/app/app.py
-      - ./config.py:/app/config.py
-      - ./templates:/app/templates
-      - ./static:/app/static
-      - ./config:/config
-      # Mount SSH keys for development
-      - ~/.ssh:/root/.ssh:ro
-    environment:
-      - CONFIG_PATH=/config/config.yaml
-    profiles:
-      - dev
