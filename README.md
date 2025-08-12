@@ -1,4 +1,4 @@
-# # ![Highball logo](/site/favicon.png "Highball logo") Highball
+# ![Highball logo](favicon.ico "Highball logo") Highball
 
 Multi-host backup orchestrator for rsync, rclone, restic, and more — all from one dashboard.
 
