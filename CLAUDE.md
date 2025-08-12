@@ -14,8 +14,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (execution), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic planning - scaffold), `restic_validator.py`, `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
-**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (template generation), `restic_runner.py` (command planning - scaffold)
+**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic planning - scaffold), `restic_validator.py`, `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
+**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command planning - scaffold)
 **Static Assets**: `job-form.js` (consolidated form handling), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
 ## Data Storage
@@ -60,7 +60,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 **Template Consolidation**: Single `job_form.html` template with dataclass-driven variable generation (eliminates `edit_job.html` duplication)
 **JavaScript Modularity**: Consolidated `job-form.js` (replaces `add-job.js`), separate `config-manager.js`, `network-scan.js` for specific functionality
-**Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`)
+**Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`, `SourceConfig`, `DestConfig`, `ResticConfig`, `CommandInfo`, `ExecutionContext`)
 **File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
 **Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
 **CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables
@@ -68,11 +68,12 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 **Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
 **Restic Scaffold**: Complete modular architecture for Restic backup provider with command planning abstraction, implicit enablement, and 202 planning responses - ready for template/execution implementation (see `RESTIC_SCAFFOLD.md`)
 **Form Parser Architecture**: Fully modular form parsing with dedicated parsers for each destination type (`LocalFormParser`, `SSHFormParser`, `RsyncdFormParser`, `ResticFormParser`) - eliminates code duplication and establishes clean extension pattern
+**Backup Execution Architecture**: Modular backup execution with separation of concerns (`BackupExecutor` for core execution, `BackupCommandBuilder` for rsync command construction, `BackupConflictHandler` for conflict management, `BackupNotificationDispatcher` for notification handling) - replaces monolithic 477-line backup handler with focused, testable components
 
 ## Commands
 
 **Run**: `./build.sh` or `./rr` (rebuild and restart)
-**Debug**: `docker logs -f backup-manager`
+**Debug**: `docker logs -f highball`
 **Test Notifications**: `./test_notifications.py`
 
 ## Configuration Schema (User-facing Only)

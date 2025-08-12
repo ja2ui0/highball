@@ -7,8 +7,8 @@ curr="$(cat "${FILES[@]}" 2>/dev/null | sha256sum | awk '{print $1}')"
 prev="$(cat "$STAMP" 2>/dev/null || true)"
 
 if [[ "$curr" != "$prev" ]]; then
-  echo "[base] Changes detected → rebuilding backup-manager-base:latest ..."
-  docker build -f Dockerfile.base -t backup-manager-base:latest .
+  echo "[base] Changes detected → rebuilding highball-base:latest ..."
+  docker build -f Dockerfile.base -t highball-base:latest .
   echo "$curr" > "$STAMP"
 else
   echo "[base] No changes in Dockerfile.base/requirements.txt → skipping base build."

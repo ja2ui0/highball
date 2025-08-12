@@ -23,7 +23,7 @@ The Restic provider follows the existing Highball patterns with these key compon
 - **`handlers/job_validator.py`** - Updated to delegate Restic validation
 - **`handlers/job_form_parser.py`** - Refactored to use modular parsing delegation
 - **`handlers/job_display.py`** - Updated to display Restic job destinations
-- **`services/form_data_service.py`** - Updated with Restic form fields and implicit enablement
+- **`services/form_data_service.py`** - Refactored to modular architecture with nested dataclasses for maintainability
 - **`app.py`** - Updated with Restic routing and handler initialization
 
 ## Implicit Enablement Pattern
@@ -74,6 +74,8 @@ All execution endpoints return HTTP 202 with structured plan payload instead of 
 - [x] Implicit enablement pattern
 - [x] Modular form parser architecture (all destination types)
 - [x] Comprehensive test suite coverage
+- [x] Form data service refactored to modular architecture with nested dataclasses
+- [x] Backup execution handler refactored to modular components for maintainability
 
 ### ⚠️ Next Implementation Steps
 
@@ -358,5 +360,7 @@ Note: Ensure rclone is configured on source system
 - ✅ Comprehensive test suite with 30+ test cases
 - ✅ Full integration with existing rsync functionality
 - ✅ Clean extension pattern established for future providers
+- ✅ Form data service modularized with nested dataclasses (eliminated repetitive conditionals)
+- ✅ Backup execution handler modularized into focused components (eliminated 477-line monolith)
 
 **Next Priority**: Complete HTML templates and form handling for UI functionality

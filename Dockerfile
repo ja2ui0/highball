@@ -1,4 +1,4 @@
-FROM backup-manager-base:latest
+FROM highball-base:latest
 WORKDIR /app
 # Copy application files (fast - just file copies)
 COPY *.py /app/
