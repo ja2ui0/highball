@@ -1,0 +1,36 @@
+/* Light Theme Colors */
+:root {
+    /* Background Colors */
+    --bg-primary: #f2f2f7;
+    --bg-secondary: #fbfbfd;
+    --bg-tertiary: #e5e5ea;
+    --bg-quaternary: #d1d1d6;
+
+    /* Text Colors */
+    --text-primary: #1c1c1e;
+    --text-secondary: #3a3a3c;
+    --text-muted: #636366;
+
+    /* Accent Colors */
+    --accent-primary: #3b82c4;
+    --accent-hover: #316da7;
+
+    /* Status Colors */
+    --success: #4caf7a;
+    --success-hover: #3f8e66;
+    --warning: #d4a93b;
+    --warning-hover: #b48e30;
+    --danger: #c76969;
+    --danger-hover: #aa5656;
+
+    /* Border */
+    --border: #d1d1d6;
+
+    /* Additional semantic colors */
+    --terminal-bg: #f6f7f9;
+    --terminal-text: #065f46;
+    --secondary-bg: #eef0f4;
+    --secondary-bg-hover: #e2e6ec;
+    --warning-text: #1c1c1e;
+}
+

@@ -1,6 +1,7 @@
 """
 Configuration handler for editing backup settings
 """
+import os
 import yaml
 from datetime import datetime
 from services.template_service import TemplateService
@@ -12,6 +13,35 @@ class ConfigHandler:
         self.backup_config = backup_config
         self.template_service = template_service
     
+    def _get_available_themes(self):
+        """Get list of available themes by scanning theme directory"""
+        themes = []
+        theme_dir = 'static/themes'
+        
+        if os.path.exists(theme_dir):
+            for file in os.listdir(theme_dir):
+                if file.endswith('.css'):
+                    theme_name = file[:-4]  # Remove .css extension
+                    themes.append(theme_name)
+        
+        # Always ensure 'dark' is available as fallback
+        if 'dark' not in themes:
+            themes.append('dark')
+        
+        return sorted(themes)
+    
+    def _generate_theme_options(self, current_theme):
+        """Generate HTML options for theme selector"""
+        themes = self._get_available_themes()
+        options = ""
+        
+        for theme in themes:
+            selected = 'selected' if theme == current_theme else ''
+            theme_display = theme.title()  # Capitalize first letter
+            options += f'<option value="{theme}" {selected}>{theme_display}</option>\n'
+        
+        return options
+    
     def show_config_manager(self, handler):
         """Show structured configuration form"""
         global_settings = self.backup_config.config.get('global_settings', {})
@@ -22,11 +52,16 @@ class ConfigHandler:
         telegram_config = notification_config.get('telegram', {})
         email_config = notification_config.get('email', {})
         
+        # Theme selection
+        current_theme = global_settings.get('theme', 'dark')
+        theme_options = self._generate_theme_options(current_theme)
+        
         # Render structured config manager
         html_content = self.template_service.render_template(
             'config_manager.html',
             # Global settings (uppercase to match template)
             SCHEDULER_TIMEZONE=global_settings.get('scheduler_timezone', 'UTC'),
+            THEME_OPTIONS=theme_options,
             ENABLE_CONFLICT_AVOIDANCE='checked' if global_settings.get('enable_conflict_avoidance', True) else '',
             CONFLICT_CHECK_INTERVAL=str(global_settings.get('conflict_check_interval', 300)),
             DELAY_NOTIFICATION_THRESHOLD=str(global_settings.get('delay_notification_threshold', 300)),
@@ -89,6 +124,15 @@ class ConfigHandler:
             
             # Basic settings
             global_settings['scheduler_timezone'] = form_data.get('scheduler_timezone', ['UTC'])[0]
+            
+            # Theme setting (only save if not default 'dark')
+            theme = form_data.get('theme', ['dark'])[0]
+            if theme != 'dark':
+                global_settings['theme'] = theme
+            elif 'theme' in global_settings:
+                # Remove theme key if set back to default
+                del global_settings['theme']
+            
             global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
             global_settings['conflict_check_interval'] = int(form_data.get('conflict_check_interval', ['300'])[0])
             global_settings['delay_notification_threshold'] = int(form_data.get('delay_notification_threshold', ['300'])[0])

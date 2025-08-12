@@ -49,7 +49,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         # Core services
         config_path = os.environ.get('CONFIG_PATH', '/config/config.yaml')
         cls._backup_config = cls._backup_config or BackupConfig(config_path)
-        cls._template_service = cls._template_service or TemplateService()
+        cls._template_service = cls._template_service or TemplateService(cls._backup_config)
         if cls._scheduler_service is None:
             cls._scheduler_service = SchedulerService()
 

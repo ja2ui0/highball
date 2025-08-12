@@ -1,0 +1,44 @@
+/* Dark Theme Colors */
+:root {
+    /* Background Colors */
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #3a3a3a;
+    --bg-quaternary: #4a4a4a;
+    
+    /* Text Colors */
+    --text-primary: #ffffff;
+    --text-secondary: #e0e0e0;
+    --text-muted: #888888;
+    
+    /* Accent Colors */
+    --accent-primary: #4a9eff;
+    --accent-hover: #357abd;
+    
+    /* Status Colors */
+    --success: #28a745;
+    --success-hover: #218838;
+    --warning: #ffc107;
+    --warning-hover: #e0a800;
+    --danger: #dc3545;
+    --danger-hover: #c82333;
+    
+    /* Border */
+    --border: #555555;
+    
+    /* Additional semantic colors */
+    --terminal-bg: #1a1a1a;
+    --terminal-text: #00ff00;
+    --secondary-bg: #6c757d;
+    --secondary-bg-hover: #5a6268;
+    --warning-text: #212529;
+    
+    /* Table and container colors */
+    --table-row-even: #404040;
+    --code-bg: #2a2a2a;
+    
+    /* Alert background colors */
+    --alert-success-bg: #2d5016;
+    --alert-error-bg: #5a1a1a;
+    --alert-info-bg: #0c4a5a;
+}

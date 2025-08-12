@@ -4,30 +4,7 @@
    DESIGN TOKENS (DO NOT MODIFY - USED THROUGHOUT)
    ============================================================================= */
 :root {
-    /* Colors */
-    --bg-primary: #1a1a1a;
-    --bg-secondary: #2d2d2d;
-    --bg-tertiary: #3a3a3a;
-    --bg-quaternary: #4a4a4a;
-    --text-primary: #ffffff;
-    --text-secondary: #e0e0e0;
-    --text-muted: #888888;
-    --accent-primary: #4a9eff;
-    --accent-hover: #357abd;
-    --success: #28a745;
-    --success-hover: #218838;
-    --warning: #ffc107;
-    --warning-hover: #e0a800;
-    --danger: #dc3545;
-    --danger-hover: #c82333;
-    --border: #555555;
-    
-    /* Additional semantic colors */
-    --terminal-bg: #1a1a1a;
-    --terminal-text: #00ff00;
-    --secondary-bg: #6c757d;
-    --secondary-bg-hover: #5a6268;
-    --warning-text: #212529;
+    /* Colors are defined in theme files (e.g., /static/themes/dark.css) */
     
     /* Spacing Scale */
     --space-xs: 2px;
@@ -72,10 +49,15 @@ body {
     box-shadow: var(--shadow);
 }
 
-h1, h2 {
+h1 {
     color: var(--text-primary);
     border-bottom: 2px solid var(--accent-primary);
     padding-bottom: var(--space-lg);
+}
+
+h2 {
+    color: var(--text-primary);
+    padding-bottom: var(--space-sm);
 }
 
 /* =============================================================================
@@ -191,9 +173,11 @@ input[type="checkbox"] {
 table {
     border-collapse: collapse;
     width: 100%;
-    margin-top: var(--space-xxl);
+    margin-top: var(--space-xl);
     background-color: var(--bg-tertiary);
     table-layout: fixed;
+    border-radius: var(--radius);
+    overflow: hidden; /* Ensures corners stay rounded with collapsed borders */
 }
 
 th, td {
@@ -212,7 +196,7 @@ th {
 }
 
 tr:nth-child(even) {
-    background-color: #404040;
+    background-color: var(--table-row-even);
 }
 
 tr:hover {
@@ -355,26 +339,26 @@ tr:hover {
 }
 
 .alert-success {
-    color: #b7e4c7;
-    background-color: #2d5016;
+    color: var(--text-secondary);
+    background-color: var(--alert-success-bg);
     border-color: var(--success);
 }
 
 .alert-error {
-    color: #f8d7da;
-    background-color: #5a1a1a;
+    color: var(--text-secondary);
+    background-color: var(--alert-error-bg);
     border-color: var(--danger);
 }
 
 .alert-info {
-    color: #bee5eb;
-    background-color: #0c4a5a;
-    border-color: #17a2b8;
+    color: var(--text-secondary);
+    background-color: var(--alert-info-bg);
+    border-color: var(--accent-primary);
 }
 
 /* Base code container - reusable */
 .code-container {
-    background-color: #2a2a2a;
+    background-color: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: var(--space-xl);
@@ -448,7 +432,7 @@ tr:hover {
 .log-controls {
     margin-bottom: var(--space-15);
     padding: var(--space-15);
-    background-color: #3a3a3a;
+    background-color: var(--bg-tertiary);
     border-radius: 4px;
 }
 

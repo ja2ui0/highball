@@ -93,6 +93,7 @@ class BackupConfig:
         return {
             "global_settings": {
                 "scheduler_timezone": "UTC",
+                "theme": "dark",  # default theme (dark, light, gruvbox, etc.)
                 "default_schedule_times": {
                     "hourly": "0 * * * *",     # top of every hour
                     "daily": "0 3 * * *",      # 3am daily

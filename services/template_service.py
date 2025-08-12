@@ -7,6 +7,23 @@ import html
 class TemplateService:
     """Service for loading and rendering HTML templates"""
     
+    def __init__(self, backup_config=None):
+        self.backup_config = backup_config
+    
+    def get_theme_css_path(self):
+        """Get the CSS path for the current theme"""
+        if not self.backup_config:
+            return "/static/themes/dark.css"  # default fallback
+        
+        theme = self.backup_config.config.get('global_settings', {}).get('theme', 'dark')
+        theme_path = f"/static/themes/{theme}.css"
+        
+        # Check if theme file exists, fallback to dark if not
+        if not os.path.exists(f"static/themes/{theme}.css"):
+            theme_path = "/static/themes/dark.css"
+        
+        return theme_path
+    
     def load_template(self, template_name):
         """Load HTML template from templates directory"""
         template_path = f"templates/{template_name}"
@@ -19,6 +36,9 @@ class TemplateService:
     def render_template(self, template_name, **kwargs):
         """Load template and replace placeholders with values"""
         template = self.load_template(template_name)
+        
+        # Automatically add theme CSS path to all templates
+        kwargs['theme_css_path'] = self.get_theme_css_path()
         
         # Replace all placeholders
         for key, value in kwargs.items():

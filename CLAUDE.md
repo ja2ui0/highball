@@ -30,10 +30,10 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 
 **Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings, consolidated templates
 **Smart Scheduling**: Configurable default times (hourly/daily/weekly/monthly), runtime conflict detection, automatic job queuing
-**Logging**: Per-job execution logs, status tracking, SSH validation state with 30min caching, conflict delay tracking, live log streaming
+**Logging**: Per-job execution logs, status tracking, SSH validation state with 30min caching, conflict delay tracking, simplified refresh-based log viewing
 **Notifications**: Professional notification system using `notifiers` library backend, method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications (emoji-free, extensible to 25+ providers)
-**UI**: Real-time validation, share discovery, job history with live log viewing, structured config forms + raw YAML editor, network scanning
-**System Inspection**: Network rsync server discovery, live log streaming, comprehensive system monitoring
+**UI**: Real-time validation, share discovery, job history with refresh-based log viewing, structured config forms + raw YAML editor, network scanning, theming system
+**System Inspection**: Network rsync server discovery, simplified log viewing, comprehensive system monitoring
 
 ## Development
 
@@ -42,6 +42,17 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 **Extensions**: New engines via `services/<engine>_runner.py` + update `job_validator.py`
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers` for modern Python patterns
 
+## Theming System
+
+**Architecture**: Base + Theme approach with complete color separation
+**Base CSS**: `/static/style.css` - structural styles, spacing, layout (no colors)  
+**Theme Files**: `/static/themes/{theme}.css` - color variables only (`:root` definitions)
+**Loading**: Automatic via `TemplateService` - all templates get `{{THEME_CSS_PATH}}` variable
+**Configuration**: `global_settings.theme` in YAML config (default: "dark")
+**Discovery**: Dynamic theme detection from filesystem - scans `/static/themes/` for `.css` files
+**UI Selection**: Theme dropdown in Config Manager with auto-generated options
+**Extension**: Add new themes by creating CSS files with color variables - no template changes needed
+
 ## Modern Architecture Notes
 
 **Template Consolidation**: Single `job_form.html` template with dataclass-driven variable generation (eliminates `edit_job.html` duplication)
@@ -49,7 +60,7 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 **Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`)
 **File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
 **Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
-**CSS Architecture**: Semantic utility classes (`.status-success`, `.status-error`, `.method-settings`) replace inline styles
+**CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables
 **Error Handling**: Comprehensive exception handling with graceful degradation and user-friendly error messages
 **Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
 
@@ -64,6 +75,7 @@ Web-based rsync backup orchestration with scheduling and monitoring.
 ```yaml
 global_settings:
   scheduler_timezone: "UTC"  # default UTC, configurable
+  theme: "dark"  # UI theme (dark, light, gruvbox, etc.)
   default_schedule_times:
     hourly: "0 * * * *"     # top of every hour
     daily: "0 3 * * *"      # 3am daily
