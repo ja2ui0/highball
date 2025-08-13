@@ -92,6 +92,13 @@ class JobFormParser:
         enabled = 'enabled' in form_data
         respect_conflicts = 'respect_conflicts' in form_data
         
+        # Parse notification configuration
+        from handlers.notification_form_parser import NotificationFormParser
+        notification_result = NotificationFormParser.parse_notification_config(form_data)
+        if not notification_result['valid']:
+            return notification_result
+        notifications = notification_result['notifications']
+        
         return {
             'valid': True,
             'job_name': job_name,
@@ -101,7 +108,8 @@ class JobFormParser:
             'dest_config': dest_config,
             'schedule': schedule,
             'enabled': enabled,
-            'respect_conflicts': respect_conflicts
+            'respect_conflicts': respect_conflicts,
+            'notifications': notifications
         }
     
     @staticmethod

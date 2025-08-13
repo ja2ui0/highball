@@ -136,10 +136,14 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Next Session Priority**: 
-1. **Per-job notification options** - Notification messages and methods selectable per job, with global provider configuration (maintain current global provider setup)
-2. **Notification backend testing** - Add and test notification integration and user experience
-3. **Restic repository browser** - Implement actual functionality for the scaffolded browser interface  
-4. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery
+1. **Notification queue system** - Implement spam-prevention queuing with configurable intervals per provider
+2. **Restic repository browser** - Implement actual functionality for the scaffolded browser interface  
+3. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery
+
+**Recent Completion (2025-08-13)**:
+- **Global notification configuration redesign** - Removed success notification toggles, changed labels to "Configure <provider>...", added test notification buttons with comprehensive error handling
+- **Modular notification testing** - Created `NotificationTestHandler` with provider-specific error messages, proper result validation, and user-friendly feedback
+- **Per-job notification foundation** - Added dynamic provider selection UI, custom success/failure messages with template variables, expandable form sections
 
 **Future Priorities**: Section-specific save buttons for configuration (spot-save individual sections instead of full form save)
 **Planned**: Borg, rclone direct destinations, enhanced Restic execution features (progress parsing, retention policies)

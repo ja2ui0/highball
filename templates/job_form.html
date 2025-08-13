@@ -51,6 +51,14 @@
                 </div>
             </div>
             
+            <!-- Notifications Section -->
+            <div class="form-section">
+                <div class="section-content">
+                    <h2 class="section-header">Notifications</h2>
+                    {{INCLUDE:job_form_notifications.html}}
+                </div>
+            </div>
+            
             <!-- Actions Section -->
             <div class="form-section">
                 <div class="section-content">
@@ -77,6 +85,7 @@
             showDestFields();
             showCronField();
             initializeSourcePaths();
+            initializeNotificationProviders();
         });
         
         function showCronField() {

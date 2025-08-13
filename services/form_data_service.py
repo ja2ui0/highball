@@ -92,6 +92,9 @@ class JobFormData:
     enabled: bool = True
     respect_conflicts: bool = True
     
+    # Notification settings
+    notifications: list = field(default_factory=list)
+    
     def to_template_vars(self) -> Dict[str, str]:
         """Convert to template variables with proper escaping and formatting"""
         template_vars = {}
@@ -104,6 +107,7 @@ class JobFormData:
         template_vars.update(self._get_schedule_variables())
         template_vars.update(self._get_pattern_variables())
         template_vars.update(self._get_checkbox_variables())
+        template_vars.update(self._get_notification_variables())
         template_vars.update(self._get_special_variables())
         
         return template_vars
@@ -158,6 +162,7 @@ class JobFormData:
     
     def _get_multi_path_variables(self) -> Dict[str, str]:
         """Get multi-path template variables - generate for ALL paths"""
+        import json
         vars_dict = {}
         
         if self.source.source_paths:
@@ -179,7 +184,6 @@ class JobFormData:
                     'excludes': path_config.get('excludes', [])
                 })
             
-            import json
             vars_dict['SOURCE_PATHS_JSON'] = json.dumps(paths_json)
             
         else:
@@ -288,6 +292,36 @@ class JobFormData:
                 'SHARE_OPTIONS': ""
             }
     
+    def _get_notification_variables(self) -> Dict[str, str]:
+        """Get notification configuration variables"""
+        import json
+        
+        # For now, we'll get available providers from a service
+        # This will be populated by checking global configuration
+        available_providers = self._get_available_notification_providers()
+        
+        # Generate JSON data for JavaScript
+        return {
+            'AVAILABLE_PROVIDERS_JSON': json.dumps(available_providers),
+            'EXISTING_NOTIFICATIONS_JSON': json.dumps(self.notifications),
+            'AVAILABLE_PROVIDERS_OPTIONS': self._generate_provider_options(available_providers),
+            'ADD_PROVIDER_CLASS': '' if available_providers else 'hidden'
+        }
+    
+    def _get_available_notification_providers(self) -> list:
+        """Get list of globally configured notification providers"""
+        # This will need to be passed in via the builder or form context
+        # For now, return common providers - will be improved when we wire up the handlers
+        return ['telegram', 'email']
+    
+    def _generate_provider_options(self, providers: list) -> str:
+        """Generate HTML options for provider dropdown"""
+        options = ""
+        for provider in providers:
+            display_name = provider.capitalize()
+            options += f'<option value="{provider}">{display_name}</option>\n'
+        return options
+    
     def _get_special_variables(self) -> Dict[str, str]:
         """Get special computed variables"""
         return {
@@ -350,7 +384,8 @@ class JobFormDataBuilder:
             includes='',  # Legacy field - includes/excludes now in source_paths
             excludes='',  # Legacy field - includes/excludes now in source_paths
             enabled=job_config.get('enabled', True),
-            respect_conflicts=job_config.get('respect_conflicts', True)
+            respect_conflicts=job_config.get('respect_conflicts', True),
+            notifications=job_config.get('notifications', [])
         )
     
     @classmethod
