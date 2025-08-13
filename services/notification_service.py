@@ -43,7 +43,7 @@ class NotificationProviderFactory:
             provider_config = {
                 "token": telegram_config["token"],
                 "chat_id": telegram_config["chat_id"],
-                "parse_mode": "Markdown",
+                "parse_mode": "markdown",
                 "disable_web_page_preview": True
             }
         
@@ -173,6 +173,15 @@ class NotificationService:
         self.send_notification(test_title, test_message, "info")
         return self.is_notifications_enabled()
     
+    def test_notification_with_results(self, title: str, message: str, notification_type: str = "info") -> List[NotificationResult]:
+        """Test notification and return detailed results for validation"""
+        if not self.is_notifications_enabled():
+            return []
+        
+        formatted_message = self._format_message(message)
+        results = self._send_to_all_providers(title, formatted_message, notification_type)
+        return results
+    
     def get_available_providers(self) -> List[str]:
         """Get list of available provider names for future frontend expansion"""
         return list(self.providers.keys())
@@ -230,25 +239,36 @@ class NotificationService:
             }
             prefix = prefixes.get(notification_type, "[INFO]")
             
-            # Prepare notification content
+            # Prepare notification content and send
+            result = None
             if provider.provider_name == "telegram":
                 # Telegram supports markdown formatting
                 formatted_text = f"{prefix} **{title}**\n\n{message}"
-                notifier.notify(message=formatted_text, **provider.config)
+                result = notifier.notify(message=formatted_text, **provider.config)
             
             elif provider.provider_name == "email":
                 # Email needs subject and body
                 email_config = provider.config.copy()
                 email_config["subject"] = f"Highball: {title}"
                 email_config["message"] = f"Highball Backup Manager\n\n{message}"
-                notifier.notify(**email_config)
+                result = notifier.notify(**email_config)
             
             else:
                 # Generic provider (for future extensions)
                 formatted_text = f"{prefix} {title}\n\n{message}"
-                notifier.notify(message=formatted_text, **provider.config)
+                result = notifier.notify(message=formatted_text, **provider.config)
             
-            return True, None
+            # Check result status
+            if result and hasattr(result, 'status'):
+                if str(result.status).lower() == 'success':
+                    return True, None
+                else:
+                    # Get error details from result
+                    errors = getattr(result, 'errors', ['Unknown error'])
+                    return False, f"Notification failed: {', '.join(errors)}"
+            else:
+                # Fallback for providers that don't return status objects
+                return True, None
             
         except Exception as e:
             return False, f"Failed to send {provider.provider_name} notification: {str(e)}"

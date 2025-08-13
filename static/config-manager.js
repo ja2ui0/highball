@@ -1,4 +1,4 @@
-// Configuration manager form interactions
+// Configuration manager core functionality
 document.addEventListener('DOMContentLoaded', function() {
     // Generic toggle function for notification settings
     const toggleSettings = (checkboxId, settingsId) => {
@@ -29,3 +29,20 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleSettings('enable_email', 'emailSettings');
     }
 });
+
+// Legacy function names for backward compatibility with inline handlers
+function toggleTelegramSettings() {
+    const checkbox = document.getElementById('enable_telegram');
+    const settings = document.getElementById('telegramSettings');
+    if (checkbox && settings) {
+        settings.classList.toggle('hidden', !checkbox.checked);
+    }
+}
+
+function toggleEmailSettings() {
+    const checkbox = document.getElementById('enable_email');
+    const settings = document.getElementById('emailSettings');
+    if (checkbox && settings) {
+        settings.classList.toggle('hidden', !checkbox.checked);
+    }
+}

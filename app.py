@@ -16,6 +16,7 @@ from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
 from handlers.job_scheduler import JobSchedulerHandler
 from handlers.restic_handler import ResticHandler
+from handlers.notification_test_handler import NotificationTestHandler
 
 # Services
 from services.template_service import TemplateService
@@ -76,6 +77,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
                 'restic': ResticHandler(cls._backup_config),
+                'notification_test': NotificationTestHandler(),
             }
         except Exception:
             cls._handlers = None
@@ -202,6 +204,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['dashboard'].dismiss_config_warning(self)
             elif path == '/schedule-job':
                 self._handlers['job_scheduler'].schedule_job(self, form_data)
+            elif path == '/test-telegram-notification':
+                self._handlers['notification_test'].test_telegram_notification(self, form_data)
+            elif path == '/test-email-notification':
+                self._handlers['notification_test'].test_email_notification(self, form_data)
             else:
                 self._send_404()
         except Exception as e:

@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
     <script src="/static/config-manager.js"></script>
+    <script src="/static/config-notifications.js"></script>
 </head>
 <body>
     <div class="container">
@@ -99,19 +100,11 @@
                 <div class="form-group">
                     <label>
                         <input type="checkbox" id="enable_telegram" name="enable_telegram" {{TELEGRAM_ENABLED}} onchange="toggleTelegramSettings()"> 
-                        Enable Telegram notifications
+                        Configure Telegram notifications
                     </label>
                 </div>
                 
                 <div id="telegramSettings" class="path-group {{TELEGRAM_SETTINGS_CLASS}}">
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" name="telegram_notify_success" {{TELEGRAM_NOTIFY_SUCCESS}}> 
-                            Notify on successful jobs via Telegram
-                        </label>
-                        <div class="help-text">Get Telegram notifications when backup jobs complete successfully (in addition to failures and delays)</div>
-                    </div>
-                    
                     <div class="form-group">
                         <label for="telegram_token">Bot Token:</label>
                         <input type="text" id="telegram_token" name="telegram_token" 
@@ -125,24 +118,24 @@
                                value="{{TELEGRAM_CHAT_ID}}" placeholder="-1001234567890">
                         <div class="help-text">Chat or group ID where notifications will be sent</div>
                     </div>
+                    
+                    <div class="form-group">
+                        <button type="button" id="test_telegram" class="button button-secondary" onclick="testTelegramNotification()">
+                            Send Test Notification
+                        </button>
+                        <div id="telegram_test_result" class="help-text"></div>
+                    </div>
                 </div>
                 
                 <!-- Email Settings -->
                 <div class="form-group">
                     <label>
                         <input type="checkbox" id="enable_email" name="enable_email" {{EMAIL_ENABLED}} onchange="toggleEmailSettings()"> 
-                        Enable email notifications
+                        Configure email notifications
                     </label>
                 </div>
                 
                 <div id="emailSettings" class="path-group {{EMAIL_SETTINGS_CLASS}}">
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" name="email_notify_success" {{EMAIL_NOTIFY_SUCCESS}}> 
-                            Notify on successful jobs via email
-                        </label>
-                        <div class="help-text">Get email notifications when backup jobs complete successfully (in addition to failures and delays)</div>
-                    </div>
                     
                     <div class="form-group">
                         <label for="email_smtp_server">SMTP Server:</label>
@@ -197,6 +190,13 @@
                         <input type="password" id="email_password" name="email_password" 
                                value="{{EMAIL_PASSWORD}}" placeholder="your-app-password">
                         <div class="help-text">Use app password for Gmail</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="button" id="test_email" class="button button-secondary" onclick="testEmailNotification()">
+                            Send Test Notification
+                        </button>
+                        <div id="email_test_result" class="help-text"></div>
                     </div>
                 </div>
             </div>

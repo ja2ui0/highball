@@ -150,14 +150,12 @@ class ConfigHandler:
             # Telegram settings
             telegram_config = notification_config.setdefault('telegram', {})
             telegram_config['enabled'] = 'enable_telegram' in form_data
-            telegram_config['notify_on_success'] = 'telegram_notify_success' in form_data
             telegram_config['token'] = form_data.get('telegram_token', [''])[0]
             telegram_config['chat_id'] = form_data.get('telegram_chat_id', [''])[0]
             
             # Email settings
             email_config = notification_config.setdefault('email', {})
             email_config['enabled'] = 'enable_email' in form_data
-            email_config['notify_on_success'] = 'email_notify_success' in form_data
             email_config['smtp_server'] = form_data.get('email_smtp_server', [''])[0]
             email_config['smtp_port'] = int(form_data.get('email_smtp_port', ['587'])[0])
             
