@@ -8,6 +8,7 @@ from .job_manager import JobManager
 from .job_form_parser import JobFormParser
 from .job_validator import JobValidator
 from .job_display import JobDisplay
+from .form_error_handler import FormErrorHandler
 from services.form_data_service import JobFormDataBuilder
 
 
@@ -19,6 +20,7 @@ class DashboardHandler:
         self.template_service = template_service
         self.scheduler_service = scheduler_service  # optional; may be unused for now
         self.job_manager = JobManager(backup_config)
+        self.error_handler = FormErrorHandler(template_service, self.job_manager)
 
     def show_dashboard(self, handler):
         """Show the main dashboard with active and deleted jobs"""
@@ -85,14 +87,14 @@ class DashboardHandler:
         # Parse form data
         parsed_job = JobFormParser.parse_job_form(form_data)
         if not parsed_job['valid']:
-            self.template_service.send_error_response(handler, parsed_job['error'])
+            self.error_handler.show_form_with_error(handler, form_data, parsed_job['error'])
             return
 
         # Validate job configuration
         validation_result = JobValidator.validate_job_config(parsed_job)
         if not validation_result['valid']:
-            error_msg = "Validation failed:\n" + "\n".join(validation_result['errors'])
-            self.template_service.send_error_response(handler, error_msg)
+            error_msg = "Validation failed: " + "; ".join(validation_result['errors'])
+            self.error_handler.show_form_with_error(handler, form_data, error_msg)
             return
 
         # Check if this is a job rename (edit operation)
@@ -104,11 +106,8 @@ class DashboardHandler:
         if not original_job_name or is_rename:
             deleted_jobs = self.job_manager.get_deleted_jobs()
             if new_job_name in deleted_jobs:
-                self.template_service.send_error_response(
-                    handler, 
-                    f'Job name "{new_job_name}" conflicts with a deleted job. '
-                    f'Please restore the deleted job first, or choose a different name.'
-                )
+                error_msg = f'Job name "{new_job_name}" conflicts with a deleted job. Please restore the deleted job first, or choose a different name.'
+                self.error_handler.show_form_with_error(handler, form_data, error_msg)
                 return
 
         # Build job configuration

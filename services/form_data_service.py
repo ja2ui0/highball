@@ -73,6 +73,7 @@ class JobFormData:
     # Form metadata
     is_edit: bool = False
     job_name: str = ""
+    error_message: str = ""
     
     # Configuration sections
     source: SourceConfig = field(default_factory=SourceConfig)
@@ -120,6 +121,15 @@ class JobFormData:
             hidden_fields = f'<input type="hidden" name="original_job_name" value="{html.escape(self.job_name)}">'
             delete_form = self._generate_delete_form()
         
+        # Generate error message HTML
+        error_html = ""
+        if self.error_message:
+            error_html = f'''
+                <div class="alert alert-error" style="margin-bottom: var(--space-lg);">
+                    <strong>Error:</strong> {html.escape(self.error_message)}
+                </div>
+            '''
+        
         return {
             'PAGE_TITLE': page_title,
             'FORM_TITLE': form_title,
@@ -127,6 +137,7 @@ class JobFormData:
             'HIDDEN_FIELDS': hidden_fields,
             'DELETE_FORM': delete_form,
             'JOB_NAME': html.escape(self.job_name),
+            'ERROR_MESSAGE': error_html,
         }
     
     def _get_source_variables(self) -> Dict[str, str]:
