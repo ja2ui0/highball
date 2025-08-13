@@ -27,6 +27,7 @@ class DestConfig:
     ssh_path: str = ""
     rsyncd_hostname: str = ""
     rsyncd_share: str = ""
+    rsync_options: str = ""
 
 
 @dataclass
@@ -152,6 +153,7 @@ class JobFormData:
             'DEST_SSH_PATH': self.dest.ssh_path,
             'DEST_RSYNCD_HOSTNAME': self.dest.rsyncd_hostname,
             'DEST_RSYNCD_SHARE': self.dest.rsyncd_share,
+            'DEST_RSYNC_OPTIONS': self.dest.rsync_options,
             'RESTIC_OPTION': f'<option value="restic" {("selected" if self.dest.dest_type == "restic" else "")}>Restic Repository</option>',
             **share_vars
         }
@@ -223,7 +225,9 @@ class JobFormData:
     
     def _get_special_variables(self) -> Dict[str, str]:
         """Get special computed variables"""
-        return {}
+        return {
+            'DEFAULT_RSYNC_OPTIONS': '-a --info=stats1 --delete --delete-excluded'
+        }
     
     def _generate_delete_form(self) -> str:
         """Generate delete form HTML for edit mode"""
@@ -263,6 +267,7 @@ class JobFormDataBuilder:
             ssh_path=dest_config.get('path', ''),
             rsyncd_hostname=dest_config.get('hostname', ''),
             rsyncd_share=dest_config.get('share', ''),
+            rsync_options=dest_config.get('rsync_options', ''),
         )
         
         # Build Restic config only if needed

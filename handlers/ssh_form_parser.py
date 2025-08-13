@@ -13,6 +13,7 @@ class SSHFormParser:
         hostname = form_data.get('dest_ssh_hostname', [''])[0].strip()
         username = form_data.get('dest_ssh_username', [''])[0].strip()
         path = form_data.get('dest_ssh_path', [''])[0].strip()
+        rsync_options = form_data.get('dest_rsync_options', [''])[0].strip()
         
         if not all([hostname, username, path]):
             return {
@@ -27,6 +28,10 @@ class SSHFormParser:
             'username': username,
             'path': path
         }
+        
+        # Add rsync options if provided
+        if rsync_options:
+            dest_config['rsync_options'] = rsync_options
         
         return {
             'valid': True,

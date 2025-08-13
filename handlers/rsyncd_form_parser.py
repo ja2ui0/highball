@@ -12,6 +12,7 @@ class RsyncdFormParser:
         """Parse rsyncd destination configuration from form data"""
         hostname = form_data.get('dest_rsyncd_hostname', [''])[0].strip()
         share = form_data.get('dest_rsyncd_share', [''])[0].strip()
+        rsync_options = form_data.get('dest_rsync_options', [''])[0].strip()
         
         if not all([hostname, share]):
             return {
@@ -25,6 +26,10 @@ class RsyncdFormParser:
             'hostname': hostname,
             'share': share
         }
+        
+        # Add rsync options if provided
+        if rsync_options:
+            dest_config['rsync_options'] = rsync_options
         
         return {
             'valid': True,

@@ -30,11 +30,11 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 ## Features
 
-**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings, consolidated templates
+**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings, consolidated templates, custom rsync options per job
 **Smart Scheduling**: Configurable default times (hourly/daily/weekly/monthly), runtime conflict detection, automatic job queuing
 **Logging**: Per-job execution logs, status tracking, SSH validation state with 30min caching, conflict delay tracking, simplified refresh-based log viewing
 **Notifications**: Professional notification system using `notifiers` library backend, method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications (emoji-free, extensible to 25+ providers)
-**UI**: Real-time validation, share discovery, job history with refresh-based log viewing, structured config forms + raw YAML editor, network scanning, theming system
+**UI**: Organized sectioned forms, real-time validation, share discovery, job history with refresh-based log viewing, structured config forms + raw YAML editor, network scanning, theming system, password visibility toggles
 **System Inspection**: Network rsync server discovery, simplified log viewing, comprehensive system monitoring
 
 ## Development
@@ -63,12 +63,14 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 **Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`, `SourceConfig`, `DestConfig`, `ResticConfig`, `CommandInfo`, `ExecutionContext`)
 **File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
 **Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
-**CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables
+**CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables, dedicated input field backgrounds (`--bg-input`) for visual depth
 **Error Handling**: Comprehensive exception handling with graceful degradation and user-friendly error messages
 **Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
 **Restic Scaffold**: Complete modular architecture for Restic backup provider with command planning abstraction, implicit enablement, and 202 planning responses - ready for template/execution implementation (see `RESTIC_SCAFFOLD.md`)
 **Form Parser Architecture**: Fully modular form parsing with dedicated parsers for each destination type (`LocalFormParser`, `SSHFormParser`, `RsyncdFormParser`, `ResticFormParser`) - eliminates code duplication and establishes clean extension pattern
-**Backup Execution Architecture**: Modular backup execution with separation of concerns (`BackupExecutor` for core execution, `BackupCommandBuilder` for rsync command construction, `BackupConflictHandler` for conflict management, `BackupNotificationDispatcher` for notification handling) - replaces monolithic 477-line backup handler with focused, testable components
+**Form UI Architecture**: Organized sectioned forms with visual hierarchy (Job Identity & Source, Backup Destination, Schedule & Options, Actions), proper form field spacing with `form-group` containers, validation result sections, and user-friendly password visibility toggles
+**Backup Execution Architecture**: Modular backup execution with separation of concerns (`BackupExecutor` for core execution, `BackupCommandBuilder` for rsync command construction with custom/default options support, `BackupConflictHandler` for conflict management, `BackupNotificationDispatcher` for notification handling) - replaces monolithic 477-line backup handler with focused, testable components
+**Rsync Options Architecture**: Per-job custom rsync options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified field for SSH and rsyncd destinations, dynamic default display, proper command parsing and integration
 
 ## Commands
 

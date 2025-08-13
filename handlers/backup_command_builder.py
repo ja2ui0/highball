@@ -33,12 +33,21 @@ class BackupCommandBuilder:
         rsync_bin = self._discover_binary_path("rsync", "/usr/bin/rsync")
         ssh_bin = self._discover_binary_path("ssh", "/usr/bin/ssh")
 
-        # Base rsync command + flags
-        rsync_cmd = [rsync_bin, "-a"]
+        # Build rsync command with custom or default options
+        dest_config = job_config.get('dest_config', {})
+        custom_options = dest_config.get('rsync_options', '')
+        
+        if custom_options:
+            # Use custom options - split by spaces and filter empty strings
+            rsync_options = [opt for opt in custom_options.split() if opt]
+            rsync_cmd = [rsync_bin] + rsync_options
+        else:
+            # Use default options
+            rsync_cmd = [rsync_bin, "-a", "--info=stats1", "--delete", "--delete-excluded"]
+        
+        # Add dry run options if needed
         if dry_run:
             rsync_cmd.extend(["--dry-run", "--verbose"])
-
-        rsync_cmd.extend(["--info=stats1", "--delete", "--delete-excluded"])
 
         # Add include/exclude patterns
         for include in job_config.get("includes", []) or []:

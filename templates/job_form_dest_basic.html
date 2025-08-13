@@ -37,6 +37,15 @@
                     <input type="text" name="dest_ssh_path" value="{{DEST_SSH_PATH}}" placeholder="/backups">
                 </div>
                 
+                <div class="form-group">
+                    <label for="dest_rsync_options">Rsync Options:</label>
+                    <input type="text" name="dest_rsync_options" value="{{DEST_RSYNC_OPTIONS}}" placeholder="{{DEFAULT_RSYNC_OPTIONS}}">
+                    <div class="help-text">
+                        <strong>Default options:</strong> <code>{{DEFAULT_RSYNC_OPTIONS}}</code><br>
+                        Leave empty to use defaults. Custom options will override defaults completely.
+                    </div>
+                </div>
+                
                 <div class="help-text">
                     <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
                     <span id="dest_ssh_validation_status"></span>
@@ -62,6 +71,15 @@
                             <option value="">Select a share...</option>
                             {{SHARE_OPTIONS}}
                         </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="dest_rsync_options">Rsync Options:</label>
+                    <input type="text" name="dest_rsync_options" value="{{DEST_RSYNC_OPTIONS}}" placeholder="{{DEFAULT_RSYNC_OPTIONS}}">
+                    <div class="help-text">
+                        <strong>Default options:</strong> <code>{{DEFAULT_RSYNC_OPTIONS}}</code><br>
+                        Leave empty to use defaults. Custom options will override defaults completely.
                     </div>
                 </div>
                 
