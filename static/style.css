@@ -460,10 +460,11 @@ tr:hover {
 
 /* Base section container - reusable */
 .section-container {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     padding: var(--space-xxl);
     margin: var(--space-xxl) 0;
     border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
 }
 
 
@@ -514,6 +515,31 @@ tr:hover {
 /* Log controls styling */
 .log-section {
     margin-top: var(--space-xl);
+}
+
+/* Restic browser styling */
+.restic-browser {
+    margin-top: var(--space-15);
+}
+
+.restic-repository-info {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-xl);
+    font-family: 'Courier New', monospace;
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.restic-snapshot-list {
+    margin-top: var(--space-15);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-xl);
 }
 
 /* Common margin utilities */

@@ -59,6 +59,9 @@ class LogsHandler:
         # Generate job dropdown with system option
         job_dropdown = self._generate_job_dropdown(job_name)
         
+        # Generate Restic job dropdown
+        restic_job_dropdown = self._generate_restic_job_dropdown()
+        
         # Render template
         html_content = self.template_service.render_template(
             'logs.html',
@@ -66,7 +69,8 @@ class LogsHandler:
             log_content=log_content,
             log_type=log_type,
             log_name=log_name,
-            job_dropdown=job_dropdown
+            job_dropdown=job_dropdown,
+            restic_job_dropdown=restic_job_dropdown
         )
         
         self.template_service.send_html_response(handler, html_content)
@@ -97,6 +101,29 @@ class LogsHandler:
         for job_name in sorted(jobs.keys()):
             selected = 'selected' if job_name == selected_job else ''
             options += f'<option value="{html.escape(job_name)}" {selected}>{html.escape(job_name)}</option>\n'
+        
+        return options
+    
+    def _generate_restic_job_dropdown(self):
+        """Generate HTML for Restic job selection dropdown"""
+        options = ""
+        
+        if not self.backup_config:
+            return options
+        
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        if not jobs:
+            return options
+        
+        # Find all Restic jobs
+        restic_jobs = []
+        for job_name, job_config in jobs.items():
+            if job_config.get('dest_type') == 'restic':
+                restic_jobs.append(job_name)
+        
+        # Sort and generate options
+        for job_name in sorted(restic_jobs):
+            options += f'<option value="{html.escape(job_name)}">{html.escape(job_name)}</option>\n'
         
         return options
     

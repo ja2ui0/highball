@@ -13,11 +13,12 @@
         
         <h1>Inspect System</h1>
         
+        <!-- Network Scanner Container -->
         <div class="section-container">
-            <h3>Network Scanner</h3>
+            <h2 class="section-header">Network Scanner</h2>
             <p>Scan your network for available rsync servers and their modules.</p>
-            <div class="flex-row">
-                <input type="text" id="networkRange" placeholder="192.168.1.0/24" class="w-150">
+            <input type="text" id="networkRange" placeholder="192.168.1.0/24" class="w-150">
+            <div class="mt-15">
                 <button id="scanNetwork" class="button button-warning">Scan Network for Rsync Servers</button>
             </div>
             <div id="scanResults" class="hidden mt-15">
@@ -26,8 +27,27 @@
             </div>
         </div>
         
-        <div class="log-controls">
-            <h3>Log Sources</h3>
+        <!-- Restic Browser Container -->
+        <div class="section-container">
+            <h2 class="section-header">Restic Repository Browser</h2>
+            <p>Browse snapshots and files in Restic repositories.</p>
+            <select id="resticJobSelect" onchange="loadResticRepository()">
+                <option value="">Select a Restic job...</option>
+                {{RESTIC_JOB_DROPDOWN}}
+            </select>
+            <div id="resticBrowserContent" class="hidden restic-browser">
+                <div id="resticRepositoryInfo" class="restic-repository-info">
+                    <!-- Repository information will be displayed here -->
+                </div>
+                <div id="resticSnapshotList" class="restic-snapshot-list">
+                    <!-- Snapshot browser will be implemented here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log Sources Container -->
+        <div class="section-container">
+            <h2 class="section-header">Log Sources</h2>
             {{LOG_BUTTONS}}
             
             <div class="log-section">
@@ -41,11 +61,10 @@
                 <button id="refreshLogs" class="button">Refresh</button>
                 <button id="clearLogs" class="button button-warning">Clear Display</button>
             </div>
+            
+            <h3>{{LOG_NAME}}</h3>
+            <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
         </div>
-        
-        <h2>{{LOG_NAME}}</h2>
-        
-        <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
     </div>
 
     <script>
@@ -76,6 +95,25 @@
         // Event listeners
         refreshButton.addEventListener('click', refreshLogs);
         clearButton.addEventListener('click', clearLogs);
+        
+        // Restic browser functions (scaffold)
+        function loadResticRepository() {
+            const resticJobSelect = document.getElementById('resticJobSelect');
+            const browserContent = document.getElementById('resticBrowserContent');
+            const repositoryInfo = document.getElementById('resticRepositoryInfo');
+            const snapshotList = document.getElementById('resticSnapshotList');
+            
+            if (resticJobSelect.value) {
+                const jobName = resticJobSelect.value;
+                
+                // TODO: Implement repository browsing
+                repositoryInfo.textContent = `Loading repository information for ${jobName}...`;
+                snapshotList.textContent = 'Snapshot browser not yet implemented';
+                browserContent.classList.remove('hidden');
+            } else {
+                browserContent.classList.add('hidden');
+            }
+        }
     </script>
 </body>
 </html>
