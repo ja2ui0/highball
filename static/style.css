@@ -550,14 +550,6 @@ tr:hover {
 .ml-10 { margin-left: 10px; }
 .ml-20 { margin-left: 20px; }
 
-/* Config method settings containers */
-.method-settings {
-    margin-left: var(--space-xxl);
-    padding: var(--space-lg);
-    background: var(--bg-tertiary);
-    border-radius: var(--radius);
-    border-left: 2px solid var(--accent-primary);
-}
 
 /* Config note styling for job forms */
 .config-note {

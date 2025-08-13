@@ -13,83 +13,87 @@
         
         <h1>Configuration Manager</h1>
         
-        
         <form method="post" action="/save-config">
             
             <!-- Global Settings -->
-            <h3>Global Settings</h3>
-            
-            <div class="form-group">
-                <label for="scheduler_timezone">Scheduler Timezone:</label>
-                <input type="text" id="scheduler_timezone" name="scheduler_timezone" 
-                       value="{{SCHEDULER_TIMEZONE}}" placeholder="UTC">
-                <div class="help-text">Timezone for scheduled jobs (e.g., America/Denver, UTC)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="theme">Theme:</label>
-                <select id="theme" name="theme">
-                    {{THEME_OPTIONS}}
-                </select>
-                <div class="help-text">Visual theme for the interface</div>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="enable_conflict_avoidance" {{ENABLE_CONFLICT_AVOIDANCE}}> 
-                    Enable Conflict Avoidance
-                </label>
-                <div class="help-text">Jobs with shared resources will wait for each other to finish</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="conflict_check_interval">Conflict Check Interval (seconds):</label>
-                <input type="number" id="conflict_check_interval" name="conflict_check_interval" 
-                       value="{{CONFLICT_CHECK_INTERVAL}}" placeholder="300">
-                <div class="help-text">How often to check for conflicting jobs (default: 300)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="delay_notification_threshold">Delay Notification Threshold (seconds):</label>
-                <input type="number" id="delay_notification_threshold" name="delay_notification_threshold" 
-                       value="{{DELAY_NOTIFICATION_THRESHOLD}}" placeholder="300">
-                <div class="help-text">Send notification after jobs are delayed this long (default: 300)</div>
+            <div class="section-container">
+                <h2 class="section-header">Global Settings</h2>
+                
+                <div class="form-group">
+                    <label for="scheduler_timezone">Scheduler Timezone:</label>
+                    <input type="text" id="scheduler_timezone" name="scheduler_timezone" 
+                           value="{{SCHEDULER_TIMEZONE}}" placeholder="UTC">
+                    <div class="help-text">Timezone for scheduled jobs (e.g., America/Denver, UTC)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="theme">Theme:</label>
+                    <select id="theme" name="theme">
+                        {{THEME_OPTIONS}}
+                    </select>
+                    <div class="help-text">Visual theme for the interface</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="enable_conflict_avoidance" {{ENABLE_CONFLICT_AVOIDANCE}}> 
+                        Enable Conflict Avoidance
+                    </label>
+                    <div class="help-text">Jobs with shared resources will wait for each other to finish</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="conflict_check_interval">Conflict Check Interval (seconds):</label>
+                    <input type="number" id="conflict_check_interval" name="conflict_check_interval" 
+                           value="{{CONFLICT_CHECK_INTERVAL}}" placeholder="300">
+                    <div class="help-text">How often to check for conflicting jobs (default: 300)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="delay_notification_threshold">Delay Notification Threshold (seconds):</label>
+                    <input type="number" id="delay_notification_threshold" name="delay_notification_threshold" 
+                           value="{{DELAY_NOTIFICATION_THRESHOLD}}" placeholder="300">
+                    <div class="help-text">Send notification after jobs are delayed this long (default: 300)</div>
+                </div>
             </div>
             
             <!-- Schedule Defaults -->
-            <h3>Default Schedule Times</h3>
-            <p>These are the default times used when you select "Daily", "Weekly", or "Hourly" schedules.</p>
-            
-            <div class="form-group">
-                <label for="hourly_default">Hourly Default:</label>
-                <input type="text" id="hourly_default" name="hourly_default" 
-                       value="{{HOURLY_DEFAULT}}" placeholder="0 * * * *">
-                <div class="help-text">Default ("0 * * * *" aka: top of every hour)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="daily_default">Daily Default:</label>
-                <input type="text" id="daily_default" name="daily_default" 
-                       value="{{DAILY_DEFAULT}}" placeholder="0 3 * * *">
-                <div class="help-text">Default ("0 3 * * *" aka: 3:00 AM daily)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="weekly_default">Weekly Default:</label>
-                <input type="text" id="weekly_default" name="weekly_default" 
-                       value="{{WEEKLY_DEFAULT}}" placeholder="0 3 * * 0">
-                <div class="help-text">Default ("0 3 * * 0" aka: Sunday 3:00 AM)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="monthly_default">Monthly Default:</label>
-                <input type="text" id="monthly_default" name="monthly_default" 
-                       value="{{MONTHLY_DEFAULT}}" placeholder="0 3 1 * *">
-                <div class="help-text">Default ("0 3 1 * *" aka: first of month 3:00 AM)</div>
+            <div class="section-container">
+                <h2 class="section-header">Default Schedule Times</h2>
+                <p>These are the default times used when you select "Daily", "Weekly", or "Hourly" schedules.</p>
+                
+                <div class="form-group">
+                    <label for="hourly_default">Hourly Default:</label>
+                    <input type="text" id="hourly_default" name="hourly_default" 
+                           value="{{HOURLY_DEFAULT}}" placeholder="0 * * * *">
+                    <div class="help-text">Default ("0 * * * *" aka: top of every hour)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="daily_default">Daily Default:</label>
+                    <input type="text" id="daily_default" name="daily_default" 
+                           value="{{DAILY_DEFAULT}}" placeholder="0 3 * * *">
+                    <div class="help-text">Default ("0 3 * * *" aka: 3:00 AM daily)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="weekly_default">Weekly Default:</label>
+                    <input type="text" id="weekly_default" name="weekly_default" 
+                           value="{{WEEKLY_DEFAULT}}" placeholder="0 3 * * 0">
+                    <div class="help-text">Default ("0 3 * * 0" aka: Sunday 3:00 AM)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="monthly_default">Monthly Default:</label>
+                    <input type="text" id="monthly_default" name="monthly_default" 
+                           value="{{MONTHLY_DEFAULT}}" placeholder="0 3 1 * *">
+                    <div class="help-text">Default ("0 3 1 * *" aka: first of month 3:00 AM)</div>
+                </div>
             </div>
             
             <!-- Notification Settings -->
-            <h3>Notification Settings</h3>
+            <div class="section-container">
+                <h2 class="section-header">Notification Settings</h2>
             
             <!-- Telegram Settings -->
                 <div class="form-group">
@@ -99,7 +103,7 @@
                     </label>
                 </div>
                 
-                <div id="telegramSettings" class="method-settings {{TELEGRAM_SETTINGS_CLASS}}">
+                <div id="telegramSettings" class="path-group {{TELEGRAM_SETTINGS_CLASS}}">
                     <div class="form-group">
                         <label>
                             <input type="checkbox" name="telegram_notify_success" {{TELEGRAM_NOTIFY_SUCCESS}}> 
@@ -131,7 +135,7 @@
                     </label>
                 </div>
                 
-                <div id="emailSettings" class="method-settings {{EMAIL_SETTINGS_CLASS}}">
+                <div id="emailSettings" class="path-group {{EMAIL_SETTINGS_CLASS}}">
                     <div class="form-group">
                         <label>
                             <input type="checkbox" name="email_notify_success" {{EMAIL_NOTIFY_SUCCESS}}> 
@@ -195,20 +199,20 @@
                         <div class="help-text">Use app password for Gmail</div>
                     </div>
                 </div>
-            
-            <div class="form-group">
-                <input type="submit" value="Save Configuration" class="button button-success">
-                <a href="/" class="button">Cancel</a>
             </div>
+            
+            <input type="submit" value="Save Configuration" class="button button-success">
+            <a href="/" class="button">Cancel</a>
             
         </form>
         
-        <h3>Advanced Options</h3>
-        <p>
+        <!-- Advanced Options -->
+        <div class="section-container">
+            <h2 class="section-header">Advanced Options</h2>
             <a href="/config/raw" class="button">Edit Raw YAML</a>
             <a href="/reload-config" class="button">Reload from File</a>
             <a href="/backup-config" class="button button-warning">Download Backup</a>
-        </p>
+        </div>
     </div>
     
 </body>
