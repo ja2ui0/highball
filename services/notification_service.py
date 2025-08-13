@@ -127,10 +127,17 @@ class NotificationService:
         
         formatted_message = self._format_message(message)
         
+        # Get job-specific notification settings if job_name provided
+        job_notifications = self._get_job_notification_config(job_name) if job_name else None
+        
         # Process each provider individually for queue management
         for provider in self.providers.values():
             if provider.is_valid():
-                self._send_via_provider_with_queue(provider, title, formatted_message, notification_type, job_name)
+                # Check if this provider should be used for this job and notification type
+                if self._should_send_to_provider(provider, notification_type, job_notifications):
+                    # Get job-specific message if available
+                    final_message = self._get_job_specific_message(formatted_message, notification_type, provider.provider_name, job_notifications)
+                    self._send_via_provider_with_queue(provider, title, final_message, notification_type, job_name)
     
     def send_job_delay_notification(self, job_name: str, delay_minutes: float, 
                                   conflicting_jobs: List[str], source: str):
@@ -149,12 +156,16 @@ class NotificationService:
         """Send notification for job failures"""
         mode = "dry run" if dry_run else "backup"
         title = f"Job Failed: {job_name}"
-        message = (
+        
+        # Default message
+        default_message = (
             f"Backup job '{job_name}' {mode} failed.\n\n"
             f"Error: {error_message}\n\n"
             f"Check logs for detailed information."
         )
-        self.send_notification(title, message, "error", job_name)
+        
+        # Send notification - per-job logic will handle custom messages and template expansion
+        self._send_job_notification(title, default_message, "error", job_name, error_message=error_message)
     
     def send_job_success_notification(self, job_name: str, duration_seconds: float, dry_run: bool = False):
         """Send notification for successful job completion (if enabled per method)"""
@@ -162,14 +173,38 @@ class NotificationService:
         title = f"Job Completed: {job_name}"
         
         duration_str = self._format_duration(duration_seconds)
-        message = (
+        default_message = (
             f"Backup job '{job_name}' {mode} completed successfully.\n\n"
             f"Duration: {duration_str}"
         )
         
-        formatted_message = self._format_message(message)
-        results = self._send_success_notifications(title, formatted_message)
-        self._log_success_notification_results(results, job_name)
+        # Send notification - per-job logic will handle custom messages and template expansion
+        self._send_job_notification(title, default_message, "success", job_name, duration=duration_str)
+    
+    def _send_job_notification(self, title: str, default_message: str, notification_type: str, job_name: str, **template_vars):
+        """Send job notification with template variable support"""
+        if not self.is_notifications_enabled():
+            return
+        
+        # Get job-specific notification settings
+        job_notifications = self._get_job_notification_config(job_name)
+        
+        # Process each provider individually
+        for provider in self.providers.values():
+            if provider.is_valid():
+                # Check if this provider should be used for this job and notification type
+                if self._should_send_to_provider(provider, notification_type, job_notifications):
+                    # Get job-specific message if available, otherwise use default
+                    message = self._get_job_specific_message(default_message, notification_type, provider.provider_name, job_notifications)
+                    
+                    # Expand template variables
+                    final_message = self._expand_template_variables(message, job_name=job_name, **template_vars)
+                    
+                    # Format with timestamp
+                    formatted_message = self._format_message(final_message)
+                    
+                    # Send via queue system
+                    self._send_via_provider_with_queue(provider, title, formatted_message, notification_type, job_name)
     
     def is_notifications_enabled(self) -> bool:
         """Check if any notification provider is enabled"""
@@ -211,6 +246,69 @@ class NotificationService:
         for provider_name in self.get_enabled_providers():
             statuses[provider_name] = self.get_queue_status(provider_name)
         return statuses
+    
+    def _get_job_notification_config(self, job_name: str) -> Optional[List[Dict[str, Any]]]:
+        """Get notification configuration for a specific job"""
+        if not job_name:
+            return None
+            
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        return job_config.get('notifications', [])
+    
+    def _should_send_to_provider(self, provider: NotificationProvider, notification_type: str, job_notifications: Optional[List[Dict[str, Any]]]) -> bool:
+        """Check if notification should be sent to this provider"""
+        # If no job-specific config, use global settings (existing behavior)
+        if not job_notifications:
+            return True
+        
+        # Find configuration for this provider in job settings
+        for job_notif in job_notifications:
+            if job_notif.get('provider') == provider.provider_name:
+                # Check if this notification type is enabled for this provider
+                if notification_type in ['success'] and job_notif.get('notify_on_success', False):
+                    return True
+                elif notification_type in ['error', 'warning', 'info'] and job_notif.get('notify_on_failure', True):
+                    return True
+        
+        # Provider not configured for this job, don't send
+        return False
+    
+    def _get_job_specific_message(self, default_message: str, notification_type: str, provider_name: str, job_notifications: Optional[List[Dict[str, Any]]]) -> str:
+        """Get job-specific message template if available (without timestamp formatting)"""
+        if not job_notifications:
+            return default_message
+        
+        # Find configuration for this provider
+        for job_notif in job_notifications:
+            if job_notif.get('provider') == provider_name:
+                # Get custom message based on notification type
+                if notification_type == 'success' and 'success_message' in job_notif:
+                    return job_notif['success_message']
+                elif notification_type in ['error', 'warning', 'info'] and 'failure_message' in job_notif:
+                    return job_notif['failure_message']
+        
+        return default_message
+    
+    def _expand_template_variables(self, message: str, job_name: Optional[str] = None, duration: Optional[str] = None, error_message: Optional[str] = None) -> str:
+        """Expand template variables in notification messages"""
+        if not message:
+            return message
+            
+        # Available template variables
+        variables = {
+            'job_name': job_name or 'Unknown Job',
+            'duration': duration or 'Unknown',
+            'error_message': error_message or 'No details available',
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Simple template variable expansion
+        expanded_message = message
+        for var_name, var_value in variables.items():
+            expanded_message = expanded_message.replace(f'{{{var_name}}}', str(var_value))
+        
+        return expanded_message
     
     def _format_message(self, message: str) -> str:
         """Add timestamp to message"""

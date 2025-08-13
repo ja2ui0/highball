@@ -24,6 +24,22 @@ class LogsHandler:
             'name': 'Supervisor',
             'file': '/var/log/supervisor/supervisord.log'
         },
+        'job-status': {
+            'name': 'Job Status',
+            'file': '/var/log/highball/job_status.yaml'
+        },
+        'running-jobs': {
+            'name': 'Running Jobs',
+            'file': '/var/log/highball/running_jobs.txt'
+        },
+        'validation': {
+            'name': 'SSH Validation Cache',
+            'file': '/var/log/highball/job_validation.yaml'
+        },
+        'notification-queues': {
+            'name': 'Notification Queues',
+            'file': '/var/log/highball/notification_queues'
+        },
     }
     
     def __init__(self, template_service, backup_config=None):
@@ -79,9 +95,14 @@ class LogsHandler:
     def _generate_log_buttons(self, current_log_type):
         """Generate HTML for log type selection buttons"""
         buttons = ""
+        button_count = 0
         for log_type, info in self.LOG_TYPES.items():
             active_class = "button-success" if log_type == current_log_type else ""
             buttons += f'<a href="/logs?type={log_type}" class="button {active_class}">{info["name"]}</a>\n'
+            button_count += 1
+            # Add line break after Supervisor (4th button)
+            if button_count == 4:
+                buttons += '<br>\n'
         return buttons
     
     def _generate_job_dropdown(self, selected_job=None):
@@ -128,8 +149,12 @@ class LogsHandler:
         return options
     
     def _read_log_file(self, log_file):
-        """Read last 100 lines of log file"""
+        """Read last 100 lines of log file or directory contents"""
         try:
+            # Special handling for notification queues directory
+            if log_file == '/var/log/highball/notification_queues':
+                return self._read_notification_queues_dir(log_file)
+            
             if os.path.exists(log_file):
                 with open(log_file, 'r') as f:
                     lines = f.readlines()
@@ -143,4 +168,35 @@ class LogsHandler:
                     return f"Log file {log_file} not found"
         except Exception as e:
             return f"Error reading log: {str(e)}"
+    
+    def _read_notification_queues_dir(self, queue_dir):
+        """Read all notification queue files and combine into single view"""
+        try:
+            if not os.path.exists(queue_dir):
+                return "Notification queue directory not found - no queues have been created yet."
+            
+            queue_files = [f for f in os.listdir(queue_dir) if f.endswith('.yaml')]
+            
+            if not queue_files:
+                return "No notification queue files found - all queues are empty."
+            
+            content = f"Notification Queue Status ({len(queue_files)} active queues):\n\n"
+            
+            for queue_file in sorted(queue_files):
+                provider = queue_file.replace('_state.yaml', '')
+                content += f"=== {provider.upper()} QUEUE ===\n"
+                
+                try:
+                    with open(os.path.join(queue_dir, queue_file), 'r') as f:
+                        file_content = f.read()
+                        content += file_content + "\n"
+                except Exception as e:
+                    content += f"Error reading {queue_file}: {str(e)}\n"
+                
+                content += "\n"
+            
+            return content
+            
+        except Exception as e:
+            return f"Error reading notification queues: {str(e)}"
     
