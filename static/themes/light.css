@@ -5,6 +5,7 @@
     --bg-secondary: #fbfbfd;
     --bg-tertiary: #e5e5ea;
     --bg-quaternary: #d1d1d6;
+    --bg-input: #ffffff;
 
     /* Text Colors */
     --text-primary: #1c1c1e;
@@ -29,6 +30,8 @@
 
     /* Border */
     --border: #d1d1d6;
+    --border-primary: #d1d1d6;
+    --border-secondary: #c7c7cc;
 
     /* Effects */
     --shadow-color: rgba(0,0,0,0.3);
@@ -41,13 +44,12 @@
     --secondary-bg-hover: #e2e6ec;
 
     /* Table and container colors */
-    --table-row-even: #404040;
-    --code-bg: #2a2a2a;
+    --table-row-even: #f5f5f5;
+    --code-bg: #f8f9fa;
     
     /* Alert background colors */
-    --alert-success-bg: #2d5016;
-    --alert-error-bg: #5a1a1a;
-    --alert-info-bg: #0c4a5a;
-}
+    --alert-success-bg: #d4edda;
+    --alert-error-bg: #f8d7da;
+    --alert-info-bg: #d1ecf1;
 }
 

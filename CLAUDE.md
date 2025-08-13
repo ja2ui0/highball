@@ -16,7 +16,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 **Core**: `app.py` (routing), `config.py` (YAML config)
 **Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic planning - scaffold), `restic_validator.py`, `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
 **Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command planning - scaffold)
-**Static Assets**: `job-form.js` (consolidated form handling), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
+**Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
 ## Data Storage
 
@@ -58,8 +58,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 ## Modern Architecture Notes
 
-**Template Consolidation**: Single `job_form.html` template with dataclass-driven variable generation (eliminates `edit_job.html` duplication)
-**JavaScript Modularity**: Consolidated `job-form.js` (replaces `add-job.js`), separate `config-manager.js`, `network-scan.js` for specific functionality
+**Template Modularity**: Template include system with `{{INCLUDE:filename}}` directives - main `job_form.html` orchestrates focused components (`job_form_source.html`, `job_form_dest_basic.html`, `job_form_dest_restic.html`, `job_form_schedule.html`)
+**JavaScript Modularity**: Modular 5-file architecture eliminates 260-line monolith - each component has single responsibility (core utilities, SSH validation, rsync discovery, Restic management, global compatibility)
 **Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`, `SourceConfig`, `DestConfig`, `ResticConfig`, `CommandInfo`, `ExecutionContext`)
 **File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
 **Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
@@ -72,7 +72,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 ## Commands
 
-**Run**: `./build.sh` or `./rr` (rebuild and restart)
+**Run**: `./rr` (intelligent rebuild and restart)
+**Multi-arch**: `./rr multi` (build multiarch image for distribution)
 **Debug**: `docker logs -f highball`
 **Test Notifications**: `./test_notifications.py`
 

@@ -131,6 +131,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/validate-restic':
                 job_name = params.get('job', [''])[0]
                 self._handlers['restic'].validate_restic_job(self, job_name)
+            elif path == '/validate-restic-form':
+                self._send_405()  # Only POST allowed for form validation
             elif path == '/check-restic-binary':
                 job_name = params.get('job', [''])[0]
                 self._handlers['restic'].check_restic_binary(self, job_name)
@@ -190,6 +192,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/plan-restic-backup':
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['restic'].plan_backup(self, job_name)
+            elif path == '/validate-restic-form':
+                self._handlers['restic'].validate_restic_form(self, form_data)
             elif path == '/save-config':
                 self._handlers['config'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':
@@ -246,6 +250,13 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(b'<html><body><h1>404 Not Found</h1></body></html>')
+
+    def _send_405(self):
+        """Send 405 Method Not Allowed error"""
+        self.send_response(405)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b'<html><body><h1>405 Method Not Allowed</h1></body></html>')
 
     def _send_error_response(self, message):
         """Send error page"""

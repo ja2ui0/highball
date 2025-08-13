@@ -116,6 +116,84 @@ h2 {
     margin-bottom: var(--space-xxl);
 }
 
+/* Form Sections */
+.form-section {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    margin-bottom: var(--space-xxxl);
+}
+
+.section-header {
+    color: var(--text-primary);
+    margin: 0 0 var(--space-xxl) 0;
+    font-weight: bold;
+    /* h2 inherits the correct size naturally */
+}
+
+.section-content {
+    padding: var(--space-xxl);
+}
+
+/* Validation Sections */
+.validation-section {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.validation-header {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    margin: 0;
+    padding: var(--space-md) var(--space-lg);
+    font-size: var(--font-md);
+    font-weight: bold;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.validation-content {
+    padding: var(--space-lg);
+}
+
+/* Password Input Toggle */
+.password-input-container {
+    position: relative;
+    display: flex;
+    width: 100%;
+}
+
+.password-input-container input {
+    flex: 1;
+    padding-right: var(--space-md);
+    border-radius: var(--radius) 0 0 var(--radius);
+    border-right: none;
+}
+
+.password-toggle {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-left: none;
+    cursor: pointer;
+    padding: var(--space-md) var(--space-lg);
+    color: var(--text-tertiary);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: var(--font-sm);
+}
+
+.password-toggle:hover {
+    color: var(--text-secondary);
+    background-color: var(--bg-primary);
+}
+
+.password-toggle-icon {
+    font-size: var(--font-sm);
+    user-select: none;
+}
+
 label {
     display: block;
     margin-bottom: var(--space-sm);
@@ -125,6 +203,7 @@ label {
 
 input[type="text"], 
 input[type="email"], 
+input[type="password"], 
 textarea, 
 select {
     width: 100%;
@@ -133,13 +212,14 @@ select {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-size: var(--font-md);
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-input);
     color: var(--text-secondary);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 input[type="text"]:focus,
 input[type="email"]:focus,
+input[type="password"]:focus,
 textarea:focus,
 select:focus {
     border-color: var(--accent-primary);

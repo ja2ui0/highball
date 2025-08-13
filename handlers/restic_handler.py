@@ -62,7 +62,7 @@ class ResticHandler:
             }, status_code=500)
     
     def validate_restic_job(self, handler, job_name):
-        """Validate Restic job configuration"""
+        """Validate existing Restic job configuration"""
         try:
             # Get job configuration
             job_config = self.backup_config.get_backup_job(job_name)
@@ -87,6 +87,68 @@ class ResticHandler:
             TemplateService.send_json_response(handler, {
                 'error': f'Validation failed: {str(e)}'
             }, status_code=500)
+
+    def validate_restic_form(self, handler, form_data):
+        """Validate Restic configuration from form data (for job creation)"""
+        try:
+            from handlers.restic_form_parser import ResticFormParser
+            
+            # Debug: Log what we received
+            print(f"DEBUG: Received form data keys: {list(form_data.keys())}")
+            print(f"DEBUG: restic_repo_type: {form_data.get('restic_repo_type')}")
+            print(f"DEBUG: restic_password exists: {'restic_password' in form_data}")
+            
+            # Parse Restic destination from form data
+            restic_result = ResticFormParser.parse_restic_destination(form_data)
+            
+            if not restic_result.get('valid'):
+                TemplateService.send_json_response(handler, {
+                    'success': False,
+                    'message': restic_result.get('error', 'Invalid Restic configuration')
+                })
+                return
+            
+            dest_config = restic_result['config']
+            
+            # Create mock job config for validation
+            mock_job_config = {
+                'dest_type': 'restic',
+                'dest_config': dest_config,
+                'source_config': self._parse_source_from_form(form_data)
+            }
+            
+            # Validate with mock job config
+            result = ResticValidator.validate_restic_destination(mock_job_config)
+            
+            # Add form-specific context
+            result['details'] = result.get('details', {})
+            result['details']['repo_uri'] = dest_config.get('repo_uri', 'Unknown')
+            result['details']['repo_type'] = dest_config.get('repo_type', 'Unknown')
+            
+            TemplateService.send_json_response(handler, result)
+            
+        except Exception as e:
+            TemplateService.send_json_response(handler, {
+                'success': False,
+                'error': f'Form validation failed: {str(e)}'
+            })
+
+    def _parse_source_from_form(self, form_data):
+        """Parse source configuration from form data for validation context"""
+        source_type = form_data.get('source_type', [''])[0]
+        
+        if source_type == 'ssh':
+            return {
+                'hostname': form_data.get('source_ssh_hostname', [''])[0],
+                'username': form_data.get('source_ssh_username', [''])[0],
+                'path': form_data.get('source_ssh_path', [''])[0]
+            }
+        elif source_type == 'local':
+            return {
+                'path': form_data.get('source_local_path', [''])[0]
+            }
+        else:
+            return {}
     
     def check_restic_binary(self, handler, job_name):
         """Check if restic binary is available on source system"""

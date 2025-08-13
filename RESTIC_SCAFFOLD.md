@@ -63,7 +63,7 @@ All execution endpoints return HTTP 202 with structured plan payload instead of 
 
 ## Current Implementation Status
 
-### ✅ Completed (Scaffold)
+### ✅ Completed (Scaffold + UI)
 - [x] Restic job schema and validation
 - [x] Form parsing and UI integration  
 - [x] Command planning abstraction
@@ -74,25 +74,14 @@ All execution endpoints return HTTP 202 with structured plan payload instead of 
 - [x] Implicit enablement pattern
 - [x] Modular form parser architecture (all destination types)
 - [x] Comprehensive test suite coverage
-- [x] Form data service refactored to modular architecture with nested dataclasses
-- [x] Backup execution handler refactored to modular components for maintainability
+- [x] **Complete Restic HTML templates** - Full Restic job creation and editing UI with all repository types
+- [x] **Restic form validation endpoint** - `/validate-restic-form` for real-time validation during job creation  
+- [x] **Restic URI preview generation** - Live URI building for REST, S3, rclone, SFTP repository types
+- [x] **Restic JavaScript module** - `job-form-restic.js` handles all Restic-specific form logic
 
 ### ⚠️ Next Implementation Steps
 
-#### 1. Template and UI Completion
-**Missing**: HTML form fields for Restic destination type
-- Add Restic option to `templates/job_form.html` destination dropdown
-- Add conditional form fields for repository configuration:
-  - Repository type selection (local, sftp, s3)
-  - Repository location field
-  - Password field (with proper secret handling)
-  - Conditional SFTP fields (hostname, username, path)
-  - Conditional S3 fields (bucket, prefix, AWS credentials)
-  - Retention policy fields (keep-daily, keep-weekly, etc.)
-- Add JavaScript form handling for conditional field display
-- Ensure field visibility follows existing patterns (like rsyncd share selection)
-
-#### 2. Actual Execution Implementation
+#### 1. Actual Execution Implementation
 **Current**: All endpoints return 202 with plans, no execution
 **Required**: 
 - SSH command execution with streaming output
@@ -101,6 +90,15 @@ All execution endpoints return HTTP 202 with structured plan payload instead of 
 - Error handling and retry logic
 - Repository initialization handling
 - Proper environment variable injection for secrets
+
+#### 2. Real Connectivity Validation
+**Current**: Form validation only (instant response)
+**Required**:
+- Network connectivity testing to REST servers
+- Repository access validation with credentials
+- Binary availability checking on source systems
+- Actual restic repository operations (list, check)
+- Meaningful error messages for connection failures
 
 #### 3. Binary Bootstrap and Management
 **Current**: Basic availability check via SSH
@@ -352,15 +350,15 @@ Note: Ensure rclone is configured on source system
 
 ---
 
-**Status**: Scaffold Complete with Modular Architecture - Ready for Template/UI and Execution Implementation
+**Status**: Restic UI Complete - Ready for Execution Implementation
 
 **Completed**: 
 - ✅ Complete Restic provider backend (planning, validation, form parsing)
-- ✅ Modular form parser architecture for all destination types  
 - ✅ Comprehensive test suite with 30+ test cases
 - ✅ Full integration with existing rsync functionality
 - ✅ Clean extension pattern established for future providers
-- ✅ Form data service modularized with nested dataclasses (eliminated repetitive conditionals)
-- ✅ Backup execution handler modularized into focused components (eliminated 477-line monolith)
+- ✅ **Complete Restic UI implementation** - Professional form handling with all repository types
+- ✅ **Restic form validation** - Real-time validation during job creation (form parsing only)
+- ✅ **Restic URI generation** - Live preview for all repository types
 
-**Next Priority**: Complete HTML templates and form handling for UI functionality
+**Next Priority**: Implement actual execution and real connectivity validation

@@ -37,6 +37,9 @@ class TemplateService:
         """Load template and replace placeholders with values"""
         template = self.load_template(template_name)
         
+        # Process includes first (before variable substitution)
+        template = self._process_includes(template)
+        
         # Automatically add theme CSS path to all templates
         kwargs['theme_css_path'] = self.get_theme_css_path()
         
@@ -46,6 +49,22 @@ class TemplateService:
             template = template.replace(placeholder, str(value))
         
         return template
+    
+    def _process_includes(self, template):
+        """Process {{INCLUDE:template_name}} directives"""
+        import re
+        
+        # Find all include directives like {{INCLUDE:job_form_source.html}}
+        include_pattern = r'\{\{INCLUDE:([^}]+)\}\}'
+        
+        def replace_include(match):
+            include_name = match.group(1)
+            try:
+                return self.load_template(include_name)
+            except:
+                return f"<!-- Error: Could not load {include_name} -->"
+        
+        return re.sub(include_pattern, replace_include, template)
     
     def _error_template(self, template_name, template_path):
         """Return error template when template not found"""
@@ -81,10 +100,10 @@ class TemplateService:
         handler.end_headers()
     
     @staticmethod
-    def send_json_response(handler, data):
+    def send_json_response(handler, data, status_code=200):
         """Send JSON response"""
         import json
-        handler.send_response(200)
+        handler.send_response(status_code)
         handler.send_header('Content-type', 'application/json')
         handler.end_headers()
         handler.wfile.write(json.dumps(data).encode())

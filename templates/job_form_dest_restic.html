@@ -1,0 +1,140 @@
+            <div id="dest_restic" class="hidden">
+                <div class="form-group">
+                    <label for="restic_repo_type">Repository Type:</label>
+                    <select id="restic_repo_type" name="restic_repo_type" onchange="showResticRepoFields()">
+                        <option value="">Select repository type...</option>
+                        <option value="local">Local Path</option>
+                        <option value="rest">REST Server</option>
+                        <option value="s3">Amazon S3</option>
+                        <option value="rclone">rclone Remote</option>
+                        <option value="sftp">SFTP</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="restic_password">Repository Password:</label>
+                    <div class="password-input-container">
+                        <input type="password" id="restic_password" name="restic_password" value="{{RESTIC_PASSWORD}}" placeholder="Strong repository password" required>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('restic_password')" aria-label="Toggle password visibility">
+                            <span class="password-toggle-icon" data-target="restic_password">Show</span>
+                        </button>
+                    </div>
+                    <div class="help-text">This password encrypts your entire backup repository. Store it securely!</div>
+                </div>
+                
+                <div id="restic_local" class="hidden mt-10">
+                    <label for="restic_local_path">Local Repository Path:</label>
+                    <input type="text" name="restic_local_path" value="{{RESTIC_LOCAL_PATH}}" placeholder="/var/backups/restic-repo">
+                    <div class="help-text config-note">
+                        <strong>Local Path Requirements:</strong><br>
+                        • Must exist and persist via bind mount or named volume<br>
+                        • Data will be lost when container restarts without proper mounting<br>
+                        • Example: <code>-v /host/backup:/var/backups</code>
+                    </div>
+                </div>
+                
+                <div id="restic_rest" class="hidden mt-10">
+                    <div class="form-group">
+                        <label for="restic_rest_hostname">REST Server Hostname:</label>
+                        <input type="text" name="restic_rest_hostname" value="{{RESTIC_REST_HOSTNAME}}" placeholder="backup.example.com" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="restic_rest_port">Port:</label>
+                        <input type="number" name="restic_rest_port" value="{{RESTIC_REST_PORT}}" placeholder="8000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="restic_rest_path">Path (optional):</label>
+                        <input type="text" name="restic_rest_path" value="{{RESTIC_REST_PATH}}" placeholder="/my-backups">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="restic_rest_use_https" {{RESTIC_REST_USE_HTTPS_CHECKED}}> Use HTTPS
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="restic_rest_username">Username (optional):</label>
+                        <input type="text" name="restic_rest_username" value="{{RESTIC_REST_USERNAME}}" placeholder="backup-user">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="restic_rest_password">Password (optional):</label>
+                        <input type="password" name="restic_rest_password" value="{{RESTIC_REST_PASSWORD}}" placeholder="server-password">
+                        <div class="help-text">Credentials are optional - some REST servers don't require authentication</div>
+                    </div>
+                    
+                    <div class="help-text">
+                        <strong>Generated URI:</strong> <span id="rest_uri_preview">rest:https://hostname:8000/path</span>
+                    </div>
+                </div>
+                
+                <div id="restic_s3" class="hidden mt-10">
+                    <label for="restic_s3_endpoint">S3 Endpoint:</label>
+                    <input type="text" name="restic_s3_endpoint" value="{{RESTIC_S3_ENDPOINT}}" placeholder="s3.amazonaws.com">
+                    
+                    <label for="restic_s3_bucket">Bucket Name:</label>
+                    <input type="text" name="restic_s3_bucket" value="{{RESTIC_S3_BUCKET}}" placeholder="my-backup-bucket" required>
+                    
+                    <label for="restic_s3_prefix">Prefix (optional):</label>
+                    <input type="text" name="restic_s3_prefix" value="{{RESTIC_S3_PREFIX}}" placeholder="restic">
+                    
+                    <label for="restic_aws_access_key">AWS Access Key ID:</label>
+                    <input type="text" name="restic_aws_access_key" value="{{RESTIC_AWS_ACCESS_KEY}}" placeholder="AKIAIOSFODNN7EXAMPLE" required>
+                    
+                    <label for="restic_aws_secret_key">AWS Secret Access Key:</label>
+                    <input type="password" name="restic_aws_secret_key" value="{{RESTIC_AWS_SECRET_KEY}}" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" required>
+                    
+                    <div class="help-text">
+                        <strong>Generated URI:</strong> <span id="s3_uri_preview">s3:s3.amazonaws.com/bucket/prefix</span>
+                    </div>
+                </div>
+                
+                <div id="restic_rclone" class="hidden mt-10">
+                    <label for="restic_rclone_remote">rclone Remote Name:</label>
+                    <input type="text" name="restic_rclone_remote" value="{{RESTIC_RCLONE_REMOTE}}" placeholder="gdrive" required>
+                    
+                    <label for="restic_rclone_path">Path:</label>
+                    <input type="text" name="restic_rclone_path" value="{{RESTIC_RCLONE_PATH}}" placeholder="backups">
+                    
+                    <div class="help-text config-note">
+                        <strong>rclone Setup Required:</strong><br>
+                        • Run <code>rclone config</code> on source system to configure remote<br>
+                        • Test with <code>rclone listremotes</code> and <code>rclone lsd remote:</code><br>
+                        • Common remotes: Google Drive, Dropbox, OneDrive, S3-compatible services
+                    </div>
+                    
+                    <div class="help-text">
+                        <strong>Generated URI:</strong> <span id="rclone_uri_preview">rclone:remote:path</span>
+                    </div>
+                </div>
+                
+                <div id="restic_sftp" class="hidden mt-10">
+                    <label for="restic_sftp_hostname">SFTP Hostname:</label>
+                    <input type="text" name="restic_sftp_hostname" value="{{RESTIC_SFTP_HOSTNAME}}" placeholder="sftp.example.com" required>
+                    
+                    <label for="restic_sftp_username">Username:</label>
+                    <input type="text" name="restic_sftp_username" value="{{RESTIC_SFTP_USERNAME}}" placeholder="backup-user" required>
+                    
+                    <label for="restic_sftp_path">Path:</label>
+                    <input type="text" name="restic_sftp_path" value="{{RESTIC_SFTP_PATH}}" placeholder="/home/backup/repo" required>
+                    
+                    <div class="help-text">
+                        <strong>Generated URI:</strong> <span id="sftp_uri_preview">sftp:user@hostname:/path</span>
+                    </div>
+                </div>
+                
+                <div class="mt-15">
+                    <button type="button" onclick="validateRestic()" class="button button-warning">Validate Restic Configuration</button>
+                </div>
+                
+                <div class="validation-section mt-15">
+                    <h3 class="validation-header">Validation Results</h3>
+                    <div class="validation-content">
+                        <span id="restic_validation_status"></span>
+                        <div id="restic_validation_details" class="validation-details hidden"></div>
+                    </div>
+                </div>
+            </div>

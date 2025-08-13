@@ -5,7 +5,11 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
-    <script src="/static/job-form.js"></script>
+    <script src="/static/job-form-core.js"></script>
+    <script src="/static/job-form-ssh.js"></script>
+    <script src="/static/job-form-rsyncd.js"></script>
+    <script src="/static/job-form-restic.js"></script>
+    <script src="/static/job-form-globals.js"></script>
 </head>
 <body>
     <div class="container">
@@ -16,153 +20,45 @@
         <form method="post" action="/save-job">
             {{HIDDEN_FIELDS}}
             
-            <div class="form-group">
-                <label for="job_name">Job Name:</label>
-                <input type="text" id="job_name" name="job_name" required value="{{JOB_NAME}}" placeholder="e.g., documents, photos">
-            </div>
-            
-            <div class="form-group">
-                <label for="source_type">Source Type:</label>
-                <select id="source_type" name="source_type" required onchange="showSourceFields()">
-                    <option value="">Select source...</option>
-                    <option value="local" {{SOURCE_LOCAL_SELECTED}}>Local Path</option>
-                    <option value="ssh" {{SOURCE_SSH_SELECTED}}>SSH Remote</option>
-                </select>
-            </div>
-            
-            <div id="source_local" class="hidden">
-                <label for="source_local_path">Local Path:</label>
-                <input type="text" name="source_local_path" value="{{SOURCE_LOCAL_PATH}}" placeholder="/var/lib/docker/volumes/data">
-            </div>
-            
-            <div id="source_ssh" class="hidden">
-                <label for="source_ssh_hostname">Hostname:</label>
-                <input type="text" name="source_ssh_hostname" value="{{SOURCE_SSH_HOSTNAME}}" placeholder="server">
-                
-                <label for="source_ssh_username">Username:</label>
-                <input type="text" name="source_ssh_username" value="{{SOURCE_SSH_USERNAME}}" placeholder="root">
-                
-                <label for="source_ssh_path">Path:</label>
-                <input type="text" name="source_ssh_path" value="{{SOURCE_SSH_PATH}}" placeholder="/mnt/data">
-                
-                <div class="help-text">
-                    <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
-                    <span id="source_validation_status"></span>
-                    <div id="source_validation_details" class="validation-details hidden"></div>
+            <!-- Job Identity Section -->
+            <div class="form-section">
+                <div class="section-content">
+                    <h2 class="section-header">Job Identity & Source</h2>
+                    <div class="form-group">
+                        <label for="job_name">Job Name:</label>
+                        <input type="text" id="job_name" name="job_name" required value="{{JOB_NAME}}" placeholder="e.g., documents, photos">
+                    </div>
+                    
+                    {{INCLUDE:job_form_source.html}}
                 </div>
             </div>
             
-            <div class="form-group">
-                <label for="dest_type">Destination Type:</label>
-                <select id="dest_type" name="dest_type" required onchange="showDestFields()">
-                    <option value="">Select destination...</option>
-                    <option value="local" {{DEST_LOCAL_SELECTED}}>Local Path</option>
-                    <option value="ssh" {{DEST_SSH_SELECTED}}>SSH Remote</option>
-                    <option value="rsyncd" {{DEST_RSYNCD_SELECTED}}>Rsync Daemon</option>
-                    {{RESTIC_OPTION}}
-                </select>
-            </div>
-            
-            <div id="dest_local" class="hidden">
-                <label for="dest_local_path">Local Destination Path (on source system):</label>
-                <input type="text" name="dest_local_path" value="{{DEST_LOCAL_PATH}}" placeholder="/backups">
-                <div class="help-text config-note">
-                    <strong>Important:</strong> "Local" means local to the SOURCE system, not this container.<br>
-                    If source is SSH remote, destination will be created on that remote system.<br>
-                    If source is local to this container, destination must be a mounted volume.
+            <!-- Destination Section -->
+            <div class="form-section">
+                <div class="section-content">
+                    <h2 class="section-header">Backup Destination</h2>
+                    {{INCLUDE:job_form_dest_basic.html}}
+                    
+                    {{INCLUDE:job_form_dest_restic.html}}
                 </div>
             </div>
             
-            <div id="dest_ssh" class="hidden">
-                <label for="dest_ssh_hostname">Hostname:</label>
-                <input type="text" name="dest_ssh_hostname" value="{{DEST_SSH_HOSTNAME}}" placeholder="backup-server">
-                
-                <label for="dest_ssh_username">Username:</label>
-                <input type="text" name="dest_ssh_username" value="{{DEST_SSH_USERNAME}}" placeholder="backup">
-                
-                <label for="dest_ssh_path">Path:</label>
-                <input type="text" name="dest_ssh_path" value="{{DEST_SSH_PATH}}" placeholder="/backups">
-                
-                <div class="help-text">
-                    <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
-                    <span id="dest_ssh_validation_status"></span>
-                    <div id="dest_ssh_validation_details" class="validation-details hidden"></div>
+            <!-- Schedule & Options Section -->
+            <div class="form-section">
+                <div class="section-content">
+                    <h2 class="section-header">Schedule & Options</h2>
+                    {{INCLUDE:job_form_schedule.html}}
                 </div>
             </div>
             
-            <div id="dest_rsyncd" class="hidden">
-                <label for="dest_rsyncd_hostname">Hostname:</label>
-                <input type="text" name="dest_rsyncd_hostname" value="{{DEST_RSYNCD_HOSTNAME}}" placeholder="backup-server">
-                
-                <div class="mt-10">
-                    <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
-                    <span id="discover_status"></span>
-                </div>
-                
-                <div id="share_selection" class="{{SHARE_SELECTION_CLASS}} mt-15">
-                    <label for="dest_rsyncd_share">{{SHARE_LABEL}}:</label>
-                    <select name="dest_rsyncd_share" id="dest_rsyncd_share">
-                        <option value="">Select a share...</option>
-                        {{SHARE_OPTIONS}}
-                    </select>
-                </div>
-                
-                <div class="help-text">
-                    <div id="rsyncd_validation_details" class="validation-details hidden"></div>
+            <!-- Job Controls Section -->
+            <div class="form-section">
+                <div class="section-content">
+                    <h2 class="section-header">Actions</h2>
+                    <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
+                    <a href="/" class="button">Cancel</a>
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label for="includes">Include Patterns (optional):</label>
-                <textarea name="includes" placeholder="**/*.jpg
-documents/**">{{INCLUDES}}</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="excludes">Exclude Patterns (optional):</label>
-                <textarea name="excludes" placeholder="*.tmp
-*.log
-.git/**">{{EXCLUDES}}</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="schedule">Schedule:</label>
-                <select id="schedule" name="schedule" onchange="showCronField()">
-                    <option value="manual" {{SCHEDULE_MANUAL_SELECTED}}>Manual Only</option>
-                    <option value="hourly" {{SCHEDULE_HOURLY_SELECTED}}>Hourly</option>
-                    <option value="daily" {{SCHEDULE_DAILY_SELECTED}}>Daily</option>
-                    <option value="weekly" {{SCHEDULE_WEEKLY_SELECTED}}>Weekly</option>
-                    <option value="monthly" {{SCHEDULE_MONTHLY_SELECTED}}>Monthly</option>
-                    <option value="cron" {{SCHEDULE_CRON_SELECTED}}>Custom Cron Pattern</option>
-                </select>
-            </div>
-            
-            <div id="cron_field" class="hidden mt-10">
-                <label for="cron_pattern">Cron Pattern:</label>
-                <input type="text" name="cron_pattern" value="{{CRON_PATTERN}}" placeholder="0 3 * * *" 
-                       title="Format: minute hour day month weekday">
-                <div class="help-text">
-                    Examples: "0 3 * * *" (daily 3am), "0 */6 * * *" (every 6 hours), "0 3 * * 0" (weekly Sunday 3am), "0 3 1 * *" (monthly 1st 3am)
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="enabled" value="true" {{ENABLED_CHECKED}}> Enabled
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="respect_conflicts" value="true" {{CONFLICTS_CHECKED}}> Wait for conflicting jobs (recommended)
-                </label>
-                <div class="help-text">
-                    When enabled, this job will wait for other jobs using the same source or destination to finish before running.
-                </div>
-            </div>
-            
-            <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
-            <a href="/" class="button">Cancel</a>
         </form>
         
         {{DELETE_FORM}}
