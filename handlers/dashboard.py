@@ -117,13 +117,9 @@ class DashboardHandler:
             'source_config': parsed_job['source_config'],
             'dest_type': parsed_job['dest_type'],
             'dest_config': parsed_job['dest_config'],
-            'includes': parsed_job['includes'],
-            'excludes': parsed_job['excludes'],
             'schedule': parsed_job['schedule'],
             'enabled': parsed_job['enabled'],
-            'respect_conflicts': parsed_job.get('respect_conflicts', True),  # Default to True
-            # Keep legacy source field for backward compatibility
-            'source': parsed_job['source_config']['source_string']
+            'respect_conflicts': parsed_job.get('respect_conflicts', True)  # Default to True
         }
 
         # Handle job rename

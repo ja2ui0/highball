@@ -216,7 +216,7 @@ class ConfigHandler:
         """Reload configuration from file"""
         try:
             self.backup_config.config = self.backup_config.load_config()
-            self.template_service.send_redirect(handler, '/config')
+            self.template_service.send_redirect(handler, '/config/raw')
         except Exception as e:
             self.template_service.send_error_response(
                 handler,

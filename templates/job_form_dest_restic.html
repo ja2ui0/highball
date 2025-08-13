@@ -36,7 +36,7 @@
                 <div id="restic_rest" class="hidden mt-10">
                     <div class="form-group">
                         <label for="restic_rest_hostname">REST Server Hostname:</label>
-                        <input type="text" name="restic_rest_hostname" value="{{RESTIC_REST_HOSTNAME}}" placeholder="backup.example.com" required>
+                        <input type="text" name="restic_rest_hostname" value="{{RESTIC_REST_HOSTNAME}}" placeholder="backup.example.com">
                     </div>
                     
                     <div class="form-group">
@@ -76,16 +76,16 @@
                     <input type="text" name="restic_s3_endpoint" value="{{RESTIC_S3_ENDPOINT}}" placeholder="s3.amazonaws.com">
                     
                     <label for="restic_s3_bucket">Bucket Name:</label>
-                    <input type="text" name="restic_s3_bucket" value="{{RESTIC_S3_BUCKET}}" placeholder="my-backup-bucket" required>
+                    <input type="text" name="restic_s3_bucket" value="{{RESTIC_S3_BUCKET}}" placeholder="my-backup-bucket">
                     
                     <label for="restic_s3_prefix">Prefix (optional):</label>
                     <input type="text" name="restic_s3_prefix" value="{{RESTIC_S3_PREFIX}}" placeholder="restic">
                     
                     <label for="restic_aws_access_key">AWS Access Key ID:</label>
-                    <input type="text" name="restic_aws_access_key" value="{{RESTIC_AWS_ACCESS_KEY}}" placeholder="AKIAIOSFODNN7EXAMPLE" required>
+                    <input type="text" name="restic_aws_access_key" value="{{RESTIC_AWS_ACCESS_KEY}}" placeholder="AKIAIOSFODNN7EXAMPLE">
                     
                     <label for="restic_aws_secret_key">AWS Secret Access Key:</label>
-                    <input type="password" name="restic_aws_secret_key" value="{{RESTIC_AWS_SECRET_KEY}}" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" required>
+                    <input type="password" name="restic_aws_secret_key" value="{{RESTIC_AWS_SECRET_KEY}}" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">
                     
                     <div class="help-text">
                         <strong>Generated URI:</strong> <span id="s3_uri_preview">s3:s3.amazonaws.com/bucket/prefix</span>
@@ -94,7 +94,7 @@
                 
                 <div id="restic_rclone" class="hidden mt-10">
                     <label for="restic_rclone_remote">rclone Remote Name:</label>
-                    <input type="text" name="restic_rclone_remote" value="{{RESTIC_RCLONE_REMOTE}}" placeholder="gdrive" required>
+                    <input type="text" name="restic_rclone_remote" value="{{RESTIC_RCLONE_REMOTE}}" placeholder="gdrive">
                     
                     <label for="restic_rclone_path">Path:</label>
                     <input type="text" name="restic_rclone_path" value="{{RESTIC_RCLONE_PATH}}" placeholder="backups">
@@ -113,13 +113,13 @@
                 
                 <div id="restic_sftp" class="hidden mt-10">
                     <label for="restic_sftp_hostname">SFTP Hostname:</label>
-                    <input type="text" name="restic_sftp_hostname" value="{{RESTIC_SFTP_HOSTNAME}}" placeholder="sftp.example.com" required>
+                    <input type="text" name="restic_sftp_hostname" value="{{RESTIC_SFTP_HOSTNAME}}" placeholder="sftp.example.com">
                     
                     <label for="restic_sftp_username">Username:</label>
-                    <input type="text" name="restic_sftp_username" value="{{RESTIC_SFTP_USERNAME}}" placeholder="backup-user" required>
+                    <input type="text" name="restic_sftp_username" value="{{RESTIC_SFTP_USERNAME}}" placeholder="backup-user">
                     
                     <label for="restic_sftp_path">Path:</label>
-                    <input type="text" name="restic_sftp_path" value="{{RESTIC_SFTP_PATH}}" placeholder="/home/backup/repo" required>
+                    <input type="text" name="restic_sftp_path" value="{{RESTIC_SFTP_PATH}}" placeholder="/home/backup/repo">
                     
                     <div class="help-text">
                         <strong>Generated URI:</strong> <span id="sftp_uri_preview">sftp:user@hostname:/path</span>

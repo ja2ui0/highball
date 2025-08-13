@@ -108,9 +108,19 @@ class JobFormParser:
     def parse_multi_path_options(form_data):
         """Parse multi-path source options from form data"""
         # Get arrays of paths, includes, and excludes
-        source_paths = form_data.getlist('source_paths[]')
-        source_includes = form_data.getlist('source_includes[]')
-        source_excludes = form_data.getlist('source_excludes[]')
+        # Handle different form data formats
+        def safe_get_list(data, key):
+            """Safely get list from form data regardless of format"""
+            if hasattr(data, 'getlist'):
+                return data.getlist(key)
+            else:
+                # For regular dict, values are already lists from parse_qs
+                value = data.get(key, [])
+                return value if isinstance(value, list) else [value]
+        
+        source_paths = safe_get_list(form_data, 'source_paths[]')
+        source_includes = safe_get_list(form_data, 'source_includes[]') 
+        source_excludes = safe_get_list(form_data, 'source_excludes[]')
         
         if not source_paths:
             return {'valid': False, 'error': 'At least one source path is required'}

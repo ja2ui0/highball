@@ -149,13 +149,39 @@ class JobDisplay:
             source_config = job_config.get('source_config', {})
             
             if source_type == 'local':
-                path = source_config.get('path', 'Unknown')
-                return f'<span class="source-type">Local:</span><br>{JobDisplay.format_source_path(path)}'
+                # Check for multi-path structure first, then legacy path
+                source_paths = source_config.get('source_paths', [])
+                if source_paths:
+                    # Format with line breaks and indentation for multiple paths
+                    path_lines = []
+                    for path_config in source_paths:
+                        path = path_config.get('path', 'Unknown')
+                        path_lines.append(f'&nbsp;&nbsp;{JobDisplay.format_source_path(path)}')
+                    path_display = '<br>'.join(path_lines)
+                else:
+                    # Legacy single path format
+                    path_display = JobDisplay.format_source_path(source_config.get('path', 'Unknown'))
+                return f'<span class="source-type">Local:</span><br>{path_display}'
             elif source_type == 'ssh':
                 hostname = source_config.get('hostname', 'unknown')
                 username = source_config.get('username', 'unknown')
-                path = source_config.get('path', 'unknown')
-                return f'<span class="source-type">SSH:</span><br>{JobDisplay.format_source_path(f"{username}@{hostname}:{path}")}'
+                
+                # Check for multi-path structure first, then legacy path
+                source_paths = source_config.get('source_paths', [])
+                if source_paths:
+                    # Format with line breaks and indentation for multiple paths
+                    connection = f"{username}@{hostname}:"
+                    path_lines = []
+                    for path_config in source_paths:
+                        path = path_config.get('path', 'Unknown')
+                        path_lines.append(f'&nbsp;&nbsp;{JobDisplay.format_source_path(path)}')
+                    path_display = f"{JobDisplay.format_source_path(connection)}<br>{'<br>'.join(path_lines)}"
+                else:
+                    # Legacy single path format
+                    path = source_config.get('path', 'Unknown')
+                    path_display = JobDisplay.format_source_path(f"{username}@{hostname}:{path}")
+                    
+                return f'<span class="source-type">SSH:</span><br>{path_display}'
         
         # Fall back to legacy format
         source = job_config.get('source', 'Unknown')
@@ -181,9 +207,8 @@ class JobDisplay:
                 share = dest_config.get('share', 'unknown')
                 return f'<span class="dest-type">rsyncd:</span><br>{JobDisplay.format_source_path(f"rsync://{hostname}/{share}")}'
             elif dest_type == 'restic':
-                repo_type = dest_config.get('repo_type', 'unknown')
-                repo_location = dest_config.get('repo_location', 'unknown')
-                return f'<span class="dest-type">Restic:</span><br>{JobDisplay.format_source_path(f"{repo_type}:{repo_location}")}'
+                repo_uri = dest_config.get('repo_uri', dest_config.get('dest_string', 'unknown'))
+                return f'<span class="dest-type">Restic:</span><br>{JobDisplay.format_source_path(repo_uri)}'
         
         # Fall back to legacy format - assume rsyncd to configured host
         return f'<span class="dest-type">rsyncd:</span><br>Default destination'

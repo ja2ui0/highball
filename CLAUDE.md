@@ -35,7 +35,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Logging**: Per-job logs, SSH validation caching (30min), refresh-based viewing
 **Notifications**: `notifiers` library backend, Telegram/email, per-method toggles, emoji-free
 **UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
-**Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting
+**Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, repository browser (scaffolded)
+**Inspect System**: Network scanner, Restic repository browser, unified log sources with proper container organization
 
 ## Development
 
@@ -130,6 +131,7 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Roadmap
 
-**Planned**: Borg, rclone direct destinations
+**Next Priority**: Section-specific save buttons for configuration (spot-save individual sections instead of full form save)
+**Planned**: Borg, rclone direct destinations, enhanced Restic execution features (progress parsing, retention policies)
 **Wishlist**: Kopia destinations
 

@@ -17,10 +17,11 @@ class JobValidator:
         
         # Validate source
         if parsed_job['source_type'] == 'ssh':
-            from services.ssh_validator import SSHValidator
-            source_validation = SSHValidator.validate_ssh_source(
-                parsed_job['source_config']['source_string']
-            )
+            from services.ssh_validator import validate_ssh_source
+            # Use connection-only validation (hostname@username format)  
+            source_config = parsed_job['source_config']
+            connection_string = f"{source_config['username']}@{source_config['hostname']}"
+            source_validation = validate_ssh_source(connection_string)
             if not source_validation['success']:
                 errors.append(f"Source SSH validation failed: {source_validation['message']}")
         

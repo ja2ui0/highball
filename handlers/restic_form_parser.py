@@ -8,10 +8,23 @@ class ResticFormParser:
     """Parses Restic destination form data"""
     
     @staticmethod
+    def _safe_get_value(data, key, default=''):
+        """Safely get single value from form data regardless of format"""
+        if hasattr(data, 'getlist'):
+            values = data.getlist(key)
+            return values[0] if values else default
+        else:
+            # For regular dict, values might be lists from parse_qs
+            value = data.get(key, default)
+            if isinstance(value, list):
+                return value[0] if value else default
+            return value
+    
+    @staticmethod
     def parse_restic_destination(form_data):
         """Parse Restic destination configuration from structured form data"""
-        repo_type = form_data.get('restic_repo_type', [''])[0].strip()
-        password = form_data.get('restic_password', [''])[0].strip()
+        repo_type = ResticFormParser._safe_get_value(form_data, 'restic_repo_type').strip()
+        password = ResticFormParser._safe_get_value(form_data, 'restic_password').strip()
         
         if not all([repo_type, password]):
             return {
@@ -22,7 +35,7 @@ class ResticFormParser:
         # Build URI and config based on repository type
         if repo_type == 'local':
             # Local repository - just a path
-            path = form_data.get('restic_local_path', [''])[0].strip()
+            path = ResticFormParser._safe_get_value(form_data, 'restic_local_path').strip()
             if not path:
                 return {'valid': False, 'error': 'Local repository requires path'}
             
@@ -92,13 +105,14 @@ class ResticFormParser:
     @staticmethod
     def _build_rest_uri(form_data):
         """Build REST repository URI from structured form data"""
-        hostname = form_data.get('restic_rest_hostname', [''])[0].strip()
-        port = form_data.get('restic_rest_port', ['8000'])[0].strip()
-        path = form_data.get('restic_rest_path', [''])[0].strip()
+        hostname = ResticFormParser._safe_get_value(form_data, 'restic_rest_hostname').strip()
+        port = ResticFormParser._safe_get_value(form_data, 'restic_rest_port', '8000').strip()
+        path = ResticFormParser._safe_get_value(form_data, 'restic_rest_path').strip()
         # Handle checkbox: present in form_data means checked, absent means unchecked
-        use_https = 'restic_rest_use_https' in form_data and form_data.get('restic_rest_use_https', [''])[0] not in ['', 'false', '0']
-        username = form_data.get('restic_rest_username', [''])[0].strip()
-        password = form_data.get('restic_rest_password', [''])[0].strip()
+        use_https_value = ResticFormParser._safe_get_value(form_data, 'restic_rest_use_https')
+        use_https = 'restic_rest_use_https' in form_data and use_https_value not in ['', 'false', '0']
+        username = ResticFormParser._safe_get_value(form_data, 'restic_rest_username').strip()
+        password = ResticFormParser._safe_get_value(form_data, 'restic_rest_password').strip()
         
         if not hostname:
             return {'valid': False, 'error': 'REST repository requires hostname'}
@@ -134,11 +148,11 @@ class ResticFormParser:
     @staticmethod 
     def _build_s3_uri(form_data):
         """Build S3 repository URI from structured form data"""
-        endpoint = form_data.get('restic_s3_endpoint', ['s3.amazonaws.com'])[0].strip()
-        bucket = form_data.get('restic_s3_bucket', [''])[0].strip()
-        prefix = form_data.get('restic_s3_prefix', [''])[0].strip()
-        aws_access_key = form_data.get('restic_aws_access_key', [''])[0].strip()
-        aws_secret_key = form_data.get('restic_aws_secret_key', [''])[0].strip()
+        endpoint = ResticFormParser._safe_get_value(form_data, 'restic_s3_endpoint', 's3.amazonaws.com').strip()
+        bucket = ResticFormParser._safe_get_value(form_data, 'restic_s3_bucket').strip()
+        prefix = ResticFormParser._safe_get_value(form_data, 'restic_s3_prefix').strip()
+        aws_access_key = ResticFormParser._safe_get_value(form_data, 'restic_aws_access_key').strip()
+        aws_secret_key = ResticFormParser._safe_get_value(form_data, 'restic_aws_secret_key').strip()
         
         if not bucket:
             return {'valid': False, 'error': 'S3 repository requires bucket name'}
@@ -167,8 +181,8 @@ class ResticFormParser:
     @staticmethod
     def _build_rclone_uri(form_data):
         """Build rclone repository URI from structured form data"""
-        remote = form_data.get('restic_rclone_remote', [''])[0].strip()
-        path = form_data.get('restic_rclone_path', [''])[0].strip()
+        remote = ResticFormParser._safe_get_value(form_data, 'restic_rclone_remote').strip()
+        path = ResticFormParser._safe_get_value(form_data, 'restic_rclone_path').strip()
         
         if not remote:
             return {'valid': False, 'error': 'rclone repository requires remote name'}
@@ -191,9 +205,9 @@ class ResticFormParser:
     @staticmethod
     def _build_sftp_uri(form_data):
         """Build SFTP repository URI from structured form data"""
-        hostname = form_data.get('restic_sftp_hostname', [''])[0].strip()
-        username = form_data.get('restic_sftp_username', [''])[0].strip() 
-        path = form_data.get('restic_sftp_path', [''])[0].strip()
+        hostname = ResticFormParser._safe_get_value(form_data, 'restic_sftp_hostname').strip()
+        username = ResticFormParser._safe_get_value(form_data, 'restic_sftp_username').strip() 
+        path = ResticFormParser._safe_get_value(form_data, 'restic_sftp_path').strip()
         
         if not all([hostname, username, path]):
             return {'valid': False, 'error': 'SFTP repository requires hostname, username, and path'}
