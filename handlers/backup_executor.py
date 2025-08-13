@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 import shlex
 from services.job_logger import JobLogger
-from .backup_command_builder import BackupCommandBuilder
+from .command_builder_factory import CommandBuilderFactory
 
 
 class BackupExecutor:
@@ -16,7 +16,7 @@ class BackupExecutor:
     def __init__(self, backup_config):
         self.backup_config = backup_config
         self.job_logger = JobLogger()
-        self.command_builder = BackupCommandBuilder(backup_config)
+        self.command_factory = CommandBuilderFactory(backup_config)
 
     def execute_backup(self, job_name, job_config, dry_run, trigger_source):
         """Execute backup and return result with timing information"""
@@ -70,8 +70,8 @@ class BackupExecutor:
         timestamp = datetime.now().isoformat()
         mode_text = "DRY RUN" if dry_run else "REAL BACKUP"
 
-        # Build command using command builder
-        command_info = self.command_builder.build_rsync_command(job_config, job_name, dry_run)
+        # Build command using appropriate builder via factory
+        command_info = self.command_factory.build_command(job_config, job_name, dry_run)
         
         # Prepare log content
         log_content = self._build_log_header(

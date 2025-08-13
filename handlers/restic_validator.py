@@ -90,11 +90,26 @@ class ResticValidator:
         runner = ResticRunner()
         repo_url = runner._build_repository_url(dest_config)
         
-        return {
-            'success': True,
-            'message': f'Restic {repo_type} repository configuration valid',
-            'repository_url': repo_url
-        }
+        # Test actual repository connectivity
+        repo_test = ResticValidator.validate_restic_repository_access(dest_config, source_config)
+        
+        if not repo_test['success']:
+            return repo_test
+        
+        # If repository exists with snapshots, perform simple content comparison
+        if repo_test.get('repository_status') == 'existing' and repo_test.get('snapshot_count', 0) > 0:
+            from services.restic_content_analyzer import ResticContentAnalyzer
+            
+            content_analysis = ResticContentAnalyzer.compare_source_to_repository(
+                dest_config, source_config, parsed_job.get('source_type')
+            )
+            
+            # Merge content analysis with repository test results
+            repo_test.update({
+                'content_analysis': content_analysis
+            })
+        
+        return repo_test
     
     @staticmethod
     def check_restic_binary(source_config):
@@ -204,11 +219,194 @@ class ResticValidator:
     
     @staticmethod
     def validate_restic_repository_access(dest_config, source_config=None):
-        """Test repository access (for future implementation)"""
-        # This would test actual repository connectivity
-        # For now, return success as placeholder
-        return {
-            'success': True,
-            'message': 'Repository access validation not yet implemented',
-            'note': 'Future: Test repository init/access without modifying it'
-        }
+        """Test actual repository connectivity and existence"""
+        from services.restic_runner import ResticRunner
+        
+        try:
+            # Build repository URL and environment
+            runner = ResticRunner()
+            repo_url = runner._build_repository_url(dest_config)
+            env_vars = runner._build_environment(dest_config)
+            
+            # Determine execution context
+            if source_config and source_config.get('hostname'):
+                # SSH execution
+                return ResticValidator._test_repository_via_ssh(repo_url, env_vars, source_config)
+            else:
+                # Local execution (container)
+                return ResticValidator._test_repository_locally(repo_url, env_vars)
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Repository access test failed: {str(e)}'
+            }
+    
+    @staticmethod
+    def _test_repository_via_ssh(repo_url, env_vars, source_config):
+        """Test repository access via SSH"""
+        hostname = source_config.get('hostname')
+        username = source_config.get('username')
+        
+        try:
+            # Build environment exports
+            env_exports = []
+            if env_vars:
+                for key, value in env_vars.items():
+                    env_exports.append(f"export {key}='{value}'")
+            
+            # Test repository existence with snapshots command (fast, read-only)
+            restic_cmd = f"restic -r '{repo_url}' snapshots --json"
+            remote_command = '; '.join(env_exports + [restic_cmd])
+            
+            ssh_cmd = [
+                'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                remote_command
+            ]
+            
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                # Repository exists and is accessible
+                import json
+                try:
+                    snapshots = json.loads(result.stdout)
+                    snapshot_count = len(snapshots) if snapshots else 0
+                    
+                    if snapshot_count > 0:
+                        latest_snap = max(snapshots, key=lambda x: x.get('time', ''))
+                        return {
+                            'success': True,
+                            'message': f'EXISTING REPO FOUND! Repository contains {snapshot_count} snapshots',
+                            'repository_status': 'existing',
+                            'snapshot_count': snapshot_count,
+                            'latest_backup': latest_snap.get('time', 'unknown'),
+                            'tested_from': f'{username}@{hostname}'
+                        }
+                    else:
+                        return {
+                            'success': True,
+                            'message': 'Repository exists but contains no snapshots (empty repository)',
+                            'repository_status': 'empty',
+                            'snapshot_count': 0,
+                            'tested_from': f'{username}@{hostname}'
+                        }
+                        
+                except json.JSONDecodeError:
+                    return {
+                        'success': True,
+                        'message': 'Repository accessible but could not parse snapshot data',
+                        'repository_status': 'accessible',
+                        'tested_from': f'{username}@{hostname}'
+                    }
+            else:
+                # Check if it's a credentials issue or repository doesn't exist
+                error_output = result.stderr.strip().lower()
+                if 'wrong password' in error_output or 'incorrect password' in error_output:
+                    return {
+                        'success': False,
+                        'message': 'Invalid repository password - credentials are incorrect',
+                        'error_type': 'authentication',
+                        'tested_from': f'{username}@{hostname}'
+                    }
+                elif 'no such file' in error_output or 'not found' in error_output:
+                    return {
+                        'success': False,
+                        'message': 'Repository not found at specified location',
+                        'error_type': 'not_found',
+                        'tested_from': f'{username}@{hostname}'
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'message': f'Cannot access repository: {result.stderr.strip()}',
+                        'error_type': 'access_error',
+                        'tested_from': f'{username}@{hostname}'
+                    }
+                    
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'message': f'Repository access test timed out on {hostname}',
+                'tested_from': f'{username}@{hostname}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Repository access test error: {str(e)}',
+                'tested_from': f'{username}@{hostname}'
+            }
+    
+    @staticmethod
+    def _test_repository_locally(repo_url, env_vars):
+        """Test repository access locally (in container)"""
+        try:
+            # Prepare environment
+            env = {}
+            if env_vars:
+                env.update(env_vars)
+            
+            # Test repository with snapshots command
+            cmd = ['restic', '-r', repo_url, 'snapshots', '--json']
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, env=env)
+            
+            if result.returncode == 0:
+                import json
+                try:
+                    snapshots = json.loads(result.stdout)
+                    snapshot_count = len(snapshots) if snapshots else 0
+                    
+                    if snapshot_count > 0:
+                        latest_snap = max(snapshots, key=lambda x: x.get('time', ''))
+                        return {
+                            'success': True,
+                            'message': f'EXISTING REPO FOUND! Repository contains {snapshot_count} snapshots',
+                            'repository_status': 'existing',
+                            'snapshot_count': snapshot_count,
+                            'latest_backup': latest_snap.get('time', 'unknown'),
+                            'tested_from': 'container'
+                        }
+                    else:
+                        return {
+                            'success': True,
+                            'message': 'Repository exists but contains no snapshots (empty repository)',
+                            'repository_status': 'empty',
+                            'snapshot_count': 0,
+                            'tested_from': 'container'
+                        }
+                        
+                except json.JSONDecodeError:
+                    return {
+                        'success': True,
+                        'message': 'Repository accessible but could not parse snapshot data',
+                        'repository_status': 'accessible',
+                        'tested_from': 'container'
+                    }
+            else:
+                error_output = result.stderr.strip().lower()
+                if 'wrong password' in error_output or 'incorrect password' in error_output:
+                    return {
+                        'success': False,
+                        'message': 'Invalid repository password - credentials are incorrect',
+                        'error_type': 'authentication'
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'message': f'Cannot access repository: {result.stderr.strip()}',
+                        'error_type': 'access_error'
+                    }
+                    
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'message': 'Repository access test timed out'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Repository access test error: {str(e)}'
+            }

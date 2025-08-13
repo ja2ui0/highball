@@ -30,47 +30,40 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 ## Features
 
-**Job Management**: Full CRUD with renaming, validation, cron scheduling, per-job conflict avoidance settings, consolidated templates, custom rsync options per job
-**Smart Scheduling**: Configurable default times (hourly/daily/weekly/monthly), runtime conflict detection, automatic job queuing
-**Logging**: Per-job execution logs, status tracking, SSH validation state with 30min caching, conflict delay tracking, simplified refresh-based log viewing
-**Notifications**: Professional notification system using `notifiers` library backend, method-specific Telegram/email alerts with individual enabled/disabled flags and per-method success notifications (emoji-free, extensible to 25+ providers)
-**UI**: Organized sectioned forms, real-time validation, share discovery, job history with refresh-based log viewing, structured config forms + raw YAML editor, network scanning, theming system, password visibility toggles
-**System Inspection**: Network rsync server discovery, simplified log viewing, comprehensive system monitoring
+**Job Management**: Full CRUD, validation, cron scheduling, per-job conflict avoidance, custom rsync options
+**Scheduling**: Runtime conflict detection, automatic queuing, configurable defaults
+**Logging**: Per-job logs, SSH validation caching (30min), refresh-based viewing
+**Notifications**: `notifiers` library backend, Telegram/email, per-method toggles, emoji-free
+**UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles
 
 ## Development
 
-**Conventions**: PEP 8, dataclasses for structured data, pathlib for file operations, external static assets (no inline JS/CSS), emoji-free interfaces
-**Modern Patterns**: Type hints throughout, consolidated YAML operations, CSS utility classes, cached validation, error handling with fallbacks
-**Extensions**: New engines via `services/<engine>_runner.py` + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update `job_validator.py` (see Restic scaffold example)
-**Modular Parsing**: All destination types use dedicated form parsers with consistent interface - `JobFormParser` delegates to specialized parsers
-**Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers` for modern Python patterns
+**Conventions**: PEP 8, dataclasses, pathlib, external assets, emoji-free
+**Patterns**: Type hints, cached validation, error fallbacks
+**Extensions**: New engines via `services/<engine>_runner.py` + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update `job_validator.py`
+**Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
 
 ## Theming System
 
-**Architecture**: Base + Theme approach with complete color separation
-**Base CSS**: `/static/style.css` - structural styles, spacing, layout (no colors)  
-**Theme Files**: `/static/themes/{theme}.css` - color variables only (`:root` definitions)
-**Loading**: Automatic via `TemplateService` - all templates get `{{THEME_CSS_PATH}}` variable
-**Configuration**: `global_settings.theme` in YAML config (default: "dark")
-**Discovery**: Dynamic theme detection from filesystem - scans `/static/themes/` for `.css` files
-**UI Selection**: Theme dropdown in Config Manager with auto-generated options
-**Extension**: Add new themes by creating CSS files with color variables - no template changes needed
+**Architecture**: Base + Theme separation - `/static/style.css` (structure) + `/static/themes/{theme}.css` (colors only)
+**Loading**: Automatic via `TemplateService` - `{{THEME_CSS_PATH}}` variable
+**Configuration**: `global_settings.theme` (default: "dark")
+**Extension**: New themes = new CSS file with color variables
 
 ## Modern Architecture Notes
 
-**Template Modularity**: Template include system with `{{INCLUDE:filename}}` directives - main `job_form.html` orchestrates focused components (`job_form_source.html`, `job_form_dest_basic.html`, `job_form_dest_restic.html`, `job_form_schedule.html`)
-**JavaScript Modularity**: Modular 5-file architecture eliminates 260-line monolith - each component has single responsibility (core utilities, SSH validation, rsync discovery, Restic management, global compatibility)
-**Type Safety**: Extensive use of dataclasses (`NotificationProvider`, `NotificationResult`, `LogPaths`, `SSHConfig`, `ValidationResult`, `JobFormData`, `SourceConfig`, `DestConfig`, `ResticConfig`, `CommandInfo`, `ExecutionContext`)
-**File Operations**: All file paths use `pathlib.Path` objects with proper error handling and atomic operations
-**Validation**: SSH validation with 30-minute in-memory cache, proper hostname validation via `validators` module
-**CSS Architecture**: Modular theming system with structural CSS (`style.css`) and theme colors (`/static/themes/{theme}.css`), consolidated utility classes, no duplication or inline styles, rounded table corners, semantic color variables, dedicated input field backgrounds (`--bg-input`) for visual depth
-**Error Handling**: Comprehensive exception handling with graceful degradation and user-friendly error messages
-**Notification Architecture**: Professional `notifiers` library backend eliminates ~200 lines of manual SMTP/HTTP code, extensible factory pattern ready for 25+ providers (Slack, Discord, SMS, etc.) with unchanged frontend
-**Restic Scaffold**: Complete modular architecture for Restic backup provider with command planning abstraction, implicit enablement, and 202 planning responses - ready for template/execution implementation (see `RESTIC_SCAFFOLD.md`)
-**Form Parser Architecture**: Fully modular form parsing with dedicated parsers for each destination type (`LocalFormParser`, `SSHFormParser`, `RsyncdFormParser`, `ResticFormParser`) - eliminates code duplication and establishes clean extension pattern
-**Form UI Architecture**: Organized sectioned forms with visual hierarchy (Job Identity & Source, Backup Destination, Schedule & Options, Actions), proper form field spacing with `form-group` containers, validation result sections, and user-friendly password visibility toggles
-**Backup Execution Architecture**: Modular backup execution with separation of concerns (`BackupExecutor` for core execution, `BackupCommandBuilder` for rsync command construction with custom/default options support, `BackupConflictHandler` for conflict management, `BackupNotificationDispatcher` for notification handling) - replaces monolithic 477-line backup handler with focused, testable components
-**Rsync Options Architecture**: Per-job custom rsync options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified field for SSH and rsyncd destinations, dynamic default display, proper command parsing and integration
+**Template Modularity**: `{{INCLUDE:filename}}` directives - `job_form.html` orchestrates components
+**JavaScript Modularity**: 5-file architecture - single responsibility per component
+**Type Safety**: Dataclasses for all structured data (`JobFormData`, `SourceConfig`, `DestConfig`, etc.)
+**File Operations**: `pathlib.Path` with atomic operations
+**Validation**: SSH 30min cache, `validators` module
+**CSS Architecture**: Structural CSS + theme colors, `--bg-input` for input field depth
+**Notification Architecture**: `notifiers` library backend, extensible to 25+ providers
+**Restic Scaffold**: Command planning abstraction, 202 responses, ready for execution (see `RESTIC_SCAFFOLD.md`)
+**Form Parser Architecture**: Dedicated parsers per destination type with consistent interface
+**Form UI Architecture**: Sectioned forms (Job Identity & Source, Backup Destination, Schedule & Options, Actions)
+**Backup Execution Architecture**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
+**Rsync Options Architecture**: Per-job custom options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified SSH/rsyncd field
 
 ## Commands
 
@@ -124,4 +117,9 @@ backup_jobs:
 deleted_jobs:  # user can manually restore to backup_jobs
   job_name: {...}
 ```
+
+## Roadmap
+
+**Planned**: Borg, rclone direct destinations
+**Wishlist**: Kopia destinations
 
