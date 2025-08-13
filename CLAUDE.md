@@ -14,7 +14,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
+**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing), `form_error_handler.py` (inline error display), `job_display.py` (dashboard formatting), `dashboard.py` (modularized coordinator)
 **Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command execution), `restic_content_analyzer.py` (content fingerprinting)
 **Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
@@ -62,10 +62,13 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **CSS Architecture**: Structural CSS + theme colors, `--bg-input` for input field depth
 **Notification Architecture**: `notifiers` library backend, extensible to 25+ providers
 **Restic Scaffold**: Command planning abstraction, 202 responses, ready for execution (see `RESTIC_SCAFFOLD.md`)
-**Form Parser Architecture**: Dedicated parsers per destination type with consistent interface
+**Form Parser Architecture**: Dedicated parsers per destination type with consistent interface (`_safe_get_value` for form data compatibility)
 **Form UI Architecture**: Sectioned forms (Job Identity & Source, Backup Destination, Schedule & Options, Actions)
+**Error Handling Architecture**: Modular inline error display (`FormErrorHandler`) with user input preservation, no scary error pages
+**Dashboard Display Architecture**: Clean multi-path source display with hierarchical formatting and proper line breaks
 **Backup Execution Architecture**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
 **Rsync Options Architecture**: Per-job custom options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified SSH/rsyncd field
+**Testing Architecture**: Comprehensive unit test coverage for error handling with mocking patterns
 
 ## Commands
 
@@ -73,6 +76,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Multi-arch**: `./rr multi` (build multiarch image for distribution)
 **Debug**: `docker logs -f highball`
 **Test Notifications**: `./test_notifications.py`
+**Test Units**: `python3 -m unittest tests.test_form_error_handler -v`
 
 ## Configuration Schema (User-facing Only)
 
@@ -131,7 +135,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Roadmap
 
-**Next Priority**: Section-specific save buttons for configuration (spot-save individual sections instead of full form save)
+**Next Session Priority**: 
+1. **Per-job notification options** - Notification messages and methods selectable per job, with global provider configuration (maintain current global provider setup)
+2. **Notification backend testing** - Add and test notification integration and user experience
+3. **Restic repository browser** - Implement actual functionality for the scaffolded browser interface  
+4. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery
+
+**Future Priorities**: Section-specific save buttons for configuration (spot-save individual sections instead of full form save)
 **Planned**: Borg, rclone direct destinations, enhanced Restic execution features (progress parsing, retention policies)
 **Wishlist**: Kopia destinations
 

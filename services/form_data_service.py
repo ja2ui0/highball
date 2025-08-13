@@ -157,15 +157,31 @@ class JobFormData:
         return vars_dict
     
     def _get_multi_path_variables(self) -> Dict[str, str]:
-        """Get multi-path template variables"""
+        """Get multi-path template variables - generate for ALL paths"""
         vars_dict = {}
         
-        # Generate variables for first path (backward compatibility and default)
         if self.source.source_paths:
-            first_path = self.source.source_paths[0]
-            vars_dict['SOURCE_PATH_0'] = first_path.get('path', '')
-            vars_dict['SOURCE_INCLUDES_0'] = '\n'.join(first_path.get('includes', []))
-            vars_dict['SOURCE_EXCLUDES_0'] = '\n'.join(first_path.get('excludes', []))
+            # Generate variables for all existing paths
+            for i, path_config in enumerate(self.source.source_paths):
+                vars_dict[f'SOURCE_PATH_{i}'] = path_config.get('path', '')
+                vars_dict[f'SOURCE_INCLUDES_{i}'] = '\n'.join(path_config.get('includes', []))
+                vars_dict[f'SOURCE_EXCLUDES_{i}'] = '\n'.join(path_config.get('excludes', []))
+            
+            # Set the count of paths for JavaScript initialization
+            vars_dict['SOURCE_PATHS_COUNT'] = str(len(self.source.source_paths))
+            
+            # Generate JSON data for JavaScript initialization
+            paths_json = []
+            for path_config in self.source.source_paths:
+                paths_json.append({
+                    'path': path_config.get('path', ''),
+                    'includes': path_config.get('includes', []),
+                    'excludes': path_config.get('excludes', [])
+                })
+            
+            import json
+            vars_dict['SOURCE_PATHS_JSON'] = json.dumps(paths_json)
+            
         else:
             # Backward compatibility: use old single path if source_paths not available
             if self.source.source_type == 'local':
@@ -177,6 +193,12 @@ class JobFormData:
             
             vars_dict['SOURCE_INCLUDES_0'] = self.includes
             vars_dict['SOURCE_EXCLUDES_0'] = self.excludes
+            vars_dict['SOURCE_PATHS_COUNT'] = '1'
+            vars_dict['SOURCE_PATHS_JSON'] = json.dumps([{
+                'path': vars_dict['SOURCE_PATH_0'],
+                'includes': self.includes.split('\n') if self.includes else [],
+                'excludes': self.excludes.split('\n') if self.excludes else []
+            }])
         
         return vars_dict
     
@@ -300,6 +322,7 @@ class JobFormDataBuilder:
             ssh_hostname=source_config.get('hostname', ''),
             ssh_username=source_config.get('username', ''),
             ssh_path=source_config.get('path', ''),
+            source_paths=source_config.get('source_paths', [])  # Multi-path support
         )
         
         dest = DestConfig(
@@ -324,8 +347,8 @@ class JobFormDataBuilder:
             restic=restic,
             schedule_type=schedule_type,
             cron_pattern=cron_pattern,
-            includes='\n'.join(job_config.get('includes', [])),
-            excludes='\n'.join(job_config.get('excludes', [])),
+            includes='',  # Legacy field - includes/excludes now in source_paths
+            excludes='',  # Legacy field - includes/excludes now in source_paths
             enabled=job_config.get('enabled', True),
             respect_conflicts=job_config.get('respect_conflicts', True)
         )
