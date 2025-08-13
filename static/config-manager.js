@@ -28,6 +28,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize visibility on page load
         toggleSettings('enable_email', 'emailSettings');
     }
+    
+    // Initialize queue settings toggles
+    document.addEventListener('DOMContentLoaded', function() {
+        const telegramQueueCheckbox = document.getElementById('telegram_queue_enabled');
+        if (telegramQueueCheckbox) {
+            toggleTelegramQueue(); // Initialize on page load
+        }
+        
+        const emailQueueCheckbox = document.getElementById('email_queue_enabled');
+        if (emailQueueCheckbox) {
+            toggleEmailQueue(); // Initialize on page load  
+        }
+    });
 });
 
 // Legacy function names for backward compatibility with inline handlers
@@ -42,6 +55,22 @@ function toggleTelegramSettings() {
 function toggleEmailSettings() {
     const checkbox = document.getElementById('enable_email');
     const settings = document.getElementById('emailSettings');
+    if (checkbox && settings) {
+        settings.classList.toggle('hidden', !checkbox.checked);
+    }
+}
+
+function toggleTelegramQueue() {
+    const checkbox = document.getElementById('telegram_queue_enabled');
+    const settings = document.getElementById('telegramQueueSettings');
+    if (checkbox && settings) {
+        settings.classList.toggle('hidden', !checkbox.checked);
+    }
+}
+
+function toggleEmailQueue() {
+    const checkbox = document.getElementById('email_queue_enabled');
+    const settings = document.getElementById('emailQueueSettings');
     if (checkbox && settings) {
         settings.classList.toggle('hidden', !checkbox.checked);
     }

@@ -75,14 +75,15 @@ class ConfigHandler:
             # Telegram settings
             TELEGRAM_ENABLED='checked' if telegram_config.get('enabled', False) else '',
             TELEGRAM_SETTINGS_CLASS='' if telegram_config.get('enabled', False) else 'hidden',
-            TELEGRAM_NOTIFY_SUCCESS='checked' if telegram_config.get('notify_on_success', False) else '',
             TELEGRAM_TOKEN=telegram_config.get('token', ''),
             TELEGRAM_CHAT_ID=telegram_config.get('chat_id', ''),
+            TELEGRAM_QUEUE_ENABLED='checked' if telegram_config.get('queue_enabled', True) else '',
+            TELEGRAM_QUEUE_SETTINGS_CLASS='' if telegram_config.get('queue_enabled', True) else 'hidden',
+            TELEGRAM_QUEUE_INTERVAL=str(telegram_config.get('queue_interval_minutes', 5)),
             
             # Email settings
             EMAIL_ENABLED='checked' if email_config.get('enabled', False) else '',
             EMAIL_SETTINGS_CLASS='' if email_config.get('enabled', False) else 'hidden',
-            EMAIL_NOTIFY_SUCCESS='checked' if email_config.get('notify_on_success', False) else '',
             EMAIL_SMTP_SERVER=email_config.get('smtp_server', ''),
             EMAIL_SMTP_PORT=str(email_config.get('smtp_port', 587)),
             EMAIL_TLS_CHECKED='checked' if email_config.get('use_tls', True) and not email_config.get('use_ssl', False) else '',
@@ -91,7 +92,10 @@ class ConfigHandler:
             EMAIL_FROM=email_config.get('from_email', ''),
             EMAIL_TO=email_config.get('to_email', ''),
             EMAIL_USERNAME=email_config.get('username', ''),
-            EMAIL_PASSWORD=email_config.get('password', '')
+            EMAIL_PASSWORD=email_config.get('password', ''),
+            EMAIL_QUEUE_ENABLED='checked' if email_config.get('queue_enabled', True) else '',
+            EMAIL_QUEUE_SETTINGS_CLASS='' if email_config.get('queue_enabled', True) else 'hidden',
+            EMAIL_QUEUE_INTERVAL=str(email_config.get('queue_interval_minutes', 15))
         )
         
         self.template_service.send_html_response(handler, html_content)
@@ -152,6 +156,8 @@ class ConfigHandler:
             telegram_config['enabled'] = 'enable_telegram' in form_data
             telegram_config['token'] = form_data.get('telegram_token', [''])[0]
             telegram_config['chat_id'] = form_data.get('telegram_chat_id', [''])[0]
+            telegram_config['queue_enabled'] = 'telegram_queue_enabled' in form_data
+            telegram_config['queue_interval_minutes'] = int(form_data.get('telegram_queue_interval', ['5'])[0])
             
             # Email settings
             email_config = notification_config.setdefault('email', {})
@@ -168,6 +174,8 @@ class ConfigHandler:
             email_config['to_email'] = form_data.get('email_to', [''])[0]
             email_config['username'] = form_data.get('email_username', [''])[0]
             email_config['password'] = form_data.get('email_password', [''])[0]
+            email_config['queue_enabled'] = 'email_queue_enabled' in form_data
+            email_config['queue_interval_minutes'] = int(form_data.get('email_queue_interval', ['15'])[0])
             
             # Save configuration
             self.backup_config.save_config()

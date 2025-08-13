@@ -120,6 +120,20 @@
                     </div>
                     
                     <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="telegram_queue_enabled" name="telegram_queue_enabled" {{TELEGRAM_QUEUE_ENABLED}} onchange="toggleTelegramQueue()"> 
+                            Enable notification queueing
+                        </label>
+                        <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
+                        <div id="telegramQueueSettings" class="{{TELEGRAM_QUEUE_SETTINGS_CLASS}}">
+                            <label for="telegram_queue_interval">Minimum time between messages (minutes):</label>
+                            <input type="number" id="telegram_queue_interval" name="telegram_queue_interval" 
+                                   value="{{TELEGRAM_QUEUE_INTERVAL}}" placeholder="5" min="1" max="1440">
+                            <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
                         <button type="button" id="test_telegram" class="button button-secondary" onclick="testTelegramNotification()">
                             Send Test Notification
                         </button>
@@ -190,6 +204,20 @@
                         <input type="password" id="email_password" name="email_password" 
                                value="{{EMAIL_PASSWORD}}" placeholder="your-app-password">
                         <div class="help-text">Use app password for Gmail</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="email_queue_enabled" name="email_queue_enabled" {{EMAIL_QUEUE_ENABLED}} onchange="toggleEmailQueue()"> 
+                            Enable notification queueing
+                        </label>
+                        <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
+                        <div id="emailQueueSettings" class="{{EMAIL_QUEUE_SETTINGS_CLASS}}">
+                            <label for="email_queue_interval">Minimum time between messages (minutes):</label>
+                            <input type="number" id="email_queue_interval" name="email_queue_interval" 
+                                   value="{{EMAIL_QUEUE_INTERVAL}}" placeholder="15" min="1" max="1440">
+                            <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
+                        </div>
                     </div>
                     
                     <div class="form-group">

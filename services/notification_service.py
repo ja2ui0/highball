@@ -1,11 +1,13 @@
 """
 Notification service for backup job alerts and status updates
 Modern implementation using notifiers library with extensible backend
+Includes queue management for spam prevention
 """
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from notifiers import get_notifier
+from services.notification_queue_service import NotificationQueueManager
 
 
 @dataclass
@@ -111,15 +113,24 @@ class NotificationService:
             p.provider_name: p 
             for p in NotificationProviderFactory.create_all_providers(self.notification_config)
         }
+        
+        # Initialize queue manager
+        self.queue_manager = NotificationQueueManager()
+        
+        # Set up queue processing callbacks
+        self._setup_queue_callbacks()
     
-    def send_notification(self, title: str, message: str, notification_type: str = "info"):
-        """Send notification via all configured providers"""
+    def send_notification(self, title: str, message: str, notification_type: str = "info", job_name: Optional[str] = None):
+        """Send notification via all configured providers with queue support"""
         if not self.is_notifications_enabled():
             return
         
         formatted_message = self._format_message(message)
-        results = self._send_to_all_providers(title, formatted_message, notification_type)
-        self._log_notification_results(results)
+        
+        # Process each provider individually for queue management
+        for provider in self.providers.values():
+            if provider.is_valid():
+                self._send_via_provider_with_queue(provider, title, formatted_message, notification_type, job_name)
     
     def send_job_delay_notification(self, job_name: str, delay_minutes: float, 
                                   conflicting_jobs: List[str], source: str):
@@ -132,7 +143,7 @@ class NotificationService:
             f"Triggered by: {source}\n\n"
             f"Consider adjusting schedules to reduce conflicts."
         )
-        self.send_notification(title, message, "warning")
+        self.send_notification(title, message, "warning", job_name)
     
     def send_job_failure_notification(self, job_name: str, error_message: str, dry_run: bool = False):
         """Send notification for job failures"""
@@ -143,7 +154,7 @@ class NotificationService:
             f"Error: {error_message}\n\n"
             f"Check logs for detailed information."
         )
-        self.send_notification(title, message, "error")
+        self.send_notification(title, message, "error", job_name)
     
     def send_job_success_notification(self, job_name: str, duration_seconds: float, dry_run: bool = False):
         """Send notification for successful job completion (if enabled per method)"""
@@ -190,6 +201,17 @@ class NotificationService:
         """Get list of currently enabled provider names"""
         return [name for name, provider in self.providers.items() if provider.is_valid()]
     
+    def get_queue_status(self, provider: str) -> Dict[str, Any]:
+        """Get queue status for a specific provider"""
+        return self.queue_manager.get_queue_status(provider)
+    
+    def get_all_queue_statuses(self) -> Dict[str, Dict[str, Any]]:
+        """Get queue status for all enabled providers"""
+        statuses = {}
+        for provider_name in self.get_enabled_providers():
+            statuses[provider_name] = self.get_queue_status(provider_name)
+        return statuses
+    
     def _format_message(self, message: str) -> str:
         """Add timestamp to message"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -223,6 +245,58 @@ class NotificationService:
                 results.append(NotificationResult(provider.provider_name, success, error))
         
         return results
+    
+    def _send_via_provider_with_queue(self, provider: NotificationProvider, title: str, 
+                                     message: str, notification_type: str, job_name: Optional[str] = None):
+        """Send notification via provider with queue management"""
+        provider_config = self.notification_config.get(provider.provider_name, {})
+        queue_enabled = provider_config.get('queue_enabled', True)
+        queue_interval_minutes = provider_config.get('queue_interval_minutes', 5 if provider.provider_name == 'telegram' else 15)
+        
+        # Check if we should send immediately or queue
+        if self.queue_manager.should_send_immediately(provider.provider_name, queue_enabled, queue_interval_minutes):
+            # Send immediately
+            success, error = self._send_via_provider(provider, title, message, notification_type)
+            
+            if success:
+                # Mark as sent to update timestamp
+                self.queue_manager.mark_sent_immediately(provider.provider_name, queue_interval_minutes)
+                print(f"INFO: Sent {notification_type} notification via {provider.provider_name}")
+            else:
+                print(f"WARNING: Failed to send {notification_type} notification via {provider.provider_name}: {error}")
+        else:
+            # Queue the message
+            success = self.queue_manager.queue_message(
+                provider.provider_name, title, message, notification_type, 
+                queue_interval_minutes, job_name
+            )
+            
+            if not success:
+                print(f"WARNING: Failed to queue notification for {provider.provider_name}")
+    
+    def _setup_queue_callbacks(self):
+        """Set up callbacks for queue processing"""
+        # Override the timer callback in queue manager to use our notification sending
+        original_timer_callback = self.queue_manager._timer_callback
+        
+        def enhanced_timer_callback(provider: str):
+            print(f"INFO: Batch timer fired for {provider} - processing queue")
+            
+            # Create send callback that uses our notification system
+            def send_callback(title, message, notification_type):
+                provider_obj = self.providers.get(provider)
+                if provider_obj and provider_obj.is_valid():
+                    success, error = self._send_via_provider(provider_obj, title, message, notification_type)
+                    if error:
+                        print(f"WARNING: Batch send error for {provider}: {error}")
+                    return success
+                return False
+            
+            # Process the queue with our callback
+            return self.queue_manager.process_queue_batch(provider, send_callback)
+        
+        # Replace the timer callback
+        self.queue_manager._timer_callback = enhanced_timer_callback
     
     def _send_via_provider(self, provider: NotificationProvider, title: str, 
                           message: str, notification_type: str) -> tuple[bool, Optional[str]]:
