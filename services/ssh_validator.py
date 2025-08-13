@@ -43,6 +43,10 @@ class SSHConnectionDetails:
     
     def is_valid(self) -> bool:
         """Validate connection details"""
+        return bool(self.username and self.hostname)
+    
+    def is_valid_with_path(self) -> bool:
+        """Validate connection details including path"""
         return bool(self.username and self.hostname and self.path)
 
 
@@ -74,17 +78,26 @@ class SSHValidator:
     @staticmethod
     def parse_ssh_source(source: str) -> Optional[SSHConnectionDetails]:
         """Parse SSH source into structured components"""
-        # Match pattern: user@hostname:/path
-        match = re.match(r'^([^@]+)@([^:]+):(.+)$', source.strip())
-        if not match:
-            return None
+        # Match pattern: user@hostname:/path OR user@hostname (for connection-only validation)
+        match_with_path = re.match(r'^([^@]+)@([^:]+):(.+)$', source.strip())
+        match_without_path = re.match(r'^([^@]+)@([^:]+)$', source.strip())
         
-        username, hostname, path = match.groups()
-        return SSHConnectionDetails(
-            username=username.strip(),
-            hostname=hostname.strip(), 
-            path=path.strip()
-        )
+        if match_with_path:
+            username, hostname, path = match_with_path.groups()
+            return SSHConnectionDetails(
+                username=username.strip(),
+                hostname=hostname.strip(), 
+                path=path.strip()
+            )
+        elif match_without_path:
+            username, hostname = match_without_path.groups()
+            return SSHConnectionDetails(
+                username=username.strip(),
+                hostname=hostname.strip(), 
+                path=""  # Empty path for connection-only validation
+            )
+        else:
+            return None
     
     def validate_hostname(self, hostname: str) -> bool:
         """Validate hostname using validators module"""
@@ -100,12 +113,12 @@ class SSHValidator:
         connection = self.parse_ssh_source(source)
         if not connection:
             return ValidationResult.error_result(
-                "Invalid SSH source format. Expected: user@hostname:/path"
+                "Invalid SSH source format. Expected: user@hostname:/path or user@hostname"
             )
         
         if not connection.is_valid():
             return ValidationResult.error_result(
-                "SSH source missing required components (username, hostname, or path)"
+                "SSH source missing required components (username or hostname)"
             )
         
         # Validate hostname format
@@ -119,32 +132,47 @@ class SSHValidator:
         if not ssh_result.success:
             return ssh_result
         
-        # Test remote path accessibility
-        path_result = self._test_remote_path(connection)
-        if not path_result.success:
-            return path_result
-        
-        # Test rsync compatibility
-        rsync_result = self._test_rsync_compatibility(connection)
-        
-        # Combine results
+        # Only test path and rsync if path is provided
         details = {
-            'ssh_status': ssh_result.message,
-            'path_status': path_result.message,
-            'rsync_status': rsync_result.message
+            'ssh_status': ssh_result.message
         }
         
-        if rsync_result.success:
-            return ValidationResult.success_result(
-                f"SSH source validated successfully: {connection.connection_string}",
-                details=details,
-                tested_from="Highball container"
-            )
+        if connection.path:
+            # Test remote path accessibility
+            path_result = self._test_remote_path(connection)
+            if not path_result.success:
+                return path_result
+            
+            # Test rsync compatibility
+            rsync_result = self._test_rsync_compatibility(connection)
+            
+            details.update({
+                'path_status': path_result.message,
+                'rsync_status': rsync_result.message
+            })
+            
+            # Return result based on rsync test
+            if rsync_result.success:
+                return ValidationResult.success_result(
+                    f"SSH source validated successfully: {connection.connection_string}",
+                    details=details,
+                    tested_from="Highball container"
+                )
+            else:
+                # SSH and path work, but rsync has issues - still report as success with warning
+                details['rsync_status'] += " (WARNING: may affect backup reliability)"
+                return ValidationResult.success_result(
+                    f"SSH source accessible with rsync warnings: {connection.connection_string}",
+                    details=details,
+                    tested_from="Highball container"
+                )
         else:
-            # SSH and path work, but rsync has issues - still report as success with warning
-            details['rsync_status'] += " (WARNING: may affect backup reliability)"
+            # Connection-only validation
+            details.update({
+                'connection_note': 'Connection test only (no path specified)'
+            })
             return ValidationResult.success_result(
-                f"SSH source accessible with rsync warnings: {connection.connection_string}",
+                f"SSH connection validated successfully: {connection.username}@{connection.hostname}",
                 details=details,
                 tested_from="Highball container"
             )

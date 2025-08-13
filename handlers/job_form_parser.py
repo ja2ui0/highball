@@ -72,9 +72,13 @@ class JobFormParser:
         else:
             return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
         
-        # Parse additional options
-        includes = JobFormParser.parse_lines(form_data.get('includes', [''])[0])
-        excludes = JobFormParser.parse_lines(form_data.get('excludes', [''])[0])
+        # Parse multi-path source options
+        source_paths_data = JobFormParser.parse_multi_path_options(form_data)
+        if not source_paths_data['valid']:
+            return source_paths_data
+        
+        # Add source paths to source config
+        source_config['source_paths'] = source_paths_data['source_paths']
         
         # Handle schedule - if 'cron' is selected, use the cron_pattern field
         schedule = form_data.get('schedule', ['manual'])[0]
@@ -95,11 +99,43 @@ class JobFormParser:
             'source_config': source_config,
             'dest_type': dest_type,
             'dest_config': dest_config,
-            'includes': includes,
-            'excludes': excludes,
             'schedule': schedule,
             'enabled': enabled,
             'respect_conflicts': respect_conflicts
+        }
+    
+    @staticmethod
+    def parse_multi_path_options(form_data):
+        """Parse multi-path source options from form data"""
+        # Get arrays of paths, includes, and excludes
+        source_paths = form_data.getlist('source_paths[]')
+        source_includes = form_data.getlist('source_includes[]')
+        source_excludes = form_data.getlist('source_excludes[]')
+        
+        if not source_paths:
+            return {'valid': False, 'error': 'At least one source path is required'}
+        
+        # Build source paths array with per-path includes/excludes
+        parsed_paths = []
+        for i, path in enumerate(source_paths):
+            path = path.strip()
+            if not path:
+                return {'valid': False, 'error': f'Source path {i+1} cannot be empty'}
+            
+            # Get includes/excludes for this path (or empty if not provided)
+            includes_text = source_includes[i] if i < len(source_includes) else ''
+            excludes_text = source_excludes[i] if i < len(source_excludes) else ''
+            
+            path_config = {
+                'path': path,
+                'includes': JobFormParser.parse_lines(includes_text),
+                'excludes': JobFormParser.parse_lines(excludes_text)
+            }
+            parsed_paths.append(path_config)
+        
+        return {
+            'valid': True,
+            'source_paths': parsed_paths
         }
     
     @staticmethod

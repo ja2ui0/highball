@@ -18,7 +18,7 @@ function showResticRepoFields() {
 }
 
 function validateSource() {
-    SSHValidator.validate(['source_ssh_hostname', 'source_ssh_username', 'source_ssh_path'], 
+    SSHValidator.validate(['source_ssh_hostname', 'source_ssh_username'], 
                          'source_validation_status', 'source_validation_details');
 }
 

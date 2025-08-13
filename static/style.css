@@ -574,3 +574,54 @@ tr:hover {
         gap: var(--space-md);
     }
 }
+
+/* =============================================================================
+   MULTI-PATH SOURCE OPTIONS
+   ============================================================================= */
+.path-entry {
+    margin-bottom: var(--space-xxxl);
+}
+
+.path-group {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: var(--space-xl);
+    background-color: var(--bg-quaternary);
+    position: relative;
+}
+
+.path-header {
+    margin: 0 0 var(--space-xl) 0;
+    font-size: var(--font-lg);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.path-number {
+    font-weight: normal;
+}
+
+.remove-path-btn {
+    margin-left: auto;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--font-xs);
+}
+
+.button-icon {
+    font-weight: bold;
+    margin-right: var(--space-sm);
+}
+
+#add_path_btn {
+    margin-top: var(--space-lg);
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Hide template */
+#path_entry_template {
+    display: none !important;
+}

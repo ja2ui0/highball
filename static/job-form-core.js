@@ -42,7 +42,7 @@ const StatusRenderer = {
         const prefixes = {
             success: '[OK] ',
             error: 'X ',
-            warning: '⚠ ',
+            warning: '[WARNING] ',
             info: ''
         };
         return `${prefixes[type] || ''}${message}`;

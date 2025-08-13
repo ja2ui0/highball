@@ -226,10 +226,10 @@ class DashboardHandler:
             return
 
         # Import here to avoid circular import
-        from services.ssh_validator import SSHValidator
+        from services.ssh_validator import validate_ssh_source
         
         # Delegate to validator
-        result = SSHValidator.validate_ssh_source(source)
+        result = validate_ssh_source(source)
         self.template_service.send_json_response(handler, result)
 
     def show_job_history(self, handler, job_name):

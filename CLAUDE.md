@@ -1,21 +1,21 @@
 # Highball - Backup Manager
 
-Web-based backup orchestration with scheduling and monitoring. Supports rsync, with Restic provider scaffolded (not yet functional).
+Web-based backup orchestration with scheduling and monitoring. Supports rsync and Restic providers with full connectivity validation.
 
 ## Architecture
 
 **Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
 **Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging, dataclass-driven configuration
 
-**Prime Directive - One Job = One Source Path + One Destination**: Each backup job targets a single source path to a single destination repository. This deliberate design decision ensures simpler mental model, clearer conflict detection, better granular control, easier troubleshooting, and reduced complexity. Multiple source paths would require significant architecture changes and make the system more complex for users.
+**Prime Directive - Job = Source + Destination + Definition**: Each backup job connects a source (host + multiple related paths) to a destination (repository) with a definition (schedule and settings). Sources contain multiple paths with per-path include/exclude rules. This architecture balances user workflow simplicity with granular control and tool efficiency.
 
 **Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
 
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic planning - scaffold), `restic_validator.py`, `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
-**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command planning - scaffold)
+**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing)
+**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command execution), `restic_content_analyzer.py` (content fingerprinting)
 **Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
 
 ## Data Storage
@@ -30,11 +30,12 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync, w
 
 ## Features
 
-**Job Management**: Full CRUD, validation, cron scheduling, per-job conflict avoidance, custom rsync options
+**Job Management**: Full CRUD, validation, cron scheduling, per-job conflict avoidance, custom rsync options, multi-path sources
 **Scheduling**: Runtime conflict detection, automatic queuing, configurable defaults
 **Logging**: Per-job logs, SSH validation caching (30min), refresh-based viewing
 **Notifications**: `notifiers` library backend, Telegram/email, per-method toggles, emoji-free
-**UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles
+**UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
+**Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting
 
 ## Development
 
@@ -107,9 +108,18 @@ global_settings:
 backup_jobs:
   job_name:
     source_type: "ssh|local"
-    source_config: {hostname, username, path}
-    dest_type: "ssh|local|rsyncd|restic"  # restic scaffolded but not functional
-    dest_config: {hostname, share} | {repo_type, repo_location, password}  # explicit destinations
+    source_config: 
+      hostname: "hostname" 
+      username: "username"
+      source_paths:  # multi-path support
+        - path: "/path/one"
+          includes: ["*.txt"]
+          excludes: ["temp/"]
+        - path: "/path/two"
+          includes: []
+          excludes: ["*.log"]
+    dest_type: "ssh|local|rsyncd|restic"  # restic fully functional
+    dest_config: {hostname, share} | {repo_type, repo_uri, password}  # explicit destinations
     schedule: "daily|weekly|hourly|monthly|cron_pattern"
     enabled: true
     respect_conflicts: true     # wait for conflicting jobs (default: true)

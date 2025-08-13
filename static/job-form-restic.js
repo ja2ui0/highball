@@ -202,13 +202,14 @@ const ResticValidator = {
         if (data.success) {
             StatusRenderer.show('restic_validation_status', 'Configuration valid', 'success');
             
-            const details = data.details || {};
             const detailsContent = [
                 '<strong>Validation Results:</strong>',
-                details.binary_status ? `- ${details.binary_status}` : '',
-                details.config_status ? `- ${details.config_status}` : '',
-                details.repo_status ? `- ${details.repo_status}` : '',
-                data.tested_from ? `- Tested from: ${data.tested_from}` : ''
+                `- ${data.message}`,
+                data.repository_status ? `- Repository status: ${data.repository_status}` : '',
+                data.snapshot_count !== undefined ? `- Snapshots: ${data.snapshot_count}` : '',
+                data.latest_backup ? `- Latest backup: ${data.latest_backup}` : '',
+                data.tested_from ? `- Tested from: ${data.tested_from}` : '',
+                data.details && data.details.repo_uri ? `- Repository URI: ${data.details.repo_uri}` : ''
             ].filter(line => line && !line.endsWith('- ')).join('<br>');
             
             StatusRenderer.showDetails('restic_validation_details', detailsContent);

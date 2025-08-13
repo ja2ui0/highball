@@ -304,12 +304,27 @@ class ResticValidator:
             else:
                 # Check if it's a credentials issue or repository doesn't exist
                 error_output = result.stderr.strip().lower()
-                if 'wrong password' in error_output or 'incorrect password' in error_output:
+                if 'wrong password' in error_output or 'incorrect password' in error_output or 'no key found' in error_output:
                     return {
                         'success': False,
                         'message': 'Invalid repository password - credentials are incorrect',
                         'error_type': 'authentication',
                         'tested_from': f'{username}@{hostname}'
+                    }
+                elif 'empty password' in error_output or 'password from stdin' in error_output:
+                    return {
+                        'success': False,
+                        'message': 'Repository password is required but not provided',
+                        'error_type': 'authentication',
+                        'tested_from': f'{username}@{hostname}'
+                    }
+                elif 'command not found' in error_output or 'restic: not found' in error_output or (': not found' in error_output and 'restic' in error_output):
+                    return {
+                        'success': False,
+                        'message': f'Restic binary not found on {hostname} - please install restic on the source system',
+                        'error_type': 'binary_missing',
+                        'tested_from': f'{username}@{hostname}',
+                        'suggestion': 'Install restic: sudo apt install restic (or download from https://github.com/restic/restic/releases)'
                     }
                 elif 'no such file' in error_output or 'not found' in error_output:
                     return {
@@ -387,10 +402,16 @@ class ResticValidator:
                     }
             else:
                 error_output = result.stderr.strip().lower()
-                if 'wrong password' in error_output or 'incorrect password' in error_output:
+                if 'wrong password' in error_output or 'incorrect password' in error_output or 'no key found' in error_output:
                     return {
                         'success': False,
                         'message': 'Invalid repository password - credentials are incorrect',
+                        'error_type': 'authentication'
+                    }
+                elif 'empty password' in error_output or 'password from stdin' in error_output:
+                    return {
+                        'success': False,
+                        'message': 'Repository password is required but not provided',
                         'error_type': 'authentication'
                     }
                 else:

@@ -1,0 +1,38 @@
+            <div class="form-group">
+                <label for="schedule">Schedule:</label>
+                <select id="schedule" name="schedule" onchange="showCronField()">
+                    <option value="manual" {{SCHEDULE_MANUAL_SELECTED}}>Manual Only</option>
+                    <option value="hourly" {{SCHEDULE_HOURLY_SELECTED}}>Hourly</option>
+                    <option value="daily" {{SCHEDULE_DAILY_SELECTED}}>Daily</option>
+                    <option value="weekly" {{SCHEDULE_WEEKLY_SELECTED}}>Weekly</option>
+                    <option value="monthly" {{SCHEDULE_MONTHLY_SELECTED}}>Monthly</option>
+                    <option value="cron" {{SCHEDULE_CRON_SELECTED}}>Custom Cron Pattern</option>
+                </select>
+            </div>
+            
+            <div id="cron_field" class="hidden mt-10">
+                <label for="cron_pattern">Cron Pattern:</label>
+                <input type="text" name="cron_pattern" value="{{CRON_PATTERN}}" placeholder="0 3 * * *" 
+                       title="Format: minute hour day month weekday">
+                <div class="help-text">
+                    Examples: "0 3 * * *" (daily 3am), "0 */6 * * *" (every 6 hours), "0 3 * * 0" (weekly Sunday 3am), "0 3 1 * *" (monthly 1st 3am)
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="enabled" value="true" {{ENABLED_CHECKED}}> Enabled
+                </label>
+                <div class="help-text">
+                    When enabled, this job will run according to its schedule. Disable to temporarily pause scheduling.
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="respect_conflicts" value="true" {{CONFLICTS_CHECKED}}> Wait for conflicting jobs (recommended)
+                </label>
+                <div class="help-text">
+                    When enabled, this job will wait for other jobs using the same source or destination to finish before running.
+                </div>
+            </div>

@@ -43,20 +43,24 @@
                 </div>
             </div>
             
-            <!-- Schedule & Options Section -->
+            <!-- Source Options Section -->
             <div class="form-section">
                 <div class="section-content">
-                    <h2 class="section-header">Schedule & Options</h2>
-                    {{INCLUDE:job_form_schedule.html}}
+                    <h2 class="section-header">Source Options</h2>
+                    {{INCLUDE:job_form_source_options.html}}
                 </div>
             </div>
             
-            <!-- Job Controls Section -->
+            <!-- Actions Section -->
             <div class="form-section">
                 <div class="section-content">
                     <h2 class="section-header">Actions</h2>
-                    <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
-                    <a href="/" class="button">Cancel</a>
+                    {{INCLUDE:job_form_actions.html}}
+                    
+                    <div class="form-group">
+                        <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
+                        <a href="/" class="button">Cancel</a>
+                    </div>
                 </div>
             </div>
         </form>

@@ -31,17 +31,10 @@ class LocalFormParser:
     @staticmethod
     def parse_local_source(form_data):
         """Parse local source configuration from form data"""
-        path = form_data.get('source_local_path', [''])[0].strip()
-        
-        if not path:
-            return {
-                'valid': False,
-                'error': 'Local source path is required'
-            }
-        
+        # Local source configuration no longer needs individual path
+        # Paths are handled in the multi-path parser
         source_config = {
-            'source_string': path,
-            'path': path
+            'source_type': 'local'
         }
         
         return {

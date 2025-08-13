@@ -95,7 +95,8 @@ class ResticFormParser:
         hostname = form_data.get('restic_rest_hostname', [''])[0].strip()
         port = form_data.get('restic_rest_port', ['8000'])[0].strip()
         path = form_data.get('restic_rest_path', [''])[0].strip()
-        use_https = form_data.get('restic_rest_use_https', ['']) != ['']
+        # Handle checkbox: present in form_data means checked, absent means unchecked
+        use_https = 'restic_rest_use_https' in form_data and form_data.get('restic_rest_use_https', [''])[0] not in ['', 'false', '0']
         username = form_data.get('restic_rest_username', [''])[0].strip()
         password = form_data.get('restic_rest_password', [''])[0].strip()
         

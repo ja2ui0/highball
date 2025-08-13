@@ -16,7 +16,8 @@ const SSHValidator = {
         }
 
         const [hostname, username, path] = values;
-        const source = `${username}@${hostname}:${path}`;
+        // Handle both 2-field (hostname, username) and 3-field (hostname, username, path) validation
+        const source = path ? `${username}@${hostname}:${path}` : `${username}@${hostname}`;
         
         StatusRenderer.show(statusId, 'Testing...', 'warning');
         StatusRenderer.hideDetails(detailsId);

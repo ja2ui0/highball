@@ -1,0 +1,181 @@
+            <div id="source_paths_container">
+                <!-- Path Entry Template (will be cloned by JavaScript) -->
+                <div id="path_entry_template" class="path-entry hidden">
+                    <div class="path-group">
+                        <h3 class="path-header">
+                            <span>Source Path <span class="path-number">1</span></span>
+                            <button type="button" class="remove-path-btn button button-danger hidden" onclick="removePath(this)">Remove</button>
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label class="path-label">Path:</label>
+                            <input type="text" class="path-input" name="source_paths[]" placeholder="" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="includes-label">Include Patterns (optional):</label>
+                            <textarea class="includes-input" name="source_includes[]" placeholder="**/*.jpg
+documents/**
+config.ini"></textarea>
+                            <div class="help-text">
+                                Glob patterns for files to include. Leave empty to include all files.
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="excludes-label">Exclude Patterns (optional):</label>
+                            <textarea class="excludes-input" name="source_excludes[]" placeholder="*.tmp
+*.log
+.git/**
+**/.DS_Store"></textarea>
+                            <div class="help-text">
+                                Glob patterns for files to exclude from backup.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Default first path (populated from existing data) -->
+                <div class="path-entry" data-path-index="0">
+                    <div class="path-group">
+                        <h3 class="path-header">
+                            <span>Source Path 1</span>
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="source_path_0">Path:</label>
+                            <input type="text" id="source_path_0" name="source_paths[]" value="{{SOURCE_PATH_0}}" placeholder="" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="source_includes_0">Include Patterns (optional):</label>
+                            <textarea id="source_includes_0" name="source_includes[]" placeholder="**/*.jpg
+documents/**
+config.ini">{{SOURCE_INCLUDES_0}}</textarea>
+                            <div class="help-text">
+                                Glob patterns for files to include. Leave empty to include all files.
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="source_excludes_0">Exclude Patterns (optional):</label>
+                            <textarea id="source_excludes_0" name="source_excludes[]" placeholder="*.tmp
+*.log
+.git/**
+**/.DS_Store">{{SOURCE_EXCLUDES_0}}</textarea>
+                            <div class="help-text">
+                                Glob patterns for files to exclude from backup.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <button type="button" id="add_path_btn" class="button button-secondary" onclick="addPath()">
+                    <span class="button-icon">+</span> Add Another Path
+                </button>
+                <div class="help-text">
+                    Add multiple source paths to backup different directories in a single job.
+                </div>
+            </div>
+            
+            <script>
+                let pathCounter = 1;
+                
+                function addPath() {
+                    pathCounter++;
+                    const container = document.getElementById('source_paths_container');
+                    const template = document.getElementById('path_entry_template');
+                    const newPath = template.cloneNode(true);
+                    
+                    // Update the new path entry
+                    newPath.id = '';
+                    newPath.classList.remove('hidden');
+                    newPath.setAttribute('data-path-index', pathCounter - 1);
+                    
+                    // Update header
+                    const header = newPath.querySelector('.path-header');
+                    header.innerHTML = `<span>Source Path ${pathCounter}</span><button type="button" class="remove-path-btn button button-danger" onclick="removePath(this)">Remove</button>`;
+                    
+                    // Update form fields
+                    const pathInput = newPath.querySelector('.path-input');
+                    pathInput.id = `source_path_${pathCounter - 1}`;
+                    pathInput.placeholder = getPathPlaceholder();
+                    
+                    const includesInput = newPath.querySelector('.includes-input');
+                    includesInput.id = `source_includes_${pathCounter - 1}`;
+                    
+                    const excludesInput = newPath.querySelector('.excludes-input');
+                    excludesInput.id = `source_excludes_${pathCounter - 1}`;
+                    
+                    // Update labels
+                    newPath.querySelector('.path-label').setAttribute('for', `source_path_${pathCounter - 1}`);
+                    newPath.querySelector('.includes-label').setAttribute('for', `source_includes_${pathCounter - 1}`);
+                    newPath.querySelector('.excludes-label').setAttribute('for', `source_excludes_${pathCounter - 1}`);
+                    
+                    container.appendChild(newPath);
+                    
+                    // Show remove buttons if we have multiple paths
+                    updateRemoveButtons();
+                }
+                
+                function removePath(button) {
+                    const pathEntry = button.closest('.path-entry');
+                    pathEntry.remove();
+                    updatePathNumbers();
+                    updateRemoveButtons();
+                }
+                
+                function updatePathNumbers() {
+                    const pathEntries = document.querySelectorAll('.path-entry:not(#path_entry_template)');
+                    pathEntries.forEach((entry, index) => {
+                        const header = entry.querySelector('.path-header');
+                        
+                        // First path (index 0) never gets a remove button
+                        if (index === 0) {
+                            header.innerHTML = `<span>Source Path ${index + 1}</span>`;
+                        } else {
+                            header.innerHTML = `<span>Source Path ${index + 1}</span><button type="button" class="remove-path-btn button button-danger" onclick="removePath(this)">Remove</button>`;
+                        }
+                        
+                        entry.setAttribute('data-path-index', index);
+                    });
+                }
+                
+                function updateRemoveButtons() {
+                    // Remove button visibility is now handled in updatePathNumbers
+                    // This function kept for backward compatibility
+                }
+                
+                function getPathPlaceholder() {
+                    const sourceType = document.getElementById('source_type').value;
+                    if (sourceType === 'local') {
+                        return '/var/lib/docker/volumes/data';
+                    } else if (sourceType === 'ssh') {
+                        return '/mnt/data';
+                    }
+                    return '/path/to/backup';
+                }
+                
+                // Update placeholders when source type changes
+                document.addEventListener('DOMContentLoaded', function() {
+                    const sourceTypeSelect = document.getElementById('source_type');
+                    if (sourceTypeSelect) {
+                        sourceTypeSelect.addEventListener('change', function() {
+                            const placeholder = getPathPlaceholder();
+                            document.querySelectorAll('.path-input').forEach(input => {
+                                input.placeholder = placeholder;
+                            });
+                        });
+                    }
+                    
+                    // Initialize placeholders
+                    const placeholder = getPathPlaceholder();
+                    document.querySelectorAll('.path-input').forEach(input => {
+                        input.placeholder = placeholder;
+                    });
+                    
+                    updateRemoveButtons();
+                });
+            </script>

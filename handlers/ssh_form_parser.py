@@ -43,20 +43,16 @@ class SSHFormParser:
         """Parse SSH source configuration from form data"""
         hostname = form_data.get('source_ssh_hostname', [''])[0].strip()
         username = form_data.get('source_ssh_username', [''])[0].strip()
-        path = form_data.get('source_ssh_path', [''])[0].strip()
         
-        if not all([hostname, username, path]):
+        if not all([hostname, username]):
             return {
                 'valid': False,
-                'error': 'SSH source requires hostname, username, and path'
+                'error': 'SSH source requires hostname and username'
             }
         
-        source_string = f"{username}@{hostname}:{path}"
         source_config = {
-            'source_string': source_string,
             'hostname': hostname,
-            'username': username,
-            'path': path
+            'username': username
         }
         
         return {

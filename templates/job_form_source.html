@@ -8,10 +8,7 @@
             </div>
             
             <div id="source_local" class="hidden">
-                <div class="form-group">
-                    <label for="source_local_path">Local Path:</label>
-                    <input type="text" name="source_local_path" value="{{SOURCE_LOCAL_PATH}}" placeholder="/var/lib/docker/volumes/data">
-                </div>
+                <p class="help-text">Local filesystem source selected. Configure paths in Source Options below.</p>
             </div>
             
             <div id="source_ssh" class="hidden">
@@ -25,14 +22,10 @@
                     <input type="text" name="source_ssh_username" value="{{SOURCE_SSH_USERNAME}}" placeholder="root">
                 </div>
                 
-                <div class="form-group">
-                    <label for="source_ssh_path">Path:</label>
-                    <input type="text" name="source_ssh_path" value="{{SOURCE_SSH_PATH}}" placeholder="/mnt/data">
-                </div>
-                
                 <div class="help-text">
                     <button type="button" onclick="validateSource()" class="button button-warning">Validate SSH Source</button>
                     <span id="source_validation_status"></span>
                     <div id="source_validation_details" class="validation-details hidden"></div>
+                    <br><small>Configure paths in Source Options below.</small>
                 </div>
             </div>

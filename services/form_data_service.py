@@ -15,6 +15,9 @@ class SourceConfig:
     ssh_hostname: str = ""
     ssh_username: str = ""
     ssh_path: str = ""
+    
+    # Multi-path support
+    source_paths: list = field(default_factory=list)
 
 
 @dataclass  
@@ -128,7 +131,7 @@ class JobFormData:
     
     def _get_source_variables(self) -> Dict[str, str]:
         """Get source configuration variables"""
-        return {
+        vars_dict = {
             'SOURCE_LOCAL_SELECTED': 'selected' if self.source.source_type == 'local' else '',
             'SOURCE_SSH_SELECTED': 'selected' if self.source.source_type == 'ssh' else '',
             'SOURCE_LOCAL_PATH': self.source.local_path,
@@ -136,6 +139,35 @@ class JobFormData:
             'SOURCE_SSH_USERNAME': self.source.ssh_username,
             'SOURCE_SSH_PATH': self.source.ssh_path,
         }
+        
+        # Add multi-path variables
+        vars_dict.update(self._get_multi_path_variables())
+        
+        return vars_dict
+    
+    def _get_multi_path_variables(self) -> Dict[str, str]:
+        """Get multi-path template variables"""
+        vars_dict = {}
+        
+        # Generate variables for first path (backward compatibility and default)
+        if self.source.source_paths:
+            first_path = self.source.source_paths[0]
+            vars_dict['SOURCE_PATH_0'] = first_path.get('path', '')
+            vars_dict['SOURCE_INCLUDES_0'] = '\n'.join(first_path.get('includes', []))
+            vars_dict['SOURCE_EXCLUDES_0'] = '\n'.join(first_path.get('excludes', []))
+        else:
+            # Backward compatibility: use old single path if source_paths not available
+            if self.source.source_type == 'local':
+                vars_dict['SOURCE_PATH_0'] = self.source.local_path
+            elif self.source.source_type == 'ssh':
+                vars_dict['SOURCE_PATH_0'] = self.source.ssh_path
+            else:
+                vars_dict['SOURCE_PATH_0'] = ''
+            
+            vars_dict['SOURCE_INCLUDES_0'] = self.includes
+            vars_dict['SOURCE_EXCLUDES_0'] = self.excludes
+        
+        return vars_dict
     
     def _get_dest_variables(self) -> Dict[str, str]:
         """Get destination configuration variables"""
