@@ -16,6 +16,7 @@ from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
 from handlers.job_scheduler import JobSchedulerHandler
 from handlers.restic_handler import ResticHandler
+from handlers.filesystem_handler import FilesystemHandler
 from handlers.notification_test_handler import NotificationTestHandler
 
 # Services
@@ -77,6 +78,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
                 'restic': ResticHandler(cls._backup_config),
+                'filesystem': FilesystemHandler(cls._backup_config),
                 'notification_test': NotificationTestHandler(),
             }
         except Exception:
@@ -153,6 +155,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 snapshot_id = params.get('snapshot', [''])[0]
                 path = params.get('path', ['/'])[0]
                 self._handlers['restic'].browse_directory(self, job_name, snapshot_id, path)
+            elif path == '/filesystem-browse':
+                self._handlers['filesystem'].browse_filesystem(self)
             elif path == '/jobs':
                 self._handlers['job_scheduler'].list_jobs(self)
             elif path == '/history':

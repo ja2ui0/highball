@@ -13,6 +13,7 @@ RUN apt-get update && \
         curl \
         supervisor \
         tzdata \
+        jq \
         netcat-openbsd && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     apt-get clean && \

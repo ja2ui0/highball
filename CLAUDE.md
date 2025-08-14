@@ -14,9 +14,9 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing), `form_error_handler.py` (inline error display), `job_display.py` (dashboard formatting), `dashboard.py` (modularized coordinator)
-**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command execution), `restic_content_analyzer.py` (content fingerprinting), `backup_client.py` (generic SSH/local execution), `repository_service.py` (abstract base for providers), `restic_repository_service.py` (Restic implementation), `binary_checker_service.py` (multi-binary support)
-**Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery)
+**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `filesystem_handler.py` (backup-agnostic filesystem browsing), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing), `form_error_handler.py` (inline error display), `job_display.py` (dashboard formatting), `dashboard.py` (modularized coordinator)
+**Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command execution), `restic_content_analyzer.py` (content fingerprinting), `backup_client.py` (generic SSH/local execution), `repository_service.py` (abstract base for providers), `restic_repository_service.py` (Restic implementation), `filesystem_service.py` (rsync filesystem browsing), `binary_checker_service.py` (multi-binary support)
+**Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery), `backup-browser.js` (multi-provider backup browsing)
 
 ## Data Storage
 
@@ -36,13 +36,14 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Notifications**: `notifiers` library backend, Telegram/email, spam-prevention queuing with configurable intervals, batch message formatting, test capabilities, emoji-free
 **UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
 **Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation
-**Inspect System**: Network scanner, complete Restic repository browser with snapshot browsing and file selection, 8 unified log sources (system + operational) with organized 2-row layout
+**Backup Browser**: Multi-provider backup browsing system supporting Restic (repository snapshots), rsync/SSH/local/rsyncd (filesystem directories) with unified interface, provider-specific terminology, and expandable file trees
+**Inspect System**: Network scanner, backup-agnostic browser for all job types, 8 unified log sources (system + operational) with organized 2-row layout
 
 ## Development
 
 **Conventions**: PEP 8, dataclasses, pathlib, external assets, emoji-free
 **Patterns**: Type hints, cached validation, error fallbacks
-**Extensions**: New engines via `services/<engine>_repository_service.py` (inheriting from `repository_service.py`) + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update routing. Multi-provider architecture supports Borg, Kopia with shared `backup_client.py` and `binary_checker_service.py`
+**Extensions**: Repository providers via `services/<engine>_repository_service.py` (inheriting from `repository_service.py`) + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update routing. Filesystem providers use existing `filesystem_service.py` + `filesystem_handler.py`. Multi-provider architecture supports Borg, Kopia with shared `backup_client.py` and `binary_checker_service.py`
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
 
 ## Theming System
@@ -61,6 +62,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Validation**: SSH 30min cache, `validators` module
 **CSS Architecture**: Structural CSS + theme colors, `--bg-input` for input field depth
 **Notification Architecture**: `notifiers` library backend, extensible to 25+ providers
+**Backup Browser Architecture**: Multi-provider system with PROVIDERS configuration for repository-based (Restic/Borg/Kopia) vs filesystem-based (rsync/SSH/local/rsyncd) access, unified JavaScript interface with provider-specific terminology and endpoints
 **Restic Implementation**: Complete job management, repository browser, snapshot statistics, multi-provider service architecture ready for Borg/Kopia (see `RESTIC.md`)
 **Form Parser Architecture**: Dedicated parsers per destination type with consistent interface (`_safe_get_value` for form data compatibility)
 **Form UI Architecture**: Sectioned forms (Job Identity & Source, Backup Destination, Schedule & Options, Actions)
@@ -141,6 +143,7 @@ deleted_jobs:  # user can manually restore to backup_jobs
 3. **Advanced notification features** - Template preview, notification history, expanded variable system
 
 **Recent Completion (2025-08-14)**:
+- **Backup-agnostic browser refactoring** - Converted Restic-only browser to multi-provider system supporting all backup types (Restic snapshots, rsync/SSH/local/rsyncd filesystems) with unified interface, proper terminology distinction, and provider detection
 - **Complete notification system** - Full spam-prevention queue system with configurable intervals, batch formatting, event-driven processing, per-job notification integration with template variables, and comprehensive testing
 - **Enhanced log inspection** - Added 4 new log sources (Job Status, Running Jobs, SSH Validation Cache, Notification Queues) with organized 2-row button layout
 - **Per-job notification completion** - Full integration of job-specific provider selection, custom message templates with variable expansion, and queue system compatibility

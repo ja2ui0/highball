@@ -75,8 +75,8 @@ class LogsHandler:
         # Generate job dropdown with system option
         job_dropdown = self._generate_job_dropdown(job_name)
         
-        # Generate Restic job dropdown
-        restic_job_dropdown = self._generate_restic_job_dropdown()
+        # Generate backup job dropdown and job types for browser
+        backup_job_dropdown, job_types_js = self._generate_backup_job_dropdown()
         
         # Render template
         html_content = self.template_service.render_template(
@@ -86,7 +86,8 @@ class LogsHandler:
             log_type=log_type,
             log_name=log_name,
             job_dropdown=job_dropdown,
-            restic_job_dropdown=restic_job_dropdown
+            backup_job_dropdown=backup_job_dropdown,
+            job_types_js=job_types_js
         )
         
         self.template_service.send_html_response(handler, html_content)
@@ -125,28 +126,31 @@ class LogsHandler:
         
         return options
     
-    def _generate_restic_job_dropdown(self):
-        """Generate HTML for Restic job selection dropdown"""
+    def _generate_backup_job_dropdown(self):
+        """Generate HTML for backup job selection dropdown and job types JavaScript"""
         options = ""
+        job_types = {}
         
         if not self.backup_config:
-            return options
+            return options, ""
         
         jobs = self.backup_config.config.get('backup_jobs', {})
         if not jobs:
-            return options
+            return options, ""
         
-        # Find all Restic jobs
-        restic_jobs = []
-        for job_name, job_config in jobs.items():
-            if job_config.get('dest_type') == 'restic':
-                restic_jobs.append(job_name)
-        
-        # Sort and generate options
-        for job_name in sorted(restic_jobs):
+        # Generate options for all backup jobs and collect job types
+        for job_name in sorted(jobs.keys()):
+            job_config = jobs[job_name]
+            dest_type = job_config.get('dest_type', 'unknown')
+            
             options += f'<option value="{html.escape(job_name)}">{html.escape(job_name)}</option>\n'
+            job_types[job_name] = dest_type
         
-        return options
+        # Generate JavaScript for job types
+        import json
+        job_types_js = f"<script>window.jobTypes = {json.dumps(job_types)};</script>"
+        
+        return options, job_types_js
     
     def _read_log_file(self, log_file):
         """Read last 100 lines of log file or directory contents"""

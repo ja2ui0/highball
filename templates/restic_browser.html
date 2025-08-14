@@ -1,50 +1,51 @@
-<!-- Restic Repository Browser Component -->
+<!-- Backup Browser Component -->
 <div class="section-container">
-    <h2 class="section-header">Restic Repository Browser</h2>
-    <p>Browse snapshots and files in Restic repositories.</p>
+    <h2 class="section-header">Backup Browser</h2>
+    <p>Browse and restore files from backup jobs.</p>
     
-    <select id="resticJobSelect" onchange="loadResticRepository()">
-        <option value="">Select a Restic job...</option>
-        {{RESTIC_JOB_DROPDOWN}}
+    {{JOB_TYPES_JS}}
+    <select id="backupJobSelect" onchange="loadBackupJob()">
+        <option value="">Select any backup job...</option>
+        {{BACKUP_JOB_DROPDOWN}}
     </select>
     
-    <div id="resticBrowserContent" class="hidden restic-browser">
-        <div id="resticRepositoryInfo" class="restic-repository-info">
-            <!-- Repository information will be displayed here -->
+    <div id="browserContent" class="hidden backup-browser">
+        <div id="repositoryInfo" class="help-text">
+            <!-- Repository/job information will be displayed here -->
         </div>
         
-        <div id="resticSnapshotSection" class="hidden">
-            <label for="resticSnapshotSelect">Select Snapshot:</label>
-            <select id="resticSnapshotSelect" onchange="loadSnapshotDetails()">
+        <div id="snapshotSection" class="hidden">
+            <h3 id="snapshotSectionTitle">Select Snapshot/Archive:</h3>
+            <select id="snapshotSelect" onchange="loadSnapshotDetails()">
                 <option value="">Select a snapshot...</option>
             </select>
         </div>
         
-        <div id="resticSnapshotDetails" class="hidden restic-snapshot-details">
-            <h4>Snapshot Details</h4>
+        <div id="snapshotDetails" class="hidden snapshot-details">
+            <h4 id="snapshotDetailsTitle">Details</h4>
             <div id="snapshotInfo"></div>
         </div>
         
-        <div id="resticFileTree" class="hidden restic-file-tree">
-            <h4>File Browser</h4>
-            <div id="resticSelectionInfo" class="selection-info hidden">
+        <div id="fileTree" class="hidden file-tree">
+            <h3>File Browser</h3>
+            <div id="selectionInfo" class="selection-info hidden">
                 <span id="selectionCount">0 items selected</span>
                 <button onclick="clearSelection()" class="button button-warning">Clear Selection</button>
             </div>
             <div style="display: flex; gap: 10px;">
-                <div id="resticTreeContainer" class="tree-container">
+                <div id="treeContainer" class="tree-container">
                     <!-- File tree will be populated here -->
                 </div>
-                <div id="resticSelectionPane" class="selection-pane">
+                <div id="selectionPane" class="selection-pane">
                     <div class="selection-header">Selected Items</div>
-                    <div id="resticSelectionList">
+                    <div id="selectionList">
                         <div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div id="resticError" class="hidden error-message">
+        <div id="browserError" class="hidden error-message">
             <!-- Error messages will be displayed here -->
         </div>
     </div>

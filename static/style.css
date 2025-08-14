@@ -244,6 +244,10 @@ input[type="checkbox"] {
     line-height: 1.4;
 }
 
+.help-text .loading {
+    text-align: left;
+}
+
 /* Tables */
 table {
     border-collapse: collapse;
