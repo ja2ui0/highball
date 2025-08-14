@@ -7,7 +7,9 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
 **Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging, dataclass-driven configuration
 
-**Prime Directive - Job = Source + Destination + Definition**: Each backup job connects a source (host + multiple related paths) to a destination (repository) with a definition (schedule and settings). Sources contain multiple paths with per-path include/exclude rules. This architecture balances user workflow simplicity with granular control and tool efficiency.
+**Rule: Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings). Definitions contain one or more paths with per-path include/exclude rules. This architecture balances user workflow simplicity with granular control and tool efficiency.
+
+**Rule: Just In Time, Progressive Disclosure**: User sees what they need when they need it. Ask only what can't be inferred. Do not overwhelm with choices.
 
 **Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
 
@@ -140,9 +142,8 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Next Session Priority**: 
-1. ✅ **Restic repository browser** - Complete and production-ready
-2. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery (NEW WORK)
-3. **Advanced notification features** - Template preview, notification history, expanded variable system
+1. **File restore functionality** - Add restore capabilities for snapshots and file recovery (NEW WORK)
+2. **Rclone direct destinations** - Add rclone as a standalone destination for file level backup (as opposed to block) to all supported backends
 
 **Recent Completion (2025-08-14)**:
 - **Backup-agnostic browser refactoring** - Converted Restic-only browser to multi-provider system supporting all backup types (Restic snapshots, rsync/SSH/local/rsyncd filesystems) with unified interface, proper terminology distinction, and provider detection
@@ -153,6 +154,6 @@ deleted_jobs:  # user can manually restore to backup_jobs
 - **Restic repository browser** - Complete implementation with progressive loading, expandable tree, multi-level selection, detailed snapshot statistics, theme-adaptive icons, instant loading feedback, and multi-provider architecture (100% complete)
 
 **Future Priorities**: Section-specific save buttons for configuration, notification template preview, enhanced Restic features
-**Planned**: Borg, rclone direct destinations, enhanced Restic execution features (progress parsing, retention policies)
-**Wishlist**: Kopia destinations
-
+**Planned**: Borg, Kopia, enhanced Restic execution features (progress parsing, retention policies)
+**Wishlist**: notification template preview, notification history, expanded variable system for notifications
+**anti-goals**: 
