@@ -173,18 +173,10 @@ const ResticValidator = {
 
     async submitFormValidation(formData) {
         try {
-            // Convert FormData to URLSearchParams for proper form encoding
-            const urlEncodedData = new URLSearchParams();
-            for (const [key, value] of formData.entries()) {
-                urlEncodedData.append(key, value);
-            }
-            
             const response = await fetch('/validate-restic-form', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: urlEncodedData
+                // Let browser set Content-Type for FormData
+                body: formData
             });
             
             if (!response.ok) {

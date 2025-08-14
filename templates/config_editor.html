@@ -17,7 +17,7 @@
             Changes will take effect immediately.
         </div>
         
-        <form method="post" action="/save-config/raw">
+        <form method="post" action="/save-config/raw" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="config_text">Configuration (YAML format):</label>
                 <textarea id="config_text" name="config_text" class="textarea-config">{{CONFIG_TEXT}}</textarea>

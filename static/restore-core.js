@@ -225,9 +225,7 @@ function executeRestoreRequest(provider, config) {
     
     return fetch('/restore', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        // Don't set Content-Type header - let browser set it for FormData
         body: requestData,
         signal: controller.signal
     }).then(response => {

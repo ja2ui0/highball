@@ -22,13 +22,14 @@ function testTelegramNotification() {
         return;
     }
     
-    // Send test request
+    // Send test request using FormData
+    const formData = new FormData();
+    formData.append('token', token);
+    formData.append('chat_id', chatId);
+    
     fetch('/test-telegram-notification', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `token=${encodeURIComponent(token)}&chat_id=${encodeURIComponent(chatId)}`
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
@@ -75,15 +76,19 @@ function testEmailNotification() {
         return;
     }
     
-    // Prepare URL-encoded data
-    const formData = `smtp_server=${encodeURIComponent(smtpServer)}&smtp_port=${encodeURIComponent(smtpPort)}&from_email=${encodeURIComponent(fromEmail)}&to_email=${encodeURIComponent(toEmail)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&encryption=${encodeURIComponent(encryption)}`;
+    // Prepare FormData
+    const formData = new FormData();
+    formData.append('smtp_server', smtpServer);
+    formData.append('smtp_port', smtpPort);
+    formData.append('from_email', fromEmail);
+    formData.append('to_email', toEmail);
+    formData.append('username', username);
+    formData.append('password', password);
+    formData.append('encryption', encryption);
     
     // Send test request
     fetch('/test-email-notification', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
         body: formData
     })
     .then(response => response.json())

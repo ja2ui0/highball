@@ -119,6 +119,12 @@
 
 ## Technical Notes
 
+**Form Data Handling**:
+- **Current Implementation**: URL-encoded form data (`application/x-www-form-urlencoded`)
+- **Frontend**: `URLSearchParams` in `restore-restic.js` for form data building
+- **Backend**: `parse_qs()` in `app.py` for URL-encoded parsing
+- **Pending**: Refactor to multipart form data for better array handling and security
+
 **Modular JavaScript Architecture**:
 - Provider registration system allows easy addition of new backup types
 - Clean separation between UI logic (restore-core.js) and provider-specific logic
@@ -128,10 +134,13 @@
 - Complete command building with repository URI, password, and path handling
 - Dry run and actual restore operation support
 - Background execution with progress tracking infrastructure
+- Password obfuscation in logs (`echo "***"` replacement)
 - Ready for `restic restore --json` progress parsing implementation
 
 **Security & Safety**:
 - Password confirmation modal for all restore operations
+- Password obfuscation in job logs and debugging output
+- Success/error styling with proper green/red status colors
 - Dry run enabled by default to prevent accidental data operations
 - Form validation and error handling throughout the workflow
 - User input preservation and friendly error messages
@@ -155,8 +164,9 @@
 **🚀 Future Enhancements**:
 1. **Real Progress Parsing**: Replace simulated progress with actual `restic restore --json` output parsing
 2. **Dashboard Integration**: Add restore status polling and display "Restoring... N%" in main dashboard job table  
-3. **Provider Expansion**: Add rsync restore support using established modular architecture
-4. **Advanced Features**: Restore to source, single file download, notification integration
+3. **Form Data Refactor**: Convert to multipart form data for consistency and better security
+4. **Provider Expansion**: Add rsync restore support using established modular architecture
+5. **Advanced Features**: Restore to source, single file download, notification integration
 
 ## Testing Readiness Checklist
 

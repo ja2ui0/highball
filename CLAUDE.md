@@ -51,6 +51,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Code Standards**: PEP 8, dataclasses, pathlib, type hints, emoji-free, external assets only
 **Extensions**: Multi-provider pattern via `services/<engine>_repository_service.py` + `handlers/<engine>_validator.py` + form parsers
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
+**Testing**: Write standalone tests that don't import main app modules (avoid dependency/permission errors). Mock external dependencies. Use `test_*_standalone.py` pattern for isolated unit tests.
 
 ## Theming System
 
@@ -139,11 +140,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 **Next Session Priority**: 
 1. **Real Progress Parsing** - Replace simulated progress with actual `restic restore --json` output parsing for accurate progress display
-2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table
-3. **Multi-Provider Restore** - Extend restore system to rsync, borg, kopia using established modular architecture
+2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
+3. **Form Data Refactor** - Convert to multipart form data for consistency and better security
+4. **Multi-Provider Restore** - Extend restore system to rsync, borg, kopia using established modular architecture
 
 **Recent Completion (2025-08-14)**:
-- **Complete Restore System Implementation** - Full Restic restore implementation with `RestoreHandler` backend, modular JavaScript architecture (`restore-core.js` + `restore-restic.js`), modal password confirmation, dry run capability, background execution with progress tracking, comprehensive unit test coverage (35/35 tests passing), and clean codebase after debugging cleanup
+- **Complete Restore System Implementation** - Full Restic restore implementation with `RestoreHandler` backend, modular JavaScript architecture (`restore-core.js` + `restore-restic.js`), modal password confirmation, dry run capability, background execution with progress tracking, URL-encoded form data handling, password obfuscation in logs, comprehensive unit test coverage (35/35 tests passing), and clean codebase after debugging cleanup
+- **Security Improvements** - Password obfuscation in job logs (`_obfuscate_password_in_command`), success/error styling fixes (green/red status colors), clean user-facing messages without sensitive data exposure
 - **HTML Structure Resolution** - Fixed corrupted job inspect template HTML structure causing layout issues, proper container nesting for selection controls and job logs, modular JavaScript provider system ready for testing
 - **Restore Infrastructure (Phase 1)** - Complete per-job inspection system with `/inspect?name=<jobname>` endpoint, integrated job status/logs/backup browser/restore controls, dashboard "Inspect" buttons, `/dev` system debugging separation, backup command builder multi-path `source_paths` format support, and UI refinements for restore workflow
 - **Backup-agnostic browser refactoring** - Converted Restic-only browser to multi-provider system supporting all backup types (Restic snapshots, rsync/SSH/local/rsyncd filesystems) with unified interface, proper terminology distinction, and provider detection

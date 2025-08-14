@@ -188,11 +188,35 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         url_parts = urlparse(self.path)
         path = url_parts.path
 
-        # Read form data
+        # Read form data - support both multipart and URL-encoded
         try:
             content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            form_data = parse_qs(post_data)
+            
+            # Check content type to determine parsing method
+            content_type = self.headers.get('Content-Type', '')
+            
+            if content_type.startswith('multipart/form-data'):
+                # Parse multipart form data
+                form = cgi.FieldStorage(
+                    fp=self.rfile,
+                    headers=self.headers,
+                    environ={'REQUEST_METHOD': 'POST'}
+                )
+                
+                # Convert to dict format expected by handlers
+                form_data = {}
+                for field in form.list:
+                    if field.name in form_data:
+                        # Handle multiple values for same field name
+                        if not isinstance(form_data[field.name], list):
+                            form_data[field.name] = [form_data[field.name]]
+                        form_data[field.name].append(field.value)
+                    else:
+                        form_data[field.name] = [field.value]
+            else:
+                # Parse URL-encoded form data (legacy support)
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                form_data = parse_qs(post_data)
                 
         except Exception as e:
             traceback.print_exc()

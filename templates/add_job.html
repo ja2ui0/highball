@@ -13,7 +13,7 @@
         
         <h1>Add New Backup Job</h1>
         
-        <form method="post" action="/save-job">
+        <form method="post" action="/save-job" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="job_name">Job Name:</label>
                 <input type="text" id="job_name" name="job_name" required placeholder="e.g., documents, photos">

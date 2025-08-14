@@ -35,30 +35,30 @@ const ResticRestoreProvider = {
     },
     
     buildRestoreRequest: function(config) {
-        // Temporarily use URL-encoded format to test if multipart is the issue
-        const params = new URLSearchParams();
-        params.append('job_name', config.job_name);
-        params.append('snapshot_id', config.snapshot_id);
-        params.append('restore_target', config.restore_target);
+        // Use multipart form data for better array handling and security
+        const formData = new FormData();
+        formData.append('job_name', config.job_name);
+        formData.append('snapshot_id', config.snapshot_id);
+        formData.append('restore_target', config.restore_target);
         
         if (config.dry_run) {
-            params.append('dry_run', 'on');
+            formData.append('dry_run', 'on');
         }
         
         if (config.select_all) {
-            params.append('select_all', 'on');
+            formData.append('select_all', 'on');
         }
         
         if (config.password) {
-            params.append('password', config.password);
+            formData.append('password', config.password);
         }
         
         // Add selected paths for granular restore
         config.selected_paths.forEach(path => {
-            params.append('selected_paths', path);
+            formData.append('selected_paths', path);
         });
         
-        return params.toString();
+        return formData;
     },
     
     buildRestoreSummary: function(config) {
