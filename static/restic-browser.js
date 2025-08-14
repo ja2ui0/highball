@@ -10,6 +10,7 @@ let resticSelection = {
 };
 let currentJob = '';
 let currentSnapshot = '';
+let currentSnapshots = []; // Store current snapshots data
 let currentPath = '/';
 let expandedDirs = new Map(); // Track expanded directories and their contents
 let loadingDirs = new Set(); // Track directories currently being loaded
@@ -58,6 +59,9 @@ function loadResticRepository() {
 function populateSnapshots(snapshots) {
     const snapshotSelect = document.getElementById('resticSnapshotSelect');
     
+    // Store snapshots globally
+    currentSnapshots = snapshots || [];
+    
     // Clear existing options except first
     snapshotSelect.innerHTML = '<option value="">Select a snapshot...</option>';
     
@@ -90,13 +94,19 @@ function loadSnapshotDetails() {
     if (snapshotSelect.value) {
         currentSnapshot = snapshotSelect.value;
         
-        // Show snapshot details
-        const selectedOption = snapshotSelect.options[snapshotSelect.selectedIndex];
+        // Find the actual snapshot data
+        const currentSnapshotData = currentSnapshots.find(s => s.full_id === currentSnapshot);
+        
         snapshotInfo.innerHTML = `
             <div><strong>Snapshot ID:</strong> ${currentSnapshot.substring(0, 8)}</div>
-            <div><strong>Created:</strong> ${selectedOption.textContent.split(' - ')[1]}</div>
+            <div><strong>Created:</strong> ${currentSnapshotData ? currentSnapshotData.time : 'unknown'}</div>
+            <div><strong>User@Host:</strong> ${currentSnapshotData ? currentSnapshotData.username + '@' + currentSnapshotData.hostname : 'unknown'}</div>
+            <div id="snapshotStatsLoading">Loading detailed statistics...</div>
         `;
         detailsDiv.classList.remove('hidden');
+        
+        // Fetch detailed snapshot statistics
+        fetchSnapshotStatistics();
         
         // Reset tree state and load root
         expandedDirs.clear();
@@ -110,6 +120,40 @@ function loadSnapshotDetails() {
         fileTree.classList.add('hidden');
         currentSnapshot = '';
     }
+}
+
+function fetchSnapshotStatistics() {
+    if (!currentJob || !currentSnapshot) {
+        return;
+    }
+    
+    fetch(`/restic-snapshot-stats?job=${encodeURIComponent(currentJob)}&snapshot=${encodeURIComponent(currentSnapshot)}`)
+        .then(response => response.json())
+        .then(data => {
+            const loadingDiv = document.getElementById('snapshotStatsLoading');
+            if (loadingDiv) {
+                if (data.success && data.stats) {
+                    const stats = data.stats;
+                    loadingDiv.innerHTML = `
+                        <div><strong>Files:</strong> ${formatNumber(stats.total_file_count)}</div>
+                        <div><strong>Total Size:</strong> ${formatFileSize(stats.total_size)}</div>
+                    `;
+                } else {
+                    loadingDiv.innerHTML = `<div style="color: var(--text-muted); font-style: italic;">Statistics unavailable: ${data.error || 'Unknown error'}</div>`;
+                }
+            }
+        })
+        .catch(error => {
+            const loadingDiv = document.getElementById('snapshotStatsLoading');
+            if (loadingDiv) {
+                loadingDiv.innerHTML = `<div style="color: var(--text-muted); font-style: italic;">Statistics unavailable</div>`;
+            }
+        });
+}
+
+function formatNumber(num) {
+    if (num == null) return '0';
+    return new Intl.NumberFormat().format(num);
 }
 
 function loadDirectoryIntoTree(path) {
@@ -134,7 +178,45 @@ function loadDirectoryIntoTree(path) {
         .then(data => {
             loadingDirs.delete(path);
             if (data.success) {
-                console.log(`Loaded directory ${path}:`, data.contents.length, 'items');
+                expandedDirs.set(path, data.contents);
+                if (path === '/') {
+                    renderFullTree();
+                } else {
+                    // Re-render the tree to show newly loaded directory
+                    renderFullTree();
+                }
+            } else {
+                showError(`Failed to load directory: ${data.error || 'Unknown error'}`);
+                if (path === '/') {
+                    treeContainer.innerHTML = '';
+                }
+            }
+        })
+        .catch(error => {
+            loadingDirs.delete(path);
+            showError(`Network error loading directory: ${error.message}`);
+            if (path === '/') {
+                treeContainer.innerHTML = '';
+            }
+        });
+}
+
+function loadDirectoryIntoTreeWithoutLoadingCheck(path) {
+    const treeContainer = document.getElementById('resticTreeContainer');
+    const errorDiv = document.getElementById('resticError');
+    
+    errorDiv.classList.add('hidden');
+    
+    if (path === '/') {
+        // Loading root - show loading message
+        treeContainer.innerHTML = '<div class="loading">Loading directory contents...</div>';
+    }
+    
+    fetch(`/restic-browse?job=${encodeURIComponent(currentJob)}&snapshot=${encodeURIComponent(currentSnapshot)}&path=${encodeURIComponent(path)}`)
+        .then(response => response.json())
+        .then(data => {
+            loadingDirs.delete(path);
+            if (data.success) {
                 expandedDirs.set(path, data.contents);
                 if (path === '/') {
                     renderFullTree();
@@ -210,7 +292,9 @@ function renderFolderView() {
             <li class="tree-item parent">
                 <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} 
                        onchange="toggleSelection('..', 'directory', this.checked)">
-                <img src="/static/icons/folder-plus.svg" class="tree-icon" alt="parent directory">
+<svg class="tree-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 10.5V16.5M15 13.5H9M13.0607 6.31066L10.9393 4.18934C10.658 3.90804 10.2765 3.75 9.87868 3.75H4.5C3.25736 3.75 2.25 4.75736 2.25 6V18C2.25 19.2426 3.25736 20.25 4.5 20.25H19.5C20.7426 20.25 21.75 19.2426 21.75 18V9C21.75 7.75736 20.7426 6.75 19.5 6.75H14.1213C13.7235 6.75 13.342 6.59197 13.0607 6.31066Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
                 <span class="tree-name" onclick="navigateToParent()">.. (Back to hierarchy view)</span>
             </li>
         `;
@@ -227,9 +311,10 @@ function renderFolderView() {
                 <li class="tree-item directory">
                     <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} 
                            onchange="toggleSelection('${escapeHtml(item.path)}', 'directory', this.checked)">
-                    <img src="/static/icons/folder-plus.svg" class="tree-icon clickable-icon" 
-                         alt="folder" onclick="navigateToFolder('${escapeHtml(item.path)}')"
-                         title="Click to navigate into folder">
+<svg class="tree-icon clickable-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                         onclick="navigateToFolder('${escapeHtml(item.path)}')" title="Click to navigate into folder">
+                        <path d="M12 10.5V16.5M15 13.5H9M13.0607 6.31066L10.9393 4.18934C10.658 3.90804 10.2765 3.75 9.87868 3.75H4.5C3.25736 3.75 2.25 4.75736 2.25 6V18C2.25 19.2426 3.25736 20.25 4.5 20.25H19.5C20.7426 20.25 21.75 19.2426 21.75 18V9C21.75 7.75736 20.7426 6.75 19.5 6.75H14.1213C13.7235 6.75 13.342 6.59197 13.0607 6.31066Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                     <span class="tree-name" onclick="navigateToFolder('${escapeHtml(item.path)}')">${escapeHtml(item.name)}</span>
                 </li>
             `;
@@ -239,7 +324,9 @@ function renderFolderView() {
                 <li class="tree-item file">
                     <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} 
                            onchange="toggleSelection('${escapeHtml(item.path)}', 'file', this.checked)">
-                    <img src="/static/icons/document.svg" class="tree-icon" alt="file">
+                    <svg class="tree-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19.5 14.25V11.625C19.5 9.76104 17.989 8.25 16.125 8.25H14.625C14.0037 8.25 13.5 7.74632 13.5 7.125V5.625C13.5 3.76104 11.989 2.25 10.125 2.25H8.25M10.5 2.25H5.625C5.00368 2.25 4.5 2.75368 4.5 3.375V20.625C4.5 21.2463 5.00368 21.75 5.625 21.75H18.375C18.9963 21.75 19.5 21.2463 19.5 20.625V11.25C19.5 6.27944 15.4706 2.25 10.5 2.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                     <span class="tree-name">${escapeHtml(item.name)}</span>
                     ${size ? `<span class="tree-size">${size}</span>` : ''}
                 </li>
@@ -285,19 +372,31 @@ function renderTreeItems(path, depth, visitedPaths = new Set()) {
                 <li class="tree-item directory${selectedClass}" style="padding-left: ${indentPx}px">
                     <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''} 
                            onchange="toggleSelection('${escapeHtml(item.path)}', 'directory', this.checked)">
-                    <img src="/static/icons/${isExpanded ? 'folder-minus.svg' : 'folder-plus.svg'}" 
-                         class="tree-icon clickable-icon" 
-                         alt="${isExpanded ? 'open folder' : 'closed folder'}"
-                         onclick="toggleDirectory('${escapeHtml(item.path)}')"
-                         title="Click to ${isExpanded ? 'collapse' : 'expand'} folder">
+${isExpanded ? 
+                        `<svg class="tree-icon clickable-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                             onclick="toggleDirectory('${escapeHtml(item.path)}')" title="Click to collapse folder">
+                            <path d="M15 13.5H9M13.0607 6.31066L10.9393 4.18934C10.658 3.90804 10.2765 3.75 9.87868 3.75H4.5C3.25736 3.75 2.25 4.75736 2.25 6V18C2.25 19.2426 3.25736 20.25 4.5 20.25H19.5C20.7426 20.25 21.75 19.2426 21.75 18V9C21.75 7.75736 20.7426 6.75 19.5 6.75H14.1213C13.7235 6.75 13.342 6.59197 13.0607 6.31066Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                         </svg>` :
+                        `<svg class="tree-icon clickable-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                             onclick="toggleDirectory('${escapeHtml(item.path)}')" title="Click to expand folder">
+                            <path d="M12 10.5V16.5M15 13.5H9M13.0607 6.31066L10.9393 4.18934C10.658 3.90804 10.2765 3.75 9.87868 3.75H4.5C3.25736 3.75 2.25 4.75736 2.25 6V18C2.25 19.2426 3.25736 20.25 4.5 20.25H19.5C20.7426 20.25 21.75 19.2426 21.75 18V9C21.75 7.75736 20.7426 6.75 19.5 6.75H14.1213C13.7235 6.75 13.342 6.59197 13.0607 6.31066Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                         </svg>`}
                     <span class="tree-name" onclick="navigateToFolder('${escapeHtml(item.path)}')">${escapeHtml(item.name)}</span>
-                    ${isLoading ? '<span class="loading-indicator">⋯</span>' : ''}
+                    ${isLoading ? '<span class="loading-indicator">Loading...</span>' : ''}
                 </li>
             `;
             
-            // Render children if expanded
+            // Render children if expanded or loading placeholder if loading
             if (isExpanded) {
                 html += renderTreeItems(item.path, depth + 1, visitedPaths);
+            } else if (isLoading) {
+                // Show loading placeholder content
+                const childIndentPx = (depth + 1) * 20;
+                html += `
+                    <li class="tree-item loading-placeholder" style="padding-left: ${childIndentPx}px">
+                        <span style="color: var(--text-muted); font-style: italic;">Loading contents...</span>
+                    </li>
+                `;
             }
         } else {
             const size = item.size ? formatFileSize(item.size) : '';
@@ -305,7 +404,9 @@ function renderTreeItems(path, depth, visitedPaths = new Set()) {
                 <li class="tree-item file${selectedClass}" style="padding-left: ${indentPx}px">
                     <input type="checkbox" class="tree-checkbox" ${isSelected ? 'checked' : ''}
                            onchange="toggleSelection('${escapeHtml(item.path)}', 'file', this.checked)">
-                    <img src="/static/icons/document.svg" class="tree-icon" alt="file">
+                    <svg class="tree-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19.5 14.25V11.625C19.5 9.76104 17.989 8.25 16.125 8.25H14.625C14.0037 8.25 13.5 7.74632 13.5 7.125V5.625C13.5 3.76104 11.989 2.25 10.125 2.25H8.25M10.5 2.25H5.625C5.00368 2.25 4.5 2.75368 4.5 3.375V20.625C4.5 21.2463 5.00368 21.75 5.625 21.75H18.375C18.9963 21.75 19.5 21.2463 19.5 20.625V11.25C19.5 6.27944 15.4706 2.25 10.5 2.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                     <span class="tree-name">${escapeHtml(item.name)}</span>
                     ${size ? `<span class="tree-size">${size}</span>` : ''}
                 </li>
@@ -323,8 +424,17 @@ function toggleDirectory(path) {
         expandedDirs.delete(path);
         renderFullTree();
     } else {
-        // Expand directory - load contents
-        loadDirectoryIntoTree(path);
+        // If it's currently loading, clear the loading state and try again
+        if (loadingDirs.has(path)) {
+            loadingDirs.delete(path);
+        }
+        
+        // Expand directory - show loading indicator immediately
+        loadingDirs.add(path);
+        renderFullTree(); // Show loading indicator
+        
+        // Then load contents (but don't add to loadingDirs again)
+        loadDirectoryIntoTreeWithoutLoadingCheck(path);
     }
 }
 
@@ -384,13 +494,33 @@ function clearSelectionForNewSnapshot() {
 function updateSelectionDisplay() {
     const selectionInfo = document.getElementById('resticSelectionInfo');
     const selectionCount = document.getElementById('selectionCount');
+    const selectionList = document.getElementById('resticSelectionList');
     const totalSelected = resticSelection.files.size + resticSelection.directories.size;
     
     if (totalSelected > 0) {
         selectionCount.textContent = `${resticSelection.files.size} files, ${resticSelection.directories.size} directories selected`;
         selectionInfo.classList.remove('hidden');
+        
+        // Update selection pane
+        let html = '<ul class="selection-list">';
+        
+        // Add directories first
+        resticSelection.directories.forEach(path => {
+            const name = path === '..' ? '..' : path.split('/').pop() || path;
+            html += `<li class="selection-item directory">${escapeHtml(name)}</li>`;
+        });
+        
+        // Add files
+        resticSelection.files.forEach(path => {
+            const name = path.split('/').pop() || path;
+            html += `<li class="selection-item file">${escapeHtml(name)}</li>`;
+        });
+        
+        html += '</ul>';
+        selectionList.innerHTML = html;
     } else {
         selectionInfo.classList.add('hidden');
+        selectionList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>';
     }
 }
 
@@ -424,8 +554,8 @@ function escapeHtml(text) {
 window.ResticBrowser = {
     loadResticRepository,
     loadSnapshotDetails,
-    loadDirectory,
-    navigateToDirectory,
+    loadDirectoryIntoTree,
+    navigateToFolder,
     toggleSelection,
     clearSelection,
     getSelection: () => resticSelection

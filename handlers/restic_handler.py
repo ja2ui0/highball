@@ -233,6 +233,37 @@ class ResticHandler:
                 'error': f'Snapshot listing failed: {str(e)}'
             }, status_code=500)
     
+    def get_snapshot_stats(self, handler, job_name, snapshot_id):
+        """Get detailed statistics for a specific snapshot"""
+        try:
+            job_config = self.backup_config.get_backup_job(job_name)
+            if not job_config:
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} not found'
+                }, status_code=404)
+                return
+            
+            if job_config.get('dest_type') != 'restic':
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} is not a Restic backup job'
+                }, status_code=400)
+                return
+            
+            if not snapshot_id:
+                TemplateService.send_json_response(handler, {
+                    'error': 'Snapshot ID is required'
+                }, status_code=400)
+                return
+            
+            # Get detailed snapshot statistics
+            result = ResticValidator.get_snapshot_statistics(job_config, snapshot_id)
+            TemplateService.send_json_response(handler, result)
+            
+        except Exception as e:
+            TemplateService.send_json_response(handler, {
+                'error': f'Snapshot statistics failed: {str(e)}'
+            }, status_code=500)
+    
     def browse_directory(self, handler, job_name, snapshot_id, path):
         """Browse directory contents in a specific snapshot"""
         try:

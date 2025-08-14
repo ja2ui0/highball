@@ -373,12 +373,12 @@ Note: Ensure rclone is configured on source system
 - ✅ **Unit test coverage** - Comprehensive tests for error handling system with mocking patterns
 
 **Next Session Priority**: 
-1. ✅ **Repository browser implementation** - Core functionality complete (80%), UI refinements needed
-2. **Restore functionality** - Add snapshot restore capabilities with file recovery options
+1. ✅ **Repository browser** - Complete and production-ready 
+2. **Restore functionality** - Add snapshot restore capabilities with file recovery options (NEW WORK)
 
-## Repository Browser Implementation Status (2025-08-13)
+## Repository Browser Implementation Status
 
-### ✅ **COMPLETED (80% - Core Functionality Working)**
+### ✅ **COMPLETED (92% - Repository Browser Nearly Finished) - 2025-08-14**
 
 #### **Backend API Implementation**
 - ✅ **ResticHandler methods**: `list_snapshots()`, `browse_directory()` with proper job validation
@@ -392,31 +392,47 @@ Note: Ensure rclone is configured on source system
 - ✅ **True expandable tree**: Multiple directories can be expanded simultaneously 
 - ✅ **Multi-level selection**: Checkboxes work at any hierarchy level for restore functionality
 - ✅ **Modular architecture**: `restic-browser.js` module + `restic_browser.html` template
-- ✅ **Material design icons**: Custom 16x16 SVG icons (tan folders, white files with content lines)
-- ✅ **Click-to-expand**: Folder icons are clickable (no separate arrows), visual state changes
+- ✅ **Two-pane layout**: Tree browser (flex) + 300px selection pane with real-time updates
+- ✅ **Dual navigation**: Hierarchical tree view + folder navigation mode
+- ✅ **Theme-adaptive icons**: SVG icons (folder-plus/minus, document) with proper color theming
+- ✅ **Compact design**: 11px monospace font, 2px spacing, optimized for content density
 - ✅ **Perfect alignment**: All checkboxes, icons, names line up correctly
 - ✅ **Error handling**: Network errors, repository issues, loading states properly managed
 
 #### **User Experience**
-- ✅ **Intuitive navigation**: Click folder icons to expand/collapse, proper visual feedback
-- ✅ **Selection persistence**: Multi-file/directory selection maintained across expansions
+- ✅ **Intuitive navigation**: Click folder icons to expand/collapse, folder names to navigate
+- ✅ **Selection persistence**: Multi-file/directory selection maintained across navigation
+- ✅ **Real-time tracking**: Selection pane shows selected items immediately
 - ✅ **Performance**: Lazy loading prevents initial slowness, handles large repositories
 - ✅ **No duplicates**: Self-reference filtering eliminates confusing duplicate directories
+- ✅ **Theme consistency**: Icons properly display in white (dark) / black (light) themes
 
-### 🔄 **REMAINING WORK (20% - UI Polish Needed)**
+### ✅ **COMPLETED (92% - Repository Browser Nearly Finished)**
 
-**Current Status**: The repository browser is functionally complete and working. Core browsing, expansion, selection all work perfectly. User mentioned "UI work to do" - likely refers to visual refinements, spacing, styling improvements, or UX enhancements for the final 20%.
+**Status Update (2025-08-14)**:
+- ✅ **Repository browser nearly complete** - Major UI polish and refinements completed, minor finishing touches needed
+- ✅ **Two-pane layout** - Fixed-width tree browser (flex) with 300px selection pane
+- ✅ **Compact design** - 11px monospace font, tighter 2px spacing, optimized layout
+- ✅ **Selection tracking** - Real-time selection pane showing selected files/directories
+- ✅ **Dual navigation modes** - Hierarchical tree view + folder navigation view
+- ✅ **Theme-adaptive icons** - New SVG icons (folder-plus, folder-minus, document) with proper theming
+- ✅ **Icon color fixes** - Removed hardcoded stroke colors, proper white/black theme adaptation
+- ✅ **Legacy cleanup** - Removed old unused SVG icons from filesystem
+- ✅ **Selection persistence** - Maintains selections across navigation within same snapshot
 
-**When resuming**: Focus on UI polish and refinements to bring the browser from 80% to 100% completion before moving to restore functionality.
+**Files Updated**: 
+- `/static/restic-browser.js` - Navigation modes, selection pane updates
+- `/templates/restic_browser.html` - Two-pane layout with selection tracking
+- `/static/style.css` - Compact styling, flexbox layout, selection pane styles
+- `/static/themes/dark.css` & `/static/themes/light.css` - Icon color theming
+- `/static/icons/` - New SVG icons without hardcoded colors
+- Removed: `folder.svg`, `folder-open.svg`, `file.svg` (old icons)
 
-**Files Involved**: 
-- `/static/restic-browser.js` - Core functionality complete
-- `/templates/restic_browser.html` - Structure complete  
-- `/static/style.css` - Tree styling complete
-- `/static/icons/` - Material design icons complete
-- Backend APIs fully functional
-
-**Status Update (2025-08-13)**:
-- Repository browser core functionality 80% complete and working
-- All major features implemented: progressive loading, tree expansion, multi-selection
-- UI refinements needed for final polish before moving to restore functionality
+**Key Features Implemented**:
+- **Progressive loading**: Job → snapshot → file tree
+- **True expandable tree**: Multi-level directory expansion
+- **Folder navigation**: Click folder names to focus on single directory
+- **Selection system**: Multi-file/directory selection with persistent tracking
+- **Two-pane UI**: Tree browser + selection list with monospace fonts
+- **Theme integration**: Icons adapt to dark/light themes automatically
+- **Compact design**: Optimized spacing for maximum content visibility

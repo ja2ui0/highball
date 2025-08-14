@@ -54,7 +54,7 @@
 }
 
 /* Restic browser icon styling - black for light theme */
-.tree-icon svg path {
-    stroke: black !important;
+.tree-icon svg {
+    color: #000000;
 }
 

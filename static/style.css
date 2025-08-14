@@ -493,12 +493,14 @@ tr:hover {
 .tree-container {
     background: var(--bg-input);
     border: 1px solid var(--border);
-    padding: 10px;
+    padding: 8px;
     border-radius: 4px;
     max-height: 400px;
     overflow-y: auto;
     font-family: 'Courier New', monospace;
+    font-size: 11px;
     color: var(--text-secondary);
+    flex: 1;
 }
 
 .file-tree {
@@ -510,8 +512,9 @@ tr:hover {
 .tree-item {
     display: flex;
     align-items: center;
-    padding: 4px 0;
+    padding: 2px 0;
     border-bottom: 1px solid transparent;
+    line-height: 1.2;
 }
 
 .tree-item:hover {
@@ -552,6 +555,16 @@ tr:hover {
     font-style: italic;
 }
 
+.loading-placeholder {
+    opacity: 0.7;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.4; }
+}
+
 .tree-name {
     flex: 1;
     cursor: pointer;
@@ -565,9 +578,53 @@ tr:hover {
 
 .tree-size {
     margin-left: auto;
-    font-size: 12px;
+    font-size: 10px;
     color: var(--text-secondary);
     padding-right: 8px;
+}
+
+/* Selection pane */
+.selection-pane {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    padding: 8px;
+    border-radius: 4px;
+    width: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.selection-header {
+    font-weight: bold;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.selection-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.selection-item {
+    padding: 2px 0;
+    word-break: break-all;
+    line-height: 1.2;
+}
+
+.selection-item.file {
+    color: var(--text-secondary);
+}
+
+.selection-item.directory {
+    color: var(--accent-primary);
+    font-weight: 500;
 }
 
 .tree-item.parent .tree-name {

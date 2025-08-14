@@ -31,8 +31,16 @@
                 <span id="selectionCount">0 items selected</span>
                 <button onclick="clearSelection()" class="button button-warning">Clear Selection</button>
             </div>
-            <div id="resticTreeContainer" class="tree-container">
-                <!-- File tree will be populated here -->
+            <div style="display: flex; gap: 10px;">
+                <div id="resticTreeContainer" class="tree-container">
+                    <!-- File tree will be populated here -->
+                </div>
+                <div id="resticSelectionPane" class="selection-pane">
+                    <div class="selection-header">Selected Items</div>
+                    <div id="resticSelectionList">
+                        <div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>
+                    </div>
+                </div>
             </div>
         </div>
         

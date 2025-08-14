@@ -144,6 +144,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/restic-snapshots':
                 job_name = params.get('job', [''])[0]
                 self._handlers['restic'].list_snapshots(self, job_name)
+            elif path == '/restic-snapshot-stats':
+                job_name = params.get('job', [''])[0]
+                snapshot_id = params.get('snapshot', [''])[0]
+                self._handlers['restic'].get_snapshot_stats(self, job_name, snapshot_id)
             elif path == '/restic-browse':
                 job_name = params.get('job', [''])[0]
                 snapshot_id = params.get('snapshot', [''])[0]
