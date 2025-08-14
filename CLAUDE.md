@@ -43,11 +43,13 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **REST API**: GET `/api/highball/jobs` endpoint for external dashboard widgets with query filtering (`state`, `fields`), CORS support, and authentication-ready architecture
 **Debug System**: System debugging interface (`/dev`) with network scanner, 8 unified log sources (system + operational) with organized 2-row layout, separated from per-job inspection
 
-## Development
+## Development Rules (Critical - Reference First)
 
-**Conventions**: PEP 8, dataclasses, pathlib, external assets, emoji-free
-**Patterns**: Type hints, cached validation, error fallbacks
-**Extensions**: Repository providers via `services/<engine>_repository_service.py` (inheriting from `repository_service.py`) + `handlers/<engine>_validator.py` + `handlers/<engine>_form_parser.py` + update routing. Filesystem providers use existing `filesystem_service.py` + `filesystem_handler.py`. Multi-provider architecture supports Borg, Kopia with shared `backup_client.py` and `binary_checker_service.py`
+**JavaScript**: Always in `/static/` files, never inline in templates. Use modular 5-file architecture with single responsibility per component
+**CSS**: Colors ONLY in `/static/themes/{dark,light}.css`. Structure ONLY in `/static/style.css` 
+**Architecture**: Proactively modularize components when they become monolithic. Thin handlers, centralized validation, dataclass-driven config
+**Code Standards**: PEP 8, dataclasses, pathlib, type hints, emoji-free, external assets only
+**Extensions**: Multi-provider pattern via `services/<engine>_repository_service.py` + `handlers/<engine>_validator.py` + form parsers
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
 
 ## Theming System
@@ -57,26 +59,18 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Configuration**: `global_settings.theme` (default: "dark")
 **Extension**: New themes = new CSS file with color variables
 
-## Modern Architecture Notes
+## Architecture Reference (Quick Lookup)
 
-**Template Modularity**: `{{INCLUDE:filename}}` directives - `job_form.html` orchestrates components
-**JavaScript Modularity**: 5-file architecture - single responsibility per component
-**Type Safety**: Dataclasses for all structured data (`JobFormData`, `SourceConfig`, `DestConfig`, etc.)
-**File Operations**: `pathlib.Path` with atomic operations
-**Validation**: SSH 30min cache, `validators` module
-**CSS Architecture**: Structural CSS + theme colors, `--bg-input` for input field depth
-**Notification Architecture**: `notifiers` library backend, extensible to 25+ providers
-**Backup Browser Architecture**: Multi-provider system with PROVIDERS configuration for repository-based (Restic/Borg/Kopia) vs filesystem-based (rsync/SSH/local/rsyncd) access, unified JavaScript interface with provider-specific terminology and endpoints
-**REST API Architecture**: External integration endpoint with query parameter filtering, CORS headers, field selection, authentication stub for future token-based access, JSON responses with API versioning
-**Restic Implementation**: Complete job management, repository browser, snapshot statistics, multi-provider service architecture ready for Borg/Kopia (see `RESTIC.md`)
-**Form Parser Architecture**: Dedicated parsers per destination type with consistent interface (`_safe_get_value` for form data compatibility)
-**Form UI Architecture**: Sectioned forms (Job Identity & Source, Backup Destination, Schedule & Options, Actions)
-**Error Handling Architecture**: Modular inline error display (`FormErrorHandler`) with user input preservation, no scary error pages
-**Dashboard Display Architecture**: Clean multi-path source display with hierarchical formatting and proper line breaks
-**Backup Execution Architecture**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
-**Restore Architecture**: Modular JavaScript provider system with `restore-core.js` (generic UI orchestration) and provider-specific implementations (`restore-restic.js`), `RestoreHandler` backend with command building and background execution, extensible to future providers
-**Rsync Options Architecture**: Per-job custom options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified SSH/rsyncd field
-**Testing Architecture**: Comprehensive unit test coverage for error handling with mocking patterns
+**Templates**: `{{INCLUDE:filename}}` directives, `job_form.html` orchestrates
+**Data**: Dataclasses for all structures (`JobFormData`, `SourceConfig`, `DestConfig`), `pathlib.Path` operations
+**Validation**: SSH 30min cache, `validators` module, centralized in `job_validator.py`
+**Forms**: Sectioned UI, dedicated parsers per destination (`_safe_get_value`), inline error display (`FormErrorHandler`)
+**Backup Browser**: Multi-provider PROVIDERS config (repository vs filesystem), unified JS interface
+**Backup Execution**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
+**Restore**: Provider system `restore-core.js` + `restore-restic.js`, `RestoreHandler` backend, extensible architecture
+**Notifications**: `notifiers` backend, spam-prevention queuing, template variables, per-job integration
+**API**: Query filtering, CORS, field selection, JSON responses, authentication-ready
+**Testing**: Unit coverage with mocking patterns
 
 ## Commands
 

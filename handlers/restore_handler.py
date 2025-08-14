@@ -104,8 +104,9 @@ class RestoreHandler:
                 timeout=300  # 5 minute timeout for dry run
             )
             
-            # Log the dry run
-            self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(cmd_result['command'])}")
+            # Log the dry run (obfuscate password)
+            safe_command = self._obfuscate_password_in_command(cmd_result['command'])
+            self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
             self.job_logger.log_job_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
                 self.job_logger.log_job_execution(job_name, f"Dry run stdout: {result.stdout}")
@@ -227,8 +228,14 @@ class RestoreHandler:
             else:
                 return {'success': False, 'error': 'No repository URI found in job configuration'}
             
-            # Add password
+            # Add password - use job config password for dry runs, form password for actual restores
             password = restore_config.get('password', '')
+            if not password:
+                # For dry runs, get password from job configuration
+                job_config = restore_config['job_config']
+                dest_config = job_config.get('dest_config', {})
+                password = dest_config.get('password', '')
+            
             if password:
                 cmd.extend(['--password-command', f'echo "{password}"'])
             
@@ -330,6 +337,15 @@ class RestoreHandler:
     def _safe_get_form_value(self, form_data: Dict[str, List[str]], key: str, default: str = '') -> str:
         """Safely get form value with default"""
         return form_data.get(key, [default])[0] if form_data.get(key) else default
+    
+    def _obfuscate_password_in_command(self, command: List[str]) -> List[str]:
+        """Replace password in command with asterisks for logging"""
+        safe_command = command.copy()
+        for i, arg in enumerate(safe_command):
+            if arg == '--password-command' and i + 1 < len(safe_command):
+                # Replace the echo command that contains the password
+                safe_command[i + 1] = 'echo "***"'
+        return safe_command
     
     def _send_json_response(self, handler, data: Dict[str, Any]):
         """Send JSON response"""

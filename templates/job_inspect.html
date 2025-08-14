@@ -71,6 +71,7 @@
                 
                 <div id="fileTree" class="hidden file-tree">
                     <h3>File Browser</h3>
+                    
                     <div id="selectionInfo" class="selection-info">
                         <span id="selectionCount">0 items selected</span>
                         <label>
@@ -91,9 +92,18 @@
                         </div>
                     </div>
                     
+                    <!-- Mode Toggle Switch -->
+                    <div class="toggle-switch">
+                        <span class="toggle-switch-label">Mode:</span>
+                        <div class="toggle-container left" id="modeToggle" onclick="toggleMode()">
+                            <div class="toggle-slider"></div>
+                            <span class="toggle-option left">View</span>
+                            <span class="toggle-option right">Restore</span>
+                        </div>
+                    </div>
+                    
                     <!-- Restore Controls -->
-                    <div id="restoreControls" class="restore-controls">
-                        <h4>Restore Options</h4>
+                    <div id="restoreControls" class="restore-controls hidden">
                         <div class="restore-options">
                             <div>
                                 <label>Restore Target:</label>
@@ -109,6 +119,7 @@
                             </div>
                             <div class="mt-15">
                                 <button id="startRestore" class="button button-success">Start Restore</button>
+                                <div id="restoreValidationError" class="hidden" style="margin-top: 8px;"></div>
                             </div>
                         </div>
                     </div>
@@ -118,6 +129,7 @@
             <div id="browserError" class="hidden error-message">
                 <!-- Error messages will be displayed here -->
             </div>
+            
         </div>
         
         <!-- Password Confirmation Modal -->
@@ -219,6 +231,23 @@
             logContent.textContent = '';
         }
         
+        function toggleMode() {
+            const modeToggle = document.getElementById('modeToggle');
+            const restoreControls = document.getElementById('restoreControls');
+            
+            if (modeToggle.classList.contains('left')) {
+                // Switch to Restore mode
+                modeToggle.classList.remove('left');
+                modeToggle.classList.add('right');
+                restoreControls.classList.remove('hidden');
+            } else {
+                // Switch to View mode
+                modeToggle.classList.remove('right');
+                modeToggle.classList.add('left');
+                restoreControls.classList.add('hidden');
+            }
+        }
+        
         function toggleSelectAll() {
             const isChecked = selectAllToggle.checked;
             
@@ -226,40 +255,32 @@
                 // Grey out selection pane when Select All is active
                 selectionPane.style.opacity = '0.5';
                 selectionPane.style.pointerEvents = 'none';
-                showRestoreControls();
+                // Clear any validation errors since we now have a selection
+                clearRestoreValidationError();
             } else {
                 // Re-enable selection pane
                 selectionPane.style.opacity = '1';
                 selectionPane.style.pointerEvents = 'auto';
-                updateRestoreControlsVisibility();
             }
         }
         
-        function showRestoreControls() {
-            restoreControls.classList.remove('hidden');
-        }
-        
-        function hideRestoreControls() {
-            restoreControls.classList.add('hidden');
-        }
-        
-        function updateRestoreControlsVisibility() {
-            // Show restore controls if Select All is checked OR selections exist
-            const hasSelections = document.querySelectorAll('.tree-item input[type="checkbox"]:checked').length > 0;
-            const selectAllChecked = selectAllToggle.checked;
-            
-            if (selectAllChecked || hasSelections) {
-                showRestoreControls();
-            } else {
-                hideRestoreControls();
+        function clearRestoreValidationError() {
+            const errorDiv = document.getElementById('restoreValidationError');
+            if (errorDiv) {
+                errorDiv.classList.add('hidden');
             }
         }
         
-        // Override the global selection update function to handle restore controls
+        // Override the global selection update function (restore controls now controlled by toggle)
         window.originalUpdateSelectionDisplay = window.updateSelectionDisplay || function() {};
         window.updateSelectionDisplay = function() {
             window.originalUpdateSelectionDisplay();
-            updateRestoreControlsVisibility();
+            
+            // Clear validation errors when items are selected
+            const hasSelections = document.querySelectorAll('.tree-item input[type="checkbox"]:checked').length > 0;
+            if (hasSelections) {
+                clearRestoreValidationError();
+            }
         };
         
         // Event listeners

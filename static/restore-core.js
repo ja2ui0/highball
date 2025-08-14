@@ -66,6 +66,12 @@ function registerRestoreProvider(providerType, providerImplementation) {
 }
 
 function startRestore() {
+    // Clear any previous error messages
+    const errorDiv = document.getElementById('restoreValidationError');
+    if (errorDiv) {
+        errorDiv.classList.add('hidden');
+    }
+    
     // Get job name and type from page
     const jobName = getJobNameFromPage();
     const jobType = getJobTypeFromPage();
@@ -211,10 +217,34 @@ function executeRestoreRequest(provider, config) {
     // Let provider build the request
     const requestData = provider.buildRestoreRequest(config);
     
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, 30000);
+    
     return fetch('/restore', {
         method: 'POST',
-        body: requestData
-    }).then(response => response.json());
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: requestData,
+        signal: controller.signal
+    }).then(response => {
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    }).then(data => {
+        return data;
+    }).catch(error => {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out');
+        }
+        throw error;
+    });
 }
 
 // UI Helper Functions
@@ -245,8 +275,23 @@ function showModalError(message) {
     }
 }
 
-function showAlert(message) {
-    alert(message); // Could be enhanced with better UI later
+function showAlert(message, isSuccess = false) {
+    // Show message inline with appropriate styling
+    const alertDiv = document.getElementById('restoreValidationError');
+    if (alertDiv) {
+        alertDiv.textContent = message;
+        alertDiv.classList.remove('hidden', 'status-error', 'status-success');
+        alertDiv.classList.add(isSuccess ? 'status-success' : 'status-error');
+        // Auto-hide success messages after 10 seconds
+        if (isSuccess) {
+            setTimeout(() => {
+                alertDiv.classList.add('hidden');
+            }, 10000);
+        }
+    } else {
+        // Fallback to browser alert if error div not found
+        alert(message);
+    }
 }
 
 // Page Data Extraction Functions
@@ -266,8 +311,22 @@ function getRestoreTarget() {
 }
 
 function gatherSelectedPaths() {
-    const checkboxes = document.querySelectorAll('.tree-item input[type="checkbox"]:checked');
-    return Array.from(checkboxes).map(cb => cb.getAttribute('data-path')).filter(path => path);
+    // Use the backup browser's selection tracking instead of DOM parsing
+    if (window.BackupBrowser && window.BackupBrowser.getSelection) {
+        const selection = window.BackupBrowser.getSelection();
+        const allPaths = [
+            ...Array.from(selection.directories || []),
+            ...Array.from(selection.files || [])
+        ];
+        
+        return allPaths;
+    } else {
+        // Fallback to DOM parsing (though this won't work with current implementation)
+        const checkboxes = document.querySelectorAll('.tree-item input[type="checkbox"]:checked');
+        const paths = Array.from(checkboxes).map(cb => cb.getAttribute('data-path')).filter(path => path);
+        
+        return paths;
+    }
 }
 
 function getCurrentSnapshotId() {

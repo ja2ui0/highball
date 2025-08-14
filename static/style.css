@@ -919,3 +919,82 @@ tr:hover {
     transition: width 0.3s ease;
     border-radius: var(--radius);
 }
+
+/* =============================================================================
+   TOGGLE SWITCH COMPONENT
+   ============================================================================= */
+
+.toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-lg);
+    margin: var(--space-lg) 0;
+}
+
+.toggle-switch-label {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-right: var(--space-md);
+}
+
+.toggle-container {
+    position: relative;
+    display: inline-block;
+    width: 120px;
+    height: 32px;
+    background-color: var(--bg-input);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-container:hover {
+    border-color: var(--accent-primary);
+}
+
+.toggle-option {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--font-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.3s ease;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.toggle-option.left {
+    left: 8px;
+}
+
+.toggle-option.right {
+    right: 8px;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 56px;
+    height: 28px;
+    background-color: var(--accent-primary);
+    border-radius: 14px;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-container.right .toggle-slider {
+    transform: translateX(60px);
+}
+
+.toggle-container.left .toggle-option.left,
+.toggle-container.right .toggle-option.right {
+    color: var(--text-inverse);
+}
+
+.toggle-container.left .toggle-option.right,
+.toggle-container.right .toggle-option.left {
+    color: var(--text-muted);
+}

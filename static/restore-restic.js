@@ -35,30 +35,30 @@ const ResticRestoreProvider = {
     },
     
     buildRestoreRequest: function(config) {
-        // Build FormData for Restic restore request
-        const formData = new FormData();
-        formData.append('job_name', config.job_name);
-        formData.append('snapshot_id', config.snapshot_id);
-        formData.append('restore_target', config.restore_target);
+        // Temporarily use URL-encoded format to test if multipart is the issue
+        const params = new URLSearchParams();
+        params.append('job_name', config.job_name);
+        params.append('snapshot_id', config.snapshot_id);
+        params.append('restore_target', config.restore_target);
         
         if (config.dry_run) {
-            formData.append('dry_run', 'on');
+            params.append('dry_run', 'on');
         }
         
         if (config.select_all) {
-            formData.append('select_all', 'on');
+            params.append('select_all', 'on');
         }
         
         if (config.password) {
-            formData.append('password', config.password);
+            params.append('password', config.password);
         }
         
         // Add selected paths for granular restore
         config.selected_paths.forEach(path => {
-            formData.append('selected_paths', path);
+            params.append('selected_paths', path);
         });
         
-        return formData;
+        return params.toString();
     },
     
     buildRestoreSummary: function(config) {
@@ -83,16 +83,8 @@ const ResticRestoreProvider = {
     handleDryRunResponse: function(result) {
         // Handle dry run response from server
         if (result.success) {
-            const message = [
-                'Dry run completed successfully!',
-                '',
-                `Command: ${result.command}`,
-                '',
-                'Output:',
-                result.output || 'No output'
-            ].join('\n');
-            
-            window.RestoreCore.showAlert(message);
+            // Simple success message - detailed output is already in the logs
+            window.RestoreCore.showAlert('Dry run completed successfully!', true);
         } else {
             window.RestoreCore.showAlert(`Dry run failed: ${result.error}`);
         }

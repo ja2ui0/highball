@@ -5,6 +5,7 @@ Clean, modular architecture
 """
 import os
 import traceback
+import cgi
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -189,9 +190,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
 
         # Read form data
         try:
-            content_length = int(self.headers['Content-Length'])
+            content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length).decode('utf-8')
             form_data = parse_qs(post_data)
+                
         except Exception as e:
             traceback.print_exc()
             self._send_error_response(f"Invalid form data: {str(e)}")
