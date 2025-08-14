@@ -36,7 +36,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Notifications**: `notifiers` library backend, Telegram/email, spam-prevention queuing with configurable intervals, batch message formatting, test capabilities, emoji-free
 **UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
 **Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, repository browser (scaffolded)
-**Inspect System**: Network scanner, Restic repository browser, unified log sources with proper container organization
+**Inspect System**: Network scanner, Restic repository browser, 8 unified log sources (system + operational) with organized 2-row layout
 
 ## Development
 
@@ -136,17 +136,18 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Next Session Priority**: 
-1. **Multi-path conflict detection** - Update conflict detection logic to handle jobs with multiple source paths correctly
-2. **Restic repository browser** - Implement actual functionality for the scaffolded browser interface  
-3. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery
+1. ✅ **Restic repository browser** - Core functionality complete (80% done), UI refinements needed for final polish
+2. **Restic restore functionality** - Add restore capabilities for snapshots and file recovery
+3. **Advanced notification features** - Template preview, notification history, expanded variable system
 
 **Recent Completion (2025-08-13)**:
-- **Notification queue system** - Complete spam-prevention implementation with configurable intervals (5min telegram, 15min email), batch message formatting, event-driven timer processing, file-based persistence, and comprehensive testing
-- **Global notification configuration redesign** - Removed success notification toggles, changed labels to "Configure <provider>...", added test notification buttons with comprehensive error handling, integrated queue settings UI
-- **Modular notification testing** - Created `NotificationTestHandler` with provider-specific error messages, proper result validation, and user-friendly feedback
-- **Per-job notification foundation** - Added dynamic provider selection UI, custom success/failure messages with template variables, expandable form sections (scaffolded)
+- **Complete notification system** - Full spam-prevention queue system with configurable intervals, batch formatting, event-driven processing, per-job notification integration with template variables, and comprehensive testing
+- **Enhanced log inspection** - Added 4 new log sources (Job Status, Running Jobs, SSH Validation Cache, Notification Queues) with organized 2-row button layout
+- **Per-job notification completion** - Full integration of job-specific provider selection, custom message templates with variable expansion, and queue system compatibility
+- **Conflict detection verification** - Confirmed host-level conflict detection works correctly for multi-path jobs (no changes needed)
+- **Restic repository browser core** - Progressive loading (job→snapshot→file tree), true expandable tree with multi-level selection, material design icons, click-to-expand folders (80% complete)
 
-**Future Priorities**: Complete per-job notification implementation, section-specific save buttons for configuration
+**Future Priorities**: Section-specific save buttons for configuration, notification template preview, enhanced Restic features
 **Planned**: Borg, rclone direct destinations, enhanced Restic execution features (progress parsing, retention policies)
 **Wishlist**: Kopia destinations
 

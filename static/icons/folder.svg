@@ -1,0 +1,6 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Folder tab -->
+  <path d="M2 3h4l2 2h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="#D4B896"/>
+  <!-- Folder tab darker -->
+  <path d="M2 3h4l2 2v-1l-2-2H2z" fill="#B8956F"/>
+</svg>

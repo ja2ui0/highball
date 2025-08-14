@@ -1,0 +1,8 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Open folder back -->
+  <path d="M2 4h4l2 2h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h-1z" fill="#D4B896"/>
+  <!-- Open folder front (angled) -->
+  <path d="M1.5 6L3 5h4l1.5 1h5.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V7a1 1 0 0 1 0-1z" fill="#E8CCA8"/>
+  <!-- Folder tab darker -->
+  <path d="M2 4h4l2 2v-1l-2-2H2z" fill="#B8956F"/>
+</svg>

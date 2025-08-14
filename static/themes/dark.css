@@ -52,3 +52,8 @@
     --alert-error-bg: #5a1a1a;
     --alert-info-bg: #0c4a5a;
 }
+
+/* Restic browser icon styling - white for dark theme */
+.tree-icon svg path {
+    stroke: white !important;
+}

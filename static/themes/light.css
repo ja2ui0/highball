@@ -53,3 +53,8 @@
     --alert-info-bg: #d1ecf1;
 }
 
+/* Restic browser icon styling - black for light theme */
+.tree-icon svg path {
+    stroke: black !important;
+}
+

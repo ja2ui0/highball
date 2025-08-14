@@ -458,6 +458,150 @@ tr:hover {
 .flex-row { display: flex; gap: 10px; align-items: center; }
 .flex-1 { flex: 1; }
 
+/* Restic Browser Styles */
+.restic-browser {
+    margin-top: 15px;
+}
+
+.restic-repository-info {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.restic-snapshot-details {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.selection-info {
+    background: var(--bg-accent);
+    border: 1px solid var(--border);
+    padding: 8px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tree-container {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    color: var(--text-secondary);
+}
+
+.file-tree {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid transparent;
+}
+
+.tree-item:hover {
+    background: var(--bg-secondary);
+}
+
+.tree-item.selected {
+    background: var(--bg-accent);
+}
+
+.tree-checkbox {
+    margin-right: 8px;
+}
+
+.tree-icon {
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+}
+
+.clickable-icon {
+    cursor: pointer;
+}
+
+.clickable-icon:hover {
+    opacity: 0.8;
+}
+
+.tree-spacer {
+    display: inline-block;
+    width: 20px;
+}
+
+.loading-indicator {
+    margin-left: 8px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.tree-name {
+    flex: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.tree-name:hover {
+    background: var(--bg-accent);
+    border-radius: 2px;
+}
+
+.tree-size {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding-right: 8px;
+}
+
+.tree-item.parent .tree-name {
+    font-weight: bold;
+    color: var(--accent-primary);
+}
+
+.tree-item.directory .tree-name {
+    font-weight: 500;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.empty-directory {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.error-message {
+    background: var(--bg-error, #fee);
+    border: 1px solid var(--border-error, #fcc);
+    color: var(--text-error, #c33);
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
 /* Base section container - reusable */
 .section-container {
     background: var(--bg-tertiary);

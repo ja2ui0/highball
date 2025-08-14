@@ -207,3 +207,53 @@ class ResticHandler:
             TemplateService.send_json_response(handler, {
                 'error': f'Repository info failed: {str(e)}'
             }, status_code=500)
+    
+    def list_snapshots(self, handler, job_name):
+        """List all snapshots for a Restic repository"""
+        try:
+            job_config = self.backup_config.get_backup_job(job_name)
+            if not job_config:
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} not found'
+                }, status_code=404)
+                return
+            
+            if job_config.get('dest_type') != 'restic':
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} is not a Restic backup job'
+                }, status_code=400)
+                return
+            
+            # Use existing ResticValidator patterns to get snapshots
+            result = ResticValidator.list_repository_snapshots(job_config)
+            TemplateService.send_json_response(handler, result)
+            
+        except Exception as e:
+            TemplateService.send_json_response(handler, {
+                'error': f'Snapshot listing failed: {str(e)}'
+            }, status_code=500)
+    
+    def browse_directory(self, handler, job_name, snapshot_id, path):
+        """Browse directory contents in a specific snapshot"""
+        try:
+            job_config = self.backup_config.get_backup_job(job_name)
+            if not job_config:
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} not found'
+                }, status_code=404)
+                return
+            
+            if job_config.get('dest_type') != 'restic':
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} is not a Restic backup job'
+                }, status_code=400)
+                return
+            
+            # Use existing ResticValidator patterns to browse directory
+            result = ResticValidator.browse_snapshot_directory(job_config, snapshot_id, path)
+            TemplateService.send_json_response(handler, result)
+            
+        except Exception as e:
+            TemplateService.send_json_response(handler, {
+                'error': f'Directory browsing failed: {str(e)}'
+            }, status_code=500)

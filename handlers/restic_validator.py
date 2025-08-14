@@ -431,3 +431,313 @@ class ResticValidator:
                 'success': False,
                 'message': f'Repository access test error: {str(e)}'
             }
+    
+    @staticmethod
+    def list_repository_snapshots(job_config):
+        """List all snapshots in a Restic repository"""
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        try:
+            from services.restic_runner import ResticRunner
+            runner = ResticRunner()
+            repo_url = runner._build_repository_url(dest_config)
+            env_vars = runner._build_environment(dest_config)
+            
+            # Use SSH if source is SSH, otherwise local
+            if source_config and source_config.get('hostname'):
+                return ResticValidator._list_snapshots_via_ssh(repo_url, env_vars, source_config)
+            else:
+                return ResticValidator._list_snapshots_locally(repo_url, env_vars)
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Snapshot listing failed: {str(e)}'
+            }
+    
+    @staticmethod
+    def _list_snapshots_via_ssh(repo_url, env_vars, source_config):
+        """List snapshots via SSH execution"""
+        hostname = source_config.get('hostname')
+        username = source_config.get('username')
+        
+        try:
+            env_exports = []
+            if env_vars:
+                for key, value in env_vars.items():
+                    env_exports.append(f"export {key}='{value}'")
+            
+            restic_cmd = f"restic -r '{repo_url}' snapshots --json"
+            remote_command = '; '.join(env_exports + [restic_cmd])
+            
+            ssh_cmd = [
+                'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                remote_command
+            ]
+            
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                import json
+                try:
+                    snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                    formatted_snapshots = []
+                    
+                    for snap in snapshots:
+                        formatted_snapshots.append({
+                            'id': snap.get('short_id', snap.get('id', 'unknown'))[:8],
+                            'full_id': snap.get('id', 'unknown'),
+                            'time': snap.get('time', 'unknown'),
+                            'hostname': snap.get('hostname', 'unknown'),
+                            'username': snap.get('username', 'unknown'),
+                            'paths': snap.get('paths', []),
+                            'tags': snap.get('tags', [])
+                        })
+                    
+                    return {
+                        'success': True,
+                        'snapshots': formatted_snapshots,
+                        'count': len(formatted_snapshots)
+                    }
+                    
+                except json.JSONDecodeError as e:
+                    return {
+                        'success': False,
+                        'error': f'Failed to parse snapshot data: {str(e)}'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Failed to list snapshots: {result.stderr.strip()}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': f'Snapshot listing timed out on {hostname}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Snapshot listing error: {str(e)}'
+            }
+    
+    @staticmethod
+    def _list_snapshots_locally(repo_url, env_vars):
+        """List snapshots locally in container"""
+        try:
+            env = {}
+            if env_vars:
+                env.update(env_vars)
+            
+            cmd = ['restic', '-r', repo_url, 'snapshots', '--json']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+            
+            if result.returncode == 0:
+                import json
+                try:
+                    snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                    formatted_snapshots = []
+                    
+                    for snap in snapshots:
+                        formatted_snapshots.append({
+                            'id': snap.get('short_id', snap.get('id', 'unknown'))[:8],
+                            'full_id': snap.get('id', 'unknown'),
+                            'time': snap.get('time', 'unknown'),
+                            'hostname': snap.get('hostname', 'unknown'),
+                            'username': snap.get('username', 'unknown'),
+                            'paths': snap.get('paths', []),
+                            'tags': snap.get('tags', [])
+                        })
+                    
+                    return {
+                        'success': True,
+                        'snapshots': formatted_snapshots,
+                        'count': len(formatted_snapshots)
+                    }
+                    
+                except json.JSONDecodeError as e:
+                    return {
+                        'success': False,
+                        'error': f'Failed to parse snapshot data: {str(e)}'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Failed to list snapshots: {result.stderr.strip()}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Snapshot listing timed out'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Snapshot listing error: {str(e)}'
+            }
+    
+    @staticmethod
+    def browse_snapshot_directory(job_config, snapshot_id, path):
+        """Browse directory contents in a specific snapshot"""
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        try:
+            from services.restic_runner import ResticRunner
+            runner = ResticRunner()
+            repo_url = runner._build_repository_url(dest_config)
+            env_vars = runner._build_environment(dest_config)
+            
+            # Use SSH if source is SSH, otherwise local
+            if source_config and source_config.get('hostname'):
+                return ResticValidator._browse_directory_via_ssh(repo_url, env_vars, source_config, snapshot_id, path)
+            else:
+                return ResticValidator._browse_directory_locally(repo_url, env_vars, snapshot_id, path)
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Directory browsing failed: {str(e)}'
+            }
+    
+    @staticmethod 
+    def _browse_directory_via_ssh(repo_url, env_vars, source_config, snapshot_id, path):
+        """Browse directory via SSH execution"""
+        hostname = source_config.get('hostname')
+        username = source_config.get('username')
+        
+        try:
+            env_exports = []
+            if env_vars:
+                for key, value in env_vars.items():
+                    env_exports.append(f"export {key}='{value}'")
+            
+            # Use restic ls command to list directory contents
+            escaped_path = path.replace("'", "'\"'\"'")  # Escape single quotes
+            restic_cmd = f"restic -r '{repo_url}' ls '{snapshot_id}' --json '{escaped_path}'"
+            remote_command = '; '.join(env_exports + [restic_cmd])
+            
+            ssh_cmd = [
+                'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                remote_command
+            ]
+            
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return ResticValidator._parse_directory_listing(result.stdout, path)
+            else:
+                return {
+                    'success': False,
+                    'error': f'Failed to browse directory: {result.stderr.strip()}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': f'Directory browsing timed out on {hostname}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Directory browsing error: {str(e)}'
+            }
+    
+    @staticmethod
+    def _browse_directory_locally(repo_url, env_vars, snapshot_id, path):
+        """Browse directory locally in container"""
+        try:
+            env = {}
+            if env_vars:
+                env.update(env_vars)
+            
+            cmd = ['restic', '-r', repo_url, 'ls', snapshot_id, '--json', path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+            
+            if result.returncode == 0:
+                return ResticValidator._parse_directory_listing(result.stdout, path)
+            else:
+                return {
+                    'success': False,
+                    'error': f'Failed to browse directory: {result.stderr.strip()}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Directory browsing timed out'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Directory browsing error: {str(e)}'
+            }
+    
+    @staticmethod
+    def _parse_directory_listing(json_output, current_path):
+        """Parse restic ls JSON output into directory structure"""
+        try:
+            import json
+            import os
+            
+            lines = json_output.strip().split('\n')
+            items = []
+            
+            # Add parent directory entry if not at root
+            if current_path and current_path != '/':
+                parent_path = os.path.dirname(current_path) if current_path != '/' else '/'
+                items.append({
+                    'name': '..',
+                    'type': 'parent',
+                    'path': parent_path,
+                    'size': None
+                })
+            
+            # Parse each JSON line 
+            for line in lines:
+                if not line.strip():
+                    continue
+                    
+                try:
+                    item = json.loads(line)
+                    name = item.get('name', '')
+                    item_type = item.get('type', 'file')
+                    size = item.get('size')
+                    full_path = item.get('path', os.path.join(current_path, name))
+                    
+                    # Skip the current directory entry, empty names, and self-references
+                    if (name == '.' or name == current_path or name == '' or 
+                        full_path == current_path or 
+                        (current_path != '/' and name == os.path.basename(current_path))):
+                        continue
+                    
+                    items.append({
+                        'name': name,
+                        'type': 'directory' if item_type == 'dir' else 'file',
+                        'path': full_path,
+                        'size': size
+                    })
+                    
+                except json.JSONDecodeError:
+                    # Skip malformed JSON lines
+                    continue
+            
+            return {
+                'success': True,
+                'contents': items,
+                'current_path': current_path,
+                'total_items': len(items)
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Failed to parse directory listing: {str(e)}'
+            }

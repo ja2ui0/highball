@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
     <script src="/static/network-scan.js"></script>
+    <script src="/static/restic-browser.js"></script>
 </head>
 <body>
     <div class="container">
@@ -27,23 +28,7 @@
             </div>
         </div>
         
-        <!-- Restic Browser Container -->
-        <div class="section-container">
-            <h2 class="section-header">Restic Repository Browser</h2>
-            <p>Browse snapshots and files in Restic repositories.</p>
-            <select id="resticJobSelect" onchange="loadResticRepository()">
-                <option value="">Select a Restic job...</option>
-                {{RESTIC_JOB_DROPDOWN}}
-            </select>
-            <div id="resticBrowserContent" class="hidden restic-browser">
-                <div id="resticRepositoryInfo" class="restic-repository-info">
-                    <!-- Repository information will be displayed here -->
-                </div>
-                <div id="resticSnapshotList" class="restic-snapshot-list">
-                    <!-- Snapshot browser will be implemented here -->
-                </div>
-            </div>
-        </div>
+        {{INCLUDE:restic_browser.html}}
         
         <!-- Log Sources Container -->
         <div class="section-container">
@@ -95,25 +80,6 @@
         // Event listeners
         refreshButton.addEventListener('click', refreshLogs);
         clearButton.addEventListener('click', clearLogs);
-        
-        // Restic browser functions (scaffold)
-        function loadResticRepository() {
-            const resticJobSelect = document.getElementById('resticJobSelect');
-            const browserContent = document.getElementById('resticBrowserContent');
-            const repositoryInfo = document.getElementById('resticRepositoryInfo');
-            const snapshotList = document.getElementById('resticSnapshotList');
-            
-            if (resticJobSelect.value) {
-                const jobName = resticJobSelect.value;
-                
-                // TODO: Implement repository browsing
-                repositoryInfo.textContent = `Loading repository information for ${jobName}...`;
-                snapshotList.textContent = 'Snapshot browser not yet implemented';
-                browserContent.classList.remove('hidden');
-            } else {
-                browserContent.classList.add('hidden');
-            }
-        }
     </script>
 </body>
 </html>
