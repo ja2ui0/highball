@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
     <script src="/static/backup-browser.js"></script>
+    <script src="/static/restore-core.js"></script>
+    <script src="/static/restore-restic.js"></script>
 </head>
 <body>
     <div class="container">
@@ -69,7 +71,7 @@
                 
                 <div id="fileTree" class="hidden file-tree">
                     <h3>File Browser</h3>
-                    <div id="selectionInfo" class="selection-info hidden">
+                    <div id="selectionInfo" class="selection-info">
                         <span id="selectionCount">0 items selected</span>
                         <label>
                             <input type="checkbox" id="selectAllToggle" onchange="toggleSelectAll()">
@@ -89,8 +91,8 @@
                         </div>
                     </div>
                     
-                    <!-- Restore Controls (shown when selections exist or Select All is checked) -->
-                    <div id="restoreControls" class="hidden restore-controls">
+                    <!-- Restore Controls -->
+                    <div id="restoreControls" class="restore-controls">
                         <h4>Restore Options</h4>
                         <div class="restore-options">
                             <div>
@@ -111,14 +113,58 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            
+            <div id="browserError" class="hidden error-message">
+                <!-- Error messages will be displayed here -->
+            </div>
+        </div>
+        
+        <!-- Password Confirmation Modal -->
+        <div id="passwordModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Confirm Restore Operation</h3>
+                <p id="restoreConfirmationText">Please enter the repository password to confirm this restore operation:</p>
                 
-                <div id="browserError" class="hidden error-message">
+                <div class="form-group">
+                    <label for="modalPassword">Repository Password:</label>
+                    <input type="password" id="modalPassword" class="w-full" placeholder="Enter repository password">
+                </div>
+                
+                <div id="restoreSummary" class="restore-summary">
+                    <h4>Restore Summary:</h4>
+                    <div id="summaryContent"></div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="confirmRestore" class="button button-success">Confirm Restore</button>
+                    <button id="cancelRestore" class="button button-warning">Cancel</button>
+                </div>
+                
+                <div id="modalError" class="hidden error-message">
                     <!-- Error messages will be displayed here -->
                 </div>
             </div>
         </div>
         
-        <!-- Job Logs (moved to bottom) -->
+        <!-- Restore Progress Modal -->
+        <div id="progressModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Restore in Progress</h3>
+                <div id="progressInfo">
+                    <div id="progressBar" class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="progressText">Starting restore...</div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="closeProgress" class="button">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Job Logs -->
         <div class="section-container">
             <h2 class="section-header">Job Logs</h2>
             <div class="log-section">

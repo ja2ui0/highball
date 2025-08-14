@@ -51,6 +51,10 @@
     --alert-success-bg: #2d5016;
     --alert-error-bg: #5a1a1a;
     --alert-info-bg: #0c4a5a;
+    
+    /* Modal and Progress */
+    --modal-overlay: rgba(0, 0, 0, 0.7);
+    --progress-fill: #4a9eff;
 }
 
 /* Restic browser icon styling - white for dark theme */

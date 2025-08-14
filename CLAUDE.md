@@ -16,9 +16,9 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 ## Key Components
 
 **Core**: `app.py` (routing), `config.py` (YAML config)
-**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (log viewer), `restic_handler.py` (Restic management), `filesystem_handler.py` (backup-agnostic filesystem browsing), `api_handler.py` (REST API for external integrations), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing), `form_error_handler.py` (inline error display), `job_display.py` (dashboard formatting), `dashboard.py` (modularized coordinator)
+**Handlers**: `backup.py` (modular execution orchestration), `backup_executor.py` (core backup execution), `backup_command_builder.py` (rsync command construction with multi-path support), `restic_command_builder.py` (restic command construction), `command_builder_factory.py` (routing commands to providers), `backup_conflict_handler.py` (conflict management), `backup_notification_dispatcher.py` (notification handling), `job_manager.py` (CRUD), `job_validator.py` (validation), `logs.py` (system debug log viewer), `inspect_handler.py` (per-job inspection and restore UI), `restore_handler.py` (complete Restic restore execution with progress tracking), `restic_handler.py` (Restic management), `filesystem_handler.py` (backup-agnostic filesystem browsing), `api_handler.py` (REST API for external integrations), `restic_validator.py` (connectivity validation), `restic_form_parser.py`, `ssh_form_parser.py`, `local_form_parser.py`, `rsyncd_form_parser.py` (modular form parsing), `form_error_handler.py` (inline error display), `job_display.py` (dashboard formatting), `dashboard.py` (modularized coordinator)
 **Services**: `job_logger.py` (pathlib-based logging), `ssh_validator.py` (modern validation with caching), `scheduler_service.py`, `job_conflict_manager.py` (runtime conflicts), `notification_service.py` (notifiers library backend), `form_data_service.py` (modular template generation), `restic_runner.py` (command execution), `restic_content_analyzer.py` (content fingerprinting), `backup_client.py` (generic SSH/local execution), `repository_service.py` (abstract base for providers), `restic_repository_service.py` (Restic implementation), `filesystem_service.py` (rsync filesystem browsing), `binary_checker_service.py` (multi-binary support)
-**Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery), `backup-browser.js` (multi-provider backup browsing)
+**Static Assets**: Modular JavaScript architecture with `job-form-core.js` (utilities), `job-form-ssh.js` (SSH validation), `job-form-rsyncd.js` (rsync discovery), `job-form-restic.js` (Restic management), `job-form-globals.js` (compatibility), `config-manager.js` (settings UI), `network-scan.js` (rsync discovery), `backup-browser.js` (multi-provider backup browsing), `restore-core.js` (generic restore UI and provider orchestration), `restore-restic.js` (Restic-specific restore implementation)
 
 ## Data Storage
 
@@ -39,8 +39,9 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
 **Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation
 **Backup Browser**: Multi-provider backup browsing system supporting Restic (repository snapshots), rsync/SSH/local/rsyncd (filesystem directories) with unified interface, provider-specific terminology, and expandable file trees
+**Restore System**: Complete Restic restore functionality with per-job inspection interface (`/inspect?name=<jobname>`), integrated job status/backup browser/restore controls, modal password confirmation, dry run capability (default enabled), "Restore to Highball" target (/restore directory), background execution with progress tracking, and modular JavaScript architecture extensible to future providers (rsync, borg, kopia) - core implementation complete with clean HTML structure and proper container nesting
 **REST API**: GET `/api/highball/jobs` endpoint for external dashboard widgets with query filtering (`state`, `fields`), CORS support, and authentication-ready architecture
-**Inspect System**: Network scanner, backup-agnostic browser for all job types, 8 unified log sources (system + operational) with organized 2-row layout
+**Debug System**: System debugging interface (`/dev`) with network scanner, 8 unified log sources (system + operational) with organized 2-row layout, separated from per-job inspection
 
 ## Development
 
@@ -73,6 +74,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Error Handling Architecture**: Modular inline error display (`FormErrorHandler`) with user input preservation, no scary error pages
 **Dashboard Display Architecture**: Clean multi-path source display with hierarchical formatting and proper line breaks
 **Backup Execution Architecture**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
+**Restore Architecture**: Modular JavaScript provider system with `restore-core.js` (generic UI orchestration) and provider-specific implementations (`restore-restic.js`), `RestoreHandler` backend with command building and background execution, extensible to future providers
 **Rsync Options Architecture**: Per-job custom options override defaults (`-a --info=stats1 --delete --delete-excluded`), unified SSH/rsyncd field
 **Testing Architecture**: Comprehensive unit test coverage for error handling with mocking patterns
 
@@ -142,10 +144,14 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Next Session Priority**: 
-1. **File restore functionality** - Add restore capabilities for snapshots and file recovery (NEW WORK)
-2. **Rclone direct destinations** - Add rclone as a standalone destination for file level backup (as opposed to block) to all supported backends
+1. **Real Progress Parsing** - Replace simulated progress with actual `restic restore --json` output parsing for accurate progress display
+2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table
+3. **Multi-Provider Restore** - Extend restore system to rsync, borg, kopia using established modular architecture
 
 **Recent Completion (2025-08-14)**:
+- **Complete Restore System Implementation** - Full Restic restore implementation with `RestoreHandler` backend, modular JavaScript architecture (`restore-core.js` + `restore-restic.js`), modal password confirmation, dry run capability, background execution with progress tracking, comprehensive unit test coverage (35/35 tests passing), and clean codebase after debugging cleanup
+- **HTML Structure Resolution** - Fixed corrupted job inspect template HTML structure causing layout issues, proper container nesting for selection controls and job logs, modular JavaScript provider system ready for testing
+- **Restore Infrastructure (Phase 1)** - Complete per-job inspection system with `/inspect?name=<jobname>` endpoint, integrated job status/logs/backup browser/restore controls, dashboard "Inspect" buttons, `/dev` system debugging separation, backup command builder multi-path `source_paths` format support, and UI refinements for restore workflow
 - **Backup-agnostic browser refactoring** - Converted Restic-only browser to multi-provider system supporting all backup types (Restic snapshots, rsync/SSH/local/rsyncd filesystems) with unified interface, proper terminology distinction, and provider detection
 - **Complete notification system** - Full spam-prevention queue system with configurable intervals, batch formatting, event-driven processing, per-job notification integration with template variables, and comprehensive testing
 - **Enhanced log inspection** - Added 4 new log sources (Job Status, Running Jobs, SSH Validation Cache, Notification Queues) with organized 2-row button layout

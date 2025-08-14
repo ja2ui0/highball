@@ -631,9 +631,11 @@ function updateSelectionDisplay() {
     const selectionList = document.getElementById('selectionList');
     const totalSelected = backupSelection.files.size + backupSelection.directories.size;
     
+    // Always show selectionInfo - don't hide it
+    selectionInfo.classList.remove('hidden');
+    
     if (totalSelected > 0) {
         selectionCount.textContent = `${backupSelection.files.size} files, ${backupSelection.directories.size} directories selected`;
-        selectionInfo.classList.remove('hidden');
         
         // Update selection pane
         let html = '<ul class="selection-list">';
@@ -653,7 +655,7 @@ function updateSelectionDisplay() {
         html += '</ul>';
         selectionList.innerHTML = html;
     } else {
-        selectionInfo.classList.add('hidden');
+        selectionCount.textContent = '0 items selected';
         selectionList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>';
     }
 }

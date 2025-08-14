@@ -19,6 +19,7 @@ from handlers.job_scheduler import JobSchedulerHandler
 from handlers.restic_handler import ResticHandler
 from handlers.filesystem_handler import FilesystemHandler
 from handlers.api_handler import ApiHandler
+from handlers.restore_handler import RestoreHandler
 from handlers.notification_test_handler import NotificationTestHandler
 
 # Services
@@ -83,6 +84,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'restic': ResticHandler(cls._backup_config),
                 'filesystem': FilesystemHandler(cls._backup_config),
                 'api': ApiHandler(cls._backup_config),
+                'restore': RestoreHandler(cls._backup_config, cls._template_service),
                 'notification_test': NotificationTestHandler(),
             }
         except Exception:
@@ -228,6 +230,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['dashboard'].dismiss_config_warning(self)
             elif path == '/schedule-job':
                 self._handlers['job_scheduler'].schedule_job(self, form_data)
+            elif path == '/restore':
+                self._handlers['restore'].process_restore_request(self, form_data)
             elif path == '/test-telegram-notification':
                 self._handlers['notification_test'].test_telegram_notification(self, form_data)
             elif path == '/test-email-notification':
