@@ -17,6 +17,7 @@ from handlers.backup import BackupHandler
 from handlers.job_scheduler import JobSchedulerHandler
 from handlers.restic_handler import ResticHandler
 from handlers.filesystem_handler import FilesystemHandler
+from handlers.api_handler import ApiHandler
 from handlers.notification_test_handler import NotificationTestHandler
 
 # Services
@@ -79,6 +80,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
                 'restic': ResticHandler(cls._backup_config),
                 'filesystem': FilesystemHandler(cls._backup_config),
+                'api': ApiHandler(cls._backup_config),
                 'notification_test': NotificationTestHandler(),
             }
         except Exception:
@@ -166,6 +168,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['config'].reload_config(self)
             elif path == '/backup-config':
                 self._handlers['config'].download_config_backup(self)
+            elif path == '/api/highball/jobs':
+                self._handlers['api'].get_jobs(self)
             else:
                 self._send_404()
         except Exception as e:
@@ -229,6 +233,16 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             self._send_error_response(f"Server error: {str(e)}")
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests for API endpoints"""
+        url_parts = urlparse(self.path)
+        path = url_parts.path
+        
+        if path.startswith('/api/'):
+            self._handlers['api'].handle_options(self)
+        else:
+            self._send_405()
 
     def _serve_static_file(self, path):
         """Serve CSS/JS files"""
