@@ -12,6 +12,7 @@ from urllib.parse import urlparse, parse_qs
 from handlers.dashboard import DashboardHandler
 from handlers.config_handler import ConfigHandler
 from handlers.logs import LogsHandler
+from handlers.inspect_handler import InspectHandler
 from handlers.network import NetworkHandler
 from handlers.backup import BackupHandler
 from handlers.job_scheduler import JobSchedulerHandler
@@ -75,6 +76,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 ),
                 'config': ConfigHandler(cls._backup_config, cls._template_service),
                 'logs': LogsHandler(cls._template_service, cls._backup_config),
+                'inspect': InspectHandler(cls._template_service, cls._backup_config),
                 'network': NetworkHandler(),
                 'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
@@ -121,9 +123,11 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['config'].show_config_manager(self)
             elif path == '/config/raw':
                 self._handlers['config'].show_raw_editor(self)
-            elif path == '/logs':
+            elif path == '/dev':
                 log_type = params.get('type', ['app'])[0]
-                self._handlers['logs'].show_logs(self, log_type)
+                self._handlers['logs'].show_dev_logs(self, log_type)
+            elif path == '/inspect':
+                self._handlers['inspect'].show_job_inspect(self)
             elif path == '/scan-network':
                 network_range = params.get('range', ['192.168.1.0/24'])[0]
                 self._handlers['network'].scan_network_for_rsyncd(self, network_range)

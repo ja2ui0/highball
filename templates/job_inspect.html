@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inspect {{JOB_NAME}} - Highball</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/nav.js"></script>
+    <script src="/static/backup-browser.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Inspect Job: {{JOB_NAME}}</h1>
+        <p class="job-type-info">Job Type: <strong>{{JOB_TYPE}}</strong></p>
+        
+        <!-- Job Status Section (moved from history page) -->
+        <div class="section-container">
+            <h2 class="section-header">Job Status</h2>
+            
+            <div class="form-group">
+                <label>Last Run:</label>
+                <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{LAST_RUN}}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Status:</label>
+                <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace;">
+                    {{STATUS}}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Message:</label>
+                <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace; word-break: break-word;">
+                    {{MESSAGE}}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Backup Browser Component -->
+        <div class="section-container">
+            <h2 class="section-header">Backup Browser</h2>
+            
+            {{JOB_TYPES_JS}}
+            <!-- Hidden pre-selected dropdown for JavaScript compatibility -->
+            <select id="backupJobSelect" onchange="loadBackupJob()" style="display: none;">
+                {{BACKUP_JOB_DROPDOWN}}
+            </select>
+            
+            <div id="browserContent" class="hidden backup-browser">
+                <div id="repositoryInfo" class="help-text">
+                    <!-- Repository/job information will be displayed here -->
+                </div>
+                
+                <div id="snapshotSection" class="hidden">
+                    <h3 id="snapshotSectionTitle">Select Snapshot/Archive:</h3>
+                    <select id="snapshotSelect" onchange="loadSnapshotDetails()">
+                        <option value="">Select a snapshot...</option>
+                    </select>
+                </div>
+                
+                <div id="snapshotDetails" class="hidden snapshot-details">
+                    <h4 id="snapshotDetailsTitle">Details</h4>
+                    <div id="snapshotInfo"></div>
+                </div>
+                
+                <div id="fileTree" class="hidden file-tree">
+                    <h3>File Browser</h3>
+                    <div id="selectionInfo" class="selection-info hidden">
+                        <span id="selectionCount">0 items selected</span>
+                        <label>
+                            <input type="checkbox" id="selectAllToggle" onchange="toggleSelectAll()">
+                            Select All (Full Snapshot Restore)
+                        </label>
+                        <button onclick="clearSelection()" class="button button-warning">Clear Selection</button>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <div id="treeContainer" class="tree-container">
+                            <!-- File tree will be populated here -->
+                        </div>
+                        <div id="selectionPane" class="selection-pane">
+                            <div class="selection-header">Selected Items</div>
+                            <div id="selectionList">
+                                <div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Restore Controls (shown when selections exist or Select All is checked) -->
+                    <div id="restoreControls" class="hidden restore-controls">
+                        <h4>Restore Options</h4>
+                        <div class="restore-options">
+                            <div>
+                                <label>Restore Target:</label>
+                                <select id="restoreTarget">
+                                    <option value="highball">Restore to Highball (/restore)</option>
+                                </select>
+                            </div>
+                            <div class="mt-15">
+                                <label>
+                                    <input type="checkbox" id="dryRunToggle" checked>
+                                    Dry Run (safe preview - uncheck to perform actual restore)
+                                </label>
+                            </div>
+                            <div class="mt-15">
+                                <button id="startRestore" class="button button-success">Start Restore</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="browserError" class="hidden error-message">
+                    <!-- Error messages will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Job Logs (moved to bottom) -->
+        <div class="section-container">
+            <h2 class="section-header">Job Logs</h2>
+            <div class="log-section">
+                <button id="refreshLogs" class="button">Refresh</button>
+                <button id="clearLogs" class="button button-warning">Clear Display</button>
+            </div>
+            
+            <div id="logContent" class="log-viewer">{{JOB_LOG_CONTENT}}</div>
+        </div>
+    </div>
+
+    <script>
+        const logContent = document.getElementById('logContent');
+        const refreshButton = document.getElementById('refreshLogs');
+        const clearButton = document.getElementById('clearLogs');
+        const restoreControls = document.getElementById('restoreControls');
+        const selectAllToggle = document.getElementById('selectAllToggle');
+        const selectionPane = document.getElementById('selectionPane');
+        
+        // Auto-load the backup job when page loads (since it's pre-selected)
+        window.addEventListener('load', function() {
+            loadBackupJob();
+        });
+        
+        function refreshLogs() {
+            // Only refresh the logs section, not the entire page
+            const jobName = '{{JOB_NAME}}';
+            const currentUrl = new URL(window.location);
+            const refreshUrl = `/inspect?name=${encodeURIComponent(jobName)}`;
+            
+            // Fetch only the log content without reloading the page
+            fetch(refreshUrl)
+                .then(response => response.text())
+                .then(html => {
+                    // Parse the response to extract just the log content
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newLogContent = doc.getElementById('logContent');
+                    
+                    if (newLogContent) {
+                        document.getElementById('logContent').innerHTML = newLogContent.innerHTML;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing logs:', error);
+                    // Fallback to full page reload if fetch fails
+                    window.location.reload();
+                });
+        }
+        
+        function clearLogs() {
+            logContent.textContent = '';
+        }
+        
+        function toggleSelectAll() {
+            const isChecked = selectAllToggle.checked;
+            
+            if (isChecked) {
+                // Grey out selection pane when Select All is active
+                selectionPane.style.opacity = '0.5';
+                selectionPane.style.pointerEvents = 'none';
+                showRestoreControls();
+            } else {
+                // Re-enable selection pane
+                selectionPane.style.opacity = '1';
+                selectionPane.style.pointerEvents = 'auto';
+                updateRestoreControlsVisibility();
+            }
+        }
+        
+        function showRestoreControls() {
+            restoreControls.classList.remove('hidden');
+        }
+        
+        function hideRestoreControls() {
+            restoreControls.classList.add('hidden');
+        }
+        
+        function updateRestoreControlsVisibility() {
+            // Show restore controls if Select All is checked OR selections exist
+            const hasSelections = document.querySelectorAll('.tree-item input[type="checkbox"]:checked').length > 0;
+            const selectAllChecked = selectAllToggle.checked;
+            
+            if (selectAllChecked || hasSelections) {
+                showRestoreControls();
+            } else {
+                hideRestoreControls();
+            }
+        }
+        
+        // Override the global selection update function to handle restore controls
+        window.originalUpdateSelectionDisplay = window.updateSelectionDisplay || function() {};
+        window.updateSelectionDisplay = function() {
+            window.originalUpdateSelectionDisplay();
+            updateRestoreControlsVisibility();
+        };
+        
+        // Event listeners
+        refreshButton.addEventListener('click', refreshLogs);
+        clearButton.addEventListener('click', clearLogs);
+    </script>
+</body>
+</html>

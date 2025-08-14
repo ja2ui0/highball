@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>System Debug - Highball</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/nav.js"></script>
+    <script src="/static/network-scan.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>System Debug</h1>
+        
+        <!-- Network Scanner Container -->
+        <div class="section-container">
+            <h2 class="section-header">Network Scanner</h2>
+            <p>Scan your network for available rsync servers and their modules.</p>
+            <input type="text" id="networkRange" placeholder="192.168.1.0/24" class="w-150">
+            <div class="mt-15">
+                <button id="scanNetwork" class="button button-warning">Scan Network for Rsync Servers</button>
+            </div>
+            <div id="scanResults" class="hidden mt-15">
+                <h4>Found Rsync Servers:</h4>
+                <div id="scanOutput" class="code-container log-container" style="height: 200px;"></div>
+            </div>
+        </div>
+        
+        <!-- Log Sources Container (moved to bottom) -->
+        <div class="section-container">
+            <h2 class="section-header">System Log Sources</h2>
+            {{LOG_BUTTONS}}
+            
+            <div class="log-section">
+                <button id="refreshLogs" class="button">Refresh</button>
+                <button id="clearLogs" class="button button-warning">Clear Display</button>
+            </div>
+            
+            <h3>{{LOG_NAME}}</h3>
+            <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
+        </div>
+    </div>
+
+    <script>
+        const logContent = document.getElementById('logContent');
+        const refreshButton = document.getElementById('refreshLogs');
+        const clearButton = document.getElementById('clearLogs');
+        
+        function refreshLogs() {
+            // Reload the current page to refresh log content
+            window.location.reload();
+        }
+        
+        function clearLogs() {
+            logContent.textContent = '';
+        }
+        
+        // Event listeners
+        refreshButton.addEventListener('click', refreshLogs);
+        clearButton.addEventListener('click', clearLogs);
+    </script>
+</body>
+</html>

@@ -1,72 +1,102 @@
-# Core mental model
+# Restore Functionality Implementation Plan
 
-Offer **three restore targets**, each with a clear, simple path:
+## Core Architecture
 
-1. **Restore to source**
-  - Default and most common.
-  - Requires re-entering the repo password and confirming overwrites.
-  - Supports partial restores (selected folders/files).
-  - Safe by default: preflight size estimate and a “dry run” summary before touching disk.
-        
-2. **Restore to highball**
-  - Restores into a persistent folder inside the container (bind-mount recommended).
-  - Useful for inspecting or hand-picking files, or when the source host path is offline.
-  - Makes follow-up actions easy (manual copy, diff, malware scan, etc.).
-        
-3. **Download a file**
-  - Single file recovery only for early versions
-        
-# How the user picks
+**Dashboard-centric workflow**: Restore initiated from dashboard "Inspect" buttons → `/inspect?name=<jobname>` → integrated restore interface
+**MVP Provider**: Restic-only initially, architecture designed for multi-provider expansion  
+**Restore Location**: `/restore` directory in container (ephemeral for development, bind-mount ready for production)
 
-- **Backup source**
-  - discovered on Inspect page
+## User Workflow
 
-- **Snapshot / Filesystem**
-  - latest snapshots on top
-  - filesystem isn't versioned
+1. **Dashboard** → Click "Inspect" button for any job
+2. **Inspect Page** (`/inspect?name=<jobname>`) contains:
+   - Job logs (moved from current `/logs` page)
+   - Backup browser with restore controls
+   - Restore status/progress display
+3. **Restore Selection**:
+   - Browse snapshots (latest first) 
+   - Use existing checkbox system for granular file/folder selection
+   - "Select All" button for full snapshot restore (Restic native)
+4. **Restore Target**: Start with "Restore to Highball" (MVP), expand to source/download later
+5. **Security**: Modal password confirmation for restore operations
 
-- **Selection**:
-  - "Select All" for repo types only (like restic, borg, kopia)
-    - will automatically trigger a full "snapshot restore" for providers with this option
-  - File browser for filesystem types (rsync, rclone) and also for snapshots
-  - Checkboxes on folders/files in the browser view
-        
-- **Target**:
-  - Source (default for all types)
-  - Highball (Local - default for filesystem types)
-    - User should bind mount a local directory for this to be useful
-  - Download
-    - Single files only (for now) - visible only when exactly one file is selected
+## Dashboard Integration  
 
-- **Safety**:
-  - **Dry run** toggle (on by default)
-  - For repo types: Overwrite policy
-    1. Skip existing
-    2. Overwrite newer only
-    3. Overwrite all
-  - User must supply password for any restore operation that would overwrite any files at source for backup methods that support passwords, or a "random" phrase for methods that don't
-        
-# Under the hood
+**Job Status Changes**:
+- `Enabled` → `Paused` during restore operations
+- Status shows `Restoring... N%` with progress from `restic restore --json`
+- Dashboard buttons adapt: `RUN`→`KILL`, `DRY RUN`→`FOLLOW`, `EDIT` hidden during restore
 
-- Estimate size / counts
-- Background the process and tail a restore log for Source and Highball (Local) types
-- Preserve ownership and permissions vs Restore as current user?
-- Symlinks, sockets, device files: show a different icon in the file browser?
-  - X icon for device files / sockets - skip these files, Highball won't handle them (and not planned)
-  - 'link' icon for symlinks. Hard link handling for supported types?
-- Nice / ionice the restore provess?
-- Hard kill switch in UI?
-  - Dashboard: RESTORING status, KILL button replaces RUN, FOLLOW replaces DRY RUN, EDIT goes away
-- Design review - do we keep file browser in the Inspect tab, or do we move job inspection to a button on the dashboard, and select all the options based on that? MUCH easier for the user and less confusing.
-- Fork process and tail log so user can watch the process in browser
-- Mark restores (log) clearly with job type, snapshot id, and selection summary.
-- Keep the dry run summary attached to the job for auditing
-    
-# Roadmap / Wishlist
-- Include / Exclude patterns for repos that support full snapshot restores
-- Multi-file Download with tar.gz or zip, with warnings (and disk space check) for large size / many files, quotas, timeouts
-- progress monitoring / notification
-- "mount snapshot" for supported types, probably to a subdir of a bind mounted "restore" volume
+## Technical Implementation
 
-# Glossary
-- App will feature a help section, advance restore ops will be linked
+**New Components**:
+- `/handlers/restore_handler.py` - RestoreHandler following BackupHandler pattern
+- `/services/restore_service.py` - Background restore execution with progress parsing
+- `/templates/job_inspect.html` - New inspect page template
+- Route: `GET /inspect?name=<jobname>` (replaces current `/logs` functionality)
+
+**Existing Code Reuse**:
+- Backup browser tree structure and checkbox system (no changes needed)
+- Job logger system (extend for restore tracking)
+- Background job execution patterns
+- Modal UI patterns from job forms
+
+**Progress Monitoring**:
+- Parse `restic restore --json` output for file counts and progress
+- Update job status with restore progress percentage  
+- Real-time progress display on dashboard
+
+## Implementation Phases
+
+### ✅ Phase 1: Core Infrastructure (COMPLETED)
+1. ✅ Created `/inspect?name=<jobname>` endpoint and InspectHandler
+2. ✅ Moved job logs to per-job inspect pages, `/logs` → `/dev`
+3. ✅ Extended backup browser with restore controls and "Select All" toggle
+4. ✅ Implemented restore UI with "Restore to Highball" target and dry run (default on)
+5. ✅ Dashboard "History" → "Inspect" buttons, preserved job status information
+6. ✅ Separated system debugging to `/dev` with network scanner
+
+### 🚧 Phase 2: Restore Execution (NEXT)
+1. Create RestoreHandler for processing restore requests
+2. Implement Restic restore command building and execution
+3. Background restore execution with `restic restore --json` progress parsing
+4. Dashboard status integration with "Restoring... N%" progress display
+5. Modal password confirmation for restore operations
+6. Job status changes: `Enabled` → `Paused` during restore
+
+### Phase 3: Polish & Expand (FUTURE)
+1. Restore to source target
+2. Single file download capability
+3. Multi-provider architecture (rsync, etc.)
+4. Advanced features (include/exclude patterns, progress notifications)
+
+## File Structure Changes
+
+**✅ Completed Routes**:
+- ✅ `GET /inspect?name=<jobname>` → Job inspection hub (InspectHandler)
+- ✅ `GET /dev` → System debugging (LogsHandler.show_dev_logs)
+- ✅ Dashboard "History" → "Inspect" buttons (always available)
+
+**🚧 Next Routes**:
+- `POST /restore` → Execute restore operation (RestoreHandler)
+- Dashboard job status integration for restore progress
+
+**✅ Completed Files**:
+- ✅ `/handlers/inspect_handler.py` → Per-job inspection
+- ✅ `/templates/job_inspect.html` → Integrated job status, backup browser, restore controls, logs
+- ✅ `/templates/dev_logs.html` → System debugging with network scanner
+- ✅ Updated `/handlers/job_display.py` → Inspect links
+- ✅ Updated `/app.py` → Routing for new endpoints
+
+## Technical Notes
+
+**Restic Integration**:
+- Use `restic restore --json` for progress monitoring
+- Support both full snapshot restore and granular file selection
+- Password required for restore operations (security confirmation)
+
+**Architecture Patterns**:
+- Follow existing BackupHandler/BackupExecutor separation of concerns
+- Reuse job conflict detection system
+- Extend job logger for restore operation tracking  
+- Modal password pattern from existing job forms

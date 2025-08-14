@@ -129,4 +129,5 @@ rr
 sample/
 *.bak
 config/config.yaml
+*.draft
 

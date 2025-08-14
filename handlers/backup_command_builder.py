@@ -85,8 +85,9 @@ class BackupCommandBuilder:
         """
         Build the source path for rsync based on config fields.
         Accepts:
-          - source_config.user / source_config.host / source_config.path
-          - source_config.username / source_config.hostname / source_config.path
+          - source_config.user / source_config.host / source_config.path (legacy)
+          - source_config.username / source_config.hostname / source_config.path (legacy)
+          - source_config.username / source_config.hostname / source_config.source_paths[] (new multi-path format)
           - or flat source_string
         """
         sc = job_config.get("source_config", {})
@@ -95,6 +96,14 @@ class BackupCommandBuilder:
         # Allow either `host` or `hostname`
         host = sc.get("host") or sc.get("hostname")
         path = sc.get("path")
+        
+        # Handle new multi-path format - use first path if no direct path specified
+        if not path and sc.get("source_paths"):
+            source_paths = sc.get("source_paths", [])
+            if source_paths and isinstance(source_paths, list) and len(source_paths) > 0:
+                first_path = source_paths[0]
+                if isinstance(first_path, dict) and "path" in first_path:
+                    path = first_path["path"]
 
         if sc.get("source_string"):
             return sc["source_string"]

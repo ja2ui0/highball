@@ -18,12 +18,8 @@ class JobDisplay:
         for job_name, job_config in jobs.items():
             status = "enabled" if job_config.get('enabled', True) else "disabled"
             
-            # Build history link
-            job_log = logs.get(job_name, {})
-            if job_log.get('last_run'):
-                history_link = f'<a href="/history?job={html.escape(job_name)}" class="history-link">View</a>'
-            else:
-                history_link = '<span style="color: #888;">None</span>'
+            # Build inspect link (always available)
+            inspect_link = f'<a href="/inspect?name={html.escape(job_name)}" class="inspect-link">Inspect</a>'
             
             # Format source and destination paths for display
             source_display = JobDisplay.format_source_display(job_config)
@@ -36,7 +32,7 @@ class JobDisplay:
                     <td class="source-path">{dest_display}</td>
                     <td class="{status}">{status.capitalize()}</td>
                     <td>{html.escape(job_config.get('schedule', 'manual'))}</td>
-                    <td>{history_link}</td>
+                    <td>{inspect_link}</td>
                     <td>
                         <div class="action-buttons">
                             <form method="post" action="/run-backup" style="display: inline;">

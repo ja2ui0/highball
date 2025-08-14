@@ -46,48 +46,24 @@ class LogsHandler:
         self.template_service = template_service
         self.backup_config = backup_config
     
-    def show_logs(self, handler, log_type='app'):
-        """Show logs viewer"""
-        from urllib.parse import urlparse, parse_qs
+    def show_dev_logs(self, handler, log_type='app'):
+        """Show system debugging logs (no job logs - those moved to /inspect)"""
+        # Validate log type
+        if log_type not in self.LOG_TYPES:
+            log_type = 'app'
         
-        # Check if this is a job log request
-        url_parts = urlparse(handler.path)
-        params = parse_qs(url_parts.query)
-        job_name = params.get('job', [''])[0]
+        current_log = self.LOG_TYPES[log_type]
+        log_name = current_log['name']
+        log_content = self._read_log_file(current_log['file'])
+        log_buttons = self._generate_log_buttons(log_type)
         
-        if job_name:
-            # Show job-specific log
-            log_file = f'/var/log/highball/jobs/{job_name}.log'
-            log_name = f'Job: {job_name}'
-            log_content = self._read_log_file(log_file)
-            log_buttons = self._generate_log_buttons(log_type)  # Show system log buttons
-        else:
-            # Show system logs
-            # Validate log type
-            if log_type not in self.LOG_TYPES:
-                log_type = 'app'
-            
-            current_log = self.LOG_TYPES[log_type]
-            log_name = current_log['name']
-            log_content = self._read_log_file(current_log['file'])
-            log_buttons = self._generate_log_buttons(log_type)
-        
-        # Generate job dropdown with system option
-        job_dropdown = self._generate_job_dropdown(job_name)
-        
-        # Generate backup job dropdown and job types for browser
-        backup_job_dropdown, job_types_js = self._generate_backup_job_dropdown()
-        
-        # Render template
+        # Render dev template (no job dropdown or backup browser)
         html_content = self.template_service.render_template(
-            'logs.html',
+            'dev_logs.html',
             log_buttons=log_buttons,
             log_content=log_content,
             log_type=log_type,
-            log_name=log_name,
-            job_dropdown=job_dropdown,
-            backup_job_dropdown=backup_job_dropdown,
-            job_types_js=job_types_js
+            log_name=log_name
         )
         
         self.template_service.send_html_response(handler, html_content)

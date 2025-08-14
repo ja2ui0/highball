@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <a href="/">Highball</a>
             <a href="/add-job">Add Job</a>
             <a href="/config">Config</a>
-            <a href="/logs">Inspect</a>
+            <a href="/dev">Dev</a>
         </nav>
     `;
     
