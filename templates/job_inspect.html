@@ -8,6 +8,7 @@
     <script src="/static/backup-browser.js"></script>
     <script src="/static/restore-core.js"></script>
     <script src="/static/restore-restic.js"></script>
+    <script src="/static/job-inspect.js"></script>
 </head>
 <body>
     <div class="container">
@@ -16,7 +17,7 @@
         <h1>Inspect Job: {{JOB_NAME}}</h1>
         <p class="job-type-info">Job Type: <strong>{{JOB_TYPE}}</strong></p>
         
-        <!-- Job Status Section (moved from history page) -->
+        <!-- Job Status Section -->
         <div class="section-container">
             <h2 class="section-header">Job Status</h2>
             
@@ -164,188 +165,5 @@
             <div id="logContent" class="log-viewer">{{JOB_LOG_CONTENT}}</div>
         </div>
     </div>
-
-    <script>
-        const logContent = document.getElementById('logContent');
-        const refreshButton = document.getElementById('refreshLogs');
-        const clearButton = document.getElementById('clearLogs');
-        const restoreControls = document.getElementById('restoreControls');
-        const selectAllToggle = document.getElementById('selectAllToggle');
-        const selectionPane = document.getElementById('selectionPane');
-        
-        // Auto-load the backup job when page loads (since it's pre-selected)
-        window.addEventListener('load', function() {
-            loadBackupJob();
-        });
-        
-        function refreshLogs() {
-            // Only refresh the logs section, not the entire page
-            const jobName = '{{JOB_NAME}}';
-            const currentUrl = new URL(window.location);
-            const refreshUrl = `/inspect?name=${encodeURIComponent(jobName)}`;
-            
-            // Fetch only the log content without reloading the page
-            fetch(refreshUrl)
-                .then(response => response.text())
-                .then(html => {
-                    // Parse the response to extract just the log content
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const newLogContent = doc.getElementById('logContent');
-                    
-                    if (newLogContent) {
-                        document.getElementById('logContent').innerHTML = newLogContent.innerHTML;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error refreshing logs:', error);
-                    // Fallback to full page reload if fetch fails
-                    window.location.reload();
-                });
-        }
-        
-        function clearLogs() {
-            logContent.textContent = '';
-        }
-        
-        function toggleMode() {
-            const modeToggle = document.getElementById('modeToggle');
-            const restoreControls = document.getElementById('restoreControls');
-            
-            if (modeToggle.classList.contains('left')) {
-                // Switch to Restore mode
-                modeToggle.classList.remove('left');
-                modeToggle.classList.add('right');
-                restoreControls.classList.remove('hidden');
-            } else {
-                // Switch to View mode
-                modeToggle.classList.remove('right');
-                modeToggle.classList.add('left');
-                restoreControls.classList.add('hidden');
-            }
-        }
-        
-        function toggleSelectAll() {
-            const isChecked = selectAllToggle.checked;
-            
-            if (isChecked) {
-                // Grey out selection pane when Select All is active
-                selectionPane.style.opacity = '0.5';
-                selectionPane.style.pointerEvents = 'none';
-                // Clear any validation errors since we now have a selection
-                clearRestoreValidationError();
-            } else {
-                // Re-enable selection pane
-                selectionPane.style.opacity = '1';
-                selectionPane.style.pointerEvents = 'auto';
-            }
-            
-            // Check for overwrites when Select All changes
-            window.checkOverwriteRisk();
-        }
-        
-        function clearRestoreValidationError() {
-            const errorDiv = document.getElementById('restoreValidationError');
-            if (errorDiv) {
-                errorDiv.classList.add('hidden');
-            }
-        }
-        
-        function togglePasswordField() {
-            // This function name is kept for compatibility, but now it handles confirmation
-            window.checkOverwriteRisk();
-        }
-        
-        function handleRestoreTargetChange() {
-            window.checkOverwriteRisk();
-        }
-        
-        window.checkOverwriteRisk = async function checkOverwriteRisk() {
-            const dryRunToggle = document.getElementById('dryRunToggle');
-            const overwriteWarning = document.getElementById('overwriteWarning');
-            const confirmationSection = document.getElementById('confirmationSection');
-            
-            // Hide confirmation elements by default
-            overwriteWarning.classList.add('hidden');
-            confirmationSection.classList.add('hidden');
-            
-            // ALWAYS check for overwrites - warn user regardless of dry run state
-            const overwriteRisk = await window.checkForOverwrites();
-            if (overwriteRisk.hasOverwrites) {
-                // Always show warning with appropriate message
-                const warningText = document.getElementById('overwriteWarningText');
-                if (dryRunToggle.checked) {
-                    warningText.textContent = 'This dry run is testing a restore that would overwrite existing files.';
-                } else {
-                    warningText.textContent = 'This restore will overwrite existing files.';
-                }
-                overwriteWarning.classList.remove('hidden');
-                
-                // Only require OVERWRITE confirmation for actual restores (not dry runs)
-                if (!dryRunToggle.checked) {
-                    confirmationSection.classList.remove('hidden');
-                }
-            }
-        }
-        
-        window.checkForOverwrites = async function checkForOverwrites() {
-            try {
-                const jobName = '{{JOB_NAME}}';
-                const selectAllChecked = document.getElementById('selectAllToggle').checked;
-                const selectedPaths = window.BackupBrowser ? window.BackupBrowser.getSelection() : [];
-                const currentSnapshot = document.getElementById('snapshotSelect').value;
-                const restoreTarget = document.getElementById('restoreTarget').value;
-                
-                const formData = new FormData();
-                formData.append('job_name', jobName);
-                formData.append('snapshot_id', selectAllChecked ? 'latest' : currentSnapshot);
-                formData.append('select_all', selectAllChecked ? 'on' : '');
-                formData.append('restore_target', restoreTarget);
-                
-                // Add selected paths
-                if (!selectAllChecked && selectedPaths.directories) {
-                    selectedPaths.directories.forEach(path => formData.append('selected_paths', path));
-                }
-                if (!selectAllChecked && selectedPaths.files) {
-                    selectedPaths.files.forEach(path => formData.append('selected_paths', path));
-                }
-                
-                
-                const response = await fetch('/check-restore-overwrites', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    return await response.json();
-                } else {
-                    console.error('Failed to check overwrites');
-                    return { hasOverwrites: false };
-                }
-            } catch (error) {
-                console.error('Error checking overwrites:', error);
-                return { hasOverwrites: false };
-            }
-        }
-        
-        // Override the global selection update function (restore controls now controlled by toggle)
-        window.originalUpdateSelectionDisplay = window.updateSelectionDisplay || function() {};
-        window.updateSelectionDisplay = function() {
-            window.originalUpdateSelectionDisplay();
-            
-            // Clear validation errors when items are selected
-            const hasSelections = document.querySelectorAll('.tree-item input[type="checkbox"]:checked').length > 0;
-            if (hasSelections) {
-                clearRestoreValidationError();
-            }
-            
-            // Check for overwrites whenever selection changes
-            window.checkOverwriteRisk();
-        };
-        
-        // Event listeners
-        refreshButton.addEventListener('click', refreshLogs);
-        clearButton.addEventListener('click', clearLogs);
-    </script>
 </body>
 </html>
