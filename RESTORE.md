@@ -120,10 +120,10 @@
 ## Technical Notes
 
 **Form Data Handling**:
-- **Current Implementation**: URL-encoded form data (`application/x-www-form-urlencoded`)
-- **Frontend**: `URLSearchParams` in `restore-restic.js` for form data building
-- **Backend**: `parse_qs()` in `app.py` for URL-encoded parsing
-- **Pending**: Refactor to multipart form data for better array handling and security
+- **Current Implementation**: Multipart form data (`multipart/form-data`)
+- **Frontend**: `FormData` in `restore-restic.js` for form data building
+- **Backend**: `cgi.FieldStorage` in `app.py` with backward compatibility for URL-encoded
+- **Benefits**: Better array handling, enhanced security, file upload ready
 
 **Modular JavaScript Architecture**:
 - Provider registration system allows easy addition of new backup types
@@ -138,22 +138,25 @@
 - Ready for `restic restore --json` progress parsing implementation
 
 **Security & Safety**:
-- Password confirmation modal for all restore operations
-- Password obfuscation in job logs and debugging output
-- Success/error styling with proper green/red status colors
-- Dry run enabled by default to prevent accidental data operations
-- Form validation and error handling throughout the workflow
-- User input preservation and friendly error messages
+- **Intelligent Overwrite Protection**: Pre-flight checks determine if source files would be overwritten
+- **Progressive Disclosure Confirmation**: Only shows confirmation when actual risk exists
+- **Restore Target Options**: Safe container restore (`/restore`) vs. risky source restore (original paths)
+- **Smart Confirmation Text**: User types "OVERWRITE" to confirm data replacement operations
+- **No Modal State Management**: Eliminated race conditions with inline progressive disclosure UI
+- **Dry Run Default**: Enabled by default to prevent accidental data operations
+- **Form Validation**: Real-time validation and error handling throughout workflow
 
 ## Current State - Ready for Testing
 
 **✅ Implementation Complete**:
-- HTML structure fully resolved (job logs properly contained, selection controls always visible)
-- Debugging code and excessive validation removed
-- Clean modular JavaScript architecture in place
-- RestoreHandler backend with command building and background execution
-- Modal UI with password confirmation and progress tracking
-- Comprehensive unit test coverage (35/35 tests passing)
+- **Progressive Disclosure UI**: Eliminated modals, implemented intelligent confirmation system
+- **Overwrite Risk Assessment**: Pre-flight endpoint `/check-restore-overwrites` with filesystem checks
+- **Dual Restore Targets**: Safe Highball container (`/restore`) and risky source location restore
+- **Smart Confirmation Logic**: Only requires "OVERWRITE" confirmation when files would be replaced
+- **Multipart Form Handling**: Complete conversion from URL-encoded with backward compatibility
+- **Clean JavaScript Architecture**: No modal state management, inline progress display
+- **Backend Restore Logic**: Handles both container and source restore targets via restic commands
+- **Comprehensive Testing**: Unit test coverage for multipart forms and restore logic (43/43 tests passing)
 
 **🧪 Next Steps - Testing Phase**:
 1. **End-to-End Testing**: Test actual restore operations (dry run and execution)
@@ -164,9 +167,10 @@
 **🚀 Future Enhancements**:
 1. **Real Progress Parsing**: Replace simulated progress with actual `restic restore --json` output parsing
 2. **Dashboard Integration**: Add restore status polling and display "Restoring... N%" in main dashboard job table  
-3. **Form Data Refactor**: Convert to multipart form data for consistency and better security
-4. **Provider Expansion**: Add rsync restore support using established modular architecture
-5. **Advanced Features**: Restore to source, single file download, notification integration
+3. **Provider Expansion**: Add rsync restore support using established modular architecture
+4. **Advanced Overwrite Detection**: Detect timestamp conflicts, size differences, content changes
+5. **Restore History**: Track restore operations with detailed logs and rollback capabilities
+6. **Single File Download**: Direct file download from repository browser without full restore
 
 ## Testing Readiness Checklist
 

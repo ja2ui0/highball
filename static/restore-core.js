@@ -1,6 +1,6 @@
 /**
  * Restore Core - Generic restore UI handling and orchestration
- * Handles modals, form validation, progress display, and provider delegation
+ * Handles form validation, progress display, and provider delegation
  */
 
 let currentRestoreConfig = null;
@@ -15,41 +15,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeRestoreCore() {
     const startRestoreButton = document.getElementById('startRestore');
-    const confirmRestoreButton = document.getElementById('confirmRestore');
-    const cancelRestoreButton = document.getElementById('cancelRestore');
-    const closeProgressButton = document.getElementById('closeProgress');
-    const passwordModal = document.getElementById('passwordModal');
-    const progressModal = document.getElementById('progressModal');
     
     if (startRestoreButton) {
         startRestoreButton.addEventListener('click', startRestore);
-    }
-    
-    if (confirmRestoreButton) {
-        confirmRestoreButton.addEventListener('click', confirmRestore);
-    }
-    
-    if (cancelRestoreButton) {
-        cancelRestoreButton.addEventListener('click', hidePasswordModal);
-    }
-    
-    if (closeProgressButton) {
-        closeProgressButton.addEventListener('click', hideProgressModal);
-    }
-    
-    // Modal background click to close
-    if (passwordModal) {
-        passwordModal.addEventListener('click', function(e) {
-            if (e.target === passwordModal) hidePasswordModal();
-        });
-    }
-    
-    if (progressModal) {
-        progressModal.addEventListener('click', function(e) {
-            if (e.target === progressModal && document.getElementById('closeProgress').style.display !== 'none') {
-                hideProgressModal();
-            }
-        });
     }
 }
 
@@ -111,104 +79,67 @@ function startRestore() {
         return;
     }
     
+    // For non-dry-run, check for confirmation if overwrites would occur
+    if (!isDryRun) {
+        // Check if confirmation is required and provided (for any overwrite situation)
+        const confirmationSection = document.getElementById('confirmationSection');
+        if (confirmationSection && !confirmationSection.classList.contains('hidden')) {
+            const confirmationField = document.getElementById('overwriteConfirmation');
+            const confirmation = confirmationField ? confirmationField.value.trim() : '';
+            
+            if (confirmation !== 'OVERWRITE') {
+                showAlert('Please type "OVERWRITE" to confirm data replacement');
+                return;
+            }
+        }
+    }
+    
     currentRestoreConfig = baseConfig;
     
     if (isDryRun) {
         // Execute dry run directly
         executeDryRun(provider);
     } else {
-        // Check if provider needs password
-        if (provider.needsPassword()) {
-            showPasswordModal(provider);
-        } else {
-            executeRestore(provider);
-        }
+        // Execute actual restore
+        executeRestore(provider);
     }
-}
-
-function showPasswordModal(provider) {
-    const passwordModal = document.getElementById('passwordModal');
-    const summaryContent = document.getElementById('summaryContent');
-    const modalPassword = document.getElementById('modalPassword');
-    
-    if (!passwordModal || !summaryContent || !modalPassword) {
-        showAlert('Modal elements not found');
-        return;
-    }
-    
-    // Let provider build summary content
-    const summaryHtml = provider.buildRestoreSummary(currentRestoreConfig);
-    summaryContent.innerHTML = summaryHtml;
-    
-    // Clear previous password and errors
-    modalPassword.value = '';
-    document.getElementById('modalError').classList.add('hidden');
-    
-    // Show modal
-    passwordModal.classList.remove('hidden');
-    modalPassword.focus();
-}
-
-function hidePasswordModal() {
-    const passwordModal = document.getElementById('passwordModal');
-    if (passwordModal) {
-        passwordModal.classList.add('hidden');
-    }
-    currentRestoreConfig = null;
-}
-
-function confirmRestore() {
-    const modalPassword = document.getElementById('modalPassword');
-    const password = modalPassword ? modalPassword.value.trim() : '';
-    
-    if (!password) {
-        showModalError('Password is required');
-        return;
-    }
-    
-    // Add password to config
-    currentRestoreConfig.password = password;
-    
-    // Get provider and execute restore
-    const provider = RESTORE_PROVIDERS[currentRestoreConfig.job_type];
-    if (!provider) {
-        showModalError('Provider not found');
-        return;
-    }
-    
-    // Hide password modal and execute restore
-    hidePasswordModal();
-    executeRestore(provider);
 }
 
 function executeDryRun(provider) {
-    showProgressModal('Executing dry run...', 0);
+    showProgressDisplay('Executing dry run...', 0);
     
     executeRestoreRequest(provider, currentRestoreConfig)
         .then(result => {
-            hideProgressModal();
+            hideProgressDisplay();
             provider.handleDryRunResponse(result);
         })
         .catch(error => {
-            hideProgressModal();
+            hideProgressDisplay();
             showAlert(`Dry run error: ${error.message}`);
         });
 }
 
 function executeRestore(provider) {
-    showProgressModal('Starting restore...', 0);
+    showProgressDisplay('Starting restore...', 0);
+    
+    // Debug: Check if config is null
+    if (!currentRestoreConfig) {
+        hideProgressDisplay();
+        showAlert('Error: Restore configuration is missing');
+        return;
+    }
     
     executeRestoreRequest(provider, currentRestoreConfig)
         .then(result => {
             if (result.success) {
                 provider.handleRestoreResponse(result, currentRestoreConfig);
             } else {
-                hideProgressModal();
+                hideProgressDisplay();
                 showAlert(`Restore failed: ${result.error}`);
             }
         })
         .catch(error => {
-            hideProgressModal();
+            hideProgressDisplay();
             showAlert(`Restore error: ${error.message}`);
         });
 }
@@ -246,30 +177,20 @@ function executeRestoreRequest(provider, config) {
 }
 
 // UI Helper Functions
-function showProgressModal(message, progress) {
-    const progressModal = document.getElementById('progressModal');
+function showProgressDisplay(message, progress) {
+    const progressDiv = document.getElementById('restoreProgress');
     const progressText = document.getElementById('progressText');
     const progressFill = document.getElementById('progressFill');
-    const closeButton = document.getElementById('closeProgress');
     
     if (progressText) progressText.textContent = message;
     if (progressFill) progressFill.style.width = progress + '%';
-    if (closeButton) closeButton.style.display = progress >= 100 ? 'block' : 'none';
-    if (progressModal) progressModal.classList.remove('hidden');
+    if (progressDiv) progressDiv.classList.remove('hidden');
 }
 
-function hideProgressModal() {
-    const progressModal = document.getElementById('progressModal');
-    if (progressModal) {
-        progressModal.classList.add('hidden');
-    }
-}
-
-function showModalError(message) {
-    const errorDiv = document.getElementById('modalError');
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('hidden');
+function hideProgressDisplay() {
+    const progressDiv = document.getElementById('restoreProgress');
+    if (progressDiv) {
+        progressDiv.classList.add('hidden');
     }
 }
 
@@ -280,12 +201,7 @@ function showAlert(message, isSuccess = false) {
         alertDiv.textContent = message;
         alertDiv.classList.remove('hidden', 'status-error', 'status-success');
         alertDiv.classList.add(isSuccess ? 'status-success' : 'status-error');
-        // Auto-hide success messages after 10 seconds
-        if (isSuccess) {
-            setTimeout(() => {
-                alertDiv.classList.add('hidden');
-            }, 10000);
-        }
+        // No auto-hide - user should manually clear status messages
     } else {
         // Fallback to browser alert if error div not found
         alert(message);
@@ -334,8 +250,8 @@ function getCurrentSnapshotId() {
 
 // Export functions for provider implementations
 window.RestoreCore = {
-    showProgressModal: showProgressModal,
-    hideProgressModal: hideProgressModal,
+    showProgressDisplay: showProgressDisplay,
+    hideProgressDisplay: hideProgressDisplay,
     showAlert: showAlert,
     registerRestoreProvider: registerRestoreProvider
 };

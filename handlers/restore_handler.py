@@ -3,6 +3,7 @@ Restore handler for processing backup restore requests
 Handles Restic restore operations with progress tracking and password validation
 """
 import json
+import os
 import threading
 import subprocess
 from urllib.parse import parse_qs
@@ -50,9 +51,7 @@ class RestoreHandler:
             if dest_type != 'restic':
                 return self._send_error_response(handler, f'Restore not supported for job type: {dest_type}')
             
-            # Validate password for non-dry-run operations
-            if not dry_run and not password:
-                return self._send_error_response(handler, 'Password is required for actual restore operations')
+            # No password validation needed - confirmation handled by frontend for source overwrites
             
             # Check if restore is already running for this job
             if job_name in self.active_restores:
@@ -85,6 +84,132 @@ class RestoreHandler:
                 
         except Exception as e:
             return self._send_error_response(handler, f'Restore request failed: {str(e)}')
+    
+    def check_restore_overwrites(self, handler, form_data):
+        """Check if restore would overwrite existing files at source"""
+        try:
+            # Parse form data
+            job_name = self._safe_get_form_value(form_data, 'job_name')
+            snapshot_id = self._safe_get_form_value(form_data, 'snapshot_id')
+            select_all = self._safe_get_form_value(form_data, 'select_all') == 'on'
+            selected_paths = form_data.get('selected_paths', [''])
+            
+            # Validate required fields
+            if not job_name:
+                return self._send_json_response(handler, {'hasOverwrites': False, 'error': 'Job name required'})
+            
+            # Get job configuration
+            jobs = self.backup_config.config.get('backup_jobs', {})
+            if job_name not in jobs:
+                return self._send_json_response(handler, {'hasOverwrites': False, 'error': 'Job not found'})
+            
+            job_config = jobs[job_name]
+            source_config = job_config.get('source_config', {})
+            source_type = job_config.get('source_type', '')
+            
+            # Get restore target
+            restore_target = self._safe_get_form_value(form_data, 'restore_target', 'highball')
+            
+            # Get paths to check based on restore target
+            check_paths = []
+            if select_all:
+                # For select all, check job's source paths
+                source_paths = source_config.get('source_paths', [])
+                for path_config in source_paths:
+                    if isinstance(path_config, dict):
+                        check_paths.append(path_config.get('path', ''))
+                    else:
+                        check_paths.append(str(path_config))
+            else:
+                # For specific selection, check selected paths
+                check_paths = [path for path in selected_paths if path.strip()]
+            
+            # Check if any files exist at destination that would be overwritten
+            has_overwrites = self._check_destination_files_exist(restore_target, source_type, source_config, check_paths)
+            
+            return self._send_json_response(handler, {'hasOverwrites': has_overwrites})
+            
+        except Exception as e:
+            return self._send_json_response(handler, {'hasOverwrites': False, 'error': str(e)})
+    
+    def _check_destination_files_exist(self, restore_target: str, source_type: str, source_config: Dict[str, Any], check_paths: List[str]) -> bool:
+        """Check if any files exist at destination that would be overwritten"""
+        try:
+            if restore_target == 'highball':
+                # Check Highball container /restore directory
+                restore_dir = '/restore'
+                
+                
+                for path in check_paths:
+                    if path:
+                        # Convert source path to restore destination path
+                        # Remove leading slash and join with restore dir
+                        dest_path = os.path.join(restore_dir, path.lstrip('/'))
+                        
+                        if os.path.exists(dest_path):
+                            # If it's a directory, check if it has any contents
+                            if os.path.isdir(dest_path):
+                                try:
+                                    if any(os.scandir(dest_path)):
+                                        return True
+                                except (PermissionError, OSError):
+                                    return True
+                            else:
+                                # File exists
+                                return True
+                                
+            elif restore_target == 'source':
+                # Check at original source location
+                if source_type == 'local':
+                    # Check local filesystem
+                    for path in check_paths:
+                        if path and os.path.exists(path):
+                            # If it's a directory, check if it has any contents
+                            if os.path.isdir(path):
+                                try:
+                                    if any(os.scandir(path)):
+                                        return True
+                                except (PermissionError, OSError):
+                                    return True
+                            else:
+                                # File exists
+                                return True
+                                
+                elif source_type == 'ssh':
+                    # Check remote filesystem via SSH
+                    hostname = source_config.get('hostname', '')
+                    username = source_config.get('username', '')
+                    
+                    if not hostname:
+                        return False
+                        
+                    # Use SSH to check if files exist
+                    for path in check_paths:
+                        if path:
+                            # Build SSH command to check if path exists and has contents
+                            ssh_cmd = ['ssh']
+                            if username:
+                                ssh_cmd.append(f'{username}@{hostname}')
+                            else:
+                                ssh_cmd.append(hostname)
+                            
+                            # Check if path exists and is non-empty
+                            check_cmd = f'[ -e "{path}" ] && ([ -f "{path}" ] || [ "$(ls -A "{path}" 2>/dev/null)" ])'
+                            ssh_cmd.append(check_cmd)
+                            
+                            try:
+                                result = subprocess.run(ssh_cmd, capture_output=True, timeout=10)
+                                if result.returncode == 0:
+                                    return True  # Path exists and has contents
+                            except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                                # Assume no overwrites if we can't check
+                                continue
+            
+            return False  # No overwrites detected
+            
+        except Exception as e:
+            self.job_logger.log_job_execution('system', f'Error checking destination files: {str(e)}', 'WARNING')
+            return False  # Default to no overwrites if check fails
     
     def _execute_dry_run_restore(self, restore_config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute dry run restore and return results"""
@@ -253,11 +378,16 @@ class RestoreHandler:
                     return {'success': False, 'error': 'No snapshot ID specified'}
             
             # Add target directory
-            if restore_config.get('restore_target') == 'highball':
+            restore_target = restore_config.get('restore_target', 'highball')
+            if restore_target == 'highball':
                 restore_path = '/restore'
                 cmd.extend(['--target', restore_path])
+            elif restore_target == 'source':
+                # Restore to original source location - no --target needed for restic
+                # Files will be restored to their original paths
+                pass
             else:
-                return {'success': False, 'error': f'Unsupported restore target: {restore_config.get("restore_target")}'}
+                return {'success': False, 'error': f'Unsupported restore target: {restore_target}'}
             
             # Add selected paths (if not select_all)
             if not restore_config.get('select_all'):

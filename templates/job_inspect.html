@@ -107,15 +107,25 @@
                         <div class="restore-options">
                             <div>
                                 <label>Restore Target:</label>
-                                <select id="restoreTarget">
+                                <select id="restoreTarget" onchange="handleRestoreTargetChange()">
                                     <option value="highball">Restore to Highball (/restore)</option>
+                                    <option value="source">Restore to Source (original location)</option>
                                 </select>
                             </div>
                             <div class="mt-15">
                                 <label>
-                                    <input type="checkbox" id="dryRunToggle" checked>
+                                    <input type="checkbox" id="dryRunToggle" checked onchange="togglePasswordField()">
                                     Dry Run (safe preview - uncheck to perform actual restore)
                                 </label>
+                            </div>
+                            <div id="overwriteWarning" class="mt-15 hidden">
+                                <div class="alert alert-warning">
+                                    <strong>Warning:</strong> <span id="overwriteWarningText">This restore will overwrite existing files.</span>
+                                </div>
+                            </div>
+                            <div id="confirmationSection" class="mt-15 hidden">
+                                <label for="overwriteConfirmation">Type "OVERWRITE" to confirm data replacement:</label>
+                                <input type="text" id="overwriteConfirmation" class="w-full" placeholder="Type OVERWRITE to confirm">
                             </div>
                             <div class="mt-15">
                                 <button id="startRestore" class="button button-success">Start Restore</button>
@@ -132,47 +142,14 @@
             
         </div>
         
-        <!-- Password Confirmation Modal -->
-        <div id="passwordModal" class="modal hidden">
-            <div class="modal-content">
-                <h3>Confirm Restore Operation</h3>
-                <p id="restoreConfirmationText">Please enter the repository password to confirm this restore operation:</p>
-                
-                <div class="form-group">
-                    <label for="modalPassword">Repository Password:</label>
-                    <input type="password" id="modalPassword" class="w-full" placeholder="Enter repository password">
+        <!-- Progress display inline in restore controls -->
+        <div id="restoreProgress" class="restore-progress hidden">
+            <div class="progress-section">
+                <h4>Restore in Progress</h4>
+                <div id="progressBar" class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
                 </div>
-                
-                <div id="restoreSummary" class="restore-summary">
-                    <h4>Restore Summary:</h4>
-                    <div id="summaryContent"></div>
-                </div>
-                
-                <div class="modal-actions">
-                    <button id="confirmRestore" class="button button-success">Confirm Restore</button>
-                    <button id="cancelRestore" class="button button-warning">Cancel</button>
-                </div>
-                
-                <div id="modalError" class="hidden error-message">
-                    <!-- Error messages will be displayed here -->
-                </div>
-            </div>
-        </div>
-        
-        <!-- Restore Progress Modal -->
-        <div id="progressModal" class="modal hidden">
-            <div class="modal-content">
-                <h3>Restore in Progress</h3>
-                <div id="progressInfo">
-                    <div id="progressBar" class="progress-bar">
-                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                    </div>
-                    <div id="progressText">Starting restore...</div>
-                </div>
-                
-                <div class="modal-actions">
-                    <button id="closeProgress" class="button">Close</button>
-                </div>
+                <div id="progressText">Starting restore...</div>
             </div>
         </div>
         
@@ -262,12 +239,92 @@
                 selectionPane.style.opacity = '1';
                 selectionPane.style.pointerEvents = 'auto';
             }
+            
+            // Check for overwrites when Select All changes
+            window.checkOverwriteRisk();
         }
         
         function clearRestoreValidationError() {
             const errorDiv = document.getElementById('restoreValidationError');
             if (errorDiv) {
                 errorDiv.classList.add('hidden');
+            }
+        }
+        
+        function togglePasswordField() {
+            // This function name is kept for compatibility, but now it handles confirmation
+            window.checkOverwriteRisk();
+        }
+        
+        function handleRestoreTargetChange() {
+            window.checkOverwriteRisk();
+        }
+        
+        window.checkOverwriteRisk = async function checkOverwriteRisk() {
+            const dryRunToggle = document.getElementById('dryRunToggle');
+            const overwriteWarning = document.getElementById('overwriteWarning');
+            const confirmationSection = document.getElementById('confirmationSection');
+            
+            // Hide confirmation elements by default
+            overwriteWarning.classList.add('hidden');
+            confirmationSection.classList.add('hidden');
+            
+            // ALWAYS check for overwrites - warn user regardless of dry run state
+            const overwriteRisk = await window.checkForOverwrites();
+            if (overwriteRisk.hasOverwrites) {
+                // Always show warning with appropriate message
+                const warningText = document.getElementById('overwriteWarningText');
+                if (dryRunToggle.checked) {
+                    warningText.textContent = 'This dry run is testing a restore that would overwrite existing files.';
+                } else {
+                    warningText.textContent = 'This restore will overwrite existing files.';
+                }
+                overwriteWarning.classList.remove('hidden');
+                
+                // Only require OVERWRITE confirmation for actual restores (not dry runs)
+                if (!dryRunToggle.checked) {
+                    confirmationSection.classList.remove('hidden');
+                }
+            }
+        }
+        
+        window.checkForOverwrites = async function checkForOverwrites() {
+            try {
+                const jobName = '{{JOB_NAME}}';
+                const selectAllChecked = document.getElementById('selectAllToggle').checked;
+                const selectedPaths = window.BackupBrowser ? window.BackupBrowser.getSelection() : [];
+                const currentSnapshot = document.getElementById('snapshotSelect').value;
+                const restoreTarget = document.getElementById('restoreTarget').value;
+                
+                const formData = new FormData();
+                formData.append('job_name', jobName);
+                formData.append('snapshot_id', selectAllChecked ? 'latest' : currentSnapshot);
+                formData.append('select_all', selectAllChecked ? 'on' : '');
+                formData.append('restore_target', restoreTarget);
+                
+                // Add selected paths
+                if (!selectAllChecked && selectedPaths.directories) {
+                    selectedPaths.directories.forEach(path => formData.append('selected_paths', path));
+                }
+                if (!selectAllChecked && selectedPaths.files) {
+                    selectedPaths.files.forEach(path => formData.append('selected_paths', path));
+                }
+                
+                
+                const response = await fetch('/check-restore-overwrites', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    return await response.json();
+                } else {
+                    console.error('Failed to check overwrites');
+                    return { hasOverwrites: false };
+                }
+            } catch (error) {
+                console.error('Error checking overwrites:', error);
+                return { hasOverwrites: false };
             }
         }
         
@@ -281,6 +338,9 @@
             if (hasSelections) {
                 clearRestoreValidationError();
             }
+            
+            // Check for overwrites whenever selection changes
+            window.checkOverwriteRisk();
         };
         
         // Event listeners

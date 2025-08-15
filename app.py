@@ -258,6 +258,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['job_scheduler'].schedule_job(self, form_data)
             elif path == '/restore':
                 self._handlers['restore'].process_restore_request(self, form_data)
+            elif path == '/check-restore-overwrites':
+                self._handlers['restore'].check_restore_overwrites(self, form_data)
             elif path == '/test-telegram-notification':
                 self._handlers['notification_test'].test_telegram_notification(self, form_data)
             elif path == '/test-email-notification':

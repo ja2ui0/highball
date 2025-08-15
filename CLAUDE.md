@@ -39,7 +39,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **UI**: Sectioned forms, real-time validation, share discovery, theming, password toggles, multi-path management
 **Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation
 **Backup Browser**: Multi-provider backup browsing system supporting Restic (repository snapshots), rsync/SSH/local/rsyncd (filesystem directories) with unified interface, provider-specific terminology, and expandable file trees
-**Restore System**: Complete Restic restore functionality with per-job inspection interface (`/inspect?name=<jobname>`), integrated job status/backup browser/restore controls, modal password confirmation, dry run capability (default enabled), "Restore to Highball" target (/restore directory), background execution with progress tracking, and modular JavaScript architecture extensible to future providers (rsync, borg, kopia) - core implementation complete with clean HTML structure and proper container nesting
+**Restore System**: Complete Restic restore functionality with intelligent overwrite protection, dual restore targets (safe Highball container vs. risky source location), pre-flight risk assessment via `/check-restore-overwrites` endpoint, progressive disclosure confirmation system (no modals), dry run capability (default enabled), background execution with progress tracking, and modular JavaScript architecture extensible to future providers (rsync, borg, kopia) - full implementation with smart safety controls
 **REST API**: GET `/api/highball/jobs` endpoint for external dashboard widgets with query filtering (`state`, `fields`), CORS support, and authentication-ready architecture
 **Debug System**: System debugging interface (`/dev`) with network scanner, 8 unified log sources (system + operational) with organized 2-row layout, separated from per-job inspection
 
@@ -140,14 +140,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 **Next Session Priority**: 
 1. **Real Progress Parsing** - Replace simulated progress with actual `restic restore --json` output parsing for accurate progress display
-2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
-3. **Form Data Refactor** - Convert to multipart form data for consistency and better security
-4. **Multi-Provider Restore** - Extend restore system to rsync, borg, kopia using established modular architecture
+2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table
+3. **Multi-Provider Restore** - Extend restore system to rsync, borg, kopia using established modular architecture
 
 **Recent Completion (2025-08-14)**:
-- **Complete Restore System Implementation** - Full Restic restore implementation with `RestoreHandler` backend, modular JavaScript architecture (`restore-core.js` + `restore-restic.js`), modal password confirmation, dry run capability, background execution with progress tracking, URL-encoded form data handling, password obfuscation in logs, comprehensive unit test coverage (35/35 tests passing), and clean codebase after debugging cleanup
-- **Security Improvements** - Password obfuscation in job logs (`_obfuscate_password_in_command`), success/error styling fixes (green/red status colors), clean user-facing messages without sensitive data exposure
-- **HTML Structure Resolution** - Fixed corrupted job inspect template HTML structure causing layout issues, proper container nesting for selection controls and job logs, modular JavaScript provider system ready for testing
+- **Intelligent Restore System** - Complete implementation with smart overwrite protection, dual restore targets (Highball container vs. source), pre-flight risk assessment, progressive disclosure confirmation (eliminated modals), multipart form data handling, and comprehensive safety controls
+- **Multipart Form Data Refactor** - Repo-wide conversion from URL-encoded to multipart with auto-detection, better array handling, enhanced security, and backward compatibility
+- **Modal Elimination** - Replaced modal-based UI with progressive disclosure patterns, eliminated race conditions, simplified state management, and improved UX consistency
 - **Restore Infrastructure (Phase 1)** - Complete per-job inspection system with `/inspect?name=<jobname>` endpoint, integrated job status/logs/backup browser/restore controls, dashboard "Inspect" buttons, `/dev` system debugging separation, backup command builder multi-path `source_paths` format support, and UI refinements for restore workflow
 - **Backup-agnostic browser refactoring** - Converted Restic-only browser to multi-provider system supporting all backup types (Restic snapshots, rsync/SSH/local/rsyncd filesystems) with unified interface, proper terminology distinction, and provider detection
 - **Complete notification system** - Full spam-prevention queue system with configurable intervals, batch formatting, event-driven processing, per-job notification integration with template variables, and comprehensive testing

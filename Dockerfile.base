@@ -20,6 +20,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/requirements.txt /root/.cache
 
 # Create directories and users in single layer
-RUN mkdir -p /app /config && \
+RUN mkdir -p /app /config /restore && \
     useradd -r -s /bin/false backupuser && \
     chown -R www-data:www-data /var/log/nginx /var/lib/nginx

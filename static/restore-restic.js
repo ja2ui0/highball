@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 const ResticRestoreProvider = {
     needsPassword: function() {
-        return true; // Restic always needs password for restore operations
+        return false; // No longer require repository passwords - use confirmation system instead
     },
     
     validateRestoreRequest: function(config) {
@@ -102,7 +102,7 @@ const ResticRestoreProvider = {
     
     startProgressMonitoring: function(jobName) {
         // Start monitoring Restic restore progress
-        window.RestoreCore.showProgressModal('Restic restore in progress...', 0);
+        window.RestoreCore.showProgressDisplay('Restic restore in progress...', 0);
         
         // TODO: Implement actual progress polling endpoint
         // For now, simulate progress for demonstration
@@ -125,17 +125,15 @@ const ResticRestoreProvider = {
             progress += 20;
             
             if (phaseIndex < phases.length) {
-                window.RestoreCore.showProgressModal(phases[phaseIndex], progress);
+                window.RestoreCore.showProgressDisplay(phases[phaseIndex], progress);
                 phaseIndex++;
             }
             
             if (progress >= 100) {
                 clearInterval(interval);
-                window.RestoreCore.showProgressModal('Restic restore completed!', 100);
-                const closeButton = document.getElementById('closeProgress');
-                if (closeButton) {
-                    closeButton.style.display = 'block';
-                }
+                window.RestoreCore.showProgressDisplay('Restic restore completed!', 100);
+                // Show success message
+                window.RestoreCore.showAlert('Restore completed successfully!', true);
                 
                 // Optionally refresh job status or logs
                 this.refreshJobStatus(jobName);
@@ -151,6 +149,11 @@ const ResticRestoreProvider = {
             if (refreshButton) {
                 // Trigger log refresh to show restore completion
                 refreshButton.click();
+            }
+            
+            // Trigger overwrite check since files now exist that didn't before
+            if (window.checkOverwriteRisk) {
+                window.checkOverwriteRisk();
             }
         }, 1000);
     },
