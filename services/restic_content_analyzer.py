@@ -180,9 +180,15 @@ class ResticContentAnalyzer:
     
     @staticmethod
     def _get_source_sample_files(source_config, source_type, timeout):
-        """Get sample file/directory names from source"""
+        """Get sample file/directory names from source - uses source_paths format"""
         try:
-            source_path = source_config.get('path', '/home')
+            source_paths = source_config.get('source_paths', [])
+            if not source_paths:
+                return []
+            
+            # Use first path for sampling
+            first_path_config = source_paths[0]
+            source_path = first_path_config.get('path', '/home') if isinstance(first_path_config, dict) else str(first_path_config)
             
             if source_type == 'ssh':
                 return ResticContentAnalyzer._get_source_files_via_ssh(

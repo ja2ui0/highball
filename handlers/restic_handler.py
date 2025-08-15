@@ -134,21 +134,25 @@ class ResticHandler:
             })
 
     def _parse_source_from_form(self, form_data):
-        """Parse source configuration from form data for validation context"""
+        """Parse source configuration from form data for validation context - uses source_paths format"""
         source_type = form_data.get('source_type', [''])[0]
         
         if source_type == 'ssh':
+            # Form validation should use source_paths array format
+            path = form_data.get('source_ssh_path', [''])[0]
             return {
                 'hostname': form_data.get('source_ssh_hostname', [''])[0],
                 'username': form_data.get('source_ssh_username', [''])[0],
-                'path': form_data.get('source_ssh_path', [''])[0]
+                'source_paths': [{'path': path, 'includes': [], 'excludes': []}] if path else []
             }
         elif source_type == 'local':
+            # Form validation should use source_paths array format
+            path = form_data.get('source_local_path', [''])[0]
             return {
-                'path': form_data.get('source_local_path', [''])[0]
+                'source_paths': [{'path': path, 'includes': [], 'excludes': []}] if path else []
             }
         else:
-            return {}
+            return {'source_paths': []}
     
     def check_restic_binary(self, handler, job_name):
         """Check if restic binary is available on source system"""
@@ -288,3 +292,155 @@ class ResticHandler:
             TemplateService.send_json_response(handler, {
                 'error': f'Directory browsing failed: {str(e)}'
             }, status_code=500)
+    
+    def init_repository(self, handler, job_name):
+        """Initialize a new Restic repository using container execution"""
+        try:
+            import subprocess
+            
+            # Get job configuration
+            job_config = self.backup_config.get_backup_job(job_name)
+            if not job_config:
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} not found'
+                }, status_code=404)
+                return
+            
+            # Validate it's a Restic job
+            if job_config.get('dest_type') != 'restic':
+                TemplateService.send_json_response(handler, {
+                    'error': f'Job {job_name} is not a Restic backup job'
+                }, status_code=400)
+                return
+            
+            # Add job name to config for ResticRunner
+            job_config_with_name = {**job_config, 'name': job_name}
+            
+            # Create init-only config for ResticRunner
+            init_config = {**job_config_with_name}
+            init_config['dest_config'] = {**job_config_with_name.get('dest_config', {})}
+            init_config['dest_config']['auto_init'] = True  # Force init command generation
+            
+            # Generate execution plan with init command
+            plan = self.restic_runner.plan_backup_job(init_config)
+            
+            if not plan.commands:
+                TemplateService.send_json_response(handler, {
+                    'error': 'No init commands generated'
+                }, status_code=500)
+                return
+            
+            # Find the init command (should be first command when auto_init is True)
+            init_command = None
+            for cmd in plan.commands:
+                if cmd.command_type.value == 'init':
+                    init_command = cmd
+                    break
+            
+            if not init_command:
+                TemplateService.send_json_response(handler, {
+                    'error': 'Init command not found in plan'
+                }, status_code=500)
+                return
+            
+            # Build execution command based on transport
+            if init_command.transport.value == 'ssh':
+                exec_command = init_command.to_ssh_command()
+            else:
+                exec_command = init_command.to_local_command()
+            
+            # Log init start
+            self.job_logger.log_job_execution(job_name, f"Starting repository initialization for {job_name}")
+            safe_command = self._obfuscate_password_in_command(exec_command)
+            self.job_logger.log_job_execution(job_name, f"Init command: {' '.join(safe_command)}")
+            
+            # Execute init command with 10 second timeout
+            result = subprocess.run(
+                exec_command,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            # Log results
+            self.job_logger.log_job_execution(job_name, f"Init completed with return code: {result.returncode}")
+            if result.stdout:
+                self.job_logger.log_job_execution(job_name, f"Init stdout: {result.stdout}")
+            if result.stderr:
+                self.job_logger.log_job_execution(job_name, f"Init stderr: {result.stderr}")
+            
+            if result.returncode == 0:
+                # Parse repository ID from stdout if available
+                repo_id = None
+                if 'created restic repository' in result.stdout:
+                    try:
+                        # Extract repo ID from "created restic repository 633ea0b609 at..."
+                        parts = result.stdout.split('created restic repository')[1].split('at')[0].strip()
+                        repo_id = parts if parts else None
+                    except:
+                        pass
+                
+                response = {
+                    'success': True,
+                    'message': f'Repository initialized successfully for {job_name}',
+                    'repository_url': init_command.repository_url,
+                    'repository_id': repo_id,
+                    'job_name': job_name,
+                    'output': result.stdout.strip(),
+                    'details': {
+                        'command_executed': 'restic init (container)',
+                        'transport': init_command.transport.value,
+                        'execution_time_seconds': 10,  # Based on timeout
+                        'container_runtime': job_config.get('container_runtime', 'docker')
+                    }
+                }
+                TemplateService.send_json_response(handler, response)
+            else:
+                # Check if repository already exists (common case)
+                already_exists = 'config file already exists' in result.stderr
+                error_type = 'repository_exists' if already_exists else 'initialization_failed'
+                
+                response = {
+                    'success': False,
+                    'error_type': error_type,
+                    'error': f'Repository initialization failed: {result.stderr.strip()}',
+                    'repository_url': init_command.repository_url,
+                    'job_name': job_name,
+                    'output': result.stdout.strip() if result.stdout else '',
+                    'return_code': result.returncode,
+                    'details': {
+                        'command_executed': 'restic init (container)',
+                        'transport': init_command.transport.value,
+                        'container_runtime': job_config.get('container_runtime', 'docker'),
+                        'repository_already_exists': already_exists
+                    }
+                }
+                
+                status_code = 409 if already_exists else 500  # 409 Conflict for existing repo
+                TemplateService.send_json_response(handler, response, status_code=status_code)
+                
+        except subprocess.TimeoutExpired:
+            self.job_logger.log_job_execution(job_name, "Repository initialization timed out after 10 seconds", "ERROR")
+            TemplateService.send_json_response(handler, {
+                'error': 'Repository initialization timed out after 10 seconds'
+            }, status_code=500)
+        except Exception as e:
+            self.job_logger.log_job_execution(job_name, f"Repository initialization error: {str(e)}", "ERROR")
+            TemplateService.send_json_response(handler, {
+                'error': f'Repository initialization failed: {str(e)}'
+            }, status_code=500)
+    
+    def _obfuscate_password_in_command(self, command):
+        """Replace password in command with asterisks for logging"""
+        safe_command = command.copy()
+        for i, arg in enumerate(safe_command):
+            # Handle environment variable assignments (e.g., RESTIC_PASSWORD=secret)
+            if '=' in arg and 'PASSWORD' in arg.upper():
+                key, _ = arg.split('=', 1)
+                safe_command[i] = f'{key}=***'
+            # Handle -e flag environment variables for container commands
+            elif arg == '-e' and i + 1 < len(safe_command) and 'PASSWORD' in safe_command[i + 1].upper():
+                if '=' in safe_command[i + 1]:
+                    key, _ = safe_command[i + 1].split('=', 1)
+                    safe_command[i + 1] = f'{key}=***'
+        return safe_command

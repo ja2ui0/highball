@@ -334,3 +334,29 @@ class ResticRepositoryService(RepositoryService):
             
         except Exception as e:
             return self._format_error_response(f'Failed to parse directory listing: {str(e)}')
+    
+    def _should_use_ssh(self, source_config: Dict[str, Any]) -> bool:
+        """
+        Determine if SSH should be used for repository operations.
+        
+        For UI operations (listing snapshots, browsing), we should use local execution
+        when accessing REST repositories since Highball container has direct access.
+        Only use SSH when the repository itself requires SSH access (e.g., SFTP repos).
+        """
+        # For REST repositories, always use local execution from Highball container
+        # SSH is only needed for SFTP repositories or when source host has special access
+        return False  # Always use local execution for UI operations
+    
+    def _format_success_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format success response"""
+        return {
+            'success': True,
+            **data
+        }
+    
+    def _format_error_response(self, error_message: str) -> Dict[str, Any]:
+        """Format error response"""
+        return {
+            'success': False,
+            'error': error_message
+        }

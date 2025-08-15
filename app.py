@@ -164,6 +164,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 snapshot_id = params.get('snapshot', [''])[0]
                 path = params.get('path', ['/'])[0]
                 self._handlers['restic'].browse_directory(self, job_name, snapshot_id, path)
+            elif path == '/restic-init':
+                job_name = params.get('job', [''])[0]
+                self._handlers['restic'].init_repository(self, job_name)
             elif path == '/filesystem-browse':
                 self._handlers['filesystem'].browse_filesystem(self)
             elif path == '/jobs':
@@ -246,6 +249,9 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/plan-restic-backup':
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['restic'].plan_backup(self, job_name)
+            elif path == '/restic-init':
+                job_name = form_data.get('job_name', [''])[0]
+                self._handlers['restic'].init_repository(self, job_name)
             elif path == '/validate-restic-form':
                 self._handlers['restic'].validate_restic_form(self, form_data)
             elif path == '/save-config':

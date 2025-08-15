@@ -61,14 +61,33 @@ class ResticCommandBuilder:
         )
     
     def _build_source_display(self, source_type, source_config):
-        """Build source display string"""
+        """Build source display string - requires source_paths array format"""
         if source_type == 'ssh':
             hostname = source_config.get('hostname', 'unknown')
             username = source_config.get('username', 'unknown')
-            path = source_config.get('path', 'unknown')
-            return f"{username}@{hostname}:{path}"
+            
+            # source_paths array is required
+            source_paths = source_config.get('source_paths', [])
+            if not source_paths:
+                return f"{username}@{hostname}:NO_PATHS_CONFIGURED"
+            
+            # Show first path, indicate if multiple
+            first_path = source_paths[0].get('path', 'unknown') if isinstance(source_paths[0], dict) else str(source_paths[0])
+            if len(source_paths) > 1:
+                return f"{username}@{hostname}:{first_path} (+{len(source_paths)-1} more)"
+            else:
+                return f"{username}@{hostname}:{first_path}"
         elif source_type == 'local':
-            return source_config.get('path', 'unknown')
+            # source_paths array is required
+            source_paths = source_config.get('source_paths', [])
+            if not source_paths:
+                return "NO_PATHS_CONFIGURED"
+            
+            first_path = source_paths[0].get('path', 'unknown') if isinstance(source_paths[0], dict) else str(source_paths[0])
+            if len(source_paths) > 1:
+                return f"{first_path} (+{len(source_paths)-1} more)"
+            else:
+                return first_path
         else:
             return f"{source_type}:unknown"
     
@@ -94,10 +113,7 @@ class ResticCommandBuilder:
         return ' '.join(cmd_parts)
     
     def _build_chained_commands(self, commands, dry_run):
-        """Build chained command execution for multiple restic commands"""
-        # For multiple commands, we need to chain them properly
-        # Since restic commands need to run on the same remote system, we'll chain the restic commands within SSH
-        
+        """Build chained command execution for multiple restic commands using container execution"""
         if not commands:
             return []
         
@@ -107,45 +123,31 @@ class ResticCommandBuilder:
                 if '--dry-run' not in (cmd.args or []):
                     cmd.args = (cmd.args or []) + ['--dry-run']
         
-        # Use the SSH configuration from the first command
+        # For multiple commands, we need to chain the container commands
+        # Each command uses its own container execution strategy
         first_command = commands[0]
+        
         if first_command.transport.value != 'ssh':
             # For non-SSH, just return the first command
             return first_command.to_ssh_command()
         
-        # Build environment exports (common to all commands)
-        env_exports = []
-        if first_command.environment_vars:
-            for key, value in first_command.environment_vars.items():
-                env_exports.append(f"export {key}='{value}'")
-        
-        # Build individual restic commands
-        restic_commands = []
+        # Build individual container commands that will be chained
+        container_commands = []
         for cmd in commands:
-            restic_cmd = ["restic", "-r", cmd.repository_url]
-            if cmd.command_type.value == 'init':
-                restic_cmd.append('init')
-            elif cmd.command_type.value == 'backup':
-                restic_cmd.append('backup')
-                if cmd.args:
-                    restic_cmd.extend(cmd.args)
-                if cmd.source_paths:
-                    restic_cmd.extend(cmd.source_paths)
-            
-            restic_commands.append(' '.join(restic_cmd))
+            # Build container command using the same strategy as single commands
+            container_cmd = cmd._build_container_command(cmd.job_config)
+            container_commands.append(' '.join(container_cmd))
         
-        # Chain restic commands with &&
-        chained_restic = ' && '.join(restic_commands)
+        # Chain container commands with &&
+        chained_containers = ' && '.join(container_commands)
         
-        # Combine environment setup and chained restic commands
-        remote_command = '; '.join(env_exports + [chained_restic])
-        
-        # Build SSH command
+        # Build SSH command to execute chained container commands on remote host
         ssh_cmd = [
             'ssh', '-o', 'ConnectTimeout=30', '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',  # Suppress known_hosts warnings
             f"{first_command.ssh_config['username']}@{first_command.ssh_config['hostname']}",
-            remote_command
+            chained_containers
         ]
         
         return ssh_cmd

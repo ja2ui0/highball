@@ -162,9 +162,36 @@ class RestoreHandler:
                                 
             elif restore_target == 'source':
                 # Check at original source location
+                # Map backup paths back to actual source paths
+                source_paths = source_config.get('source_paths', [])
+                if not source_paths:
+                    return False  # No source paths configured
+                
+                # Map backup paths to actual source paths
+                actual_paths_to_check = []
+                for check_path in check_paths:
+                    if check_path:
+                        # Remove container mount prefix (e.g., /backup-source-0/README.md -> README.md)
+                        if check_path.startswith('/backup-source-'):
+                            # Find the mount number and remove prefix
+                            parts = check_path.split('/', 3)  # ['', 'backup-source-N', 'relative', 'path']
+                            if len(parts) >= 3:
+                                relative_path = parts[2] if len(parts) == 3 else '/'.join(parts[2:])
+                                
+                                # Map to actual source paths
+                                for source_path_config in source_paths:
+                                    source_path = source_path_config.get('path', '') if isinstance(source_path_config, dict) else str(source_path_config)
+                                    if source_path:
+                                        # Combine source path with relative path from backup
+                                        actual_path = os.path.join(source_path, relative_path) if relative_path else source_path
+                                        actual_paths_to_check.append(actual_path)
+                        else:
+                            # Direct path - add to check list
+                            actual_paths_to_check.append(check_path)
+                
                 if source_type == 'local':
                     # Check local filesystem
-                    for path in check_paths:
+                    for path in actual_paths_to_check:
                         if path and os.path.exists(path):
                             # If it's a directory, check if it has any contents
                             if os.path.isdir(path):
@@ -186,10 +213,11 @@ class RestoreHandler:
                         return False
                         
                     # Use SSH to check if files exist
-                    for path in check_paths:
+                    for path in actual_paths_to_check:
                         if path:
                             # Build SSH command to check if path exists and has contents
-                            ssh_cmd = ['ssh']
+                            ssh_cmd = ['ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', 
+                                     '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null']
                             if username:
                                 ssh_cmd.append(f'{username}@{hostname}')
                             else:
@@ -236,11 +264,6 @@ class RestoreHandler:
             else:
                 exec_command = restore_command.to_local_command()
             
-            # Debug: Log the exact command being executed (with password obfuscated)
-            safe_command = self._obfuscate_password_in_command(exec_command)
-            self.job_logger.log_job_execution(job_name, f"DEBUG: Full command: {' '.join(safe_command)}")
-            safe_args = self._obfuscate_password_in_list(restore_command.args)
-            self.job_logger.log_job_execution(job_name, f"DEBUG: Args from ResticRunner: {safe_args}")
             
             # Execute command
             result = subprocess.run(
@@ -251,7 +274,8 @@ class RestoreHandler:
             )
             
             # Log the dry run (obfuscate password)
-            safe_command = self._obfuscate_password_in_command(exec_command)
+            job_password = job_config.get('dest_config', {}).get('password', '')
+            safe_command = self._obfuscate_password_in_command(exec_command, job_password)
             self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
             self.job_logger.log_job_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
@@ -259,19 +283,23 @@ class RestoreHandler:
             if result.stderr:
                 self.job_logger.log_job_execution(job_name, f"Dry run stderr: {result.stderr}")
             
+            # Get safe command for API response
+            job_password = job_config.get('dest_config', {}).get('password', '')
+            safe_command_for_api = self._obfuscate_password_in_command(exec_command, job_password)
+            
             if result.returncode == 0:
                 return {
                     'success': True,
                     'message': 'Dry run completed successfully',
                     'output': result.stdout,
-                    'command': ' '.join(exec_command)
+                    'command': ' '.join(safe_command_for_api)
                 }
             else:
                 return {
                     'success': False,
                     'error': f'Dry run failed: {result.stderr}',
                     'output': result.stdout,
-                    'command': ' '.join(exec_command)
+                    'command': ' '.join(safe_command_for_api)
                 }
                 
         except subprocess.TimeoutExpired:
@@ -324,7 +352,8 @@ class RestoreHandler:
                 exec_command = restore_command.to_local_command()
             
             # Log restore start
-            safe_command = self._obfuscate_password_in_command(exec_command)
+            job_password = restore_config['job_config'].get('dest_config', {}).get('password', '')
+            safe_command = self._obfuscate_password_in_command(exec_command, job_password)
             self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
             # Execute with progress tracking
@@ -425,29 +454,26 @@ class RestoreHandler:
         """Safely get form value with default"""
         return form_data.get(key, [default])[0] if form_data.get(key) else default
     
-    def _obfuscate_password_in_command(self, command: List[str]) -> List[str]:
-        """Replace password in command with asterisks for logging"""
-        safe_command = command.copy()
-        for i, arg in enumerate(safe_command):
-            # Handle environment variable assignments (e.g., RESTIC_PASSWORD=secret)
-            if '=' in arg and 'PASSWORD' in arg.upper():
-                key, _ = arg.split('=', 1)
-                safe_command[i] = f'{key}=***'
-            # Handle -e flag environment variables for container commands
-            elif arg == '-e' and i + 1 < len(safe_command) and 'PASSWORD' in safe_command[i + 1].upper():
-                if '=' in safe_command[i + 1]:
-                    key, _ = safe_command[i + 1].split('=', 1)
-                    safe_command[i + 1] = f'{key}=***'
-            # Handle --password-command arguments
-            elif arg == '--password-command' and i + 1 < len(safe_command):
-                safe_command[i + 1] = 'echo "***"'
+    def _obfuscate_password_in_command(self, command: List[str], password: str = None) -> List[str]:
+        """Replace password in command with asterisks for logging using simple string replacement"""
+        safe_command = []
+        
+        for arg in command:
+            safe_arg = arg
+            
+            # If we have the actual password value, do simple string replacement
+            if password and password in arg:
+                safe_arg = arg.replace(password, '***')
+            
+            safe_command.append(safe_arg)
+                
         return safe_command
     
-    def _obfuscate_password_in_list(self, args: List[str]) -> List[str]:
+    def _obfuscate_password_in_list(self, args: List[str], password: str = None) -> List[str]:
         """Replace password in argument list with asterisks for logging"""
         if not args:
             return []
-        return self._obfuscate_password_in_command(args)
+        return self._obfuscate_password_in_command(args, password)
     
     def _send_json_response(self, handler, data: Dict[str, Any]):
         """Send JSON response"""
