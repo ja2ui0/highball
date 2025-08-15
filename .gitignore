@@ -115,7 +115,7 @@ logs/
 # Ignore live bind-mounted configs but allow templates
 config/*
 !config/README.md
-!config/config.example.yaml
+!config/config.yaml.example
 
 # Ignore AI tool configs
 .continue/
