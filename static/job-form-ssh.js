@@ -25,12 +25,12 @@ const SSHValidator = {
         APIClient.call(
             '/validate-ssh',
             { source },
-            (data) => this.handleValidationSuccess(data, statusId, detailsId),
+            (data) => this.handleValidationSuccess(data, statusId, detailsId, fields),
             (error) => this.handleValidationError(error, statusId, detailsId)
         );
     },
 
-    handleValidationSuccess(data, statusId, detailsId) {
+    handleValidationSuccess(data, statusId, detailsId, fields) {
         if (data.success) {
             StatusRenderer.show(statusId, 'Validated', 'success');
             
@@ -44,6 +44,19 @@ const SSHValidator = {
             ].filter(line => line && !line.endsWith('- ')).join('<br>');
             
             StatusRenderer.showDetails(detailsId, detailsContent);
+            
+            // Store container runtime for SSH source validation (simple approach)
+            if (fields && fields.includes('source_ssh_hostname') && details.container_runtime) {
+                const runtime = details.container_runtime.toLowerCase().includes('podman') ? 'podman' : 'docker';
+                let hiddenField = document.querySelector('input[name="container_runtime"]');
+                if (!hiddenField) {
+                    hiddenField = document.createElement('input');
+                    hiddenField.type = 'hidden';
+                    hiddenField.name = 'container_runtime';
+                    document.querySelector('form').appendChild(hiddenField);
+                }
+                hiddenField.value = runtime;
+            }
         } else {
             this.handleValidationError(new Error(data.message), statusId, detailsId);
         }

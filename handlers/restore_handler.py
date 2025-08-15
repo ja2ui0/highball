@@ -236,9 +236,11 @@ class RestoreHandler:
             else:
                 exec_command = restore_command.to_local_command()
             
-            # Debug: Log the exact command being executed
-            self.job_logger.log_job_execution(job_name, f"DEBUG: Full command: {' '.join(exec_command)}")
-            self.job_logger.log_job_execution(job_name, f"DEBUG: Args from ResticRunner: {restore_command.args}")
+            # Debug: Log the exact command being executed (with password obfuscated)
+            safe_command = self._obfuscate_password_in_command(exec_command)
+            self.job_logger.log_job_execution(job_name, f"DEBUG: Full command: {' '.join(safe_command)}")
+            safe_args = self._obfuscate_password_in_list(restore_command.args)
+            self.job_logger.log_job_execution(job_name, f"DEBUG: Args from ResticRunner: {safe_args}")
             
             # Execute command
             result = subprocess.run(
@@ -427,10 +429,25 @@ class RestoreHandler:
         """Replace password in command with asterisks for logging"""
         safe_command = command.copy()
         for i, arg in enumerate(safe_command):
-            if arg == '--password-command' and i + 1 < len(safe_command):
-                # Replace the echo command that contains the password
+            # Handle environment variable assignments (e.g., RESTIC_PASSWORD=secret)
+            if '=' in arg and 'PASSWORD' in arg.upper():
+                key, _ = arg.split('=', 1)
+                safe_command[i] = f'{key}=***'
+            # Handle -e flag environment variables for container commands
+            elif arg == '-e' and i + 1 < len(safe_command) and 'PASSWORD' in safe_command[i + 1].upper():
+                if '=' in safe_command[i + 1]:
+                    key, _ = safe_command[i + 1].split('=', 1)
+                    safe_command[i + 1] = f'{key}=***'
+            # Handle --password-command arguments
+            elif arg == '--password-command' and i + 1 < len(safe_command):
                 safe_command[i + 1] = 'echo "***"'
         return safe_command
+    
+    def _obfuscate_password_in_list(self, args: List[str]) -> List[str]:
+        """Replace password in argument list with asterisks for logging"""
+        if not args:
+            return []
+        return self._obfuscate_password_in_command(args)
     
     def _send_json_response(self, handler, data: Dict[str, Any]):
         """Send JSON response"""

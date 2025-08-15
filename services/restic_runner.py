@@ -37,56 +37,23 @@ class ResticCommand:
     args: List[str] = None
     environment_vars: Dict[str, str] = None
     timeout_seconds: int = 3600
+    job_config: Optional[Dict] = None  # Job config for container runtime access
     
     def to_ssh_command(self) -> List[str]:
-        """Convert to SSH command array for execution"""
+        """Convert to SSH command array for container execution on remote host"""
         if self.transport != TransportType.SSH:
             return self.to_local_command()
         
-        # Build environment variable exports
-        env_exports = []
-        if self.environment_vars:
-            for key, value in self.environment_vars.items():
-                env_exports.append(f"export {key}='{value}'")
+        # Build container command for remote execution
+        container_cmd = self._build_container_command(self.job_config)
         
-        # Build restic command
-        restic_cmd = ["restic", "-r", self.repository_url]
-        
-        # Add command type
-        if self.command_type == CommandType.BACKUP:
-            restic_cmd.append("backup")
-        elif self.command_type == CommandType.RESTORE:
-            restic_cmd.append("restore")
-        elif self.command_type == CommandType.INIT:
-            restic_cmd.append("init")
-        elif self.command_type == CommandType.SNAPSHOTS:
-            restic_cmd.append("snapshots")
-        elif self.command_type == CommandType.FORGET:
-            restic_cmd.append("forget")
-        elif self.command_type == CommandType.PRUNE:
-            restic_cmd.append("prune")
-        elif self.command_type == CommandType.CHECK:
-            restic_cmd.append("check")
-        
-        # Add command-specific arguments
-        if self.args:
-            restic_cmd.extend(self.args)
-            
-        # Add source paths for backup operations only
-        if self.source_paths and self.command_type == CommandType.BACKUP:
-            restic_cmd.extend(self.source_paths)
-        
-        # Combine environment setup and restic command with proper shell escaping
-        escaped_restic_cmd = shlex.join(restic_cmd)
-        remote_command = "; ".join(env_exports + [escaped_restic_cmd])
-        
-        # Build SSH command
+        # Build SSH command to execute container on remote host
         ssh_cmd = [
             'ssh', '-o', 'ConnectTimeout=30', '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
             '-o', 'LogLevel=ERROR',  # Suppress known_hosts warnings
             f"{self.ssh_config['username']}@{self.ssh_config['hostname']}",
-            remote_command
+            shlex.join(container_cmd)  # Properly escape the container command
         ]
         
         return ssh_cmd
@@ -99,6 +66,90 @@ class ResticCommand:
         if self.source_paths and self.command_type == CommandType.BACKUP:
             cmd.extend(self.source_paths)
         return cmd
+    
+    def _build_container_command(self, job_config: Dict = None) -> List[str]:
+        """Build container run command with restic official container"""
+        # Get container runtime from job config
+        runtime = job_config.get('container_runtime', 'docker') if job_config else 'docker'
+        
+        cmd = [runtime, 'run', '--rm']
+        
+        # Add environment variables
+        if self.environment_vars:
+            for key, value in self.environment_vars.items():
+                cmd.extend(['-e', f'{key}={value}'])
+        
+        # Mount source paths for backup operations
+        if self.source_paths and self.command_type == CommandType.BACKUP:
+            for i, source_path in enumerate(self.source_paths):
+                cmd.extend(['-v', f'{source_path}:/backup-source-{i}:ro'])
+        
+        # For restore operations, mount target directory
+        if self.command_type == CommandType.RESTORE:
+            target_path = self._extract_target_from_args()
+            if target_path:
+                cmd.extend(['-v', f'{target_path}:/restore-target'])
+        
+        # Use official restic container
+        cmd.append('restic/restic:0.18.0')
+        
+        # Add restic repository
+        cmd.extend(['-r', self.repository_url])
+        
+        # Add command type
+        cmd.append(self.command_type.value)
+        
+        # Add command-specific arguments (adjust paths for container)
+        if self.args:
+            adjusted_args = self._adjust_args_for_container()
+            cmd.extend(adjusted_args)
+            
+        # Add container source paths for backup operations
+        if self.source_paths and self.command_type == CommandType.BACKUP:
+            for i in range(len(self.source_paths)):
+                cmd.append(f'/backup-source-{i}')
+        
+        return cmd
+    
+    def _extract_target_from_args(self) -> str:
+        """Extract target directory from restore arguments"""
+        if not self.args:
+            return ""
+        
+        try:
+            target_idx = self.args.index('--target')
+            if target_idx + 1 < len(self.args):
+                return self.args[target_idx + 1]
+        except ValueError:
+            pass
+        
+        return ""
+    
+    def _adjust_args_for_container(self) -> List[str]:
+        """Adjust arguments for container execution (update paths)"""
+        if not self.args:
+            return []
+        
+        adjusted = []
+        i = 0
+        while i < len(self.args):
+            arg = self.args[i]
+            
+            # Adjust target path for restore operations
+            if arg == '--target' and i + 1 < len(self.args):
+                adjusted.append('--target')
+                adjusted.append('/restore-target')
+                i += 2
+            # Keep include paths as-is (they reference backup content paths)
+            elif arg == '--include' and i + 1 < len(self.args):
+                adjusted.append('--include')
+                adjusted.append(self.args[i + 1])
+                i += 2
+            else:
+                adjusted.append(arg)
+                i += 1
+        
+        return adjusted
 
 
 @dataclass
@@ -250,6 +301,9 @@ class ResticRunner:
             environment_vars=environment_vars,
             timeout_seconds=restore_config.get('timeout', self.default_timeout)
         )
+        
+        # Store job config reference for container runtime access
+        restore_cmd.job_config = job_config
         
         return ResticPlan(
             job_name=job_name,

@@ -55,6 +55,11 @@ class SSHFormParser:
             'username': username
         }
         
+        # Add container runtime if detected during SSH validation
+        container_runtime = form_data.get('container_runtime', [''])[0].strip()
+        if container_runtime:
+            source_config['container_runtime'] = container_runtime
+        
         return {
             'valid': True,
             'config': source_config
