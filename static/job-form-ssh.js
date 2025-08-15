@@ -39,8 +39,8 @@ const SSHValidator = {
                 '<strong>Validation Results:</strong>',
                 `- ${details.ssh_status || data.message}`,
                 details.rsync_status ? `- ${details.rsync_status}` : '',
-                details.path_status ? `- ${details.path_status}` : '',
-                data.tested_from ? `- Tested from: ${data.tested_from}` : ''
+                details.container_runtime ? `- ${details.container_runtime}` : '',
+                details.path_status ? `- ${details.path_status}` : ''
             ].filter(line => line && !line.endsWith('- ')).join('<br>');
             
             StatusRenderer.showDetails(detailsId, detailsContent);

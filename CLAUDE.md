@@ -9,6 +9,10 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 **Rule: Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings). Definitions contain one or more paths with per-path include/exclude rules. This architecture balances user workflow simplicity with granular control and tool efficiency.
 
+**Rule: Pure Orchestration Layer**: Highball orchestrates backup/restore operations by SSH-ing to hosts and running binaries there. Never acts as intermediary for data transfer. Backup: SSH to source host → run restic/rsync → direct to destination. Restore: SSH to target host → run restic restore → files appear on target. This design enables ANY host to ANY destination with Highball providing only coordination.
+
+**Rule: DRY Principle & Provider Separation**: Don't Repeat Yourself. RestoreHandler orchestrates provider-agnostic operations (overwrite detection, validation, progress tracking). Provider-specific runners (ResticRunner, future BorgRunner/KopiaRunner) handle command building and execution. SSH patterns, authentication, environment management shared across all operations. This separation enables cohesive multi-provider support without code duplication.
+
 **Rule: Just In Time, Progressive Disclosure**: User sees what they need when they need it. Ask only what can't be inferred. Do not overwhelm with choices.
 
 **Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
@@ -49,7 +53,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **CSS**: Colors ONLY in `/static/themes/{dark,light}.css`. Structure ONLY in `/static/style.css` 
 **Architecture**: Proactively modularize components when they become monolithic. Thin handlers, centralized validation, dataclass-driven config
 **Code Standards**: PEP 8, dataclasses, pathlib, type hints, emoji-free, external assets only
-**Extensions**: Multi-provider pattern via `services/<engine>_repository_service.py` + `handlers/<engine>_validator.py` + form parsers
+**Extensions**: Multi-provider pattern via `services/<engine>_repository_service.py` + `handlers/<engine>_validator.py` + form parsers. Official containers: `restic/restic`, future `kopia/kopia`
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
 **Testing**: Write standalone tests that don't import main app modules (avoid dependency/permission errors). Mock external dependencies. Use `test_*_standalone.py` pattern for isolated unit tests.
 
@@ -156,6 +160,6 @@ deleted_jobs:  # user can manually restore to backup_jobs
 - **Restic repository browser** - Complete implementation with progressive loading, expandable tree, multi-level selection, detailed snapshot statistics, theme-adaptive icons, instant loading feedback, and multi-provider architecture (100% complete)
 
 **Future Priorities**: Section-specific save buttons for configuration, notification template preview, enhanced Restic features
-**Planned**: Borg, Kopia, enhanced Restic execution features (progress parsing, retention policies)
+**Planned**: Kopia provider (official `kopia/kopia` container), enhanced Restic execution features (progress parsing, retention policies)
 **Wishlist**: notification template preview, notification history, expanded variable system for notifications
 **anti-goals**: 

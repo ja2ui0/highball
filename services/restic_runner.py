@@ -5,6 +5,7 @@ Handles Restic backup operations via SSH execution, similar to rsync pattern
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 from enum import Enum
+import shlex
 
 
 class TransportType(Enum):
@@ -18,6 +19,7 @@ class CommandType(Enum):
     """Types of Restic commands"""
     INIT = "init"
     BACKUP = "backup"
+    RESTORE = "restore"
     CHECK = "check"
     FORGET = "forget"
     PRUNE = "prune"
@@ -49,18 +51,40 @@ class ResticCommand:
         
         # Build restic command
         restic_cmd = ["restic", "-r", self.repository_url]
+        
+        # Add command type
+        if self.command_type == CommandType.BACKUP:
+            restic_cmd.append("backup")
+        elif self.command_type == CommandType.RESTORE:
+            restic_cmd.append("restore")
+        elif self.command_type == CommandType.INIT:
+            restic_cmd.append("init")
+        elif self.command_type == CommandType.SNAPSHOTS:
+            restic_cmd.append("snapshots")
+        elif self.command_type == CommandType.FORGET:
+            restic_cmd.append("forget")
+        elif self.command_type == CommandType.PRUNE:
+            restic_cmd.append("prune")
+        elif self.command_type == CommandType.CHECK:
+            restic_cmd.append("check")
+        
+        # Add command-specific arguments
         if self.args:
             restic_cmd.extend(self.args)
+            
+        # Add source paths for backup operations only
         if self.source_paths and self.command_type == CommandType.BACKUP:
             restic_cmd.extend(self.source_paths)
         
-        # Combine environment setup and restic command
-        remote_command = "; ".join(env_exports + [" ".join(restic_cmd)])
+        # Combine environment setup and restic command with proper shell escaping
+        escaped_restic_cmd = shlex.join(restic_cmd)
+        remote_command = "; ".join(env_exports + [escaped_restic_cmd])
         
         # Build SSH command
         ssh_cmd = [
             'ssh', '-o', 'ConnectTimeout=30', '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',  # Suppress known_hosts warnings
             f"{self.ssh_config['username']}@{self.ssh_config['hostname']}",
             remote_command
         ]
@@ -201,6 +225,41 @@ class ResticRunner:
             retention_policy=retention
         )
     
+    def plan_restore_job(self, job_config: Dict, restore_config: Dict) -> ResticPlan:
+        """Create execution plan for restore job"""
+        job_name = job_config.get('name', 'unnamed')
+        
+        # Determine transport and target host for restore
+        transport, ssh_config = self._determine_restore_transport(job_config, restore_config)
+        
+        # Parse repository configuration (same as backup)
+        repository_url = self._build_repository_url(job_config.get('dest_config', {}))
+        
+        # Parse environment variables (same as backup)
+        environment_vars = self._build_environment(job_config.get('dest_config', {}))
+        
+        # Build restore command
+        restore_args = self._build_restore_args(restore_config)
+        restore_cmd = ResticCommand(
+            command_type=CommandType.RESTORE,
+            transport=transport,
+            ssh_config=ssh_config,
+            repository_url=repository_url,
+            source_paths=None,  # Restore doesn't use source_paths
+            args=restore_args,
+            environment_vars=environment_vars,
+            timeout_seconds=restore_config.get('timeout', self.default_timeout)
+        )
+        
+        return ResticPlan(
+            job_name=job_name,
+            commands=[restore_cmd],
+            estimated_duration_minutes=self._estimate_restore_duration(restore_config),
+            requires_binary_check=transport == TransportType.SSH,
+            requires_init=False,  # Restore never needs init
+            retention_policy=None
+        )
+    
     def _determine_transport(self, job_config: Dict) -> tuple:
         """Determine transport method and SSH config"""
         source_type = job_config.get('source_type', 'local')
@@ -293,3 +352,67 @@ class ResticRunner:
         # Simple heuristic based on data size or default
         size_hint = job_config.get('estimated_size_gb', 1)
         return max(10, min(180, size_hint * 3))  # 3 minutes per GB, 10-180 min range
+    
+    def _determine_restore_transport(self, job_config: Dict, restore_config: Dict) -> tuple:
+        """Determine transport method and SSH config for restore operations"""
+        restore_target = restore_config.get('restore_target', 'highball')
+        
+        if restore_target == 'source':
+            # Restore to source - use source host credentials
+            source_type = job_config.get('source_type', 'local')
+            if source_type == 'ssh':
+                source_config = job_config.get('source_config', {})
+                ssh_config = {
+                    'hostname': source_config.get('hostname', ''),
+                    'username': source_config.get('username', '')
+                }
+                return TransportType.SSH, ssh_config
+            elif source_type == 'local':
+                return TransportType.LOCAL, None
+            else:
+                return TransportType.CONTAINER, None
+        else:
+            # Restore to Highball - always local execution
+            return TransportType.LOCAL, None
+    
+    def _build_restore_args(self, restore_config: Dict) -> List[str]:
+        """Build arguments for restore command"""
+        args = []
+        
+        # Add snapshot ID first (must come immediately after 'restore' command)
+        snapshot_id = restore_config.get('snapshot_id', 'latest')
+        if snapshot_id:
+            args.append(snapshot_id)
+        
+        # Add target directory
+        restore_target = restore_config.get('restore_target', 'highball')
+        if restore_target == 'highball':
+            args.extend(['--target', '/restore'])
+        elif restore_target == 'source':
+            args.extend(['--target', '/'])
+        
+        # Add selected paths (for granular restore)
+        if not restore_config.get('select_all', False):
+            selected_paths = restore_config.get('selected_paths', [])
+            for path in selected_paths:
+                if path.strip():
+                    args.extend(['--include', path])
+        
+        # Add dry run flag
+        if restore_config.get('dry_run', False):
+            args.append('--dry-run')
+        
+        # Add JSON output for progress tracking
+        if not restore_config.get('dry_run', False):
+            args.append('--json')
+        
+        return args
+    
+    def _estimate_restore_duration(self, restore_config: Dict) -> int:
+        """Estimate restore duration in minutes"""
+        # Simple heuristic - restores are typically faster than backups
+        if restore_config.get('select_all', False):
+            return 30  # Full restore
+        else:
+            path_count = len(restore_config.get('selected_paths', []))
+            return max(5, min(60, path_count * 2))  # 2 minutes per selected path

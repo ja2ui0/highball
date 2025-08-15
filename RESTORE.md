@@ -146,7 +146,71 @@
 - **Dry Run Default**: Enabled by default to prevent accidental data operations
 - **Form Validation**: Real-time validation and error handling throughout workflow
 
-## Current State - Ready for Testing
+## Architecture Implementation Plan
+
+**Provider Separation Design**: 
+- **RestoreHandler**: Provider-agnostic orchestration, overwrite detection, validation, progress tracking
+- **ResticRunner**: Restic-specific command building and execution (backup AND restore operations)
+- **Future Providers**: BorgRunner, KopiaRunner follow same pattern
+
+**SSH Restore Implementation**:
+1. **Extend ResticRunner**: Add `CommandType.RESTORE` support and `plan_restore_job()` method
+2. **Command Building**: Use existing SSH patterns (`to_ssh_command()`) for restore operations
+3. **Target Host Logic**: For "restore to source", SSH to source host and run restore there
+4. **Overwrite Detection**: SSH to target host, run `find` commands to check file existence
+
+**Command Execution Pattern**:
+```bash
+# SSH Restore to Source
+ssh user@source_host "export RESTIC_PASSWORD='***'; restic -r repo_url restore snapshot_id --target /"
+
+# Local Restore to Highball  
+restic -r repo_url restore snapshot_id --target /restore
+```
+
+**Current Session Tasks**:
+1. **ResticRunner Extension**: Add RESTORE command type and planning method
+2. **RestoreHandler Refactor**: Replace manual command building with ResticRunner calls
+3. **SSH Overwrite Detection**: Implement remote file existence checking
+4. **Unified Architecture**: Ensure all restore operations use consistent patterns
+
+## SSH Restore Implementation Plan
+
+### Phase 1: Extend ResticRunner
+1. **Add `plan_restore_job()` method** after `plan_backup_job()` in `restic_runner.py`
+   - Reuse existing `_determine_transport()`, `_build_repository_url()`, `_build_environment()` 
+   - Add restore-specific args building: `--target`, `--include` paths, `--dry-run`
+   - Handle both SSH and LOCAL transport types
+
+2. **Update `to_ssh_command()` method** to handle RESTORE command type
+   - Add restore path handling (no source_paths for restore)
+   - Include target directory and selected paths in args
+
+### Phase 2: Refactor RestoreHandler
+3. **Replace `_build_restic_restore_command()`** with ResticRunner calls
+   - Use `restic_runner.plan_restore_job()` for all restore operations
+   - Execute commands via `command.to_ssh_command()` or `command.to_local_command()`
+   - Maintain existing dry run and progress tracking
+
+4. **Implement SSH overwrite detection** in `_check_destination_files_exist()`
+   - Build SSH commands to run `find` on target hosts
+   - Use same SSH connection patterns as ResticRunner
+   - Keep logic in RestoreHandler (provider-agnostic)
+
+### Phase 3: Target Host Logic
+5. **Fix restore target determination**
+   - "restore to source": Use source host credentials, target "/"
+   - "restore to highball": Use local execution, target "/restore"
+   - Handle both local and SSH source types correctly
+
+**Files to Modify:**
+- `services/restic_runner.py`: Add restore planning
+- `handlers/restore_handler.py`: Replace manual command building
+- Test restore to source with yeti job (SSH source)
+
+**Maintains DRY principles and sets up clean provider separation for future borg/kopia integration.**
+
+## Current State - Implementation In Progress
 
 **✅ Implementation Complete**:
 - **Progressive Disclosure UI**: Eliminated modals, implemented intelligent confirmation system

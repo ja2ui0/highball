@@ -75,7 +75,7 @@ class LogsHandler:
         button_count = 0
         for log_type, info in self.LOG_TYPES.items():
             active_class = "button-success" if log_type == current_log_type else ""
-            buttons += f'<a href="/logs?type={log_type}" class="button {active_class}">{info["name"]}</a>\n'
+            buttons += f'<a href="/dev?type={log_type}" class="button {active_class}">{info["name"]}</a>\n'
             button_count += 1
             # Add line break after Supervisor (4th button)
             if button_count == 4:

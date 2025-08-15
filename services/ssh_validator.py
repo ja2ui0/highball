@@ -143,39 +143,76 @@ class SSHValidator:
             if not path_result.success:
                 return path_result
             
-            # Test rsync compatibility
-            rsync_result = self._test_rsync_compatibility(connection)
+            # Test backup capabilities (rsync + container runtimes)
+            capabilities = self._test_capabilities(connection)
+            analysis = self._analyze_capabilities(capabilities)
             
+            # Update details with capability information
             details.update({
                 'path_status': path_result.message,
-                'rsync_status': rsync_result.message
+                'rsync_status': capabilities['rsync'].message,
+                'supported_backends': analysis['supported_backends'],
+                'warnings': analysis['warnings']
             })
             
-            # Return result based on rsync test
-            if rsync_result.success:
+            # Add container runtime info if available
+            if analysis['container_runtime_info']:
+                details['container_runtime'] = analysis['container_runtime_info']
+            
+            # Determine overall result
+            if not analysis['supported_backends']:
+                return ValidationResult.error_result(
+                    f"No backup capabilities found on {connection.hostname} - install rsync or container runtime",
+                    details=details,
+                    tested_from="Highball container"
+                )
+            elif analysis['warnings']:
                 return ValidationResult.success_result(
-                    f"SSH source validated successfully: {connection.connection_string}",
+                    f"SSH source accessible with limited capabilities: {connection.connection_string}",
                     details=details,
                     tested_from="Highball container"
                 )
             else:
-                # SSH and path work, but rsync has issues - still report as success with warning
-                details['rsync_status'] += " (WARNING: may affect backup reliability)"
                 return ValidationResult.success_result(
-                    f"SSH source accessible with rsync warnings: {connection.connection_string}",
+                    f"SSH source validated with full capabilities: {connection.connection_string}",
                     details=details,
                     tested_from="Highball container"
                 )
         else:
-            # Connection-only validation
+            # Connection-only validation - still test backup capabilities
+            capabilities = self._test_capabilities(connection)
+            analysis = self._analyze_capabilities(capabilities)
+            
             details.update({
-                'connection_note': 'Connection test only (no path specified)'
+                'connection_note': 'Connection test only (no path specified)',
+                'rsync_status': capabilities['rsync'].message,
+                'supported_backends': analysis['supported_backends'],
+                'warnings': analysis['warnings']
             })
-            return ValidationResult.success_result(
-                f"SSH connection validated successfully: {connection.username}@{connection.hostname}",
-                details=details,
-                tested_from="Highball container"
-            )
+            
+            # Add container runtime info if available
+            if analysis['container_runtime_info']:
+                details['container_runtime'] = analysis['container_runtime_info']
+            
+            # Even for connection-only, warn about missing capabilities
+            if not analysis['supported_backends']:
+                return ValidationResult.error_result(
+                    f"No backup capabilities found on {connection.hostname} - install rsync or container runtime",
+                    details=details,
+                    tested_from="Highball container"
+                )
+            elif analysis['warnings']:
+                return ValidationResult.success_result(
+                    f"SSH connection established with limited capabilities: {connection.username}@{connection.hostname}",
+                    details=details,
+                    tested_from="Highball container"
+                )
+            else:
+                return ValidationResult.success_result(
+                    f"SSH connection validated with full capabilities: {connection.username}@{connection.hostname}",
+                    details=details,
+                    tested_from="Highball container"
+                )
     
     def _test_ssh_connection(self, connection: SSHConnectionDetails) -> ValidationResult:
         """Test basic SSH connectivity"""
@@ -238,39 +275,111 @@ class SSHValidator:
         except Exception as e:
             return ValidationResult.error_result(f'Path test error: {str(e)}')
     
-    def _test_rsync_compatibility(self, connection: SSHConnectionDetails) -> ValidationResult:
-        """Test rsync compatibility with the remote host"""
+    def _test_capabilities(self, connection: SSHConnectionDetails) -> Dict[str, ValidationResult]:
+        """Test all backup capabilities: rsync, container runtimes"""
+        capabilities = {}
+        
+        # Test rsync
+        capabilities['rsync'] = self._test_rsync_availability(connection)
+        
+        # Test container runtimes (podman preferred, docker fallback)
+        capabilities['podman'] = self._test_container_runtime(connection, 'podman')
+        capabilities['docker'] = self._test_container_runtime(connection, 'docker')
+        
+        return capabilities
+    
+    def _test_rsync_availability(self, connection: SSHConnectionDetails) -> ValidationResult:
+        """Test rsync availability on remote host"""
         try:
-            # Test rsync --version on remote host
             cmd = ['ssh'] + self.config.to_ssh_args() + [
                 f'{connection.username}@{connection.hostname}',
                 'rsync --version 2>/dev/null | head -1 || echo "RSYNC_MISSING"'
             ]
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.config.timeout_seconds
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
             
             if result.returncode == 0:
                 output = result.stdout.strip()
-                if 'rsync version' in output.lower():
-                    return ValidationResult.success_result(f'Rsync available: {output}')
+                if 'rsync' in output.lower() and 'version' in output.lower():
+                    # Extract just the version info for cleaner display
+                    version_line = output.split('\n')[0].strip()
+                    return ValidationResult.success_result(f'Available: {version_line}')
                 elif 'RSYNC_MISSING' in output:
-                    return ValidationResult.error_result(
-                        'rsync not found on remote host - backup will fail'
-                    )
+                    return ValidationResult.error_result('Not found')
                 else:
-                    return ValidationResult.error_result('Could not determine rsync availability')
+                    return ValidationResult.error_result('Could not determine availability')
             else:
-                return ValidationResult.error_result('Could not test rsync on remote host')
+                return ValidationResult.error_result('Test failed')
                 
         except subprocess.TimeoutExpired:
-            return ValidationResult.error_result('Rsync compatibility test timed out')
+            return ValidationResult.error_result('Test timed out')
         except Exception as e:
-            return ValidationResult.error_result(f'Rsync test error: {str(e)}')
+            return ValidationResult.error_result(f'Test error: {str(e)}')
+    
+    def _test_container_runtime(self, connection: SSHConnectionDetails, runtime: str) -> ValidationResult:
+        """Test container runtime (podman/docker) availability"""
+        try:
+            cmd = ['ssh'] + self.config.to_ssh_args() + [
+                f'{connection.username}@{connection.hostname}',
+                f'{runtime} --version 2>/dev/null || echo "{runtime.upper()}_MISSING"'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
+            
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if f'{runtime} version' in output.lower() or f'{runtime} (podman)' in output.lower():
+                    # Clean up version string - remove trailing commas and extra text
+                    parts = output.split()
+                    if len(parts) >= 3:
+                        version_str = f'{parts[0]} {parts[2].rstrip(",")}'
+                    else:
+                        version_str = parts[0] if parts else runtime
+                    return ValidationResult.success_result(f'Available: {version_str}')
+                elif f'{runtime.upper()}_MISSING' in output:
+                    return ValidationResult.error_result('Not found')
+                else:
+                    return ValidationResult.error_result('Could not determine availability')
+            else:
+                return ValidationResult.error_result('Test failed')
+                
+        except subprocess.TimeoutExpired:
+            return ValidationResult.error_result('Test timed out')
+        except Exception as e:
+            return ValidationResult.error_result(f'Test error: {str(e)}')
+    
+    def _analyze_capabilities(self, capabilities: Dict[str, ValidationResult]) -> Dict[str, Any]:
+        """Analyze available capabilities and determine supported backends"""
+        analysis = {
+            'has_rsync': capabilities['rsync'].success,
+            'has_podman': capabilities['podman'].success,
+            'has_docker': capabilities['docker'].success,
+            'container_runtime': None,
+            'container_runtime_info': None,
+            'supported_backends': [],
+            'warnings': []
+        }
+        
+        # Determine preferred container runtime and info
+        if analysis['has_podman']:
+            analysis['container_runtime'] = 'podman'
+            analysis['container_runtime_info'] = capabilities['podman'].message
+        elif analysis['has_docker']:
+            analysis['container_runtime'] = 'docker'
+            analysis['container_runtime_info'] = capabilities['docker'].message
+        
+        # Determine supported backends
+        if analysis['has_rsync']:
+            analysis['supported_backends'].extend(['ssh', 'local', 'rsyncd'])
+        
+        if analysis['container_runtime']:
+            analysis['supported_backends'].append('restic')
+        
+        # Generate warnings only for complete lack of capabilities
+        if not analysis['has_rsync'] and not analysis['container_runtime']:
+            analysis['warnings'].append('No backup capabilities found - install rsync or container runtime')
+        
+        return analysis
     
     @staticmethod
     def get_validation_summary(result: ValidationResult) -> Dict[str, Any]:

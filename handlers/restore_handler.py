@@ -9,6 +9,7 @@ import subprocess
 from urllib.parse import parse_qs
 from typing import Dict, Any, List
 from services.job_logger import JobLogger
+from services.restic_runner import ResticRunner
 
 
 class RestoreHandler:
@@ -18,6 +19,7 @@ class RestoreHandler:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_logger = JobLogger()
+        self.restic_runner = ResticRunner()
         self.active_restores = {}  # Track active restore operations
     
     def process_restore_request(self, handler, form_data):
@@ -215,22 +217,39 @@ class RestoreHandler:
         """Execute dry run restore and return results"""
         try:
             job_name = restore_config['job_name']
+            job_config = restore_config['job_config']
             
-            # Build restic restore command for dry run
-            cmd_result = self._build_restic_restore_command(restore_config, dry_run=True)
-            if not cmd_result['success']:
-                return cmd_result
+            # Set dry run flag
+            dry_run_config = {**restore_config, 'dry_run': True}
+            
+            # Build restic restore command using ResticRunner
+            plan = self.restic_runner.plan_restore_job(job_config, dry_run_config)
+            if not plan.commands:
+                return {'success': False, 'error': 'No restore commands generated'}
+            
+            # Get first command (restore operations have only one command)
+            restore_command = plan.commands[0]
+            
+            # Build execution command based on transport
+            if restore_command.transport.value == 'ssh':
+                exec_command = restore_command.to_ssh_command()
+            else:
+                exec_command = restore_command.to_local_command()
+            
+            # Debug: Log the exact command being executed
+            self.job_logger.log_job_execution(job_name, f"DEBUG: Full command: {' '.join(exec_command)}")
+            self.job_logger.log_job_execution(job_name, f"DEBUG: Args from ResticRunner: {restore_command.args}")
             
             # Execute command
             result = subprocess.run(
-                cmd_result['command'],
+                exec_command,
                 capture_output=True,
                 text=True,
                 timeout=300  # 5 minute timeout for dry run
             )
             
             # Log the dry run (obfuscate password)
-            safe_command = self._obfuscate_password_in_command(cmd_result['command'])
+            safe_command = self._obfuscate_password_in_command(exec_command)
             self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
             self.job_logger.log_job_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
@@ -243,14 +262,14 @@ class RestoreHandler:
                     'success': True,
                     'message': 'Dry run completed successfully',
                     'output': result.stdout,
-                    'command': ' '.join(cmd_result['command'])
+                    'command': ' '.join(exec_command)
                 }
             else:
                 return {
                     'success': False,
                     'error': f'Dry run failed: {result.stderr}',
                     'output': result.stdout,
-                    'command': ' '.join(cmd_result['command'])
+                    'command': ' '.join(exec_command)
                 }
                 
         except subprocess.TimeoutExpired:
@@ -285,18 +304,30 @@ class RestoreHandler:
         job_name = restore_config['job_name']
         
         try:
-            # Build restic restore command
-            cmd_result = self._build_restic_restore_command(restore_config, dry_run=False)
-            if not cmd_result['success']:
-                self._finish_restore_with_error(job_name, cmd_result['error'])
+            job_config = restore_config['job_config']
+            
+            # Build restic restore command using ResticRunner
+            plan = self.restic_runner.plan_restore_job(job_config, restore_config)
+            if not plan.commands:
+                self._finish_restore_with_error(job_name, 'No restore commands generated')
                 return
             
+            # Get first command (restore operations have only one command)
+            restore_command = plan.commands[0]
+            
+            # Build execution command based on transport
+            if restore_command.transport.value == 'ssh':
+                exec_command = restore_command.to_ssh_command()
+            else:
+                exec_command = restore_command.to_local_command()
+            
             # Log restore start
-            self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(cmd_result['command'])}")
+            safe_command = self._obfuscate_password_in_command(exec_command)
+            self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
             # Execute with progress tracking
             process = subprocess.Popen(
-                cmd_result['command'],
+                exec_command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -336,82 +367,6 @@ class RestoreHandler:
                 
         except Exception as e:
             self._finish_restore_with_error(job_name, f"Restore execution error: {str(e)}")
-    
-    def _build_restic_restore_command(self, restore_config: Dict[str, Any], dry_run: bool = False) -> Dict[str, Any]:
-        """Build restic restore command based on configuration"""
-        try:
-            job_config = restore_config['job_config']
-            dest_config = job_config.get('dest_config', {})
-            
-            # Basic restic command
-            cmd = ['restic']
-            
-            # Add repository
-            repo_uri = dest_config.get('repo_uri') or dest_config.get('dest_string')
-            if repo_uri:
-                cmd.extend(['-r', repo_uri])
-            else:
-                return {'success': False, 'error': 'No repository URI found in job configuration'}
-            
-            # Add password - use job config password for dry runs, form password for actual restores
-            password = restore_config.get('password', '')
-            if not password:
-                # For dry runs, get password from job configuration
-                job_config = restore_config['job_config']
-                dest_config = job_config.get('dest_config', {})
-                password = dest_config.get('password', '')
-            
-            if password:
-                cmd.extend(['--password-command', f'echo "{password}"'])
-            
-            # Restore command
-            cmd.append('restore')
-            
-            # Add snapshot ID (latest if select_all)
-            if restore_config.get('select_all'):
-                cmd.append('latest')
-            else:
-                snapshot_id = restore_config.get('snapshot_id')
-                if snapshot_id:
-                    cmd.append(snapshot_id)
-                else:
-                    return {'success': False, 'error': 'No snapshot ID specified'}
-            
-            # Add target directory
-            restore_target = restore_config.get('restore_target', 'highball')
-            if restore_target == 'highball':
-                restore_path = '/restore'
-                cmd.extend(['--target', restore_path])
-            elif restore_target == 'source':
-                # Restore to original source location - no --target needed for restic
-                # Files will be restored to their original paths
-                pass
-            else:
-                return {'success': False, 'error': f'Unsupported restore target: {restore_target}'}
-            
-            # Add selected paths (if not select_all)
-            if not restore_config.get('select_all'):
-                selected_paths = restore_config.get('selected_paths', [])
-                if selected_paths:
-                    for path in selected_paths:
-                        cmd.extend(['--include', path])
-            
-            # Add dry run flag
-            if dry_run:
-                cmd.append('--dry-run')
-            
-            # Add JSON output for progress tracking (if not dry run)
-            if not dry_run:
-                cmd.append('--json')
-            
-            return {
-                'success': True,
-                'command': cmd,
-                'description': f'Restic restore to {restore_config.get("restore_target")}'
-            }
-            
-        except Exception as e:
-            return {'success': False, 'error': f'Command building error: {str(e)}'}
     
     def _update_restore_progress(self, job_name: str, progress_data: Dict[str, Any]):
         """Update restore progress from JSON output"""
