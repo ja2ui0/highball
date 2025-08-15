@@ -26,11 +26,11 @@ class ResticValidator:
                 'message': 'Repository type is required for Restic destinations'
             }
         
-        repo_location = dest_config.get('repo_location')
-        if not repo_location:
+        repo_uri = dest_config.get('repo_uri')
+        if not repo_uri:
             return {
                 'success': False,
-                'message': 'Repository location is required for Restic destinations'
+                'message': 'Repository URI is required for Restic destinations'
             }
         
         password = dest_config.get('password')
@@ -97,3 +97,9 @@ class ResticValidator:
         """Browse files and directories in a Restic snapshot"""
         repo_service = ResticRepositoryService()
         return repo_service.browse_directory(job_config, snapshot_id, path)
+    
+    @staticmethod
+    def init_repository(parsed_job: Dict[str, Any]) -> Dict[str, Any]:
+        """Initialize a new Restic repository"""
+        repo_service = ResticRepositoryService()
+        return repo_service.init_repository(parsed_job)

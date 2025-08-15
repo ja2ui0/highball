@@ -1,12 +1,12 @@
 """
 Filesystem browsing service for rsync-compatible destinations.
-Leverages existing BackupClient for SSH execution and native rsync tools.
+Leverages CommandExecutionService for SSH execution and native rsync tools.
 """
 
 import os
 import subprocess
 from typing import Dict, List, Optional, Any
-from services.backup_client import BackupClient
+from services.command_execution_service import CommandExecutionService
 
 
 class FilesystemService:
@@ -14,7 +14,7 @@ class FilesystemService:
     
     def __init__(self):
         """Initialize filesystem service"""
-        self.client = BackupClient()
+        self.executor = CommandExecutionService()
     
     def browse_directory(self, job_config: Dict[str, Any], path: str = '/') -> Dict[str, Any]:
         """Browse files and directories in filesystem path"""
@@ -24,7 +24,7 @@ class FilesystemService:
             
             # Determine which destination to browse based on job configuration
             if dest_type == 'ssh':
-                return self._browse_ssh_destination(dest_config, path)
+                return self._browse_destination_via_ssh(dest_config, path)
             elif dest_type == 'local':
                 return self._browse_local_destination(dest_config, path)
             elif dest_type == 'rsyncd':
@@ -35,8 +35,8 @@ class FilesystemService:
         except Exception as e:
             return self._format_error_response(f'Filesystem browse failed: {str(e)}')
     
-    def _browse_ssh_destination(self, dest_config: Dict[str, Any], path: str) -> Dict[str, Any]:
-        """Browse SSH destination directory using existing BackupClient"""
+    def _browse_destination_via_ssh(self, dest_config: Dict[str, Any], path: str) -> Dict[str, Any]:
+        """Browse SSH destination directory using CommandExecutionService"""
         try:
             hostname = dest_config.get('hostname', '')
             username = dest_config.get('username', '')
@@ -48,14 +48,14 @@ class FilesystemService:
             # Combine destination path with requested browse path
             full_path = self._combine_paths(dest_path, path)
             
-            # Use existing BackupClient for SSH execution
+            # Use CommandExecutionService for SSH execution
             ls_command = f'ls -la "{full_path}" 2>/dev/null || echo "ERROR: Cannot access {full_path}"'
-            result = self.client.execute_via_ssh(hostname, username, ls_command, timeout=30)
+            result = self.executor.execute_via_ssh(hostname, username, ls_command)
             
-            if not result.get('success', False):
-                return self._format_error_response(f'SSH ls failed: {result.get("error", "Unknown error")}')
+            if not result.success:
+                return self._format_error_response(f'SSH ls failed: {result.stderr or "Unknown error"}')
             
-            stdout = result.get('stdout', '')
+            stdout = result.stdout
             if stdout.startswith('ERROR:'):
                 return self._format_error_response(stdout)
             

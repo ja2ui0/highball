@@ -265,12 +265,21 @@ class RestoreHandler:
                 exec_command = restore_command.to_local_command()
             
             
-            # Execute command
+            # Get environment variables from restore command  
+            env_vars = restore_command.environment_vars or {}
+            
+            # Add cache environment variables to prevent warnings
+            env_vars.update({
+                'HOME': '/tmp',
+                'XDG_CACHE_HOME': '/tmp/.cache'
+            })
+            
+            # Execute command (no timeout - let legitimate operations complete)
             result = subprocess.run(
                 exec_command,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout for dry run
+                env=env_vars
             )
             
             # Log the dry run (obfuscate password)
@@ -356,21 +365,57 @@ class RestoreHandler:
             safe_command = self._obfuscate_password_in_command(exec_command, job_password)
             self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
+            # Get environment variables from restore command
+            env_vars = restore_command.environment_vars or {}
+            
+            # Add cache environment variables to prevent warnings
+            env_vars.update({
+                'HOME': '/tmp',
+                'XDG_CACHE_HOME': '/tmp/.cache'
+            })
+            
             # Execute with progress tracking
             process = subprocess.Popen(
                 exec_command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                env=env_vars
             )
             
-            # Track progress if using JSON output
+            # Track progress with health monitoring
+            import time
+            import select
+            import sys
+            
+            last_output_time = time.time()
+            initial_response_timeout = 30  # 30 seconds to start producing output
+            ongoing_timeout = 60  # 60 seconds between outputs once started
+            has_started = False
+            
             while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
+                # Check if process has finished
+                if process.poll() is not None:
                     break
-                    
+                
+                # Use select to check for available output (non-blocking)
+                if sys.platform != 'win32':
+                    ready, _, _ = select.select([process.stdout], [], [], 1.0)  # 1 second timeout
+                    if ready:
+                        output = process.stdout.readline()
+                    else:
+                        output = ''
+                else:
+                    # Windows fallback - blocking read with shorter readline
+                    output = process.stdout.readline()
+                
+                current_time = time.time()
+                
                 if output:
+                    # Got output - update timing and mark as started
+                    last_output_time = current_time
+                    has_started = True
+                    
                     # Log output
                     self.job_logger.log_job_execution(job_name, f"Restore output: {output.strip()}")
                     
@@ -381,9 +426,34 @@ class RestoreHandler:
                             self._update_restore_progress(job_name, progress_data)
                         except json.JSONDecodeError:
                             pass  # Not JSON, continue
+                else:
+                    # No output - check if we've exceeded timeout
+                    time_since_last_output = current_time - last_output_time
+                    
+                    if not has_started and time_since_last_output > initial_response_timeout:
+                        # Process hasn't started producing output within initial timeout
+                        self.job_logger.log_job_execution(job_name, 
+                            f"Process appears stuck - no initial output after {initial_response_timeout} seconds", "WARNING")
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                        raise Exception(f"Process failed to start - no output after {initial_response_timeout} seconds")
+                    
+                    elif has_started and time_since_last_output > ongoing_timeout:
+                        # Process was working but stopped producing output
+                        self.job_logger.log_job_execution(job_name, 
+                            f"Process appears stuck - no output for {ongoing_timeout} seconds", "WARNING")
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                        raise Exception(f"Process stopped responding - no output for {ongoing_timeout} seconds")
             
             # Wait for completion
-            return_code = process.poll()
+            return_code = process.wait()  # Use wait() instead of poll() to ensure process completion
             stderr_output = process.stderr.read()
             
             # Log completion
@@ -441,7 +511,10 @@ class RestoreHandler:
         if job_name in self.active_restores:
             del self.active_restores[job_name]
         
-        self.job_logger.log_job_status(job_name, 'restore_failed', f'Restore failed: {error_message}')
+        # Parse and clean up error message for user display
+        clean_message = self._parse_error_message(error_message)
+        
+        self.job_logger.log_job_status(job_name, 'restore_failed', f'Restore failed: {clean_message}')
         self.job_logger.log_job_execution(job_name, f"Restore failed: {error_message}", "ERROR")
     
     def get_restore_status(self, job_name: str) -> Dict[str, Any]:
@@ -449,6 +522,86 @@ class RestoreHandler:
         if job_name in self.active_restores:
             return self.active_restores[job_name]
         return {'status': 'none'}
+    
+    def _parse_error_message(self, error_message: str) -> str:
+        """Parse error message and extract meaningful information for users"""
+        try:
+            # Check if message contains JSON lines
+            if '{' in error_message and '"message_type"' in error_message:
+                lines = error_message.split('\n')
+                parsed_errors = []
+                initial_error = ""
+                
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('{') and '"message_type"' in line:
+                        try:
+                            # Parse JSON error
+                            error_json = json.loads(line)
+                            if error_json.get('message_type') == 'error':
+                                error_info = error_json.get('error', {})
+                                error_msg = error_info.get('message', '')
+                                item = error_json.get('item', '')
+                                
+                                if error_msg and item:
+                                    parsed_errors.append(f"{item}: {error_msg}")
+                                elif error_msg:
+                                    parsed_errors.append(error_msg)
+                            elif error_json.get('message_type') == 'exit_error':
+                                exit_msg = error_json.get('message', '')
+                                if exit_msg:
+                                    parsed_errors.append(f"Fatal: {exit_msg}")
+                        except json.JSONDecodeError:
+                            continue
+                    elif line and not line.startswith('{'):
+                        # Capture non-JSON error messages
+                        if not initial_error:
+                            initial_error = line
+                
+                # Build clean error message
+                if parsed_errors:
+                    # Group similar errors
+                    error_counts = {}
+                    unique_errors = []
+                    
+                    for error in parsed_errors:
+                        # Extract the base error type
+                        if ': permission denied' in error:
+                            base_error = 'Permission denied accessing backup destination'
+                        elif ': no such file or directory' in error:
+                            base_error = 'Backup destination path does not exist'
+                        elif 'mkdir' in error and 'permission denied' in error:
+                            base_error = 'Cannot create directory due to permissions'
+                        elif 'chmod' in error or 'lchown' in error:
+                            base_error = 'Cannot set file permissions/ownership'
+                        else:
+                            base_error = error
+                        
+                        if base_error in error_counts:
+                            error_counts[base_error] += 1
+                        else:
+                            error_counts[base_error] = 1
+                            unique_errors.append(base_error)
+                    
+                    # Build summary message
+                    if len(unique_errors) == 1:
+                        return unique_errors[0]
+                    else:
+                        # Show the most common error and count
+                        main_error = max(error_counts.keys(), key=lambda k: error_counts[k])
+                        total_errors = sum(error_counts.values())
+                        return f"{main_error} ({total_errors} errors total)"
+                
+                # Fall back to initial error if we have one
+                if initial_error:
+                    return initial_error
+            
+            # Return original message if no JSON parsing needed
+            return error_message
+            
+        except Exception:
+            # If parsing fails, return original message
+            return error_message
     
     def _safe_get_form_value(self, form_data: Dict[str, List[str]], key: str, default: str = '') -> str:
         """Safely get form value with default"""

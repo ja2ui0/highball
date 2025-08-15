@@ -117,6 +117,9 @@ class ResticFormParser:
         if not hostname:
             return {'valid': False, 'error': 'REST repository requires hostname'}
         
+        if not path:
+            return {'valid': False, 'error': 'REST repository requires path (to prevent initializing at server root)'}
+        
         # Build URI components
         scheme = 'https' if use_https else 'http'
         port_str = f":{port}" if port and port != '80' and port != '443' else ''

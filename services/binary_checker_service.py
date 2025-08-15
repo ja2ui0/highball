@@ -4,7 +4,7 @@ Supports restic, borg, kopia, rclone, and other backup binaries.
 """
 
 from typing import Dict, List, Optional, Any
-from services.backup_client import BackupClient
+from services.command_execution_service import CommandExecutionService
 
 
 class BinaryCheckerService:
@@ -55,7 +55,13 @@ class BinaryCheckerService:
         
         command = f"which {binary_name} && {binary_info['version_command']}"
         
-        result = BackupClient.execute_via_ssh(hostname, username, command, timeout=15)
+        executor = CommandExecutionService()
+        exec_result = executor.execute_via_ssh(hostname, username, command)
+        result = {
+            'success': exec_result.success,
+            'stdout': exec_result.stdout,
+            'stderr': exec_result.stderr
+        }
         
         if result['success']:
             version_info = result['stdout'].strip()
@@ -82,7 +88,13 @@ class BinaryCheckerService:
         """Check binary availability locally"""
         command = ['sh', '-c', f'which {binary_name} && {binary_info["version_command"]}']
         
-        result = BackupClient.execute_locally(command, timeout=15)
+        executor = CommandExecutionService()
+        exec_result = executor.execute_locally(command)
+        result = {
+            'success': exec_result.success,
+            'stdout': exec_result.stdout,
+            'stderr': exec_result.stderr
+        }
         
         if result['success']:
             version_info = result['stdout'].strip()

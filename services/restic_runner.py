@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 from enum import Enum
 import shlex
+from services.container_command_builder import ContainerCommandBuilder, MountStrategy
+from services.snapshot_introspection_service import SnapshotIntrospectionService
+from services.restic_argument_builder import ResticArgumentBuilder
 
 
 class TransportType(Enum):
@@ -47,26 +50,21 @@ class ResticCommand:
         # Build container command for remote execution
         container_cmd = self._build_container_command(self.job_config)
         
-        # Build the full command with user ID expansion on remote host
-        # We need the remote host to evaluate $(id -u):$(id -g), not the local host
-        container_cmd_str = shlex.join(container_cmd)
-        # Replace the literal string with one that will be evaluated on remote host
-        container_cmd_str = container_cmd_str.replace("'$(id -u):$(id -g)'", "$(id -u):$(id -g)")
-        
-        # Build SSH command to execute container on remote host
-        ssh_cmd = [
-            'ssh', '-o', 'ConnectTimeout=30', '-o', 'BatchMode=yes',
-            '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
-            '-o', 'LogLevel=ERROR',  # Suppress known_hosts warnings
-            f"{self.ssh_config['username']}@{self.ssh_config['hostname']}",
-            container_cmd_str  # Use modified string that allows shell evaluation
-        ]
-        
-        return ssh_cmd
+        # Use ContainerCommandBuilder for SSH command construction
+        container_builder = ContainerCommandBuilder(self.job_config.get('container_runtime', 'docker'))
+        return container_builder.build_ssh_command(
+            self.ssh_config['hostname'],
+            self.ssh_config['username'],
+            container_cmd
+        )
     
     def to_local_command(self) -> List[str]:
         """Convert to local restic command for container execution"""
         cmd = ["restic", "-r", self.repository_url]
+        
+        # Add command type (backup, restore, etc.)
+        cmd.append(self.command_type.value)
+        
         if self.args:
             cmd.extend(self.args)
         if self.source_paths and self.command_type == CommandType.BACKUP:
@@ -75,147 +73,69 @@ class ResticCommand:
     
     def _build_container_command(self, job_config: Dict = None) -> List[str]:
         """Build container run command with restic official container"""
-        # Get container runtime from job config
         runtime = job_config.get('container_runtime', 'docker') if job_config else 'docker'
+        container_builder = ContainerCommandBuilder(runtime)
         
-        cmd = [runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)']
+        # Determine mount strategy and paths
+        mount_strategy, mount_paths, target_path = self._determine_mount_strategy()
         
-        # Add environment variables
-        if self.environment_vars:
-            for key, value in self.environment_vars.items():
-                cmd.extend(['-e', f'{key}={value}'])
+        # Adjust arguments for container execution
+        adjusted_args = ResticArgumentBuilder.adjust_args_for_container(self.args or [])
         
-        # Mount source paths for backup operations
-        if self.source_paths and self.command_type == CommandType.BACKUP:
-            for source_path in self.source_paths:
-                # Mount actual path as itself (no artificial /backup-source-{i} names)
-                cmd.extend(['-v', f'{source_path}:{source_path}:ro'])
-        
-        # For restore operations, mount target directory
-        if self.command_type == CommandType.RESTORE:
-            target_path = self._extract_target_from_args()
+        return container_builder.build_container_command(
+            command_type=self.command_type.value,
+            repository_url=self.repository_url,
+            args=adjusted_args,
+            environment_vars=self.environment_vars or {},
+            mount_strategy=mount_strategy,
+            mount_paths=mount_paths,
+            target_path=target_path
+        )
+    
+    def _determine_mount_strategy(self) -> tuple:
+        """Determine mount strategy, paths, and target based on command type"""
+        if self.command_type == CommandType.BACKUP:
+            return MountStrategy.BACKUP_SOURCES, self.source_paths, None
+            
+        elif self.command_type == CommandType.RESTORE:
+            target_path = ResticArgumentBuilder.extract_target_from_args(self.args or [])
+            
             if target_path == '/' and hasattr(self, 'job_config') and self.job_config:
-                # For restore-to-source, introspect snapshot to determine what paths to mount
-                snapshot_id = self._extract_snapshot_id_from_args()
+                # Restore-to-source: introspect snapshot for mount paths
+                snapshot_id = ResticArgumentBuilder.extract_snapshot_id_from_args(self.args or [])
                 if snapshot_id:
                     snapshot_paths = self._get_snapshot_root_paths(snapshot_id)
-                    for path in snapshot_paths:
-                        # Mount exactly what's in the snapshot - let natural failures occur
-                        cmd.extend(['-v', f'{path}:{path}'])
+                    return MountStrategy.RESTORE_TO_SOURCE, snapshot_paths, None
+                    
             elif target_path:
-                # For restore-to-highball, mount target directory
-                cmd.extend(['-v', f'{target_path}:/restore-target'])
-        
-        # Use official restic container
-        cmd.append('restic/restic:0.18.0')
-        
-        # Add restic repository
-        cmd.extend(['-r', self.repository_url])
-        
-        # Add command type
-        cmd.append(self.command_type.value)
-        
-        # Add command-specific arguments (adjust paths for container)
-        if self.args:
-            adjusted_args = self._adjust_args_for_container()
-            cmd.extend(adjusted_args)
-            
-        # Add container source paths for backup operations
-        if self.source_paths and self.command_type == CommandType.BACKUP:
-            for source_path in self.source_paths:
-                # Use actual source paths in backup command
-                cmd.append(source_path)
-        
-        return cmd
+                # Restore-to-highball: mount target directory
+                return MountStrategy.RESTORE_TO_HIGHBALL, None, target_path
+                
+        return MountStrategy.BACKUP_SOURCES, [], None
     
-    def _extract_target_from_args(self) -> str:
-        """Extract target directory from restore arguments"""
-        if not self.args:
-            return ""
-        
-        try:
-            target_idx = self.args.index('--target')
-            if target_idx + 1 < len(self.args):
-                return self.args[target_idx + 1]
-        except ValueError:
-            pass
-        
-        return ""
-    
-    def _extract_snapshot_id_from_args(self) -> str:
-        """Extract snapshot ID from restore arguments"""
-        if not self.args:
-            return ""
-        
-        # First argument after 'restore' command is snapshot ID
-        for arg in self.args:
-            if arg not in ['--target', '--include', '--exclude', '--dry-run', '--json'] and not arg.startswith('-'):
-                return arg
-        
-        return ""
     
     def _get_snapshot_root_paths(self, snapshot_id: str) -> List[str]:
         """Get root paths from snapshot by introspecting its contents"""
         if not snapshot_id or not hasattr(self, 'job_config') or not self.job_config:
             return []
         
-        try:
-            # Build restic command to list snapshot contents
-            dest_config = self.job_config.get('dest_config', {})
-            repo_url = self._build_repository_url(dest_config)
-            env_vars = self._build_environment(dest_config)
+        # Use SnapshotIntrospectionService for cleaner separation of concerns
+        introspection_service = SnapshotIntrospectionService()
+        dest_config = self.job_config.get('dest_config', {})
+        repo_url = self._build_repository_url(dest_config)
+        env_vars = self._build_environment(dest_config)
+        
+        ssh_config = None
+        if self.transport == TransportType.SSH:
+            ssh_config = self.ssh_config
             
-            # Use BackupClient to execute restic ls command
-            from services.backup_client import BackupClient
-            
-            if self.transport == TransportType.SSH:
-                # Execute via SSH using container (restic not installed on remote host)
-                hostname = self.ssh_config.get('hostname', '')
-                username = self.ssh_config.get('username', '') 
-                
-                # Build container command for snapshot introspection
-                runtime = self.job_config.get('container_runtime', 'docker')
-                container_cmd = [runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)']
-                
-                # Add environment variables
-                for key, value in env_vars.items():
-                    container_cmd.extend(['-e', f'{key}={value}'])
-                
-                # Use restic container for ls command
-                container_cmd.extend(['restic/restic:0.18.0', '-r', repo_url, 'ls', snapshot_id])
-                
-                # Execute container command via SSH
-                import shlex
-                container_cmd_str = shlex.join(container_cmd)
-                container_cmd_str = container_cmd_str.replace("'$(id -u):$(id -g)'", "$(id -u):$(id -g)")
-                
-                result = BackupClient.execute_via_ssh(hostname, username, container_cmd_str, {}, timeout=30)
-            else:
-                # Execute locally
-                command = ['restic', '-r', repo_url, 'ls', snapshot_id]
-                result = BackupClient.execute_locally(command, env_vars, timeout=30)
-            
-            if result.get('success'):
-                # Parse output to extract root directory paths
-                lines = result.get('stdout', '').strip().split('\n')
-                root_paths = set()
-                
-                for line in lines:
-                    line = line.strip()
-                    if line and line.startswith('/'):
-                        # Extract top-level directory (e.g., /home from /home/user/file.txt)
-                        parts = line.split('/')
-                        if len(parts) >= 2:
-                            root_path = '/' + parts[1]  # e.g., /home, /backup-source-0
-                            root_paths.add(root_path)
-                
-                return list(root_paths)
-                
-        except Exception as e:
-            # If introspection fails, return empty list - restore will fail gracefully
-            pass
-            
-        return []
+        return introspection_service.get_snapshot_source_paths(
+            snapshot_id=snapshot_id,
+            repository_url=repo_url,
+            environment_vars=env_vars,
+            ssh_config=ssh_config,
+            container_runtime=self.job_config.get('container_runtime', 'docker')
+        )
     
     def _build_repository_url(self, dest_config: Dict) -> str:
         """Get Restic repository URL from destination config"""
@@ -228,31 +148,6 @@ class ResticCommand:
             env['RESTIC_PASSWORD'] = dest_config['password']
         return env
     
-    def _adjust_args_for_container(self) -> List[str]:
-        """Adjust arguments for container execution (update paths)"""
-        if not self.args:
-            return []
-        
-        adjusted = []
-        i = 0
-        while i < len(self.args):
-            arg = self.args[i]
-            
-            # Adjust target path for restore operations  
-            if arg == '--target' and i + 1 < len(self.args):
-                adjusted.append('--target')
-                adjusted.append('/restore-target')
-                i += 2
-            # Keep include paths as-is (they reference backup content paths)
-            elif arg == '--include' and i + 1 < len(self.args):
-                adjusted.append('--include')
-                adjusted.append(self.args[i + 1])
-                i += 2
-            else:
-                adjusted.append(arg)
-                i += 1
-        
-        return adjusted
 
 
 @dataclass
@@ -333,7 +228,7 @@ class ResticRunner:
             commands.append(init_cmd)
         
         # Main backup command
-        backup_args = self._build_backup_args(job_config)
+        backup_args = ResticArgumentBuilder.build_backup_args(job_config)
         backup_cmd = ResticCommand(
             command_type=CommandType.BACKUP,
             transport=transport,
@@ -350,7 +245,7 @@ class ResticRunner:
         # Retention policy (if configured)
         retention = job_config.get('retention_policy')
         if retention:
-            forget_args = self._build_retention_args(retention)
+            forget_args = ResticArgumentBuilder.build_retention_args(retention)
             forget_cmd = ResticCommand(
                 command_type=CommandType.FORGET,
                 transport=transport,
@@ -398,7 +293,7 @@ class ResticRunner:
         
         # Build restore command - pass job_config in restore_config for path mapping
         restore_config_with_job = {**restore_config, 'job_config': job_config}
-        restore_args = self._build_restore_args(restore_config_with_job)
+        restore_args = ResticArgumentBuilder.build_restore_args(restore_config_with_job)
         restore_cmd = ResticCommand(
             command_type=CommandType.RESTORE,
             transport=transport,
@@ -460,6 +355,12 @@ class ResticRunner:
         # Additional environment variables
         env.update(dest_config.get('environment_vars', {}))
         
+        # Add cache environment variables to prevent permission issues
+        env.update({
+            'HOME': '/tmp',
+            'XDG_CACHE_HOME': '/tmp/.cache'
+        })
+        
         return env
     
     def _parse_source_paths(self, source_config: Dict) -> List[str]:
@@ -484,43 +385,7 @@ class ResticRunner:
         
         return path_strings
     
-    def _build_backup_args(self, job_config: Dict) -> List[str]:
-        """Build arguments for backup command"""
-        args = []
-        
-        # Add JSON output for parsing
-        args.append('--json')
-        
-        # Add tags
-        tags = job_config.get('tags', [])
-        for tag in tags:
-            args.extend(['--tag', tag])
-        
-        # Add exclude patterns
-        excludes = job_config.get('exclude_patterns', [])
-        for pattern in excludes:
-            args.extend(['--exclude', pattern])
-        
-        # Add verbose output if requested
-        if job_config.get('verbose', True):  # Default to verbose for better logging
-            args.append('--verbose')
-        
-        return args
     
-    def _build_retention_args(self, retention: Dict) -> List[str]:
-        """Build arguments for retention policy"""
-        args = ['--prune']  # Auto-prune when forgetting
-        
-        if 'keep_daily' in retention:
-            args.extend(['--keep-daily', str(retention['keep_daily'])])
-        if 'keep_weekly' in retention:
-            args.extend(['--keep-weekly', str(retention['keep_weekly'])])
-        if 'keep_monthly' in retention:
-            args.extend(['--keep-monthly', str(retention['keep_monthly'])])
-        if 'keep_yearly' in retention:
-            args.extend(['--keep-yearly', str(retention['keep_yearly'])])
-        
-        return args
     
     def _estimate_duration(self, job_config: Dict) -> int:
         """Estimate backup duration in minutes"""
@@ -550,39 +415,6 @@ class ResticRunner:
             # Restore to Highball - always local execution
             return TransportType.LOCAL, None
     
-    def _build_restore_args(self, restore_config: Dict) -> List[str]:
-        """Build arguments for restore command"""
-        args = []
-        
-        # Add snapshot ID first (must come immediately after 'restore' command)
-        snapshot_id = restore_config.get('snapshot_id', 'latest')
-        if snapshot_id:
-            args.append(snapshot_id)
-        
-        # Add target directory
-        restore_target = restore_config.get('restore_target', 'highball')
-        if restore_target == 'highball':
-            args.extend(['--target', '/restore'])
-        elif restore_target == 'source':
-            # For restore-to-source, restore to root and let mount mapping handle the paths
-            args.extend(['--target', '/'])
-        
-        # Add selected paths (for granular restore)
-        if not restore_config.get('select_all', False):
-            selected_paths = restore_config.get('selected_paths', [])
-            for path in selected_paths:
-                if path.strip():
-                    args.extend(['--include', path])
-        
-        # Add dry run flag
-        if restore_config.get('dry_run', False):
-            args.append('--dry-run')
-        
-        # Add JSON output for progress tracking
-        if not restore_config.get('dry_run', False):
-            args.append('--json')
-        
-        return args
     
     def _estimate_restore_duration(self, restore_config: Dict) -> int:
         """Estimate restore duration in minutes"""

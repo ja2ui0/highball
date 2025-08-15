@@ -23,7 +23,7 @@ class BackupExecutor:
         start_time = time.time()
         
         try:
-            result = self._execute_rsync(job_name, job_config, dry_run, trigger_source)
+            result = self._execute_backup(job_name, job_config, dry_run, trigger_source)
             duration = time.time() - start_time
             result["duration"] = duration
             
@@ -65,7 +65,7 @@ class BackupExecutor:
         self.job_logger.log_job_status(job_name, "error", error_message)
         self.job_logger.log_job_execution(job_name, f"ERROR: {error_message}", "ERROR")
 
-    def _execute_rsync(self, job_name, job_config, dry_run, trigger_source):
+    def _execute_backup(self, job_name, job_config, dry_run, trigger_source):
         """Execute rsync command and log output"""
         timestamp = datetime.now().isoformat()
         mode_text = "DRY RUN" if dry_run else "REAL BACKUP"
