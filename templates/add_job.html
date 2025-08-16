@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
     <script src="/static/job-form.js"></script>
+    <script src="/static/add-job-form.js"></script>
 </head>
 <body>
     <div class="container">
@@ -156,17 +157,5 @@ documents/**"></textarea>
             <a href="/" class="button">Cancel</a>
         </form>
     </div>
-    
-    <script>
-        function showCronField() {
-            const schedule = document.getElementById('schedule').value;
-            const cronField = document.getElementById('cron_field');
-            if (schedule === 'cron') {
-                cronField.style.display = 'block';
-            } else {
-                cronField.style.display = 'none';
-            }
-        }
-    </script>
 </body>
 </html>

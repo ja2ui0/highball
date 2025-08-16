@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
     <script src="/static/nav.js"></script>
     <script src="/static/network-scan.js"></script>
+    <script src="/static/dev-logs.js"></script>
 </head>
 <body>
     <div class="container">
@@ -41,24 +42,5 @@
             <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
         </div>
     </div>
-
-    <script>
-        const logContent = document.getElementById('logContent');
-        const refreshButton = document.getElementById('refreshLogs');
-        const clearButton = document.getElementById('clearLogs');
-        
-        function refreshLogs() {
-            // Reload the current page to refresh log content
-            window.location.reload();
-        }
-        
-        function clearLogs() {
-            logContent.textContent = '';
-        }
-        
-        // Event listeners
-        refreshButton.addEventListener('click', refreshLogs);
-        clearButton.addEventListener('click', clearLogs);
-    </script>
 </body>
 </html>

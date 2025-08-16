@@ -66,7 +66,6 @@ nice -n 5 ionice -c 2 -n 4 docker run --rm --user $(id -u):$(id -g) \
 
 ### Immediate (Session Start)
 1. **Verify Backup Execution**: Test backup operations with fixed container commands to ensure no regressions
-2. **Test Full Restore**: Execute actual (non-dry-run) restore operation to verify complete functionality
 
 ### Primary Development Tasks  
 1. **Dashboard Status Integration**: Add restore status polling and display "Restoring... N%" in main dashboard job table
@@ -103,4 +102,29 @@ cmd.extend(['-r', repository_url, command_type])  # NO 'restic' prefix
 - Added container command fix to Completed 2025-08-16 section
 
 ## Session Conclusion
-Container execution cascade of failures **RESOLVED**. System restored to full functionality with unified, correct container command patterns across all SSH Restic operations. Ready for dashboard status integration development.
+Container execution cascade of failures **RESOLVED**. System restored to full functionality with unified, correct container command patterns across all SSH Restic operations. 
+
+### Additional Cleanup Completed
+- ✅ **JavaScript Standards Compliance**: Extracted all embedded JavaScript from templates to external `/static/` files per frontend standards
+- ✅ **Template Cleanup**: 5 templates updated (add_job.html, dev_logs.html, job_form.html, job_form_notifications.html, logs.html)
+- ✅ **Modular Architecture**: Created 5 new JavaScript modules with single-responsibility patterns
+
+### Critical Context Not Obvious in Documentation
+
+#### Template Substitution Issue
+The `job-form-init.js` file contains template variables like `'{{SOURCE_PATHS_JSON}}'` that need server-side substitution. This creates a dependency where the JavaScript file must be processed as a template, which breaks the external file pattern. **SOLUTION NEEDED**: Either:
+1. Pass data via HTML data attributes instead of template variables in JS files
+2. Create inline `<script>` blocks with just data, sourcing logic from external files
+3. Use AJAX to fetch initialization data
+
+#### Container Command Structure Verification
+While restore dry-run is working, the full restore and backup execution still need verification with the new container command structure. The fix removes `restic` prefix from container commands, which affects ALL Restic operations.
+
+#### Template Variable Dependencies
+Multiple JavaScript files contain template variables that require server-side processing:
+- `job-form-init.js`: `{{SOURCE_PATHS_JSON}}`
+- `notifications-form.js`: `{{AVAILABLE_PROVIDERS_JSON}}`, `{{EXISTING_NOTIFICATIONS_JSON}}`
+
+These break the "external files only" rule and need architectural resolution.
+
+Ready for backup verification and dashboard status integration development.
