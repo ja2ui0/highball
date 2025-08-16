@@ -258,33 +258,30 @@ class RestoreHandler:
             # Get first command (restore operations have only one command)
             restore_command = plan.commands[0]
             
-            # Build execution command based on transport
+            # Execute using container execution for consistency with backup operations
+            from services.command_execution_service import CommandExecutionService, ExecutionConfig
+            
+            # Configure execution
+            config = ExecutionConfig(timeout=300)  # 5 minutes for dry runs
+            executor = CommandExecutionService(config)
+            
+            # Get container command
+            container_cmd = restore_command._build_container_command(restore_command.job_config)
+            
             if restore_command.transport.value == 'ssh':
-                exec_command = restore_command.to_ssh_command()
+                # SSH restore - use container execution service
+                result = executor.execute_container_via_ssh(
+                    restore_command.ssh_config['hostname'],
+                    restore_command.ssh_config['username'],
+                    container_cmd
+                )
             else:
-                exec_command = restore_command.to_local_command()
-            
-            
-            # Get environment variables from restore command  
-            env_vars = restore_command.environment_vars or {}
-            
-            # Add cache environment variables to prevent warnings
-            env_vars.update({
-                'HOME': '/tmp',
-                'XDG_CACHE_HOME': '/tmp/.cache'
-            })
-            
-            # Execute command (no timeout - let legitimate operations complete)
-            result = subprocess.run(
-                exec_command,
-                capture_output=True,
-                text=True,
-                env=env_vars
-            )
+                # Local restore - execute container locally
+                result = executor.execute_locally(container_cmd, restore_command.environment_vars)
             
             # Log the dry run (obfuscate password)
             job_password = job_config.get('dest_config', {}).get('password', '')
-            safe_command = self._obfuscate_password_in_command(exec_command, job_password)
+            safe_command = self._obfuscate_password_in_command(container_cmd, job_password)
             self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
             self.job_logger.log_job_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
@@ -294,7 +291,7 @@ class RestoreHandler:
             
             # Get safe command for API response
             job_password = job_config.get('dest_config', {}).get('password', '')
-            safe_command_for_api = self._obfuscate_password_in_command(exec_command, job_password)
+            safe_command_for_api = self._obfuscate_password_in_command(container_cmd, job_password)
             
             if result.returncode == 0:
                 return {
@@ -354,15 +351,19 @@ class RestoreHandler:
             # Get first command (restore operations have only one command)
             restore_command = plan.commands[0]
             
-            # Build execution command based on transport
-            if restore_command.transport.value == 'ssh':
-                exec_command = restore_command.to_ssh_command()
-            else:
-                exec_command = restore_command.to_local_command()
+            # Use container execution for consistency
+            from services.command_execution_service import CommandExecutionService, ExecutionConfig
+            
+            # Configure execution for background restore (longer timeout)
+            config = ExecutionConfig(timeout=3600)  # 1 hour for full restores
+            executor = CommandExecutionService(config)
+            
+            # Get container command
+            container_cmd = restore_command._build_container_command(restore_command.job_config)
             
             # Log restore start
             job_password = restore_config['job_config'].get('dest_config', {}).get('password', '')
-            safe_command = self._obfuscate_password_in_command(exec_command, job_password)
+            safe_command = self._obfuscate_password_in_command(container_cmd, job_password)
             self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
             # Get environment variables from restore command
@@ -373,6 +374,14 @@ class RestoreHandler:
                 'HOME': '/tmp',
                 'XDG_CACHE_HOME': '/tmp/.cache'
             })
+            
+            # Build execution command for progress tracking
+            if restore_command.transport.value == 'ssh':
+                # For SSH, we need to use the SSH command that wraps the container
+                exec_command = restore_command.to_ssh_command()
+            else:
+                # For local, use the container command directly
+                exec_command = container_cmd
             
             # Execute with progress tracking
             process = subprocess.Popen(

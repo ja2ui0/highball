@@ -6,7 +6,7 @@ import html
 from urllib.parse import urlparse, parse_qs
 from .job_manager import JobManager
 from .job_form_parser import JobFormParser
-from .job_validator import JobValidator
+from services.job_validator import JobValidator
 from .job_display import JobDisplay
 from .form_error_handler import FormErrorHandler
 from services.form_data_service import JobFormDataBuilder
@@ -227,6 +227,28 @@ class DashboardHandler:
         result = validate_ssh_source(source)
         self.template_service.send_json_response(handler, result)
 
+    def validate_source_paths(self, handler, form_data):
+        """AJAX endpoint to validate source paths with permission checking"""
+        try:
+            from .job_form_parser import JobFormParser
+            from services.source_path_validator import SourcePathValidator
+            
+            # Parse source configuration from form data
+            source_result = JobFormParser.parse_source_configuration(form_data)
+            
+            if source_result.get('valid'):
+                result = SourcePathValidator.validate_source_paths(source_result['config'])
+            else:
+                result = {'success': False, 'message': source_result.get('error', 'Invalid source configuration')}
+            
+            self.template_service.send_json_response(handler, result)
+        
+        except Exception as e:
+            self.template_service.send_json_response(handler, {
+                'success': False,
+                'message': f'Source validation failed: {str(e)}'
+            })
+
     def show_job_history(self, handler, job_name):
         """Show job execution history"""
         if not job_name:
@@ -276,3 +298,25 @@ class DashboardHandler:
             result = JobValidator.validate_rsyncd_destination(hostname, share, source_config)
 
         self.template_service.send_json_response(handler, result)
+
+    def validate_source_paths(self, handler, form_data):
+        """AJAX endpoint to validate source paths with permission checking"""
+        try:
+            from .job_form_parser import JobFormParser
+            from services.source_path_validator import SourcePathValidator
+            
+            # Parse source configuration from form data
+            source_result = JobFormParser.parse_source_configuration(form_data)
+            
+            if source_result.get('valid'):
+                result = SourcePathValidator.validate_source_paths(source_result['config'])
+            else:
+                result = {'success': False, 'message': source_result.get('error', 'Invalid source configuration')}
+            
+            self.template_service.send_json_response(handler, result)
+        
+        except Exception as e:
+            self.template_service.send_json_response(handler, {
+                'success': False,
+                'message': f'Source validation failed: {str(e)}'
+            })

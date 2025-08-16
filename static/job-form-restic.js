@@ -205,6 +205,9 @@ const ResticValidator = {
             ].filter(line => line && !line.endsWith('- ')).join('<br>');
             
             StatusRenderer.showDetails('restic_validation_details', detailsContent);
+            
+            // Show init button if repository doesn't exist at location
+            this.handleInitButtonVisibility(data);
         } else {
             this.handleValidationError(new Error(data.message || 'Validation failed'));
         }
@@ -214,8 +217,79 @@ const ResticValidator = {
         StatusRenderer.show('restic_validation_status', 'Validation failed', 'error');
         const errorContent = `<strong>Error:</strong><br>${error.message}`;
         StatusRenderer.showDetails('restic_validation_details', errorContent);
+        this.hideInitButton();
+    },
+
+    handleInitButtonVisibility(data) {
+        const initButton = document.getElementById('init_restic_button');
+        if (!initButton) return;
+
+        // Show init button if location is empty (no existing repository)
+        if (data.repository_status === 'empty' || 
+            (data.message && data.message.toLowerCase().includes('no repository found')) ||
+            (data.message && data.message.toLowerCase().includes('repository does not exist'))) {
+            initButton.classList.remove('hidden');
+        } else {
+            initButton.classList.add('hidden');
+        }
+    },
+
+    hideInitButton() {
+        const initButton = document.getElementById('init_restic_button');
+        if (initButton) {
+            initButton.classList.add('hidden');
+        }
     }
 };
+
+// Initialize repository function
+async function initializeRestic() {
+    const formData = ResticValidator.collectFormData();
+    
+    if (!formData) {
+        StatusRenderer.show('restic_validation_status', 'Please fill required fields first', 'error');
+        return;
+    }
+
+    StatusRenderer.show('restic_validation_status', 'Initializing repository...', 'warning');
+    
+    try {
+        const response = await fetch('/initialize-restic-repo', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            StatusRenderer.show('restic_validation_status', 'Repository initialized successfully', 'success');
+            
+            const detailsContent = [
+                '<strong>Initialization Results:</strong>',
+                `- ${data.message}`,
+                data.details && data.details.repo_uri ? `- Repository URI: ${data.details.repo_uri}` : '',
+                data.tested_from ? `- Initialized from: ${data.tested_from}` : '',
+                '<br><strong>Repository is ready for backup jobs!</strong>'
+            ].filter(line => line && !line.endsWith('- ')).join('<br>');
+            
+            StatusRenderer.showDetails('restic_validation_details', detailsContent);
+            
+            // Hide init button after successful initialization
+            ResticValidator.hideInitButton();
+        } else {
+            StatusRenderer.show('restic_validation_status', `Initialization failed: ${data.message}`, 'error');
+            const errorDetails = data.details ? `<br><strong>Details:</strong> ${data.details}` : '';
+            StatusRenderer.showDetails('restic_validation_details', `<strong>Error:</strong> ${data.message}${errorDetails}`);
+        }
+    } catch (error) {
+        StatusRenderer.show('restic_validation_status', `Initialization error: ${error.message}`, 'error');
+        StatusRenderer.hideDetails('restic_validation_details');
+    }
+}
 
 // Password visibility toggle
 function togglePasswordVisibility(inputId) {

@@ -29,18 +29,31 @@ class ResticCommandBuilder:
         if not plan.commands:
             raise ValueError(f"No commands generated for Restic job {job_name}")
         
-        # Handle multiple commands (init + backup) by chaining them
-        if len(plan.commands) > 1:
-            # Multiple commands - chain them with && for sequential execution
-            exec_argv = self._build_chained_commands(plan.commands, dry_run)
+        # Get the primary backup command (skip init commands)
+        primary_command = None
+        for cmd in plan.commands:
+            if cmd.command_type.value == 'backup':
+                primary_command = cmd
+                break
+        
+        if not primary_command:
+            raise ValueError(f"No backup command found in plan for job {job_name}")
+        
+        # Add dry-run flag if needed
+        if dry_run:
+            if '--dry-run' not in (primary_command.args or []):
+                primary_command.args = (primary_command.args or []) + ['--dry-run']
+        
+        # Determine execution strategy based on source type
+        source_type = job_config.get('source_type')
+        source_config = job_config.get('source_config', {})
+        
+        if source_type == 'ssh' and source_config.get('hostname'):
+            # SSH execution - return container command for CommandExecutionService
+            exec_argv = primary_command._build_container_command(primary_command.job_config)
         else:
-            # Single command
-            primary_command = plan.commands[0]
-            if dry_run:
-                # Add --dry-run flag to restic args if not already present
-                if '--dry-run' not in (primary_command.args or []):
-                    primary_command.args = (primary_command.args or []) + ['--dry-run']
-            exec_argv = primary_command.to_ssh_command()
+            # Local execution - use traditional command
+            exec_argv = primary_command.to_local_command()
         
         # Build display strings
         source_config = job_config.get('source_config', {})

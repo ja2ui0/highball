@@ -254,6 +254,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['restic'].init_repository(self, job_name)
             elif path == '/validate-restic-form':
                 self._handlers['restic'].validate_restic_form(self, form_data)
+            elif path == '/validate-source-paths':
+                self._handlers['dashboard'].validate_source_paths(self, form_data)
+            elif path == '/initialize-restic-repo':
+                self._handlers['restic'].initialize_restic_repo(self, form_data)
             elif path == '/save-config':
                 self._handlers['config'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':

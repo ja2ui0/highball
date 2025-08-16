@@ -2,7 +2,7 @@
 Restic backup handler
 Handles Restic backup job management and execution planning
 """
-from handlers.restic_validator import ResticValidator
+from services.restic_validator import ResticValidator
 from services.restic_runner import ResticRunner
 from services.template_service import TemplateService
 from services.job_logger import JobLogger
@@ -131,6 +131,46 @@ class ResticHandler:
             TemplateService.send_json_response(handler, {
                 'success': False,
                 'error': f'Form validation failed: {str(e)}'
+            })
+
+    def initialize_restic_repo(self, handler, form_data):
+        """Initialize a new Restic repository from form data"""
+        try:
+            from handlers.restic_form_parser import ResticFormParser
+            
+            # Parse Restic destination from form data
+            restic_result = ResticFormParser.parse_restic_destination(form_data)
+            
+            if not restic_result.get('valid'):
+                TemplateService.send_json_response(handler, {
+                    'success': False,
+                    'message': restic_result.get('error', 'Invalid Restic configuration')
+                })
+                return
+            
+            dest_config = restic_result['config']
+            
+            # Create mock job config for initialization
+            mock_job_config = {
+                'dest_type': 'restic',
+                'dest_config': dest_config,
+                'source_config': self._parse_source_from_form(form_data)
+            }
+            
+            # Initialize repository
+            result = ResticValidator.initialize_restic_repository(mock_job_config)
+            
+            # Add form-specific context
+            result['details'] = result.get('details', {})
+            result['details']['repo_uri'] = dest_config.get('repo_uri', 'Unknown')
+            result['details']['repo_type'] = dest_config.get('repo_type', 'Unknown')
+            
+            TemplateService.send_json_response(handler, result)
+            
+        except Exception as e:
+            TemplateService.send_json_response(handler, {
+                'success': False,
+                'message': f'Repository initialization failed: {str(e)}'
             })
 
     def _parse_source_from_form(self, form_data):

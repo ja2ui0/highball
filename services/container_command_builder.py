@@ -32,7 +32,14 @@ class ContainerCommandBuilder:
         target_path: str = None
     ) -> List[str]:
         """Build complete container command with proper mounting and environment"""
-        cmd = [self.container_runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)']
+        cmd = []
+        
+        # Add resource management for CPU-intensive operations (wrap the entire container)
+        if command_type in ['backup', 'restore', 'prune', 'check']:
+            cmd.extend(['nice', '-n', '5', 'ionice', '-c', '2', '-n', '4'])
+        
+        # Add container runtime command
+        cmd.extend([self.container_runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)'])
         
         # Add environment variables
         cmd.extend(self._build_environment_flags(environment_vars))
@@ -43,11 +50,7 @@ class ContainerCommandBuilder:
         # Add container image
         cmd.append(self.restic_image)
         
-        # Add resource management for CPU-intensive operations
-        if command_type in ['backup', 'restore', 'prune', 'check']:
-            cmd.extend(['nice', '-n', '5', 'ionice', '-c', '2', '-n', '4'])
-        
-        # Add restic command
+        # Add restic command (restic/restic:0.18.0 already has restic as entrypoint)
         cmd.extend(['-r', repository_url, command_type])
         
         # Add arguments

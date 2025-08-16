@@ -83,29 +83,31 @@ class BackupExecutor:
             job_config=job_config,
         )
 
-        # Execute with timeout policy
+        # Execute using appropriate execution strategy
         timeout = self._get_timeout(dry_run)
-
+        
+        # Determine execution strategy based on job configuration
+        source_type = job_config.get('source_type')
+        source_config = job_config.get('source_config', {})
+        dest_type = job_config.get('dest_type')
+        
         try:
-            if timeout is None:
-                result = subprocess.run(command_info.exec_argv, capture_output=True, text=True)
+            if source_type == 'ssh' and source_config.get('hostname') and dest_type == 'restic':
+                # SSH + Restic: Use container execution via CommandExecutionService
+                execution_result = self._execute_via_container_ssh(command_info, source_config, timeout)
             else:
-                result = subprocess.run(command_info.exec_argv, capture_output=True, text=True, timeout=timeout)
-
-            log_content += f"\nSTDOUT:\n{result.stdout}\n"
-            log_content += f"\nSTDERR:\n{result.stderr}\n"
-            log_content += f"\nRETURN CODE: {result.returncode}\n"
-            success = result.returncode == 0
-
-        except subprocess.TimeoutExpired:
-            log_content += f"\nERROR: {mode_text} timed out after {timeout} seconds\n"
-            success = False
-            result = type("Result", (), {"returncode": -1})()
+                # Local or non-container execution: Use traditional subprocess
+                execution_result = self._execute_via_subprocess(command_info, timeout)
+            
+            log_content += f"\nSTDOUT:\n{execution_result.stdout}\n"
+            log_content += f"\nSTDERR:\n{execution_result.stderr}\n"
+            log_content += f"\nRETURN CODE: {execution_result.returncode}\n"
+            success = execution_result.success
 
         except Exception as e:
             log_content += f"\nERROR: {str(e)}\n"
             success = False
-            result = type("Result", (), {"returncode": -1})()
+            execution_result = type("Result", (), {"returncode": -1})()
 
         # Log detailed execution
         try:
@@ -115,7 +117,7 @@ class BackupExecutor:
 
         return {
             "success": success,
-            "return_code": result.returncode,
+            "return_code": execution_result.returncode,
             "log_content": log_content,
         }
 
@@ -148,3 +150,49 @@ EXCLUDES: {job_config.get('excludes', [])}
 ========================================
 {mode_text} OUTPUT:
 """
+    
+    def _execute_via_container_ssh(self, command_info, source_config, timeout):
+        """Execute container command via SSH using CommandExecutionService pattern from repository initialization"""
+        from services.command_execution_service import CommandExecutionService, ExecutionConfig
+        
+        # Configure execution with backup timeout
+        backup_config = ExecutionConfig(
+            timeout=timeout or 3600,  # Default 1 hour if no timeout
+            capture_output=True,
+            text=True
+        )
+        
+        executor = CommandExecutionService(backup_config)
+        
+        # Execute container command via SSH - command_info.exec_argv should be the container command
+        result = executor.execute_container_via_ssh(
+            source_config['hostname'],
+            source_config['username'],
+            command_info.exec_argv
+        )
+        
+        return result
+    
+    def _execute_via_subprocess(self, command_info, timeout):
+        """Execute command via traditional subprocess for local/non-container operations"""
+        try:
+            if timeout is None:
+                result = subprocess.run(command_info.exec_argv, capture_output=True, text=True)
+            else:
+                result = subprocess.run(command_info.exec_argv, capture_output=True, text=True, timeout=timeout)
+            
+            # Convert subprocess result to ExecutionResult-like format
+            return type("ExecutionResult", (), {
+                "success": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            })()
+            
+        except subprocess.TimeoutExpired:
+            return type("ExecutionResult", (), {
+                "success": False,
+                "returncode": -1,
+                "stdout": "",
+                "stderr": f"Command timed out after {timeout} seconds"
+            })()

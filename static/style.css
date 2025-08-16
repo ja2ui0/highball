@@ -694,6 +694,38 @@ tr:hover {
     padding: var(--space-lg);
 }
 
+/* Source path validation */
+.path-validation-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-top: var(--space-sm);
+}
+
+.validate-path-btn {
+    flex-shrink: 0;
+}
+
+.path-validation-result {
+    flex-grow: 1;
+}
+
+.validation-success {
+    color: var(--success-text);
+    font-size: 0.9em;
+}
+
+.validation-error {
+    color: var(--error-text);
+    font-size: 0.9em;
+}
+
+.validation-pending {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    font-style: italic;
+}
+
 /* Large textarea (config editor) */
 .textarea-config {
     height: 400px;

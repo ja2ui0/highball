@@ -7,18 +7,13 @@ class JobFormParser:
     """Parses form data into structured job configurations"""
     
     @staticmethod
-    def parse_job_form(form_data):
-        """Parse complete job form data"""
-        # Basic job info
-        job_name = form_data.get('job_name', [''])[0].strip()
-        if not job_name:
-            return {'valid': False, 'error': 'Job name is required'}
-        
-        # Source parsing (delegated to modular parsers)
+    def parse_source_configuration(form_data):
+        """Parse complete source configuration including paths from form data"""
         source_type = form_data.get('source_type', [''])[0]
         if not source_type:
             return {'valid': False, 'error': 'Source type is required'}
         
+        # Parse basic source config (connection details)
         if source_type == 'local':
             from handlers.local_form_parser import LocalFormParser
             source_result = LocalFormParser.parse_local_source(form_data)
@@ -35,6 +30,31 @@ class JobFormParser:
             
         else:
             return {'valid': False, 'error': f'Unknown source type: {source_type}'}
+        
+        # Parse source paths (common to all source types)
+        source_paths_data = JobFormParser.parse_multi_path_options(form_data)
+        if not source_paths_data['valid']:
+            return source_paths_data
+        
+        # Combine config with paths
+        source_config['source_type'] = source_type
+        source_config['source_paths'] = source_paths_data['source_paths']
+        
+        return {'valid': True, 'config': source_config}
+    
+    @staticmethod
+    def parse_job_form(form_data):
+        """Parse complete job form data"""
+        # Basic job info
+        job_name = form_data.get('job_name', [''])[0].strip()
+        if not job_name:
+            return {'valid': False, 'error': 'Job name is required'}
+        
+        # Source parsing (use dedicated method)
+        source_result = JobFormParser.parse_source_configuration(form_data)
+        if not source_result['valid']:
+            return source_result
+        source_config = source_result['config']
         
         # Destination parsing (delegated to modular parsers)
         dest_type = form_data.get('dest_type', [''])[0]

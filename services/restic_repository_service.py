@@ -137,7 +137,18 @@ class ResticRepositoryService(RepositoryService):
             else:
                 return self._format_error_response(f'Failed to parse snapshots: {json_result["error"]}')
         else:
-            return self._format_error_response(f'Repository test failed: {result.stderr}')
+            # Check if this is a "repository does not exist" error (should trigger init button)
+            if ('repository does not exist' in result.stderr.lower() or 
+                'does not exist' in result.stderr.lower() or
+                'config file' in result.stderr.lower()):
+                return self._format_success_response({
+                    'message': 'No repository found at this location (ready for initialization)',
+                    'repository_status': 'empty',
+                    'snapshot_count': 0,
+                    'tested_from': f'{username}@{hostname}'
+                })
+            else:
+                return self._format_error_response(f'Repository test failed: {result.stderr}')
     
     def _test_repository_locally(self, repo_url: str, env_vars: Dict[str, str]) -> Dict[str, Any]:
         """Test repository access locally"""
@@ -170,7 +181,18 @@ class ResticRepositoryService(RepositoryService):
             else:
                 return self._format_error_response(f'Failed to parse snapshots: {json_result["error"]}')
         else:
-            return self._format_error_response(f'Repository test failed: {result.stderr}')
+            # Check if this is a "repository does not exist" error (should trigger init button)
+            if ('repository does not exist' in result.stderr.lower() or 
+                'does not exist' in result.stderr.lower() or
+                'config file' in result.stderr.lower()):
+                return self._format_success_response({
+                    'message': 'No repository found at this location (ready for initialization)',
+                    'repository_status': 'empty',
+                    'snapshot_count': 0,
+                    'tested_from': 'container'
+                })
+            else:
+                return self._format_error_response(f'Repository test failed: {result.stderr}')
     
     def _list_snapshots_via_ssh(self, repo_url: str, env_vars: Dict[str, str], source_config: Dict[str, Any]) -> Dict[str, Any]:
         """List snapshots via SSH"""

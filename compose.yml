@@ -1,6 +1,5 @@
 services:
   highball:
-    build: .
     image: highball:latest
     container_name: highball
     ports:

@@ -424,3 +424,27 @@ class ResticRunner:
         else:
             path_count = len(restore_config.get('selected_paths', []))
             return max(5, min(60, path_count * 2))  # 2 minutes per selected path
+    
+    def plan_init_repository(self, job_config: Dict) -> List[ResticCommand]:
+        """Create execution plan for repository initialization"""
+        # Determine transport and SSH config
+        transport, ssh_config = self._determine_transport(job_config)
+        
+        # Parse repository configuration
+        repository_url = self._build_repository_url(job_config.get('dest_config', {}))
+        
+        # Parse environment variables (secrets)
+        environment_vars = self._build_environment(job_config.get('dest_config', {}))
+        
+        # Create init command
+        init_cmd = ResticCommand(
+            command_type=CommandType.INIT,
+            transport=transport,
+            ssh_config=ssh_config,
+            repository_url=repository_url,
+            environment_vars=environment_vars,
+            args=[],
+            job_config=job_config
+        )
+        
+        return [init_cmd]
