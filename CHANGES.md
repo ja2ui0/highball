@@ -113,6 +113,7 @@ Container execution cascade of failures **RESOLVED**. System restored to full fu
 - ✅ **Command Obfuscation Utility**: Created `services/command_obfuscation.py` for centralized password masking, eliminating code duplication
 - ✅ **Build Script Recovery**: Recovered and updated `rr` script for two-stage Docker build process (Dockerfile.app instead of docker compose build)
 - ✅ **Restore Execution Path Fix**: Fixed RestoreHandler to use correct execution strategy - direct `restic` binary for local operations ("Restore to Highball") and container execution for SSH operations ("Restore to Source")
+- ✅ **RestoreHandler Refactoring**: Completely refactored 660-line monolithic RestoreHandler into modular services following DRY principles and separation of concerns
 
 ### Critical Context Not Obvious in Documentation
 
@@ -141,3 +142,21 @@ All critical issues **RESOLVED**:
 - ✅ Command obfuscation properly modularized
 
 **Ready for dashboard status integration development** - the highest value user-facing feature.
+
+### RestoreHandler Refactoring Completed
+
+**Problem**: 660-line monolithic RestoreHandler with DRY violations, mixed concerns, and duplicate code patterns
+
+**Solution**: Created specialized services following established architectural patterns:
+- **`RestoreExecutionService`**: Handles restore execution (dry run + background) with proper command selection
+- **`RestoreOverwriteChecker`**: File existence and overwrite detection for both local and SSH destinations  
+- **`RestoreErrorParser`**: JSON error parsing and user-friendly error aggregation
+- **Refactored RestoreHandler**: Now thin HTTP coordinator (140 lines) delegating to services
+
+**Benefits**:
+- ✅ Eliminated duplicate password obfuscation (uses `services/command_obfuscation.py`)
+- ✅ Separated HTTP handling from business logic
+- ✅ Modular services can be unit tested independently
+- ✅ Follows established `handlers/` → `services/` pattern
+- ✅ 75% code reduction in main handler (660 → 140 lines)
+- ✅ Zero functionality breaks - same interface maintained
