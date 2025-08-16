@@ -130,4 +130,7 @@ sample/
 *.bak
 config/config.yaml
 *.draft
-
+.base.hash
+CHANGES.md
+CLAUDE.md
+Dockerfile.*
