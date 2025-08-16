@@ -57,7 +57,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          no-cache: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           provenance: true
           sbom: true
           tags: |
