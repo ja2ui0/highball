@@ -5,6 +5,7 @@ Handles restic command construction for backup execution
 from dataclasses import dataclass
 from typing import List
 from services.restic_runner import ResticRunner
+from services.command_obfuscation import obfuscate_password_in_command
 from .backup_command_builder import CommandInfo
 
 
@@ -62,9 +63,11 @@ class ResticCommandBuilder:
         src_display = self._build_source_display(job_config.get('source_type'), source_config)
         dst_display = self._build_dest_display(dest_config)
         
-        # Build log command string (without sensitive info) - use backup command for display
-        backup_command = plan.commands[-1] if plan.commands else plan.commands[0]  # Last command is typically backup
-        log_cmd_str = self._build_log_command_string(backup_command)
+        # Build log command string from actual execution command (obfuscate sensitive info)
+        dest_config = job_config.get('dest_config', {})
+        password = dest_config.get('password', '')
+        safe_command = obfuscate_password_in_command(exec_argv, password)
+        log_cmd_str = ' '.join(safe_command)
         
         return CommandInfo(
             exec_argv=exec_argv,

@@ -131,6 +131,6 @@ sample/
 config/config.yaml
 *.draft
 .base.hash
-CHANGES.md
-CLAUDE.md
+#CHANGES.md
+#CLAUDE.md
 Dockerfile.*
