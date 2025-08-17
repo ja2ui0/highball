@@ -111,6 +111,11 @@ class JobFormData:
     # Notification settings
     notifications: list = field(default_factory=list)
     
+    # Feedback variables
+    feedback_type: str = ""  # 'success', 'error', or empty
+    feedback_message: str = ""
+    feedback_payload: str = ""
+    
     def to_template_vars(self) -> Dict[str, str]:
         """Convert to template variables with proper escaping and formatting"""
         template_vars = {}
@@ -126,6 +131,7 @@ class JobFormData:
         template_vars.update(self._get_checkbox_variables())
         template_vars.update(self._get_notification_variables())
         template_vars.update(self._get_special_variables())
+        template_vars.update(self._get_feedback_variables())
         
         return template_vars
     
@@ -370,6 +376,30 @@ class JobFormData:
             'DEFAULT_RSYNC_OPTIONS': '-a --info=stats1 --delete --delete-excluded'
         }
     
+    def _get_feedback_variables(self) -> Dict[str, str]:
+        """Get feedback section variables"""
+        if not self.feedback_type:
+            return {'FEEDBACK_SECTION': ''}
+        
+        # Generate feedback section HTML using existing classes
+        alert_class = 'alert-success' if self.feedback_type == 'success' else 'alert-error'
+        
+        feedback_html = f'''
+        <div class="validation-section">
+            <div class="{alert_class}" style="margin-bottom: var(--space-lg);">
+                {html.escape(self.feedback_message)}
+            </div>
+            <div class="validation-content">
+                <h3>Configuration Payload:</h3>
+                <div class="log-container">
+                    <pre style="margin: 0; font-family: monospace; white-space: pre-wrap;">{html.escape(self.feedback_payload)}</pre>
+                </div>
+            </div>
+        </div>
+        '''
+        
+        return {'FEEDBACK_SECTION': feedback_html}
+    
     def _generate_delete_form(self) -> str:
         """Generate delete form HTML for edit mode"""
         return f'''
@@ -379,124 +409,3 @@ class JobFormData:
         </form>'''
 
 
-class JobFormDataBuilder:
-    """Builder for creating JobFormData from job configurations"""
-    
-    @classmethod
-    def from_job_config(cls, job_name: str, job_config: Dict[str, Any]) -> JobFormData:
-        """Create JobFormData from existing job configuration"""
-        source_config = job_config.get('source_config', {})
-        dest_config = job_config.get('dest_config', {})
-        
-        # Parse schedule
-        schedule_type, cron_pattern = cls._parse_schedule(job_config.get('schedule', 'manual'))
-        
-        # Build structured configuration
-        source = SourceConfig(
-            source_type=job_config.get('source_type', ''),
-            local_path=source_config.get('path', ''),
-            ssh_hostname=source_config.get('hostname', ''),
-            ssh_username=source_config.get('username', ''),
-            ssh_path=source_config.get('path', ''),
-            source_paths=source_config.get('source_paths', [])  # Multi-path support
-        )
-        
-        dest = DestConfig(
-            dest_type=job_config.get('dest_type', ''),
-            local_path=dest_config.get('path', ''),
-            ssh_hostname=dest_config.get('hostname', ''),
-            ssh_username=dest_config.get('username', ''),
-            ssh_path=dest_config.get('path', ''),
-            rsyncd_hostname=dest_config.get('hostname', ''),
-            rsyncd_share=dest_config.get('share', ''),
-            rsync_options=dest_config.get('rsync_options', ''),
-        )
-        
-        # Build Restic config only if needed
-        restic = cls._build_restic_config(job_config.get('dest_type'), dest_config)
-        
-        # Build maintenance config
-        maintenance = cls._build_maintenance_config(job_config.get('maintenance_config', {}))
-        
-        return JobFormData(
-            is_edit=True,
-            job_name=job_name,
-            source=source,
-            dest=dest,
-            restic=restic,
-            maintenance=maintenance,
-            schedule_type=schedule_type,
-            cron_pattern=cron_pattern,
-            includes='',  # Legacy field - includes/excludes now in source_paths
-            excludes='',  # Legacy field - includes/excludes now in source_paths
-            enabled=job_config.get('enabled', True),
-            respect_conflicts=job_config.get('respect_conflicts', True),
-            notifications=job_config.get('notifications', [])
-        )
-    
-    @classmethod
-    def for_new_job(cls) -> JobFormData:
-        """Create JobFormData for new job creation"""
-        return JobFormData(is_edit=False)
-    
-    @staticmethod
-    def _parse_schedule(schedule: str) -> tuple[str, str]:
-        """Parse schedule into type and cron pattern"""
-        known_schedule_types = ['manual', 'hourly', 'daily', 'weekly', 'monthly']
-        if ' ' in schedule and schedule not in known_schedule_types:
-            return 'cron', schedule
-        return schedule, ''
-    
-    @staticmethod
-    def _build_restic_config(dest_type: str, dest_config: Dict[str, Any]) -> ResticConfig:
-        """Build Restic configuration from destination config"""
-        if dest_type != 'restic':
-            return ResticConfig()
-        
-        # Extract repo-type specific data
-        repo_type = dest_config.get('repo_type', '')
-        
-        return ResticConfig(
-            repo_type=repo_type,
-            password=dest_config.get('password', ''),
-            local_path=dest_config.get('repo_uri', '') if repo_type == 'local' else '',
-            rest_hostname=dest_config.get('rest_hostname', ''),
-            rest_port=dest_config.get('rest_port', '8000'),
-            rest_path=dest_config.get('rest_path', ''),
-            rest_use_https=dest_config.get('rest_use_https', True),
-            rest_username=dest_config.get('rest_username', ''),
-            rest_password=dest_config.get('rest_password', ''),
-            s3_endpoint=dest_config.get('s3_endpoint', 's3.amazonaws.com'),
-            s3_bucket=dest_config.get('s3_bucket', ''),
-            s3_prefix=dest_config.get('s3_prefix', ''),
-            aws_access_key=dest_config.get('aws_access_key', ''),
-            aws_secret_key=dest_config.get('aws_secret_key', ''),
-            rclone_remote=dest_config.get('rclone_remote', ''),
-            rclone_path=dest_config.get('rclone_path', ''),
-            sftp_hostname=dest_config.get('sftp_hostname', ''),
-            sftp_username=dest_config.get('sftp_username', ''),
-            sftp_path=dest_config.get('sftp_path', ''),
-        )
-    
-    @staticmethod
-    def _build_maintenance_config(maintenance_config: Dict[str, Any]) -> MaintenanceConfig:
-        """Build maintenance configuration from job config"""
-        retention_policy = maintenance_config.get('retention_policy', {})
-        
-        return MaintenanceConfig(
-            restic_maintenance=maintenance_config.get('restic_maintenance', 'auto'),
-            maintenance_discard_schedule=maintenance_config.get('maintenance_discard_schedule', ''),
-            maintenance_check_schedule=maintenance_config.get('maintenance_check_schedule', ''),
-            keep_last=retention_policy.get('keep_last'),
-            keep_hourly=retention_policy.get('keep_hourly'),
-            keep_daily=retention_policy.get('keep_daily'),
-            keep_weekly=retention_policy.get('keep_weekly'),
-            keep_monthly=retention_policy.get('keep_monthly'),
-            keep_yearly=retention_policy.get('keep_yearly'),
-        )
-    
-    @staticmethod
-    def should_show_restic_option(backup_config):
-        """Check if Restic option should be available in UI (implicit enablement)"""
-        jobs = backup_config.get_backup_jobs()
-        return any(job.get('dest_type') == 'restic' for job in jobs.values())

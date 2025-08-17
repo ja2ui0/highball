@@ -92,13 +92,7 @@ class JobFormParser:
         else:
             return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
         
-        # Parse multi-path source options
-        source_paths_data = JobFormParser.parse_multi_path_options(form_data)
-        if not source_paths_data['valid']:
-            return source_paths_data
-        
-        # Add source paths to source config
-        source_config['source_paths'] = source_paths_data['source_paths']
+        # Source paths already parsed in parse_source_configuration - no need to parse again
         
         # Handle schedule - if 'cron' is selected, use the cron_pattern field
         schedule = form_data.get('schedule', ['manual'])[0]
@@ -131,7 +125,7 @@ class JobFormParser:
         job_data = {
             'valid': True,
             'job_name': job_name,
-            'source_type': source_type,
+            'source_type': source_config['source_type'],
             'source_config': source_config,
             'dest_type': dest_type,
             'dest_config': dest_config,
@@ -165,6 +159,7 @@ class JobFormParser:
         source_includes = safe_get_list(form_data, 'source_includes[]') 
         source_excludes = safe_get_list(form_data, 'source_excludes[]')
         
+        
         if not source_paths:
             return {'valid': False, 'error': 'At least one source path is required'}
         
@@ -173,7 +168,7 @@ class JobFormParser:
         for i, path in enumerate(source_paths):
             path = path.strip()
             if not path:
-                return {'valid': False, 'error': f'Source path {i+1} cannot be empty'}
+                continue  # Skip empty paths instead of failing
             
             # Get includes/excludes for this path (or empty if not provided)
             includes_text = source_includes[i] if i < len(source_includes) else ''
@@ -185,6 +180,10 @@ class JobFormParser:
                 'excludes': JobFormParser.parse_lines(excludes_text)
             }
             parsed_paths.append(path_config)
+        
+        # Ensure we have at least one valid path after filtering empty ones
+        if not parsed_paths:
+            return {'valid': False, 'error': 'At least one source path is required'}
         
         return {
             'valid': True,

@@ -15,6 +15,16 @@ const FormManager = {
         document.getElementById('dest_ssh').classList.toggle('hidden', type !== 'ssh');
         document.getElementById('dest_rsyncd').classList.toggle('hidden', type !== 'rsyncd');
         document.getElementById('dest_restic').classList.toggle('hidden', type !== 'restic');
+        
+        // Handle required fields - disable when hidden to prevent form validation issues
+        const resticFields = document.querySelectorAll('#dest_restic [required]');
+        resticFields.forEach(field => {
+            if (type === 'restic') {
+                field.setAttribute('required', '');
+            } else {
+                field.removeAttribute('required');
+            }
+        });
     },
 
     showCronField() {

@@ -20,6 +20,8 @@
         
         <h1>{{FORM_TITLE}}</h1>
         
+        <!-- Feedback Section removed - using bottom feedback only -->
+        
         <form method="post" action="/save-job" enctype="multipart/form-data">
             {{HIDDEN_FIELDS}}
             
@@ -74,6 +76,9 @@
                         <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
                         <a href="/" class="button">Cancel</a>
                     </div>
+                    
+                    <!-- Feedback Section -->
+                    {{FEEDBACK_SECTION}}
                 </div>
             </div>
         </form>

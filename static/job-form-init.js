@@ -25,18 +25,18 @@ function showCronField() {
 function initializeSourcePaths() {
     // Initialize source paths from server data for edit forms
     try {
-        const sourcePathsJson = '{{SOURCE_PATHS_JSON}}';
+        const container = document.getElementById('source_paths_container');
+        if (!container) {
+            console.log('No source_paths_container found');
+            return;
+        }
+        
+        const sourcePathsJson = container.dataset.sourcePaths;
         console.log('SOURCE_PATHS_JSON:', sourcePathsJson);
         
         if (sourcePathsJson && sourcePathsJson !== '') {
             const sourcePaths = JSON.parse(sourcePathsJson);
             console.log('Parsed source paths:', sourcePaths);
-            
-            const container = document.getElementById('source_paths_container');
-            if (!container) {
-                console.log('No source_paths_container found');
-                return;
-            }
             
             // Check if addPath function exists
             if (typeof addPath !== 'function') {

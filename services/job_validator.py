@@ -27,8 +27,8 @@ class JobValidator:
         
         # Validate destination
         if parsed_job['dest_type'] == 'ssh':
-            from services.ssh_validator import SSHValidator
-            dest_validation = SSHValidator.validate_ssh_source(
+            from services.ssh_validator import validate_ssh_source
+            dest_validation = validate_ssh_source(
                 parsed_job['dest_config']['dest_string']
             )
             if not dest_validation['success']:

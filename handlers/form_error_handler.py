@@ -2,7 +2,7 @@
 Form error handler for displaying inline error messages
 Handles form validation errors gracefully without scary error pages
 """
-from services.form_data_service import JobFormDataBuilder
+from services.job_form_data_builder import JobFormDataBuilder
 
 
 class FormErrorHandler:

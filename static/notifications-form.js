@@ -9,13 +9,19 @@ let configuredProviders = []; // Track what's already configured
 function initializeNotificationProviders() {
     // This will be called on page load to populate available providers
     try {
-        const providersJson = '{{AVAILABLE_PROVIDERS_JSON}}';
+        const container = document.getElementById('notification_providers');
+        if (!container) {
+            console.log('No notification_providers container found');
+            return;
+        }
+        
+        const providersJson = container.dataset.availableProviders;
         if (providersJson && providersJson !== '') {
             availableProviders = JSON.parse(providersJson);
         }
         
         // Initialize existing providers for edit mode
-        const existingProvidersJson = '{{EXISTING_NOTIFICATIONS_JSON}}';
+        const existingProvidersJson = container.dataset.existingNotifications;
         if (existingProvidersJson && existingProvidersJson !== '') {
             const existingProviders = JSON.parse(existingProvidersJson);
             existingProviders.forEach(providerConfig => {
