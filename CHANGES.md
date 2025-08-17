@@ -106,6 +106,95 @@
 
 **Quality Improvement**: Job creation form now handles all workflows smoothly - SSH-to-SSH, Restic repositories, notifications, and provides clear feedback on validation errors without losing user data.
 
+## Session 10: HTMX Architecture Consolidation Plan 🎯
+**Critical Analysis**: External code review revealed we created **architectural accumulation** instead of simplification - added 14 files and 40+ routes instead of consolidating. The HTMX migration was functionally successful but architecturally failed.
+
+### Current Problem State
+- **File Explosion**: 71→85 Python files (+14 HTMX files) 
+- **Route Explosion**: app.py grew from ~300 to 500+ lines with 40+ manual HTMX endpoints
+- **Service-per-Feature Anti-Pattern**: 12 HTMX coordinators doing minimal work (pass-through architecture)
+- **Parallel Systems**: Maintaining both JavaScript AND HTMX form handling
+- **Coordinator Explosion**: `htmx_validation_coordinator.py`, `htmx_restic_coordinator.py`, `htmx_source_path_manager.py`, etc.
+
+### Root Cause
+**Misunderstood HTMX's Purpose**: Treated HTMX as addition rather than replacement. Should have consolidated into single form handler with inline HTML fragments, not created parallel coordinator architecture.
+
+### Consolidation Plan - Target Architecture
+
+```
+highball/
+├── app.py                    # Slim router (100 lines max) - Single HTMX route
+├── handlers/
+│   ├── pages.py             # Full page renders only  
+│   ├── forms.py             # ALL form/HTMX operations (replaces 12 HTMX files)
+│   └── api.py               # REST endpoints
+├── models/                   # Business logic (consolidated validators)
+│   ├── backup.py            # Backup operations
+│   ├── restic.py            # Restic provider
+│   └── validation.py        # All validation logic (no coordinators)
+└── templates/
+    ├── pages/               # Full pages
+    └── partials/            # HTMX fragments
+```
+
+### Execution Strategy (Priority Order)
+
+#### Phase 1: Core Infrastructure ⚡
+1. **Create `handlers/forms.py`** - Single unified HTMX handler with action dispatch pattern
+2. **Consolidate routing** - Replace 40+ manual routes with single `/htmx/{action}` pattern
+3. **Direct validation calls** - Remove coordinator indirection, call validators directly
+4. **Inline HTML rendering** - Replace renderer services with simple template strings
+
+#### Phase 2: Service Consolidation 🔨
+1. **Delete HTMX coordinators** - Remove all 12 `htmx_*_coordinator.py` files
+2. **Merge validation services** - Consolidate into `models/validation.py`
+3. **Unified form parsing** - Single form parser instead of 7+ different parsers
+4. **Remove JavaScript systems** - Delete replaced form JS files completely
+
+#### Phase 3: Clean Architecture 🧹
+1. **Template reorganization** - Separate full pages from HTMX partials
+2. **Service layer cleanup** - Keep only business logic, remove pass-through services
+3. **Route simplification** - Clean app.py down to <100 lines
+4. **Documentation update** - Reflect simplified architecture in CLAUDE.md
+
+### Success Metrics (Opus Target: ~15 files)
+- **Files**: 85 → ~15 files (-70 files, 82% reduction)
+- **HTMX Routes**: 40+ → 1 universal route with action dispatch  
+- **Form Handler Lines**: 500+ coordinator lines → <200 lines in single handler
+- **Maintainability**: Single file to modify for HTMX changes vs 12+ files
+
+### Radical Consolidation - ~15 File Target
+**Core Application** (9 files):
+```
+├── app.py                    # Single router
+├── handlers/
+│   ├── pages.py             # All page renders
+│   ├── forms.py             # All HTMX/forms  
+│   └── api.py               # REST endpoints
+├── models/
+│   ├── backup.py            # Core backup logic + all providers
+│   ├── validation.py        # All validation (SSH, Restic, paths, etc.)
+│   └── config.py            # Config management
+└── services/
+    ├── scheduler.py         # Job scheduling
+    └── notifications.py     # Notification dispatch
+```
+
+**Massive Consolidation Targets**:
+- **Delete 25+ handlers/services**: All HTMX coordinators, form parsers, validators
+- **Merge all providers**: Restic, SSH, local into `models/backup.py`  
+- **Single validation file**: All SSH, path, Restic validation in `models/validation.py`
+- **Eliminate renderer layer**: Inline HTML strings in forms.py
+- **Remove pass-through services**: Job managers, template services, etc.
+
+### Context for Fresh Session
+**Current State**: Functional HTMX system with architectural debt - too many small files doing pass-through work
+**Target State**: Clean HTMX system with direct validation calls and consolidated handlers  
+**Key Files**: `/handlers/htmx_form_handler.py` + 12 coordinators → `/handlers/forms.py` (single file)
+**Pattern**: Replace `handler→coordinator→renderer→validator` with `handler→validator` (eliminate middle layers)
+
+**Critical Success Factor**: SUBTRACT complexity, don't add it. HTMX should make the codebase smaller and simpler.
+
 ---
 
 # Previous Session (2025-08-16) - Container & Notification Infrastructure
