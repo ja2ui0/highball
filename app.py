@@ -9,20 +9,14 @@ import cgi
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-# Handlers
-from handlers.dashboard import DashboardHandler
-from handlers.config_handler import ConfigHandler
-from handlers.logs import LogsHandler
-from handlers.inspect_handler import InspectHandler
-from handlers.network import NetworkHandler
-from handlers.backup import BackupHandler
+# Consolidated Handlers
+from handlers.pages import PagesHandler
+from handlers.operations import OperationsHandler
+from handlers.api import APIHandler
+from handlers.forms import FormsHandler
+
+# Legacy handlers for compatibility
 from handlers.job_scheduler import JobSchedulerHandler
-from handlers.restic_handler import ResticHandler
-from handlers.filesystem_handler import FilesystemHandler
-from handlers.api_handler import ApiHandler
-from handlers.restore_handler import RestoreHandler
-from handlers.notification_test_handler import NotificationTestHandler
-from handlers.htmx_form_handler import HTMXFormHandler
 
 # Services
 from services.template_service import TemplateService
@@ -72,23 +66,11 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         # Build handler map last; if this throws, leave _handlers=None so we retry next request
         try:
             cls._handlers = {
-                'dashboard': DashboardHandler(
-                    cls._backup_config,
-                    cls._template_service,
-                    cls._scheduler_service
-                ),
-                'config': ConfigHandler(cls._backup_config, cls._template_service),
-                'logs': LogsHandler(cls._template_service, cls._backup_config),
-                'inspect': InspectHandler(cls._template_service, cls._backup_config),
-                'network': NetworkHandler(),
-                'backup': BackupHandler(cls._backup_config, cls._scheduler_service),
+                'pages': PagesHandler(cls._backup_config, cls._template_service),
+                'operations': OperationsHandler(cls._backup_config, cls._template_service),
+                'api': APIHandler(cls._backup_config, cls._template_service),
+                'forms': FormsHandler(cls._backup_config, cls._template_service),
                 'job_scheduler': JobSchedulerHandler(cls._scheduler_service),
-                'restic': ResticHandler(cls._backup_config),
-                'filesystem': FilesystemHandler(cls._backup_config),
-                'api': ApiHandler(cls._backup_config),
-                'restore': RestoreHandler(cls._backup_config, cls._template_service),
-                'notification_test': NotificationTestHandler(),
-                'htmx': HTMXFormHandler(),
             }
         except Exception:
             cls._handlers = None
@@ -116,70 +98,56 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._serve_favicon()
                 return
 
-            # Route to handlers
+            # Route to consolidated handlers
             if path in ['/', '/dashboard']:
-                self._handlers['dashboard'].show_dashboard(self)
+                self._handlers['pages'].show_dashboard(self)
             elif path == '/add-job':
-                self._handlers['dashboard'].show_add_job_form(self)
+                self._handlers['pages'].show_add_job_form(self)
             elif path == '/edit-job':
                 job_name = params.get('name', [''])[0]
-                self._handlers['dashboard'].show_edit_job_form(self, job_name)
+                self._handlers['pages'].show_edit_job_form(self, job_name)
             elif path == '/config':
-                self._handlers['config'].show_config_manager(self)
+                self._handlers['pages'].show_config_manager(self)
             elif path == '/config/raw':
-                self._handlers['config'].show_raw_editor(self)
+                self._handlers['pages'].show_raw_editor(self)
             elif path == '/dev':
                 log_type = params.get('type', ['app'])[0]
-                self._handlers['logs'].show_dev_logs(self, log_type)
+                self._handlers['pages'].show_dev_logs(self, log_type)
             elif path == '/inspect':
-                self._handlers['inspect'].show_job_inspect(self)
+                self._handlers['pages'].show_job_inspect(self)
             elif path == '/scan-network':
                 network_range = params.get('range', ['192.168.1.0/24'])[0]
-                self._handlers['network'].scan_network_for_rsyncd(self, network_range)
+                self._handlers['pages'].scan_network_for_rsyncd(self, network_range)
             elif path == '/validate-ssh':
                 source = params.get('source', [''])[0]
-                self._handlers['dashboard'].validate_ssh_source(self, source)
-            elif path == '/validate-rsyncd':
-                hostname = params.get('hostname', [''])[0]
-                share = params.get('share', [''])[0]
-                self._handlers['dashboard'].validate_rsyncd_destination(self, hostname, share)
+                self._handlers['pages'].validate_ssh_source(self, source)
             elif path == '/validate-restic':
                 job_name = params.get('job', [''])[0]
-                self._handlers['restic'].validate_restic_job(self, job_name)
+                self._handlers['api'].validate_restic_job(self, job_name)
             elif path == '/validate-restic-form':
                 self._send_405()  # Only POST allowed for form validation
-            elif path == '/check-restic-binary':
-                job_name = params.get('job', [''])[0]
-                self._handlers['restic'].check_restic_binary(self, job_name)
             elif path == '/restic-repo-info':
                 job_name = params.get('job', [''])[0]
-                self._handlers['restic'].get_repository_info(self, job_name)
+                self._handlers['api'].get_repository_info(self, job_name)
             elif path == '/restic-snapshots':
                 job_name = params.get('job', [''])[0]
-                self._handlers['restic'].list_snapshots(self, job_name)
+                self._handlers['api'].list_snapshots(self, job_name)
             elif path == '/restic-snapshot-stats':
                 job_name = params.get('job', [''])[0]
                 snapshot_id = params.get('snapshot', [''])[0]
-                self._handlers['restic'].get_snapshot_stats(self, job_name, snapshot_id)
+                self._handlers['api'].get_snapshot_stats(self, job_name, snapshot_id)
             elif path == '/restic-browse':
                 job_name = params.get('job', [''])[0]
                 snapshot_id = params.get('snapshot', [''])[0]
-                path = params.get('path', ['/'])[0]
-                self._handlers['restic'].browse_directory(self, job_name, snapshot_id, path)
+                browse_path = params.get('path', ['/'])[0]
+                self._handlers['api'].browse_directory(self, job_name, snapshot_id, browse_path)
             elif path == '/restic-init':
                 job_name = params.get('job', [''])[0]
-                self._handlers['restic'].init_repository(self, job_name)
+                self._handlers['api'].init_repository(self, job_name)
             elif path == '/filesystem-browse':
-                self._handlers['filesystem'].browse_filesystem(self)
+                self._handlers['api'].browse_filesystem(self)
             elif path == '/jobs':
                 self._handlers['job_scheduler'].list_jobs(self)
-            elif path == '/history':
-                job_name = params.get('job', [''])[0]
-                self._handlers['dashboard'].show_job_history(self, job_name)
-            elif path == '/reload-config':
-                self._handlers['config'].reload_config(self)
-            elif path == '/backup-config':
-                self._handlers['config'].download_config_backup(self)
             elif path == '/api/highball/jobs':
                 self._handlers['api'].get_jobs(self)
             else:
@@ -229,185 +197,45 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Route to handlers
+            # Route to consolidated handlers
             if path == '/save-job':
-                self._handlers['dashboard'].save_backup_job(self, form_data)
+                self._handlers['pages'].save_backup_job(self, form_data)
             elif path == '/delete-job':
                 job_name = form_data.get('job_name', [''])[0]
-                self._handlers['dashboard'].delete_backup_job(self, job_name)
-            elif path == '/restore-job':
-                job_name = form_data.get('job_name', [''])[0]
-                self._handlers['dashboard'].restore_backup_job(self, job_name)
-            elif path == '/purge-job':
-                job_name = form_data.get('job_name', [''])[0]
-                self._handlers['dashboard'].purge_backup_job(self, job_name)
+                self._handlers['pages'].delete_backup_job(self, job_name)
             elif path == '/run-backup':
                 job_name = form_data.get('job_name', [''])[0]
-                # Real run
-                self._handlers['backup'].run_backup_job(self, job_name, dry_run=False)
+                self._handlers['operations'].run_backup_job(self, job_name, dry_run=False)
             elif path == '/dry-run-backup':
                 job_name = form_data.get('job_name', [''])[0]
-                self._handlers['backup'].run_backup_job(self, job_name, dry_run=True)
-            elif path == '/plan-restic-backup':
-                job_name = form_data.get('job_name', [''])[0]
-                self._handlers['restic'].plan_backup(self, job_name)
-            elif path == '/restic-init':
-                job_name = form_data.get('job_name', [''])[0]
-                self._handlers['restic'].init_repository(self, job_name)
+                self._handlers['operations'].run_backup_job(self, job_name, dry_run=True)
             elif path == '/validate-restic-form':
-                self._handlers['restic'].validate_restic_form(self, form_data)
+                self._handlers['api'].validate_restic_form(self, form_data)
             elif path == '/validate-source-paths':
-                self._handlers['dashboard'].validate_source_paths(self, form_data)
+                self._handlers['pages'].validate_source_paths(self, form_data)
             elif path == '/initialize-restic-repo':
-                self._handlers['restic'].initialize_restic_repo(self, form_data)
+                self._handlers['api'].initialize_restic_repo(self, form_data)
             
-            # HTMX form field updates
-            elif path == '/htmx/source-fields':
-                source_type = form_data.get('source_type', [''])[0]
-                html = self._handlers['htmx'].handle_source_type_change(source_type, dict(form_data))
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/dest-fields':
-                dest_type = form_data.get('dest_type', [''])[0]
-                html = self._handlers['htmx'].handle_dest_type_change(dest_type, dict(form_data))
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX validation endpoints
-            elif path == '/htmx/validate-source':
-                html = self._handlers['htmx'].handle_ssh_validation(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/validate-dest-ssh':
-                html = self._handlers['htmx'].handle_ssh_validation(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/validate-source-paths':
-                html = self._handlers['htmx'].handle_source_path_validation(form_data)
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX Restic endpoints
-            elif path == '/htmx/restic-repo-fields':
-                html = self._handlers['htmx'].handle_restic_repo_fields(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/restic-uri-preview':
-                html = self._handlers['htmx'].handle_restic_uri_preview(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/validate-restic':
-                html = self._handlers['htmx'].handle_restic_validation(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/initialize-restic':
-                html = self._handlers['htmx'].handle_restic_initialization(form_data)
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX source path management endpoints
-            elif path == '/htmx/add-source-path':
-                html = self._handlers['htmx'].handle_add_source_path(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/remove-source-path':
-                html = self._handlers['htmx'].handle_remove_source_path(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/validate-single-source-path':
-                html = self._handlers['htmx'].handle_validate_single_source_path(form_data)
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX log management endpoints
-            elif path == '/htmx/refresh-logs':
-                job_name = form_data.get('job_name', [''])[0]
-                if job_name:
-                    html = self._handlers['htmx'].handle_log_refresh(job_name)
-                    self._send_htmx_response(html)
-                else:
-                    self._send_htmx_response('<div class="error-message">Job name required for log refresh</div>')
-                return
-            elif path == '/htmx/clear-logs':
-                html = self._handlers['htmx'].handle_log_clear()
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/cron-field':
-                html = self._handlers['htmx'].handle_cron_field_toggle(form_data)
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX config management endpoints
-            elif path == '/htmx/notification-settings':
-                html = self._handlers['htmx'].handle_notification_settings_toggle(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/queue-settings':
-                html = self._handlers['htmx'].handle_queue_settings_toggle(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/test-telegram':
-                html = self._handlers['htmx'].handle_notification_test('telegram', form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/test-email':
-                html = self._handlers['htmx'].handle_notification_test('email', form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/maintenance-toggle':
-                html = self._handlers['htmx'].handle_maintenance_toggle(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/maintenance-section':
-                html = self._handlers['htmx'].handle_maintenance_section_visibility(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/rsyncd-discovery':
-                html = self._handlers['htmx'].handle_rsyncd_discovery(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/rsyncd-validation':
-                html = self._handlers['htmx'].handle_rsyncd_validation(form_data)
-                self._send_htmx_response(html)
-                return
-            
-            # HTMX notification management endpoints
-            elif path == '/htmx/add-notification-provider':
-                # Get available providers from config (this would need to be implemented)
-                available_providers = ['telegram', 'email']  # Placeholder
-                html = self._handlers['htmx'].handle_add_notification_provider(form_data, available_providers)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/remove-notification-provider':
-                available_providers = ['telegram', 'email']  # Placeholder
-                html = self._handlers['htmx'].handle_remove_notification_provider(form_data, available_providers)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/toggle-success-message':
-                print(f"[DEBUG] HTMX toggle-success-message called with form_data: {form_data}")
-                html = self._handlers['htmx'].handle_toggle_success_message(form_data)
-                self._send_htmx_response(html)
-                return
-            elif path == '/htmx/toggle-failure-message':
-                html = self._handlers['htmx'].handle_toggle_failure_message(form_data)
+            # Unified HTMX handler - single dispatch route
+            elif path.startswith('/htmx/'):
+                action = path[6:]  # Remove '/htmx/' prefix
+                html = self._handlers['forms'].handle_htmx_request(self, action)
                 self._send_htmx_response(html)
                 return
             elif path == '/save-config':
-                self._handlers['config'].save_structured_config(self, form_data)
+                self._handlers['pages'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':
-                self._handlers['config'].save_raw_config(self, form_data)
-            elif path == '/dismiss-warning':
-                self._handlers['dashboard'].dismiss_config_warning(self)
+                self._handlers['pages'].save_raw_config(self, form_data)
             elif path == '/schedule-job':
-                self._handlers['job_scheduler'].schedule_job(self, form_data)
+                self._handlers['operations'].schedule_job(self, form_data)
             elif path == '/restore':
-                self._handlers['restore'].process_restore_request(self, form_data)
+                self._handlers['operations'].process_restore_request(self, form_data)
             elif path == '/check-restore-overwrites':
-                self._handlers['restore'].check_restore_overwrites(self, form_data)
+                self._handlers['operations'].check_restore_overwrites(self, form_data)
             elif path == '/test-telegram-notification':
-                self._handlers['notification_test'].test_telegram_notification(self, form_data)
+                self._handlers['api'].test_telegram_notification(self, form_data)
             elif path == '/test-email-notification':
-                self._handlers['notification_test'].test_email_notification(self, form_data)
+                self._handlers['api'].test_email_notification(self, form_data)
             else:
                 self._send_404()
         except Exception as e:

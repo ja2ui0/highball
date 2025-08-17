@@ -4,6 +4,7 @@ Handles loading and rendering HTML templates
 """
 import os
 import html
+from typing import Dict, Any
 class TemplateService:
     """Service for loading and rendering HTML templates"""
     
@@ -25,13 +26,21 @@ class TemplateService:
         return theme_path
     
     def load_template(self, template_name):
-        """Load HTML template from templates directory"""
+        """Load HTML template from templates directory (enforces pages vs partials separation)"""
         template_path = f"templates/{template_name}"
         if os.path.exists(template_path):
             with open(template_path, 'r') as f:
                 return f.read()
         else:
             return self._error_template(template_name, template_path)
+    
+    def load_page_template(self, page_name):
+        """Template concern: load full page template (complete HTML documents)"""
+        return self.load_template(f"pages/{page_name}")
+    
+    def load_partial_template(self, partial_name):
+        """Template concern: load HTMX partial template (HTML fragments)"""
+        return self.load_template(f"partials/{partial_name}")
     
     def render_template(self, template_name, **kwargs):
         """Load template and replace placeholders with values"""
@@ -49,6 +58,49 @@ class TemplateService:
             template = template.replace(placeholder, str(value))
         
         return template
+    
+    def render_validation_status(self, validation_type: str, result: Dict[str, Any]) -> str:
+        """Template concern: render validation status HTML from result data"""
+        if result.get('valid'):
+            status_class = 'success'
+            status_icon = '✓'
+            status_text = result.get('message', 'Valid')
+            
+            # Add details if available
+            details = []
+            if result.get('ssh_status') == 'OK':
+                details.append("SSH connection successful")
+            if result.get('rsync_status') == 'OK':
+                details.append("rsync available")
+            if result.get('container_runtime'):
+                details.append(f"Container runtime: {result['container_runtime']}")
+            if result.get('path_permissions'):
+                details.append(f"Path permissions: {result['path_permissions']}")
+            
+            details_html = "<br>".join(details) if details else ""
+            
+            # Add hidden fields for job creation
+            hidden_fields = ""
+            if result.get('container_runtime'):
+                hidden_fields = f'<input type="hidden" name="container_runtime" value="{html.escape(result["container_runtime"])}">'
+            
+            return f"""
+            <div class="validation-result {status_class}">
+                <span class="status">[{status_icon}]</span> {html.escape(status_text)}
+                {f'<div class="status-details">{details_html}</div>' if details_html else ''}
+                {hidden_fields}
+            </div>
+            """
+        else:
+            status_class = 'error'
+            status_icon = '✗'
+            error_msg = result.get('error', 'Validation failed')
+            
+            return f"""
+            <div class="validation-result {status_class}">
+                <span class="status">[{status_icon}]</span> {html.escape(error_msg)}
+            </div>
+            """
     
     def _process_includes(self, template):
         """Process {{INCLUDE:template_name}} directives"""
