@@ -35,6 +35,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 - **Validation**: `job_validator.py`, `restic_validator.py`, `source_path_validator.py`, `ssh_validator.py`
 - **Execution**: `restic_runner.py`, `backup_client.py`, `*_repository_service.py`
 - **Infrastructure**: `notification_service.py`, `scheduler_service.py`, `job_logger.py`
+- **Maintenance**: `restic_maintenance_service.py` + 7 specialized services for repository maintenance (discard/check operations)
 - **Support**: `template_service.py`, `form_data_service.py`, `binary_checker_service.py`
 
 ### Frontend (static/)
@@ -153,7 +154,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Restore**: Provider system `restore-core.js` + `restore-restic.js`, `RestoreHandler` backend, extensible architecture
 **Notifications**: `notifiers` backend, spam-prevention queuing, template variables, per-job integration
 **API**: Query filtering, CORS, field selection, JSON responses, authentication-ready
-**Testing**: Unit coverage with mocking patterns
+**Maintenance System**: Modular 8-service architecture for Restic repository maintenance (discard/check operations), auto-enabled with safe defaults, progressive disclosure UI ready
+**Testing**: Unit coverage with mocking patterns, 22 maintenance tests with 100% pass rate
 **Development Environment**: Live testing against `yeti.home.arpa` with actual restic repository at `rest:http://yeti.home.arpa:8000/yeti` (not example data)
 
 ## Commands
@@ -195,6 +197,18 @@ global_settings:
       to_email: ""                # recipient email address
       username: ""                # SMTP authentication username
       password: ""                # SMTP authentication password
+  maintenance:
+    discard_schedule: "0 3 * * *"         # daily at 3am - combines forget+prune operations
+    check_schedule: "0 2 * * 0"           # weekly Sunday 2am (staggered from backups)
+    retention_policy:
+      keep_last: 7                        # always keep last 7 snapshots regardless of age
+      keep_hourly: 6                      # keep 6 most recent hourly snapshots
+      keep_daily: 7                       # keep 7 most recent daily snapshots  
+      keep_weekly: 4                      # keep 4 most recent weekly snapshots
+      keep_monthly: 6                     # keep 6 most recent monthly snapshots
+      keep_yearly: 0                      # disable yearly retention by default
+    check_config:
+      read_data_subset: "5%"              # balance integrity vs performance
 
 backup_jobs:
   job_name:
@@ -215,6 +229,11 @@ backup_jobs:
     enabled: true
     respect_conflicts: true     # wait for conflicting jobs (default: true)
     container_runtime: "docker|podman"  # detected during SSH validation, used for restic container execution
+    auto_maintenance: true              # automatic repository maintenance (default: true, Restic only)
+    # Optional per-job maintenance overrides:
+    # maintenance_discard_schedule: "0 4 * * *"     # custom discard schedule
+    # retention_policy: {keep_last: 10, ...}        # custom retention policy
+    # maintenance_check_schedule: "0 1 * * 0"       # custom check schedule
 
 deleted_jobs:  # user can manually restore to backup_jobs
   job_name: {...}
@@ -229,11 +248,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 4. ✅ **JavaScript Standards Compliance** - Extracted all embedded JavaScript from templates to external `/static/` files with modular architecture
 5. ✅ **Backup Logging Enhancement** - Fixed logging to show actual container commands executed instead of simplified restic commands for debugging
 6. ✅ **Command Obfuscation Utility** - Created centralized `services/command_obfuscation.py` for DRY password masking across handlers
+7. ✅ **Notification System Modularization** - Complete refactor from 552-line monolith to 6 specialized services with 63% coordinator reduction
+8. ✅ **Restic Repository Maintenance System** - Production-ready maintenance architecture with 8 modular services, safe defaults, and comprehensive test coverage
 
 **Current Priorities**:
-1. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table
-2. **Real Progress Parsing** - Replace simulated progress with actual `restic restore --json` output parsing for accurate progress display
-3. **RestoreHandler Modernization** - Update restore execution to use ResticRunner command patterns consistently
+1. **Maintenance System UI Integration** - Add simple UI toggle for automatic repository maintenance and progressive disclosure options
+2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
+3. **Real Progress Parsing** - Replace simulated progress with actual `restic restore --json` output parsing for accurate progress display
 
 ## Recent Development Context
 

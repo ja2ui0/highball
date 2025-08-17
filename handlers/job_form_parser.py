@@ -119,7 +119,16 @@ class JobFormParser:
             return notification_result
         notifications = notification_result['notifications']
         
-        return {
+        # Parse maintenance configuration (only for Restic destinations)
+        maintenance_config = None
+        if dest_type == 'restic':
+            from handlers.maintenance_form_parser import MaintenanceFormParser
+            maintenance_result = MaintenanceFormParser.parse_maintenance_config(form_data)
+            if not maintenance_result['valid']:
+                return maintenance_result
+            maintenance_config = maintenance_result.get('maintenance_config')
+        
+        job_data = {
             'valid': True,
             'job_name': job_name,
             'source_type': source_type,
@@ -131,6 +140,12 @@ class JobFormParser:
             'respect_conflicts': respect_conflicts,
             'notifications': notifications
         }
+        
+        # Add maintenance config if present
+        if maintenance_config:
+            job_data['maintenance_config'] = maintenance_config
+            
+        return job_data
     
     @staticmethod
     def parse_multi_path_options(form_data):

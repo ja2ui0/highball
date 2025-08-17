@@ -1,0 +1,76 @@
+                <!-- Repository Maintenance -->
+                <div class="mt-15">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto_maintenance" name="auto_maintenance" {{AUTO_MAINTENANCE_CHECKED}}> 
+                            Automatic repository maintenance
+                        </label>
+                        <div class="help-text">
+                            Automatically remove old snapshots and verify repository integrity. 
+                            Runs daily discard (forget+prune) at 3am and weekly check on Sundays at 2am.
+                        </div>
+                    </div>
+                    
+                    <!-- Manual maintenance options (shown when auto maintenance is disabled) -->
+                    <div id="manual_maintenance_options" class="hidden mt-15">
+                        <div class="validation-section">
+                            <h4>Manual Maintenance Options</h4>
+                            <div class="help-text">
+                                Configure custom schedules and retention policies. Leave blank to use global defaults.
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="maintenance_discard_schedule">Discard Schedule (cron format):</label>
+                                <input type="text" id="maintenance_discard_schedule" name="maintenance_discard_schedule" 
+                                       value="{{MAINTENANCE_DISCARD_SCHEDULE}}" placeholder="0 3 * * * (daily at 3am)">
+                                <div class="help-text">When to remove old snapshots and reclaim space (combines forget+prune operations)</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="maintenance_check_schedule">Check Schedule (cron format):</label>
+                                <input type="text" id="maintenance_check_schedule" name="maintenance_check_schedule" 
+                                       value="{{MAINTENANCE_CHECK_SCHEDULE}}" placeholder="0 2 * * 0 (weekly Sunday 2am)">
+                                <div class="help-text">When to verify repository integrity (reads 5% of data)</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <h4>Retention Policy</h4>
+                                <div class="help-text">How many snapshots to keep. Higher values = more storage used.</div>
+                                
+                                <div class="flex-row mt-15">
+                                    <div class="flex-1">
+                                        <label for="keep_last">Keep Last:</label>
+                                        <input type="number" id="keep_last" name="keep_last" value="{{KEEP_LAST}}" placeholder="7" min="1">
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <label for="keep_hourly">Keep Hourly:</label>
+                                        <input type="number" id="keep_hourly" name="keep_hourly" value="{{KEEP_HOURLY}}" placeholder="6" min="0">
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <label for="keep_daily">Keep Daily:</label>
+                                        <input type="number" id="keep_daily" name="keep_daily" value="{{KEEP_DAILY}}" placeholder="7" min="0">
+                                    </div>
+                                </div>
+                                
+                                <div class="flex-row mt-10">
+                                    <div class="flex-1">
+                                        <label for="keep_weekly">Keep Weekly:</label>
+                                        <input type="number" id="keep_weekly" name="keep_weekly" value="{{KEEP_WEEKLY}}" placeholder="4" min="0">
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <label for="keep_monthly">Keep Monthly:</label>
+                                        <input type="number" id="keep_monthly" name="keep_monthly" value="{{KEEP_MONTHLY}}" placeholder="6" min="0">
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <label for="keep_yearly">Keep Yearly:</label>
+                                        <input type="number" id="keep_yearly" name="keep_yearly" value="{{KEEP_YEARLY}}" placeholder="0" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>

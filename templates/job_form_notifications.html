@@ -44,6 +44,14 @@
                             </div>
                         </div>
                         
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" class="notify-maintenance-failure-checkbox" name="notify_maintenance_failure[]"> 
+                                Notify on Maintenance Failure
+                            </label>
+                            <div class="help-text">Get notified when repository maintenance operations (forget/prune/check) fail</div>
+                        </div>
+                        
                         <!-- Hidden field to track which provider this configuration is for -->
                         <input type="hidden" class="provider-name-hidden" name="notification_providers[]" value="">
                     </div>

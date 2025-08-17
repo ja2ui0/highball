@@ -29,7 +29,8 @@ class ContainerCommandBuilder:
         environment_vars: Dict[str, str],
         mount_strategy: MountStrategy,
         mount_paths: List[str] = None,
-        target_path: str = None
+        target_path: str = None,
+        job_name: str = None
     ) -> List[str]:
         """Build complete container command with proper mounting and environment"""
         cmd = []
@@ -41,8 +42,15 @@ class ContainerCommandBuilder:
         # Add container runtime command
         cmd.extend([self.container_runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)'])
         
+        # Add job identification environment variable for process tracking
+        enhanced_env_vars = environment_vars.copy()
+        if job_name:
+            import time
+            job_id = f"{job_name}_{int(time.time())}"
+            enhanced_env_vars['HIGHBALL_JOB_ID'] = job_id
+        
         # Add environment variables
-        cmd.extend(self._build_environment_flags(environment_vars))
+        cmd.extend(self._build_environment_flags(enhanced_env_vars))
         
         # Add mount points based on strategy
         cmd.extend(self._build_mount_flags(mount_strategy, mount_paths, target_path))

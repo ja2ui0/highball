@@ -255,6 +255,13 @@ input[type="checkbox"] {
     text-align: left;
 }
 
+/* Maintenance form: reuse validation-section for manual options container */
+.validation-section h4 {
+    color: var(--text-primary);
+    margin: 0 0 var(--space-lg) 0;
+    font-size: var(--font-lg);
+}
+
 /* Tables */
 table {
     border-collapse: collapse;

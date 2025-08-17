@@ -23,6 +23,7 @@ class NotificationFormParser:
         success_messages = safe_get_list(form_data, 'success_messages[]')
         notify_failure_flags = safe_get_list(form_data, 'notify_failure[]')
         failure_messages = safe_get_list(form_data, 'failure_messages[]')
+        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_maintenance_failure[]')
         
         notifications = []
         
@@ -36,6 +37,7 @@ class NotificationFormParser:
             success_message = success_messages[i] if i < len(success_messages) else ''
             notify_failure = i < len(notify_failure_flags) and notify_failure_flags[i] == 'on'
             failure_message = failure_messages[i] if i < len(failure_messages) else ''
+            notify_maintenance_failure = i < len(notify_maintenance_failure_flags) and notify_maintenance_failure_flags[i] == 'on'
             
             # Validate - at least one notification type must be enabled
             if not notify_success and not notify_failure:
@@ -48,7 +50,8 @@ class NotificationFormParser:
             notification_config = {
                 'provider': provider,
                 'notify_on_success': notify_success,
-                'notify_on_failure': notify_failure
+                'notify_on_failure': notify_failure,
+                'notify_on_maintenance_failure': notify_maintenance_failure
             }
             
             # Add custom messages if provided

@@ -138,4 +138,117 @@
                         <div id="restic_validation_details" class="validation-details hidden"></div>
                     </div>
                 </div>
+                
+                <!-- Repository Maintenance -->
+                <div class="mt-15">
+                    <!-- Hidden field to store maintenance mode -->
+                    <input type="hidden" id="restic_maintenance" name="restic_maintenance" value="{{RESTIC_MAINTENANCE_MODE}}">
+                    
+                    <!-- First Toggle: Auto / User -->
+                    <div class="toggle-switch">
+                        <span class="toggle-switch-label">Repository Maintenance:</span>
+                        <div class="toggle-container {{MAINTENANCE_FIRST_TOGGLE_CLASS}}" id="maintenanceFirstToggle" onclick="toggleMaintenanceFirst()">
+                            <div class="toggle-slider"></div>
+                            <span class="toggle-option left">Auto</span>
+                            <span class="toggle-option right">User</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Auto Mode Help Text -->
+                    <div id="auto_help_text" class="help-text">
+                        Automatically remove old snapshots and verify repository integrity. 
+                        Runs daily discard (forget+prune) at 3am and weekly check on Sundays at 2am.
+                    </div>
+                    
+                    <!-- User Mode Section -->
+                    <div id="user_mode_section" class="hidden">
+                        <div class="help-text">
+                            User settings below:
+                        </div>
+                        
+                        <!-- Second Toggle: Config / Off -->
+                        <div class="toggle-switch mt-10">
+                            <span class="toggle-switch-label">Manual Options:</span>
+                            <div class="toggle-container {{MAINTENANCE_SECOND_TOGGLE_CLASS}}" id="maintenanceSecondToggle" onclick="toggleMaintenanceSecond()">
+                                <div class="toggle-slider"></div>
+                                <span class="toggle-option left">Config</span>
+                                <span class="toggle-option right">Off</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Config Mode Help Text -->
+                        <div id="config_help_text" class="help-text">
+                            Please set your options below, or leave blank to honor defaults.
+                        </div>
+                        
+                        <!-- Off Mode Help Text -->
+                        <div id="off_help_text" class="help-text hidden">
+                            <strong>WARNING:</strong> No maintenance will be performed on this repository. It will grow indefinitely without manual intervention.
+                        </div>
+                        
+                        <!-- Manual Configuration Options -->
+                        <div id="manual_config_options" class="mt-15">
+                            <div class="validation-section">
+                                <div class="form-group">
+                                    <label for="maintenance_discard_schedule">Discard Schedule (cron format):</label>
+                                    <input type="text" id="maintenance_discard_schedule" name="maintenance_discard_schedule" 
+                                           value="{{MAINTENANCE_DISCARD_SCHEDULE}}" placeholder="0 3 * * *">
+                                    <div class="help-text">When to remove old snapshots and reclaim space. Default: daily at 3am (0 3 * * *)</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="maintenance_check_schedule">Check Schedule (cron format):</label>
+                                    <input type="text" id="maintenance_check_schedule" name="maintenance_check_schedule" 
+                                           value="{{MAINTENANCE_CHECK_SCHEDULE}}" placeholder="0 2 * * 0">
+                                    <div class="help-text">When to verify repository integrity. Default: weekly Sunday 2am (0 2 * * 0)</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <h4>Retention Policy</h4>
+                                    <div class="help-text">How many snapshots to keep. Leave blank to use defaults.</div>
+                                    
+                                    <div class="flex-row mt-15">
+                                        <div class="flex-1">
+                                            <label for="keep_last">Keep Last:</label>
+                                            <input type="number" id="keep_last" name="keep_last" value="{{KEEP_LAST}}" placeholder="7" min="1">
+                                            <div class="help-text">Default: 7</div>
+                                        </div>
+                                        
+                                        <div class="flex-1">
+                                            <label for="keep_hourly">Keep Hourly:</label>
+                                            <input type="number" id="keep_hourly" name="keep_hourly" value="{{KEEP_HOURLY}}" placeholder="6" min="0">
+                                            <div class="help-text">Default: 6</div>
+                                        </div>
+                                        
+                                        <div class="flex-1">
+                                            <label for="keep_daily">Keep Daily:</label>
+                                            <input type="number" id="keep_daily" name="keep_daily" value="{{KEEP_DAILY}}" placeholder="7" min="0">
+                                            <div class="help-text">Default: 7</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex-row mt-10">
+                                        <div class="flex-1">
+                                            <label for="keep_weekly">Keep Weekly:</label>
+                                            <input type="number" id="keep_weekly" name="keep_weekly" value="{{KEEP_WEEKLY}}" placeholder="4" min="0">
+                                            <div class="help-text">Default: 4</div>
+                                        </div>
+                                        
+                                        <div class="flex-1">
+                                            <label for="keep_monthly">Keep Monthly:</label>
+                                            <input type="number" id="keep_monthly" name="keep_monthly" value="{{KEEP_MONTHLY}}" placeholder="6" min="0">
+                                            <div class="help-text">Default: 6</div>
+                                        </div>
+                                        
+                                        <div class="flex-1">
+                                            <label for="keep_yearly">Keep Yearly:</label>
+                                            <input type="number" id="keep_yearly" name="keep_yearly" value="{{KEEP_YEARLY}}" placeholder="0" min="0">
+                                            <div class="help-text">Default: 0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>

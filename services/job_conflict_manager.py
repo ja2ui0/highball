@@ -12,7 +12,6 @@ class RuntimeConflictManager:
     
     def __init__(self, backup_config):
         self.backup_config = backup_config
-        self.running_jobs_file = "/var/log/highball/running_jobs.txt"
     
     def get_job_resources(self, job_config):
         """Extract source and destination resources from job config"""
@@ -48,50 +47,25 @@ class RuntimeConflictManager:
         return global_settings.get('conflict_check_interval', 300)  # 5 minutes default
     
     def register_running_job(self, job_name):
-        """Register a job as currently running"""
-        try:
-            os.makedirs(os.path.dirname(self.running_jobs_file), exist_ok=True)
-            with open(self.running_jobs_file, 'a') as f:
-                f.write(f"{job_name}:{datetime.now().isoformat()}\n")
-        except Exception as e:
-            print(f"WARNING: Could not register running job {job_name}: {e}")
+        """Register a job as currently running using process tracker"""
+        from services.job_process_tracker import JobProcessTracker
+        
+        tracker = JobProcessTracker()
+        tracker.register_job(job_name)
     
     def unregister_running_job(self, job_name):
-        """Remove a job from the running jobs list"""
-        try:
-            if not os.path.exists(self.running_jobs_file):
-                return
-            
-            # Read all lines except the one for this job
-            with open(self.running_jobs_file, 'r') as f:
-                lines = f.readlines()
-            
-            # Filter out lines for this job
-            filtered_lines = [line for line in lines if not line.startswith(f"{job_name}:")]
-            
-            # Write back the filtered list
-            with open(self.running_jobs_file, 'w') as f:
-                f.writelines(filtered_lines)
-        except Exception as e:
-            print(f"WARNING: Could not unregister running job {job_name}: {e}")
+        """Remove a job from the running jobs list using process tracker"""
+        from services.job_process_tracker import JobProcessTracker
+        
+        tracker = JobProcessTracker()
+        tracker.unregister_job(job_name)
     
     def get_running_jobs(self):
-        """Get list of currently running jobs"""
-        running_jobs = []
-        try:
-            if not os.path.exists(self.running_jobs_file):
-                return running_jobs
-            
-            with open(self.running_jobs_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if ':' in line:
-                        job_name, timestamp = line.split(':', 1)
-                        running_jobs.append(job_name)
-        except Exception as e:
-            print(f"WARNING: Could not read running jobs: {e}")
+        """Get list of currently running jobs using process tracker"""
+        from services.job_process_tracker import JobProcessTracker
         
-        return running_jobs
+        tracker = JobProcessTracker()
+        return tracker.get_verified_running_jobs()
     
     def has_conflicting_jobs_running(self, job_name, job_config):
         """Check if there are conflicting jobs currently running"""

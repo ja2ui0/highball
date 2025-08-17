@@ -105,14 +105,12 @@ class BackupConfig:
                 "delay_notification_threshold": 300,  # seconds delay before sending notification (5 minutes)
                 "notification": {
                     "telegram": {
-                        "enabled": False,          # enable/disable telegram notifications
-                        "notify_on_success": False,# send telegram notifications for successful jobs
+                        "enabled": False,          # enable/disable telegram notifications globally
                         "token": "",               # Bot token from @BotFather
                         "chat_id": ""              # Chat ID for notifications
                     },
                     "email": {
-                        "enabled": False,          # enable/disable email notifications
-                        "notify_on_success": False,# send email notifications for successful jobs
+                        "enabled": False,          # enable/disable email notifications globally
                         "smtp_server": "",         # e.g. smtp.gmail.com
                         "smtp_port": 587,          # 587 for TLS, 465 for SSL, 25 for plain
                         "use_tls": True,           # use TLS encryption
@@ -121,6 +119,21 @@ class BackupConfig:
                         "to_email": "",            # recipient email address  
                         "username": "",            # SMTP authentication username
                         "password": ""             # SMTP authentication password
+                    }
+                },
+                "maintenance": {
+                    "discard_schedule": "0 3 * * *",         # daily at 3am - combines forget+prune operations
+                    "check_schedule": "0 2 * * 0",           # weekly Sunday 2am (staggered from backups)
+                    "retention_policy": {
+                        "keep_last": 7,        # always keep last 7 snapshots regardless of age
+                        "keep_hourly": 6,      # keep 6 most recent hourly snapshots (6 hours coverage)
+                        "keep_daily": 7,       # keep 7 most recent daily snapshots (1 week coverage)
+                        "keep_weekly": 4,      # keep 4 most recent weekly snapshots (1 month coverage)
+                        "keep_monthly": 6,     # keep 6 most recent monthly snapshots (6 months coverage)
+                        "keep_yearly": 0       # disable yearly retention by default
+                    },
+                    "check_config": {
+                        "read_data_subset": "5%"   # balance integrity vs performance
                     }
                 }
             },

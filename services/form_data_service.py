@@ -68,6 +68,21 @@ class ResticConfig:
 
 
 @dataclass
+class MaintenanceConfig:
+    """Maintenance configuration fields"""
+    restic_maintenance: str = "auto"  # "auto", "user", or "off"
+    maintenance_discard_schedule: str = ""
+    maintenance_check_schedule: str = ""
+    # Retention policy fields
+    keep_last: Optional[int] = None
+    keep_hourly: Optional[int] = None
+    keep_daily: Optional[int] = None
+    keep_weekly: Optional[int] = None
+    keep_monthly: Optional[int] = None
+    keep_yearly: Optional[int] = None
+
+
+@dataclass
 class JobFormData:
     """Structured data for job form template variables"""
     # Form metadata
@@ -79,6 +94,7 @@ class JobFormData:
     source: SourceConfig = field(default_factory=SourceConfig)
     dest: DestConfig = field(default_factory=DestConfig)
     restic: ResticConfig = field(default_factory=ResticConfig)
+    maintenance: MaintenanceConfig = field(default_factory=MaintenanceConfig)
     
     # Schedule configuration
     schedule_type: str = "manual"
@@ -104,6 +120,7 @@ class JobFormData:
         template_vars.update(self._get_source_variables())
         template_vars.update(self._get_dest_variables()) 
         template_vars.update(self._get_restic_variables())
+        template_vars.update(self._get_maintenance_variables())
         template_vars.update(self._get_schedule_variables())
         template_vars.update(self._get_pattern_variables())
         template_vars.update(self._get_checkbox_variables())
@@ -251,6 +268,31 @@ class JobFormData:
             'RESTIC_SFTP_PATH': self.restic.sftp_path,
         }
     
+    def _get_maintenance_variables(self) -> Dict[str, str]:
+        """Get maintenance configuration variables"""
+        mode = self.maintenance.restic_maintenance
+        
+        # First toggle: Auto (left) / User (right)
+        first_toggle_class = 'left' if mode == 'auto' else 'right'
+        
+        # Second toggle: Config (left) / Off (right) - only for user mode
+        # Default to Config (left) when switching to User mode
+        second_toggle_class = 'right' if mode == 'off' else 'left'
+        
+        return {
+            'RESTIC_MAINTENANCE_MODE': mode,
+            'MAINTENANCE_FIRST_TOGGLE_CLASS': first_toggle_class,
+            'MAINTENANCE_SECOND_TOGGLE_CLASS': second_toggle_class,
+            'MAINTENANCE_DISCARD_SCHEDULE': self.maintenance.maintenance_discard_schedule,
+            'MAINTENANCE_CHECK_SCHEDULE': self.maintenance.maintenance_check_schedule,
+            'KEEP_LAST': str(self.maintenance.keep_last) if self.maintenance.keep_last is not None else '',
+            'KEEP_HOURLY': str(self.maintenance.keep_hourly) if self.maintenance.keep_hourly is not None else '',
+            'KEEP_DAILY': str(self.maintenance.keep_daily) if self.maintenance.keep_daily is not None else '',
+            'KEEP_WEEKLY': str(self.maintenance.keep_weekly) if self.maintenance.keep_weekly is not None else '',
+            'KEEP_MONTHLY': str(self.maintenance.keep_monthly) if self.maintenance.keep_monthly is not None else '',
+            'KEEP_YEARLY': str(self.maintenance.keep_yearly) if self.maintenance.keep_yearly is not None else '',
+        }
+    
     def _get_schedule_variables(self) -> Dict[str, str]:
         """Get schedule configuration variables"""
         return {
@@ -373,12 +415,16 @@ class JobFormDataBuilder:
         # Build Restic config only if needed
         restic = cls._build_restic_config(job_config.get('dest_type'), dest_config)
         
+        # Build maintenance config
+        maintenance = cls._build_maintenance_config(job_config.get('maintenance_config', {}))
+        
         return JobFormData(
             is_edit=True,
             job_name=job_name,
             source=source,
             dest=dest,
             restic=restic,
+            maintenance=maintenance,
             schedule_type=schedule_type,
             cron_pattern=cron_pattern,
             includes='',  # Legacy field - includes/excludes now in source_paths
@@ -430,6 +476,23 @@ class JobFormDataBuilder:
             sftp_hostname=dest_config.get('sftp_hostname', ''),
             sftp_username=dest_config.get('sftp_username', ''),
             sftp_path=dest_config.get('sftp_path', ''),
+        )
+    
+    @staticmethod
+    def _build_maintenance_config(maintenance_config: Dict[str, Any]) -> MaintenanceConfig:
+        """Build maintenance configuration from job config"""
+        retention_policy = maintenance_config.get('retention_policy', {})
+        
+        return MaintenanceConfig(
+            restic_maintenance=maintenance_config.get('restic_maintenance', 'auto'),
+            maintenance_discard_schedule=maintenance_config.get('maintenance_discard_schedule', ''),
+            maintenance_check_schedule=maintenance_config.get('maintenance_check_schedule', ''),
+            keep_last=retention_policy.get('keep_last'),
+            keep_hourly=retention_policy.get('keep_hourly'),
+            keep_daily=retention_policy.get('keep_daily'),
+            keep_weekly=retention_policy.get('keep_weekly'),
+            keep_monthly=retention_policy.get('keep_monthly'),
+            keep_yearly=retention_policy.get('keep_yearly'),
         )
     
     @staticmethod

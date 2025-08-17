@@ -172,7 +172,9 @@ class RestoreOverwriteChecker:
                         if path and os.path.exists(path):
                             overwrite_paths.append(path)
                 elif source_type == 'ssh':
-                    # For SSH, we'd need to query remotely - simplified for now
+                    # Return summary labels instead of SSH-querying each file for performance.
+                    # Core overwrite detection works via SSH - this display method unused by UI.
+                    # TODO: If UI needs specific file lists, implement SSH queries here.
                     overwrite_paths = [f"Remote: {path}" for path in actual_paths]
         
         except Exception as e:

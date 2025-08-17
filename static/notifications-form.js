@@ -98,6 +98,12 @@ function addExistingNotificationProvider(config) {
         failureMessageInput.value = config.failure_message || '';
     }
     
+    // Set maintenance failure notification
+    const maintenanceFailureCheckbox = newProvider.querySelector('.notify-maintenance-failure-checkbox');
+    if (config.notify_on_maintenance_failure) {
+        maintenanceFailureCheckbox.checked = true;
+    }
+    
     // Add to configured providers
     configuredProviders.push(config.provider);
     

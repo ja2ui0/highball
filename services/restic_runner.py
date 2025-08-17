@@ -82,6 +82,9 @@ class ResticCommand:
         # Adjust arguments for container execution
         adjusted_args = ResticArgumentBuilder.adjust_args_for_container(self.args or [])
         
+        # Extract job name for process identification
+        job_name = job_config.get('name') if job_config else None
+        
         return container_builder.build_container_command(
             command_type=self.command_type.value,
             repository_url=self.repository_url,
@@ -89,7 +92,8 @@ class ResticCommand:
             environment_vars=self.environment_vars or {},
             mount_strategy=mount_strategy,
             mount_paths=mount_paths,
-            target_path=target_path
+            target_path=target_path,
+            job_name=job_name
         )
     
     def _determine_mount_strategy(self) -> tuple:
