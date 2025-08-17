@@ -4,6 +4,7 @@
     <title>Inspect {{JOB_NAME}} - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/backup-browser.js"></script>
     <script src="/static/restore-core.js"></script>
@@ -158,8 +159,15 @@
         <div class="section-container">
             <h2 class="section-header">Job Logs</h2>
             <div class="log-section">
-                <button id="refreshLogs" class="button">Refresh</button>
-                <button id="clearLogs" class="button button-warning">Clear Display</button>
+                <button class="button" 
+                        hx-post="/htmx/refresh-logs" 
+                        hx-vals='{"job_name": "{{JOB_NAME}}"}' 
+                        hx-target="#logContent" 
+                        hx-swap="outerHTML">Refresh</button>
+                <button class="button button-warning" 
+                        hx-post="/htmx/clear-logs" 
+                        hx-target="#logContent" 
+                        hx-swap="outerHTML">Clear Display</button>
             </div>
             
             <div id="logContent" class="log-viewer">{{JOB_LOG_CONTENT}}</div>

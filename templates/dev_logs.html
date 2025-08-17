@@ -4,9 +4,10 @@
     <title>System Debug - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/network-scan.js"></script>
-    <script src="/static/dev-logs.js"></script>
+    <!-- dev-logs.js removed - replaced with HTMX -->
 </head>
 <body>
     <div class="container">
@@ -34,8 +35,14 @@
             {{LOG_BUTTONS}}
             
             <div class="log-section">
-                <button id="refreshLogs" class="button">Refresh</button>
-                <button id="clearLogs" class="button button-warning">Clear Display</button>
+                <button class="button" 
+                        hx-get="/dev" 
+                        hx-target="#logContent" 
+                        hx-swap="innerHTML">Refresh</button>
+                <button class="button button-warning" 
+                        hx-post="/htmx/clear-logs" 
+                        hx-target="#logContent" 
+                        hx-swap="outerHTML">Clear Display</button>
             </div>
             
             <h3>{{LOG_NAME}}</h3>

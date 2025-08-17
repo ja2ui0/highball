@@ -1,14 +1,11 @@
 /**
- * Job Inspect Page JavaScript
- * Handles job status display, log management, restore controls, and overwrite checking
+ * Job Inspect Page JavaScript (HTMX-enabled)
+ * Handles restore controls and overwrite checking - log management migrated to HTMX
  */
 
 class JobInspectManager {
     constructor(jobName) {
         this.jobName = jobName;
-        this.logContent = null;
-        this.refreshButton = null;
-        this.clearButton = null;
         this.restoreControls = null;
         this.selectAllToggle = null;
         this.selectionPane = null;
@@ -17,16 +14,10 @@ class JobInspectManager {
     }
     
     init() {
-        // Get DOM elements
-        this.logContent = document.getElementById('logContent');
-        this.refreshButton = document.getElementById('refreshLogs');
-        this.clearButton = document.getElementById('clearLogs');
+        // Get DOM elements (log elements removed - handled by HTMX)
         this.restoreControls = document.getElementById('restoreControls');
         this.selectAllToggle = document.getElementById('selectAllToggle');
         this.selectionPane = document.getElementById('selectionPane');
-        
-        // Setup event listeners
-        this.setupEventListeners();
         
         // Setup backup browser integration
         this.setupBackupBrowserIntegration();
@@ -41,16 +32,6 @@ class JobInspectManager {
         // Make functions globally available for restore system
         window.checkOverwriteRisk = this.checkOverwriteRisk.bind(this);
         window.checkForOverwrites = this.checkForOverwrites.bind(this);
-    }
-    
-    setupEventListeners() {
-        if (this.refreshButton) {
-            this.refreshButton.addEventListener('click', this.refreshLogs.bind(this));
-        }
-        
-        if (this.clearButton) {
-            this.clearButton.addEventListener('click', this.clearLogs.bind(this));
-        }
     }
     
     setupBackupBrowserIntegration() {
@@ -68,37 +49,6 @@ class JobInspectManager {
             // Check for overwrites whenever selection changes
             this.checkOverwriteRisk();
         };
-    }
-    
-    // Log Management
-    refreshLogs() {
-        const currentUrl = new URL(window.location);
-        const refreshUrl = `/inspect?name=${encodeURIComponent(this.jobName)}`;
-        
-        // Fetch only the log content without reloading the page
-        fetch(refreshUrl)
-            .then(response => response.text())
-            .then(html => {
-                // Parse the response to extract just the log content
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const newLogContent = doc.getElementById('logContent');
-                
-                if (newLogContent && this.logContent) {
-                    this.logContent.innerHTML = newLogContent.innerHTML;
-                }
-            })
-            .catch(error => {
-                console.error('Error refreshing logs:', error);
-                // Fallback to full page reload if fetch fails
-                window.location.reload();
-            });
-    }
-    
-    clearLogs() {
-        if (this.logContent) {
-            this.logContent.textContent = '';
-        }
     }
     
     // Restore Controls

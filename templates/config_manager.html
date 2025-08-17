@@ -4,9 +4,9 @@
     <title>Configuration Manager - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
-    <script src="/static/config-manager.js"></script>
-    <script src="/static/config-notifications.js"></script>
+    <!-- config-manager.js, config-notifications.js removed - replaced with HTMX -->
 </head>
 <body>
     <div class="container">
@@ -99,7 +99,14 @@
             <!-- Telegram Settings -->
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="enable_telegram" name="enable_telegram" {{TELEGRAM_ENABLED}} onchange="toggleTelegramSettings()"> 
+                        <input type="checkbox" id="enable_telegram" name="enable_telegram" {{TELEGRAM_ENABLED}}
+                               hx-post="/htmx/notification-settings"
+                               hx-target="#telegramSettings"
+                               hx-swap="outerHTML"
+                               hx-include="[name^='telegram_']"
+                               hx-trigger="change"
+                               hx-vals="js:{provider: 'telegram', enabled: event.target.checked}"
+                               value="true"> 
                         Configure Telegram notifications
                     </label>
                 </div>
@@ -121,7 +128,14 @@
                     
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="telegram_queue_enabled" name="telegram_queue_enabled" {{TELEGRAM_QUEUE_ENABLED}} onchange="toggleTelegramQueue()"> 
+                            <input type="checkbox" id="telegram_queue_enabled" name="telegram_queue_enabled" {{TELEGRAM_QUEUE_ENABLED}}
+                                   hx-post="/htmx/queue-settings"
+                                   hx-target="#telegramQueueSettings"
+                                   hx-swap="outerHTML"
+                                   hx-include="[name^='telegram_queue_']"
+                                   hx-trigger="change"
+                                   hx-vals="js:{provider: 'telegram', enabled: event.target.checked}"
+                                   value="true"> 
                             Enable notification queueing
                         </label>
                         <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
@@ -144,7 +158,14 @@
                 <!-- Email Settings -->
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="enable_email" name="enable_email" {{EMAIL_ENABLED}} onchange="toggleEmailSettings()"> 
+                        <input type="checkbox" id="enable_email" name="enable_email" {{EMAIL_ENABLED}}
+                               hx-post="/htmx/notification-settings"
+                               hx-target="#emailSettings"
+                               hx-swap="outerHTML"
+                               hx-include="[name^='email_']"
+                               hx-trigger="change"
+                               hx-vals="js:{provider: 'email', enabled: event.target.checked}"
+                               value="true"> 
                         Configure email notifications
                     </label>
                 </div>
@@ -208,7 +229,14 @@
                     
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="email_queue_enabled" name="email_queue_enabled" {{EMAIL_QUEUE_ENABLED}} onchange="toggleEmailQueue()"> 
+                            <input type="checkbox" id="email_queue_enabled" name="email_queue_enabled" {{EMAIL_QUEUE_ENABLED}}
+                                   hx-post="/htmx/queue-settings"
+                                   hx-target="#emailQueueSettings"
+                                   hx-swap="outerHTML"
+                                   hx-include="[name^='email_queue_']"
+                                   hx-trigger="change"
+                                   hx-vals="js:{provider: 'email', enabled: event.target.checked}"
+                                   value="true"> 
                             Enable notification queueing
                         </label>
                         <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>

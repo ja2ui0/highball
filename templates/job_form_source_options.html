@@ -1,47 +1,5 @@
-            <div id="source_paths_container" data-source-paths='{{SOURCE_PATHS_JSON}}'>
-                <!-- Path Entry Template (will be cloned by JavaScript) -->
-                <div id="path_entry_template" class="path-entry hidden">
-                    <div class="path-group">
-                        <h3 class="path-header">
-                            <span>Source Path <span class="path-number">1</span></span>
-                            <button type="button" class="remove-path-btn button button-danger hidden" onclick="removePath(this)">Remove</button>
-                        </h3>
-                        
-                        <div class="form-group">
-                            <label class="path-label">Path:</label>
-                            <input type="text" class="path-input" name="source_paths[]" placeholder="">
-                            <div class="path-validation-row">
-                                <button type="button" class="validate-path-btn button button-secondary" onclick="validatePath(this)">
-                                    Validate Path
-                                </button>
-                                <div class="path-validation-result"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="includes-label">Include Patterns (optional):</label>
-                            <textarea class="includes-input" name="source_includes[]" placeholder="**/*.jpg
-documents/**
-config.ini"></textarea>
-                            <div class="help-text">
-                                Glob patterns for files to include. Leave empty to include all files.
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="excludes-label">Exclude Patterns (optional):</label>
-                            <textarea class="excludes-input" name="source_excludes[]" placeholder="*.tmp
-*.log
-.git/**
-**/.DS_Store"></textarea>
-                            <div class="help-text">
-                                Glob patterns for files to exclude from backup.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Default first path (populated from existing data) -->
+            <div id="source_paths_container">
+                <!-- First path entry with template variables for existing data -->
                 <div class="path-entry" data-path-index="0">
                     <div class="path-group">
                         <h3 class="path-header">
@@ -50,20 +8,24 @@ config.ini"></textarea>
                         
                         <div class="form-group">
                             <label for="source_path_0">Path:</label>
-                            <input type="text" id="source_path_0" class="path-input" name="source_paths[]" value="{{SOURCE_PATH_0}}" placeholder="">
+                            <input type="text" id="source_path_0" name="source_paths[]" 
+                                   value="{{SOURCE_PATH_0}}" placeholder="/path/to/backup">
                             <div class="path-validation-row">
-                                <button type="button" class="validate-path-btn button button-secondary" onclick="validatePath(this)">
+                                <button type="button" class="validate-path-btn button button-secondary" 
+                                        hx-post="/htmx/validate-single-source-path" 
+                                        hx-target="#path_validation_0"
+                                        hx-vals='{"path_index": "0"}'
+                                        hx-include="#source_path_0, [name='source_ssh_hostname'], [name='source_ssh_username']">
                                     Validate Path
                                 </button>
-                                <div class="path-validation-result"></div>
+                                <div id="path_validation_0" class="path-validation-result"></div>
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="source_includes_0">Include Patterns (optional):</label>
-                            <textarea id="source_includes_0" name="source_includes[]" placeholder="**/*.jpg
-documents/**
-config.ini">{{SOURCE_INCLUDES_0}}</textarea>
+                            <textarea id="source_includes_0" name="source_includes[]" 
+                                      placeholder="**/*.jpg&#10;documents/**&#10;config.ini">{{SOURCE_INCLUDES_0}}</textarea>
                             <div class="help-text">
                                 Glob patterns for files to include. Leave empty to include all files.
                             </div>
@@ -71,24 +33,27 @@ config.ini">{{SOURCE_INCLUDES_0}}</textarea>
                         
                         <div class="form-group">
                             <label for="source_excludes_0">Exclude Patterns (optional):</label>
-                            <textarea id="source_excludes_0" name="source_excludes[]" placeholder="*.tmp
-*.log
-.git/**
-**/.DS_Store">{{SOURCE_EXCLUDES_0}}</textarea>
+                            <textarea id="source_excludes_0" name="source_excludes[]" 
+                                      placeholder="**/*.tmp&#10;cache/**&#10;*.log">{{SOURCE_EXCLUDES_0}}</textarea>
                             <div class="help-text">
                                 Glob patterns for files to exclude from backup.
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <button type="button" id="add_path_btn" class="button button-secondary" onclick="addPath()">
-                    <span class="button-icon">+</span> Add Another Path
-                </button>
-                <div class="help-text">
-                    Add multiple source paths to backup different directories in a single job.
+                
+                <!-- Additional paths will be added here by HTMX -->
+                
+                <div class="add-path-section">
+                    <button type="button" class="button button-secondary" 
+                            hx-post="/htmx/add-source-path" 
+                            hx-target="#source_paths_container"
+                            hx-include="#source_paths_container [name]">
+                        <span class="button-icon">+</span> Add Another Path
+                    </button>
+                    <div class="help-text">
+                        Add multiple source paths to backup different directories in a single job.
+                    </div>
                 </div>
             </div>
             

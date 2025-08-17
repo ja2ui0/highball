@@ -22,6 +22,7 @@ from handlers.filesystem_handler import FilesystemHandler
 from handlers.api_handler import ApiHandler
 from handlers.restore_handler import RestoreHandler
 from handlers.notification_test_handler import NotificationTestHandler
+from handlers.htmx_form_handler import HTMXFormHandler
 
 # Services
 from services.template_service import TemplateService
@@ -87,6 +88,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 'api': ApiHandler(cls._backup_config),
                 'restore': RestoreHandler(cls._backup_config, cls._template_service),
                 'notification_test': NotificationTestHandler(),
+                'htmx': HTMXFormHandler(),
             }
         except Exception:
             cls._handlers = None
@@ -258,6 +260,138 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['dashboard'].validate_source_paths(self, form_data)
             elif path == '/initialize-restic-repo':
                 self._handlers['restic'].initialize_restic_repo(self, form_data)
+            
+            # HTMX form field updates
+            elif path == '/htmx/source-fields':
+                source_type = form_data.get('source_type', [''])[0]
+                html = self._handlers['htmx'].handle_source_type_change(source_type, dict(form_data))
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/dest-fields':
+                dest_type = form_data.get('dest_type', [''])[0]
+                html = self._handlers['htmx'].handle_dest_type_change(dest_type, dict(form_data))
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX validation endpoints
+            elif path == '/htmx/validate-source':
+                html = self._handlers['htmx'].handle_ssh_validation(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/validate-dest-ssh':
+                html = self._handlers['htmx'].handle_ssh_validation(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/validate-source-paths':
+                html = self._handlers['htmx'].handle_source_path_validation(form_data)
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX Restic endpoints
+            elif path == '/htmx/restic-repo-fields':
+                html = self._handlers['htmx'].handle_restic_repo_fields(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/restic-uri-preview':
+                html = self._handlers['htmx'].handle_restic_uri_preview(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/validate-restic':
+                html = self._handlers['htmx'].handle_restic_validation(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/initialize-restic':
+                html = self._handlers['htmx'].handle_restic_initialization(form_data)
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX source path management endpoints
+            elif path == '/htmx/add-source-path':
+                html = self._handlers['htmx'].handle_add_source_path(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/remove-source-path':
+                html = self._handlers['htmx'].handle_remove_source_path(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/validate-single-source-path':
+                html = self._handlers['htmx'].handle_validate_single_source_path(form_data)
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX log management endpoints
+            elif path == '/htmx/refresh-logs':
+                job_name = form_data.get('job_name', [''])[0]
+                if job_name:
+                    html = self._handlers['htmx'].handle_log_refresh(job_name)
+                    self._send_htmx_response(html)
+                else:
+                    self._send_htmx_response('<div class="error-message">Job name required for log refresh</div>')
+                return
+            elif path == '/htmx/clear-logs':
+                html = self._handlers['htmx'].handle_log_clear()
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/cron-field':
+                html = self._handlers['htmx'].handle_cron_field_toggle(form_data)
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX config management endpoints
+            elif path == '/htmx/notification-settings':
+                html = self._handlers['htmx'].handle_notification_settings_toggle(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/queue-settings':
+                html = self._handlers['htmx'].handle_queue_settings_toggle(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/test-telegram':
+                html = self._handlers['htmx'].handle_notification_test('telegram', form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/test-email':
+                html = self._handlers['htmx'].handle_notification_test('email', form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/maintenance-toggle':
+                html = self._handlers['htmx'].handle_maintenance_toggle(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/maintenance-section':
+                html = self._handlers['htmx'].handle_maintenance_section_visibility(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/rsyncd-discovery':
+                html = self._handlers['htmx'].handle_rsyncd_discovery(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/rsyncd-validation':
+                html = self._handlers['htmx'].handle_rsyncd_validation(form_data)
+                self._send_htmx_response(html)
+                return
+            
+            # HTMX notification management endpoints
+            elif path == '/htmx/add-notification-provider':
+                # Get available providers from config (this would need to be implemented)
+                available_providers = ['telegram', 'email']  # Placeholder
+                html = self._handlers['htmx'].handle_add_notification_provider(form_data, available_providers)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/remove-notification-provider':
+                available_providers = ['telegram', 'email']  # Placeholder
+                html = self._handlers['htmx'].handle_remove_notification_provider(form_data, available_providers)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/toggle-success-message':
+                print(f"[DEBUG] HTMX toggle-success-message called with form_data: {form_data}")
+                html = self._handlers['htmx'].handle_toggle_success_message(form_data)
+                self._send_htmx_response(html)
+                return
+            elif path == '/htmx/toggle-failure-message':
+                html = self._handlers['htmx'].handle_toggle_failure_message(form_data)
+                self._send_htmx_response(html)
+                return
             elif path == '/save-config':
                 self._handlers['config'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':
@@ -339,6 +473,13 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(b'<html><body><h1>405 Method Not Allowed</h1></body></html>')
+
+    def _send_htmx_response(self, html_content):
+        """Send HTMX HTML fragment response"""
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(html_content.encode())
 
     def _send_error_response(self, message):
         """Send error page"""

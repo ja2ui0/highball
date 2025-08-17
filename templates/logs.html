@@ -4,10 +4,11 @@
     <title>Inspect System - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/network-scan.js"></script>
     <script src="/static/backup-browser.js"></script>
-    <script src="/static/logs-viewer.js"></script>
+    <!-- logs-viewer.js removed - replaced with HTMX -->
 </head>
 <body>
     <div class="container">
@@ -38,14 +39,26 @@
             
             <div class="log-section">
                 <label for="jobSelect">Job Logs:</label>
-                <select id="jobSelect" onchange="viewJobLog()">
+                <select id="jobSelect" 
+                        hx-get="/logs" 
+                        hx-trigger="change"
+                        hx-target="#logContent"
+                        hx-swap="innerHTML"
+                        hx-vals="js:{job: event.target.value || ''}"
+                        name="job">
                     {{JOB_DROPDOWN}}
                 </select>
             </div>
             
             <div class="log-section">
-                <button id="refreshLogs" class="button">Refresh</button>
-                <button id="clearLogs" class="button button-warning">Clear Display</button>
+                <button class="button" 
+                        hx-get="/logs" 
+                        hx-target="#logContent" 
+                        hx-swap="innerHTML">Refresh</button>
+                <button class="button button-warning" 
+                        hx-post="/htmx/clear-logs" 
+                        hx-target="#logContent" 
+                        hx-swap="outerHTML">Clear Display</button>
             </div>
             
             <h3>{{LOG_NAME}}</h3>

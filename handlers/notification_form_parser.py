@@ -19,11 +19,11 @@ class NotificationFormParser:
         
         # Get notification form arrays
         providers = safe_get_list(form_data, 'notification_providers[]')
-        notify_success_flags = safe_get_list(form_data, 'notify_success[]')
-        success_messages = safe_get_list(form_data, 'success_messages[]')
-        notify_failure_flags = safe_get_list(form_data, 'notify_failure[]')
-        failure_messages = safe_get_list(form_data, 'failure_messages[]')
-        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_maintenance_failure[]')
+        notify_success_flags = safe_get_list(form_data, 'notify_on_success[]')
+        success_messages = safe_get_list(form_data, 'notification_success_messages[]')
+        notify_failure_flags = safe_get_list(form_data, 'notify_on_failure[]')
+        failure_messages = safe_get_list(form_data, 'notification_failure_messages[]')
+        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_on_maintenance_failure[]')
         
         notifications = []
         

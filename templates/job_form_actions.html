@@ -1,6 +1,10 @@
             <div class="form-group">
                 <label for="schedule">Schedule:</label>
-                <select id="schedule" name="schedule" onchange="showCronField()">
+                <select id="schedule" name="schedule" 
+                        hx-post="/htmx/cron-field" 
+                        hx-target="#cron_field" 
+                        hx-swap="outerHTML"
+                        hx-include="[name='cron_pattern']">
                     <option value="manual" {{SCHEDULE_MANUAL_SELECTED}}>Manual Only</option>
                     <option value="hourly" {{SCHEDULE_HOURLY_SELECTED}}>Hourly</option>
                     <option value="daily" {{SCHEDULE_DAILY_SELECTED}}>Daily</option>

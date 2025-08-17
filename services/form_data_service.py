@@ -5,6 +5,7 @@ Refactored for modularity and maintainability
 import html
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
+from .htmx_field_renderer import HTMXFieldRenderer
 
 
 @dataclass
@@ -181,6 +182,21 @@ class JobFormData:
         # Add multi-path variables
         vars_dict.update(self._get_multi_path_variables())
         
+        # Generate HTMX source fields HTML if source type is selected
+        if self.source.source_type:
+            field_renderer = HTMXFieldRenderer()
+            # Convert self to dict for the renderer
+            existing_data = {
+                'source_ssh_hostname': self.source.ssh_hostname,
+                'source_ssh_username': self.source.ssh_username,
+                'source_local_path': self.source.local_path,
+            }
+            vars_dict['SOURCE_FIELDS_HTML'] = field_renderer.render_source_fields(
+                self.source.source_type, existing_data
+            )
+        else:
+            vars_dict['SOURCE_FIELDS_HTML'] = ''
+        
         return vars_dict
     
     def _get_multi_path_variables(self) -> Dict[str, str]:
@@ -234,7 +250,7 @@ class JobFormData:
         # Share selection logic for rsyncd
         share_vars = self._get_share_selection_variables()
         
-        return {
+        vars_dict = {
             'DEST_LOCAL_SELECTED': 'selected' if self.dest.dest_type == 'local' else '',
             'DEST_SSH_SELECTED': 'selected' if self.dest.dest_type == 'ssh' else '',
             'DEST_RSYNCD_SELECTED': 'selected' if self.dest.dest_type == 'rsyncd' else '',
@@ -249,6 +265,37 @@ class JobFormData:
             'RESTIC_OPTION': f'<option value="restic" {("selected" if self.dest.dest_type == "restic" else "")}>Restic Repository</option>',
             **share_vars
         }
+        
+        # Generate HTMX destination fields HTML if destination type is selected
+        if self.dest.dest_type:
+            field_renderer = HTMXFieldRenderer()
+            # Convert self to dict for the renderer
+            existing_data = {
+                'dest_local_path': self.dest.local_path,
+                'dest_ssh_hostname': self.dest.ssh_hostname,
+                'dest_ssh_username': self.dest.ssh_username,
+                'dest_ssh_path': self.dest.ssh_path,
+                'dest_rsyncd_hostname': self.dest.rsyncd_hostname,
+                'dest_rsyncd_share': self.dest.rsyncd_share,
+                'dest_rsync_options': self.dest.rsync_options,
+                # Add Restic fields
+                'restic_password': self.restic.password,
+                'restic_repo_type': self.restic.repo_type,
+                'restic_local_path': self.restic.local_path,
+                'restic_rest_hostname': self.restic.rest_hostname,
+                'restic_rest_port': self.restic.rest_port,
+                'restic_rest_path': self.restic.rest_path,
+                'restic_rest_use_https': self.restic.rest_use_https,
+                'restic_rest_username': self.restic.rest_username,
+                'restic_rest_password': self.restic.rest_password,
+            }
+            vars_dict['DEST_FIELDS_HTML'] = field_renderer.render_dest_fields(
+                self.dest.dest_type, existing_data
+            )
+        else:
+            vars_dict['DEST_FIELDS_HTML'] = ''
+        
+        return vars_dict
     
     def _get_restic_variables(self) -> Dict[str, str]:
         """Get Restic configuration variables"""
@@ -343,17 +390,26 @@ class JobFormData:
     def _get_notification_variables(self) -> Dict[str, str]:
         """Get notification configuration variables"""
         import json
+        from services.htmx_notifications_manager import HTMXNotificationsManager
         
         # For now, we'll get available providers from a service
         # This will be populated by checking global configuration
         available_providers = self._get_available_notification_providers()
+        
+        # Generate HTML for existing notification providers
+        notifications_manager = HTMXNotificationsManager()
+        existing_html = ""
+        if self.notifications:
+            for notification in self.notifications:
+                existing_html += notifications_manager._render_existing_provider(notification)
         
         # Generate JSON data for JavaScript
         return {
             'AVAILABLE_PROVIDERS_JSON': json.dumps(available_providers),
             'EXISTING_NOTIFICATIONS_JSON': json.dumps(self.notifications),
             'AVAILABLE_PROVIDERS_OPTIONS': self._generate_provider_options(available_providers),
-            'ADD_PROVIDER_CLASS': '' if available_providers else 'hidden'
+            'ADD_PROVIDER_CLASS': '' if available_providers else 'hidden',
+            'EXISTING_NOTIFICATION_PROVIDERS_HTML': existing_html
         }
     
     def _get_available_notification_providers(self) -> list:

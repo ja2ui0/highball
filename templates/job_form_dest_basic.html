@@ -1,6 +1,9 @@
             <div class="form-group">
                 <label for="dest_type">Destination Type:</label>
-                <select id="dest_type" name="dest_type" required onchange="showDestFields()">
+                <select id="dest_type" name="dest_type" required 
+                        hx-post="/htmx/dest-fields" 
+                        hx-target="#dest_fields" 
+                        hx-include="this">
                     <option value="">Select destination...</option>
                     <option value="local" {{DEST_LOCAL_SELECTED}}>Local Path</option>
                     <option value="ssh" {{DEST_SSH_SELECTED}}>SSH Remote</option>
@@ -9,81 +12,7 @@
                 </select>
             </div>
             
-            <div id="dest_local" class="hidden">
-                <div class="form-group">
-                    <label for="dest_local_path">Local Destination Path (on source system):</label>
-                    <input type="text" name="dest_local_path" value="{{DEST_LOCAL_PATH}}" placeholder="/backups">
-                    <div class="help-text config-note">
-                        <strong>Important:</strong> "Local" means local to the SOURCE system, not this container.<br>
-                        If source is SSH remote, destination will be created on that remote system.<br>
-                        If source is local to this container, destination must be a mounted volume.
-                    </div>
-                </div>
-            </div>
-            
-            <div id="dest_ssh" class="hidden">
-                <div class="form-group">
-                    <label for="dest_ssh_hostname">Hostname:</label>
-                    <input type="text" name="dest_ssh_hostname" value="{{DEST_SSH_HOSTNAME}}" placeholder="backup-server">
-                </div>
-                
-                <div class="form-group">
-                    <label for="dest_ssh_username">Username:</label>
-                    <input type="text" name="dest_ssh_username" value="{{DEST_SSH_USERNAME}}" placeholder="backup">
-                </div>
-                
-                <div class="form-group">
-                    <label for="dest_ssh_path">Path:</label>
-                    <input type="text" name="dest_ssh_path" value="{{DEST_SSH_PATH}}" placeholder="/backups">
-                </div>
-                
-                <div class="form-group">
-                    <label for="dest_rsync_options">Rsync Options:</label>
-                    <input type="text" name="dest_rsync_options" value="{{DEST_RSYNC_OPTIONS}}" placeholder="{{DEFAULT_RSYNC_OPTIONS}}">
-                    <div class="help-text">
-                        <strong>Default options:</strong> <code>{{DEFAULT_RSYNC_OPTIONS}}</code><br>
-                        Leave empty to use defaults. Custom options will override defaults completely.
-                    </div>
-                </div>
-                
-                <div class="help-text">
-                    <button type="button" onclick="validateDestSSH()" class="button button-warning">Validate SSH Destination</button>
-                    <span id="dest_ssh_validation_status"></span>
-                    <div id="dest_ssh_validation_details" class="validation-details hidden"></div>
-                </div>
-            </div>
-            
-            <div id="dest_rsyncd" class="hidden">
-                <div class="form-group">
-                    <label for="dest_rsyncd_hostname">Hostname:</label>
-                    <input type="text" name="dest_rsyncd_hostname" value="{{DEST_RSYNCD_HOSTNAME}}" placeholder="backup-server">
-                </div>
-                
-                <div class="form-group">
-                    <button type="button" onclick="discoverShares()" class="button button-warning">Discover Shares</button>
-                    <span id="discover_status"></span>
-                </div>
-                
-                <div id="share_selection" class="{{SHARE_SELECTION_CLASS}}">
-                    <div class="form-group">
-                        <label for="dest_rsyncd_share">{{SHARE_LABEL}}:</label>
-                        <select name="dest_rsyncd_share" id="dest_rsyncd_share">
-                            <option value="">Select a share...</option>
-                            {{SHARE_OPTIONS}}
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="dest_rsync_options">Rsync Options:</label>
-                    <input type="text" name="dest_rsync_options" value="{{DEST_RSYNC_OPTIONS}}" placeholder="{{DEFAULT_RSYNC_OPTIONS}}">
-                    <div class="help-text">
-                        <strong>Default options:</strong> <code>{{DEFAULT_RSYNC_OPTIONS}}</code><br>
-                        Leave empty to use defaults. Custom options will override defaults completely.
-                    </div>
-                </div>
-                
-                <div class="help-text">
-                    <div id="rsyncd_validation_details" class="validation-details hidden"></div>
-                </div>
+            <div id="dest_fields">
+                <!-- HTMX will populate this based on dest_type selection -->
+                {{DEST_FIELDS_HTML}}
             </div>
