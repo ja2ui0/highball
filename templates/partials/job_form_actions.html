@@ -1,35 +1,35 @@
-            <div class="form-group">
-                <label for="schedule">Schedule:</label>
-                <select id="schedule" name="schedule" 
-                        hx-post="/htmx/cron-field" 
-                        hx-target="#cron_field" 
-                        hx-swap="outerHTML"
-                        hx-include="[name='cron_pattern']">
-                    <option value="manual" {% if schedule_manual_selected %}selected{% endif %}>Manual Only</option>
-                    <option value="hourly" {% if schedule_hourly_selected %}selected{% endif %}>Hourly</option>
-                    <option value="daily" {% if schedule_daily_selected %}selected{% endif %}>Daily</option>
-                    <option value="weekly" {% if schedule_weekly_selected %}selected{% endif %}>Weekly</option>
-                    <option value="monthly" {% if schedule_monthly_selected %}selected{% endif %}>Monthly</option>
-                    <option value="cron" {% if schedule_cron_selected %}selected{% endif %}>Custom Cron Pattern</option>
-                </select>
-            </div>
-            
-            {% include 'partials/cron_field.html' %}
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="enabled" value="true" {% if enabled_checked %}checked{% endif %}> Enabled
-                </label>
-                <div class="help-text">
-                    When enabled, this job will run according to its schedule. Disable to temporarily pause scheduling.
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="respect_conflicts" value="true" {% if conflicts_checked %}checked{% endif %}> Wait for conflicting jobs (recommended)
-                </label>
-                <div class="help-text">
-                    When enabled, this job will wait for other jobs using the same source or destination to finish before running.
-                </div>
-            </div>
+<div class="form-group">
+    <label for="schedule">Schedule:</label>
+    <select id="schedule" name="schedule" 
+            hx-post="/htmx/cron-field" 
+            hx-target="#cron_field" 
+            hx-swap="outerHTML"
+            hx-include="[name='cron_pattern']">
+        <option value="manual" {% if schedule_manual_selected %}selected{% endif %}>Manual Only</option>
+        <option value="hourly" {% if schedule_hourly_selected %}selected{% endif %}>Hourly</option>
+        <option value="daily" {% if schedule_daily_selected %}selected{% endif %}>Daily</option>
+        <option value="weekly" {% if schedule_weekly_selected %}selected{% endif %}>Weekly</option>
+        <option value="monthly" {% if schedule_monthly_selected %}selected{% endif %}>Monthly</option>
+        <option value="cron" {% if schedule_cron_selected %}selected{% endif %}>Custom Cron Pattern</option>
+    </select>
+</div>
+
+{% include 'partials/cron_field.html' %}
+
+<div class="form-group">
+    <label>
+        <input type="checkbox" name="enabled" value="true" {% if enabled_checked %}checked{% endif %}> Enabled
+    </label>
+    <div class="help-text">
+        When enabled, this job will run according to its schedule. Disable to temporarily pause scheduling.
+    </div>
+</div>
+
+<div class="form-group">
+    <label>
+        <input type="checkbox" name="respect_conflicts" value="true" {% if conflicts_checked %}checked{% endif %}> Wait for conflicting jobs (recommended)
+    </label>
+    <div class="help-text">
+        When enabled, this job will wait for other jobs using the same source or destination to finish before running.
+    </div>
+</div>

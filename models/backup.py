@@ -19,6 +19,39 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# DESTINATION TYPE SCHEMAS
+# =============================================================================
+
+DESTINATION_TYPE_SCHEMAS = {
+    'local': {
+        'display_name': 'Local Path',
+        'description': 'Store backups on local filesystem',
+        'always_available': True,
+        'requires': []
+    },
+    'ssh': {
+        'display_name': 'Rsync (SSH)',
+        'description': 'Remote backup using rsync over SSH',
+        'always_available': True,
+        'requires': ['rsync', 'ssh']
+    },
+    'rsyncd': {
+        'display_name': 'Rsync Daemon',
+        'description': 'Remote backup using rsync daemon protocol',
+        'always_available': True,
+        'requires': ['rsync']
+    },
+    'restic': {
+        'display_name': 'Restic Repository',
+        'description': 'Encrypted, deduplicated backup repository',
+        'always_available': False,  # depends on binary availability
+        'requires': ['restic'],
+        'requires_container_runtime': True,
+        'availability_check': 'check_restic_availability'
+    }
+}
+
+# =============================================================================
 # COMMAND EXECUTION DATA STRUCTURES
 # =============================================================================
 

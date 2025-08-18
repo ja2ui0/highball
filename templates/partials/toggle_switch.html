@@ -1,0 +1,11 @@
+<div class="toggle-section">
+    <span class="toggle-label">{{ left_label }}</span>
+    <button type="button" class="toggle-switch {{ toggle_class }}" 
+            hx-post="{{ endpoint }}"
+            hx-target="{{ target }}"
+            hx-vals="{{ vals }}"
+            hx-include="{{ include_selector }}">
+        <div class="toggle-button"></div>
+    </button>
+    <span class="toggle-label">{{ right_label }}</span>
+</div>

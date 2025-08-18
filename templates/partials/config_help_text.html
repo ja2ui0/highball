@@ -1,0 +1,9 @@
+<div class="help-text config-note">
+    <strong>{{ title }}:</strong><br>
+    {% for line in help_lines %}
+    • {{ line | safe }}<br>
+    {% endfor %}
+    {% if example_command %}
+    • Example: <code>{{ example_command }}</code>
+    {% endif %}
+</div>

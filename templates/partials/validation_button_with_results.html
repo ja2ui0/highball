@@ -1,0 +1,16 @@
+<div class="{{ container_class | default('mt-15') }}">
+    <button type="button" 
+            hx-post="{{ endpoint }}"
+            hx-target="{{ target }}"
+            hx-include="{{ include_selector | default('form') }}"
+            class="button {{ button_class | default('button-warning') }}">
+        {{ button_text }}
+    </button>
+</div>
+
+<div class="validation-section {{ section_class | default('mt-15') }}">
+    <h3 class="validation-header">{{ header_text | default('Validation Results') }}</h3>
+    <div class="validation-content">
+        <div id="{{ target_id }}">{{ initial_content | safe }}</div>
+    </div>
+</div>

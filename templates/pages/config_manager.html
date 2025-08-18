@@ -15,20 +15,13 @@
         
         <form method="post" action="/save-config" enctype="multipart/form-data">
             
-            <!-- Global Settings -->
             {% include 'partials/global_settings_section.html' %}
-            
-            <!-- Schedule Defaults -->
             {% include 'partials/schedule_defaults_section.html' %}
-            
-            <!-- Notification Settings -->
             {% include 'partials/notification_section.html' %}
-            
             {% include 'partials/config_form_actions.html' %}
             
         </form>
         
-        <!-- Advanced Options -->
         {% include 'partials/advanced_options_section.html' %}
     </div>
     

@@ -1,0 +1,62 @@
+<div class="form-group">
+    {% if field.type == 'text' or field.type == 'email' or field.type == 'number' %}
+    <label for="{{ provider }}_{{ field.name }}">{{ field.label }}:</label>
+    <input type="{{ field.type }}" 
+           id="{{ provider }}_{{ field.name }}" 
+           name="{{ provider }}_{{ field.name }}" 
+           value="{{ config[field.name] if config and field.name in config else '' }}"
+           {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+           {% if field.min %}min="{{ field.min }}"{% endif %}
+           {% if field.max %}max="{{ field.max }}"{% endif %}
+           {% if field.required %}required{% endif %}>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'password' %}
+    <label for="{{ provider }}_{{ field.name }}">{{ field.label }}:</label>
+    {% set field_id = provider + '_' + field.name %}
+    {% set field_name = provider + '_' + field.name %}
+    {% set field_value = config[field.name] if config and field.name in config else '' %}
+    {% set placeholder = field.placeholder %}
+    {% set hidden = true %}
+    {% include 'partials/password_field.html' %}
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'checkbox' %}
+    <label>
+        <input type="checkbox" 
+               name="{{ provider }}_{{ field.name }}" 
+               {% if config and config[field.name] %}checked{% endif %}> 
+        {{ field.label }}
+    </label>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'select' %}
+    <label for="{{ provider }}_{{ field.name }}">{{ field.label }}:</label>
+    <select id="{{ provider }}_{{ field.name }}" 
+            name="{{ provider }}_{{ field.name }}"
+            {% if field.required %}required{% endif %}>
+        {% for option in field.options %}
+        <option value="{{ option.value }}"
+                {% if option.config_field %}
+                    {% if config and config[option.config_field] %}selected{% endif %}
+                {% elif option.value == 'none' %}
+                    {% if config and not config.get('use_tls') and not config.get('use_ssl') %}selected{% endif %}
+                {% elif option.value == field.default %}
+                    {% if not config or (not config.get('use_tls') and not config.get('use_ssl') and option.value == 'none') %}selected{% endif %}
+                {% endif %}>
+            {{ option.label }}
+        </option>
+        {% endfor %}
+    </select>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% endif %}
+</div>

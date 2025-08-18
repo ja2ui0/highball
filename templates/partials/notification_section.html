@@ -1,0 +1,33 @@
+<div class="section-container">
+    <h2 class="section-header">Notification Settings</h2>
+    
+    <!-- Configured Providers (dynamically iterate through existing providers) -->
+    {% for provider_name, config in global_settings.notification.items() %}
+    {% if config %}
+    {% set provider = provider_name %}
+    {% set config = config %}
+    {% include 'partials/notification_provider_dynamic.html' %}
+    {% endif %}
+    {% endfor %}
+    
+    <!-- Add Provider Dropdown (only show unconfigured providers) -->
+    <div id="notification-providers">
+        <h3>Add Notification Provider</h3>
+        <div class="form-group">
+            <label for="add_provider">Select Provider:</label>
+            <select id="add_provider" name="add_provider"
+                    hx-post="/htmx/add-global-notification-provider"
+                    hx-target="#notification-providers"
+                    hx-swap="outerHTML"
+                    hx-trigger="change[target.value != '']">
+                <option value="">Choose a provider to configure...</option>
+                {% for provider_name in provider_schemas.keys() %}
+                {% if provider_name not in global_settings.notification or not global_settings.notification[provider_name] %}
+                <option value="{{ provider_name }}">{{ provider_schemas[provider_name].display_name }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+            <div class="help-text">Each provider can only be configured once</div>
+        </div>
+    </div>
+</div>

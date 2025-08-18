@@ -1,16 +1,16 @@
-            <div class="form-group">
-                <label for="source_type">Source Type:</label>
-                <select id="source_type" name="source_type" required 
-                        hx-post="/htmx/source-fields" 
-                        hx-target="#source_fields" 
-                        hx-include="this">
-                    <option value="">Select source...</option>
-                    <option value="local" {% if source_local_selected %}selected{% endif %}>Local Path</option>
-                    <option value="ssh" {% if source_ssh_selected %}selected{% endif %}>SSH Remote</option>
-                </select>
-            </div>
-            
-            <div id="source_fields">
-                <!-- HTMX will populate this based on source_type selection -->
-                {{ source_fields_html | safe }}
-            </div>
+<div class="form-group">
+    <label for="source_type">Source Type:</label>
+    <select id="source_type" name="source_type" required 
+            hx-post="/htmx/source-fields" 
+            hx-target="#source_fields" 
+            hx-include="this">
+        <option value="">Select source...</option>
+        <option value="local" {% if source_local_selected %}selected{% endif %}>Local Path</option>
+        <option value="ssh" {% if source_ssh_selected %}selected{% endif %}>SSH Remote</option>
+    </select>
+</div>
+
+<div id="source_fields">
+    <!-- HTMX will populate this based on source_type selection -->
+    {{ source_fields_html | safe }}
+</div>

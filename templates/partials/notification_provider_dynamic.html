@@ -1,0 +1,36 @@
+{% set schema = provider_schemas[provider] %}
+<div class="path-group">
+    <h3 class="path-header">
+        <span>{{ schema.display_name }} Notifications</span>
+    </h3>
+    
+    <!-- Top-level fields (if any) -->
+    {% for field in schema.fields %}
+    {% include 'partials/form_field.html' %}
+    {% endfor %}
+    
+    <!-- Sections with grouped fields -->
+    {% for section in schema.sections %}
+    {% if section.title %}
+    <h4>{{ section.title }}</h4>
+    {% endif %}
+    
+    {% for field in section.fields %}
+    {% include 'partials/form_field.html' %}
+    {% endfor %}
+    {% endfor %}
+    
+    <!-- Actions -->
+    <div class="form-group">
+        {% set provider = provider %}
+        {% include 'partials/test_notification_button.html' %}
+        <button type="button" class="button button-danger" 
+                hx-post="/htmx/remove-global-notification-provider"
+                hx-vals='{"provider": "{{ provider }}"}'
+                hx-target="#notification-providers"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to remove {{ schema.display_name }} notifications? This will delete all configuration.">
+            Remove {{ schema.display_name }} Provider
+        </button>
+    </div>
+</div>

@@ -1,0 +1,16 @@
+<div class="form-section">
+    <div class="section-content">
+        <h2 class="section-header">Actions</h2>
+        {% include 'partials/job_form_actions.html' %}
+        
+        {% if error_message %}{{ error_message | safe }}{% endif %}
+        
+        <div class="form-group">
+            <input type="submit" value="{{ submit_button_text }}" class="button button-success">
+            <a href="/" class="button">Cancel</a>
+        </div>
+        
+        <!-- Feedback Section -->
+        {% if feedback_section %}{{ feedback_section | safe }}{% endif %}
+    </div>
+</div>

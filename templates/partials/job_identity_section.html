@@ -1,0 +1,11 @@
+<div class="form-section">
+    <div class="section-content">
+        <h2 class="section-header">Job Identity & Source</h2>
+        <div class="form-group">
+            <label for="job_name">Job Name:</label>
+            <input type="text" id="job_name" name="job_name" required value="{{ job_name }}" placeholder="e.g., documents, photos">
+        </div>
+        
+        {% include 'partials/job_form_source.html' %}
+    </div>
+</div>

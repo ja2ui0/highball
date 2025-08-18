@@ -1,0 +1,30 @@
+{% if success %}
+<div class="alert alert-info">
+    <h3>Configuration Preview</h3>
+    <p>This shows exactly what would be saved to your configuration file. Review carefully before clicking "Save Configuration".</p>
+</div>
+
+<div class="code-container log-container">
+    <div class="log-viewer">{{ preview_yaml }}</div>
+</div>
+
+<div style="margin-top: 15px;">
+    <button type="button" class="button button-success" onclick="document.querySelector('input[type=submit]').click();">
+        ✓ Looks Good - Save Configuration
+    </button>
+    <button type="button" class="button" onclick="document.getElementById('config-preview').style.display='none';">
+        Hide Preview
+    </button>
+</div>
+
+{% else %}
+<div class="alert alert-error">
+    <h3>Preview Error</h3>
+    <p>{{ error_message }}</p>
+</div>
+{% endif %}
+
+<script>
+// Show the preview container when content is loaded
+document.getElementById('config-preview').style.display = 'block';
+</script>

@@ -1,0 +1,14 @@
+<div class="form-actions">
+    <button type="button" class="button button-warning"
+            hx-post="/preview-config-changes"
+            hx-include="closest form"
+            hx-target="#config-preview"
+            hx-swap="innerHTML">Preview Changes</button>
+    <input type="submit" value="Save Configuration" class="button button-success">
+    <a href="/" class="button">Cancel</a>
+</div>
+
+<!-- Preview Results Area -->
+<div id="config-preview" class="section-container" style="margin-top: 20px; display: none;">
+    <!-- Preview content will be loaded here via HTMX -->
+</div>

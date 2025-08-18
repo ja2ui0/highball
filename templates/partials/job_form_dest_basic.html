@@ -1,18 +1,19 @@
-            <div class="form-group">
-                <label for="dest_type">Destination Type:</label>
-                <select id="dest_type" name="dest_type" required 
-                        hx-post="/htmx/dest-fields" 
-                        hx-target="#dest_fields" 
-                        hx-include="this">
-                    <option value="">Select destination...</option>
-                    <option value="local" {% if dest_local_selected %}selected{% endif %}>Local Path</option>
-                    <option value="ssh" {% if dest_ssh_selected %}selected{% endif %}>SSH Remote</option>
-                    <option value="rsyncd" {% if dest_rsyncd_selected %}selected{% endif %}>Rsync Daemon</option>
-                    {{ restic_option | safe }}
-                </select>
-            </div>
-            
-            <div id="dest_fields">
-                <!-- HTMX will populate this based on dest_type selection -->
-                {{ dest_fields_html | safe }}
-            </div>
+<div class="form-group">
+    <label for="dest_type">Destination Type:</label>
+    <select id="dest_type" name="dest_type" required 
+            hx-post="/htmx/dest-fields" 
+            hx-target="#dest_fields" 
+            hx-include="this">
+        <option value="">Select destination...</option>
+        {% for dest_type in available_destination_types %}
+        <option value="{{ dest_type.value }}" {% if dest_type.value == selected_dest_type %}selected{% endif %}>
+            {{ dest_type.display_name }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
+<div id="dest_fields">
+    <!-- HTMX will populate this based on dest_type selection -->
+    {{ dest_fields_html | safe }}
+</div>
