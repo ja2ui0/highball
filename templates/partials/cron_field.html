@@ -1,0 +1,12 @@
+{% if show_field or schedule == 'cron' %}
+<div id="cron_field" class="mt-10">
+    <label for="cron_pattern">Cron Pattern:</label>
+    <input type="text" name="cron_pattern" value="{{ cron_pattern }}" placeholder="0 3 * * *" 
+           title="Format: minute hour day month weekday">
+    <div class="help-text">
+        Examples: "0 3 * * *" (daily 3am), "0 */6 * * *" (every 6 hours), "0 3 * * 0" (weekly Sunday 3am), "0 3 1 * *" (monthly 1st 3am)
+    </div>
+</div>
+{% else %}
+<div id="cron_field" class="hidden mt-10"></div>
+{% endif %}

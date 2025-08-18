@@ -5,12 +5,12 @@
                         hx-target="#source_fields" 
                         hx-include="this">
                     <option value="">Select source...</option>
-                    <option value="local" {{SOURCE_LOCAL_SELECTED}}>Local Path</option>
-                    <option value="ssh" {{SOURCE_SSH_SELECTED}}>SSH Remote</option>
+                    <option value="local" {% if source_local_selected %}selected{% endif %}>Local Path</option>
+                    <option value="ssh" {% if source_ssh_selected %}selected{% endif %}>SSH Remote</option>
                 </select>
             </div>
             
             <div id="source_fields">
                 <!-- HTMX will populate this based on source_type selection -->
-                {{SOURCE_FIELDS_HTML}}
+                {{ source_fields_html | safe }}
             </div>

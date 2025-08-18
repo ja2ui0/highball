@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{PAGE_TITLE}} - Highball</title>
+    <title>{{ page_title }} - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <!-- job-form-core.js, job-form-ssh.js, job-form-globals.js, job-form-restic.js, job-form-source-paths.js removed - replaced with HTMX -->
@@ -15,12 +15,12 @@
     <div class="container">
         <div id="navigation"></div>
         
-        <h1>{{FORM_TITLE}}</h1>
+        <h1>{{ form_title }}</h1>
         
         <!-- Feedback Section removed - using bottom feedback only -->
         
         <form method="post" action="/save-job" enctype="multipart/form-data">
-            {{HIDDEN_FIELDS}}
+            {{ hidden_fields | safe }}
             
             <!-- Job Identity Section -->
             <div class="form-section">
@@ -28,10 +28,10 @@
                     <h2 class="section-header">Job Identity & Source</h2>
                     <div class="form-group">
                         <label for="job_name">Job Name:</label>
-                        <input type="text" id="job_name" name="job_name" required value="{{JOB_NAME}}" placeholder="e.g., documents, photos">
+                        <input type="text" id="job_name" name="job_name" required value="{{ job_name }}" placeholder="e.g., documents, photos">
                     </div>
                     
-                    {{INCLUDE:job_form_source.html}}
+                    {% include 'partials/job_form_source.html' %}
                 </div>
             </div>
             
@@ -39,9 +39,9 @@
             <div class="form-section">
                 <div class="section-content">
                     <h2 class="section-header">Backup Destination</h2>
-                    {{INCLUDE:job_form_dest_basic.html}}
+                    {% include 'partials/job_form_dest_basic.html' %}
                     
-                    {{INCLUDE:job_form_dest_restic.html}}
+                    {% include 'partials/job_form_dest_restic.html' %}
                 </div>
             </div>
             
@@ -49,7 +49,7 @@
             <div class="form-section">
                 <div class="section-content">
                     <h2 class="section-header">Source Options</h2>
-                    {{INCLUDE:job_form_source_options.html}}
+                    {% include 'partials/job_form_source_options.html' %}
                 </div>
             </div>
             
@@ -57,7 +57,7 @@
             <div class="form-section">
                 <div class="section-content">
                     <h2 class="section-header">Notifications</h2>
-                    {{INCLUDE:job_form_notifications.html}}
+                    {% include 'partials/job_form_notifications.html' %}
                 </div>
             </div>
             
@@ -65,22 +65,22 @@
             <div class="form-section">
                 <div class="section-content">
                     <h2 class="section-header">Actions</h2>
-                    {{INCLUDE:job_form_actions.html}}
+                    {% include 'partials/job_form_actions.html' %}
                     
-                    {{ERROR_MESSAGE}}
+                    {% if error_message %}{{ error_message | safe }}{% endif %}
                     
                     <div class="form-group">
-                        <input type="submit" value="{{SUBMIT_BUTTON_TEXT}}" class="button button-success">
+                        <input type="submit" value="{{ submit_button_text }}" class="button button-success">
                         <a href="/" class="button">Cancel</a>
                     </div>
                     
                     <!-- Feedback Section -->
-                    {{FEEDBACK_SECTION}}
+                    {% if feedback_section %}{{ feedback_section | safe }}{% endif %}
                 </div>
             </div>
         </form>
         
-        {{DELETE_FORM}}
+        {% if delete_form %}{{ delete_form | safe }}{% endif %}
     </div>
 </body>
 </html>

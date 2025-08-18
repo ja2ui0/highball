@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Inspect {{JOB_NAME}} - Highball</title>
+    <title>Inspect {{ job_name }} - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/backup-browser.js"></script>
@@ -15,8 +15,8 @@
     <div class="container">
         <div id="navigation"></div>
         
-        <h1>Inspect Job: {{JOB_NAME}}</h1>
-        <p class="job-type-info">Job Type: <strong>{{JOB_TYPE}}</strong></p>
+        <h1>Inspect Job: {{ job_name }}</h1>
+        <p class="job-type-info">Job Type: <strong>{{ job_type }}</strong></p>
         
         <!-- Job Status Section -->
         <div class="section-container">
@@ -25,21 +25,21 @@
             <div class="form-group">
                 <label>Last Run:</label>
                 <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace;">
-                    {{LAST_RUN}}
+                    {{ last_run }}
                 </div>
             </div>
             
             <div class="form-group">
                 <label>Status:</label>
                 <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace;">
-                    {{STATUS}}
+                    {{ status }}
                 </div>
             </div>
             
             <div class="form-group">
                 <label>Message:</label>
                 <div style="background-color: var(--bg-darker); padding: 12px; border-radius: 4px; font-family: monospace; word-break: break-word;">
-                    {{MESSAGE}}
+                    {{ message }}
                 </div>
             </div>
         </div>
@@ -48,10 +48,10 @@
         <div class="section-container">
             <h2 class="section-header">Backup Browser</h2>
             
-            {{JOB_TYPES_JS}}
+            <script>window.jobTypes = {"{{ job_name }}": "{{ job_type }}"};</script>
             <!-- Hidden pre-selected dropdown for JavaScript compatibility -->
             <select id="backupJobSelect" onchange="loadBackupJob()" style="display: none;">
-                {{BACKUP_JOB_DROPDOWN}}
+                <option value="{{ job_name }}" selected>{{ job_name }}</option>
             </select>
             
             <div id="browserContent" class="hidden backup-browser">
@@ -109,14 +109,24 @@
                         <div class="restore-options">
                             <div>
                                 <label>Restore Target:</label>
-                                <select id="restoreTarget" onchange="handleRestoreTargetChange()">
+                                <select id="restoreTarget" 
+                                        hx-post="/htmx/restore-target-change"
+                                        hx-target="#overwriteWarning"
+                                        hx-swap="outerHTML"
+                                        hx-include="#dryRunToggle, #selectAllToggle"
+                                        hx-vals="js:{job_name: '{{ job_name }}'}">
                                     <option value="highball">Restore to Highball (/restore)</option>
                                     <option value="source">Restore to Source (original location)</option>
                                 </select>
                             </div>
                             <div class="mt-15">
                                 <label>
-                                    <input type="checkbox" id="dryRunToggle" checked onchange="togglePasswordField()">
+                                    <input type="checkbox" id="dryRunToggle" checked 
+                                           hx-post="/htmx/restore-dry-run-change"
+                                           hx-target="#overwriteWarning"
+                                           hx-swap="outerHTML"
+                                           hx-include="#restoreTarget, #selectAllToggle"
+                                           hx-vals="js:{job_name: '{{ job_name }}'}">
                                     Dry Run (safe preview - uncheck to perform actual restore)
                                 </label>
                             </div>
@@ -158,20 +168,19 @@
         <!-- Job Logs -->
         <div class="section-container">
             <h2 class="section-header">Job Logs</h2>
-            <div class="log-section">
-                <button class="button" 
-                        hx-post="/htmx/refresh-logs" 
-                        hx-vals='{"job_name": "{{JOB_NAME}}"}' 
-                        hx-target="#logContent" 
-                        hx-swap="outerHTML">Refresh</button>
-                <button class="button button-warning" 
-                        hx-post="/htmx/clear-logs" 
-                        hx-target="#logContent" 
-                        hx-swap="outerHTML">Clear Display</button>
-            </div>
+            {% include 'partials/log_controls.html' %}
             
-            <div id="logContent" class="log-viewer">{{JOB_LOG_CONTENT}}</div>
+            <div id="logContent" class="log-viewer">{{ job_log_content }}</div>
         </div>
     </div>
+    
+    <script>
+        // Initialize backup browser when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof loadBackupJob === 'function') {
+                loadBackupJob();
+            }
+        });
+    </script>
 </body>
 </html>

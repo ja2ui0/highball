@@ -3,10 +3,10 @@
     <h2 class="section-header">Backup Browser</h2>
     <p>Browse and restore files from backup jobs.</p>
     
-    {{JOB_TYPES_JS}}
+    {{ job_types_js }}
     <select id="backupJobSelect" onchange="loadBackupJob()">
         <option value="">Select any backup job...</option>
-        {{BACKUP_JOB_DROPDOWN}}
+        {{ backup_job_dropdown }}
     </select>
     
     <div id="browserContent" class="hidden backup-browser">

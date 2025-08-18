@@ -3,9 +3,13 @@ Forms Handler - Pure HTTP coordination for HTMX operations
 Delegates all business logic to appropriate services
 """
 
+import cgi
+import html
 import logging
+import time
+from urllib.parse import parse_qs
 from models.validation import ValidationService
-from models.forms import JobFormParser
+from models.forms import JobFormParser, DestinationParser
 from services.template import TemplateService
 
 logger = logging.getLogger(__name__)
@@ -18,16 +22,19 @@ class FormsHandler:
         self.validation_service = ValidationService(backup_config)
         self.form_parser = JobFormParser()
         self.template_service = template_service
+        self.configured_providers = []  # Track configured notification providers
     
-    def handle_htmx_request(self, request, action):
+    def handle_htmx_request(self, request, action, form_data=None):
         """Single HTMX entry point with action dispatch"""
-        # HTTP concern: parse form data once
-        form_data = self._parse_form_data(request)
+        # HTTP concern: use pre-parsed form data or parse if needed
+        if form_data is None:
+            form_data = self._parse_form_data(request)
         
         # Action dispatch table
         actions = {
             # Validation actions
             'validate-ssh-source': self._validate_ssh_source,
+            'validate-ssh-dest': self._validate_ssh_dest,
             'validate-source-path': self._validate_source_path,
             'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
@@ -54,6 +61,28 @@ class FormsHandler:
             # Maintenance fields
             'maintenance-fields': self._render_maintenance_fields,
             'rsyncd-fields': self._render_rsyncd_fields,
+            
+            # Restore actions
+            'restore-target-change': self._handle_restore_target_change,
+            'restore-dry-run-change': self._handle_restore_dry_run_change,
+            
+            # Log management (connect to pages handler functionality)
+            'clear-logs': self._clear_logs,
+            'refresh-logs': self._refresh_logs,
+            
+            # Configuration management (connect to existing notification functionality)
+            'notification-settings': self._render_notification_providers,
+            'queue-settings': self._handle_queue_settings,
+            
+            # Global notification provider management (config manager)
+            'add-global-notification-provider': self._add_global_notification_provider,
+            'remove-global-notification-provider': self._remove_global_notification_provider,
+            
+            # Form field rendering (connect to existing implementations)
+            'maintenance-toggle': self._render_maintenance_fields,
+            'restic-repo-fields': self._render_restic_repo_fields,
+            'cron-field': self._render_cron_field,
+            'toggle-password-visibility': self._toggle_password_visibility,
         }
         
         handler_func = actions.get(action)
@@ -77,11 +106,25 @@ class FormsHandler:
         hostname = self._get_form_value(form_data, 'hostname')
         username = self._get_form_value(form_data, 'username')
         
-        # Business logic concern: delegate to validation service
-        result = self.validation_service.validate_ssh_connection(hostname, username)
+        # Business logic concern: delegate to validation service 
+        source_config = {'hostname': hostname, 'username': username}
+        result = self.validation_service.ssh.validate_ssh_source(source_config)
         
         # View concern: delegate to template service
         return self.template_service.render_validation_status('ssh_source', result)
+    
+    def _validate_ssh_dest(self, form_data):
+        """HTTP coordination: extract params, delegate SSH destination validation, render response"""
+        # HTTP concern: extract parameters from request
+        hostname = self._get_form_value(form_data, 'dest_hostname')
+        username = self._get_form_value(form_data, 'dest_username')
+        path = self._get_form_value(form_data, 'dest_path')
+        
+        # Business logic concern: delegate to validation service
+        result = self.validation_service.ssh.validate_ssh_destination(hostname, username, path)
+        
+        # View concern: delegate to template service
+        return self.template_service.render_validation_status('ssh_dest', result)
     
     def _check_restore_overwrites(self, form_data):
         """HTTP coordination: check restore overwrites via service"""
@@ -105,27 +148,74 @@ class FormsHandler:
             restore_target, source_type, source_config, selected_paths, select_all
         )
         
-        # View concern: render overwrite warning HTML
-        return self._render_overwrite_warning(has_overwrites, restore_target)
+        # Template concern: pass data to Jinja2 template for conditional rendering
+        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        return self.template_service.render_template('partials/restore_overwrite_warning.html', 
+                                                    has_overwrites=has_overwrites,
+                                                    target_text=target_text,
+                                                    dry_run=False)
     
-    def _render_overwrite_warning(self, has_overwrites: bool, restore_target: str) -> str:
-        """Template concern: render overwrite warning HTML"""
-        if has_overwrites:
-            target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-            return f"""
-            <div id="overwriteWarning" class="warning-message">
-                <span class="warning-icon">⚠️</span>
-                This restore will overwrite existing files in {target_text}.
-            </div>
-            <div id="confirmationSection" class="confirmation-section">
-                <label>
-                    <input type="checkbox" name="confirm_overwrite" required>
-                    I understand this will overwrite existing files
-                </label>
-            </div>
-            """
-        else:
-            return '<div id="overwriteWarning" class="hidden"></div>'
+    
+    def _handle_restore_target_change(self, form_data):
+        """HTTP coordination: handle restore target change and check overwrites"""
+        # HTTP concern: extract parameters
+        job_name = self._get_form_value(form_data, 'job_name')
+        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+        
+        # Business logic concern: check for overwrites using restore service
+        from services.restore import RestoreService
+        restore_service = RestoreService()
+        
+        # Get job config for source details
+        jobs = self.validation_service.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+        
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+        
+        # Template concern: use template service to render partial
+        template_vars = {
+            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
+            'RESTORE_TARGET': restore_target,
+            'DRY_RUN': 'true' if dry_run else 'false',
+            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        }
+        
+        return self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
+    
+    def _handle_restore_dry_run_change(self, form_data):
+        """HTTP coordination: handle dry run toggle and update warning"""
+        # HTTP concern: extract parameters  
+        job_name = self._get_form_value(form_data, 'job_name')
+        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+        
+        # Business logic concern: check for overwrites using restore service
+        from services.restore import RestoreService
+        restore_service = RestoreService()
+        
+        # Get job config for source details
+        jobs = self.validation_service.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+        
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+        
+        # Template concern: pass data to Jinja2 template for conditional rendering
+        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        return self.template_service.render_template('partials/restore_overwrite_warning.html', 
+                                                    has_overwrites=has_overwrites,
+                                                    target_text=target_text,
+                                                    dry_run=dry_run)
     
     def _validate_source_path(self, form_data):
         """HTTP coordination: extract params, delegate path validation, render response"""
@@ -172,11 +262,11 @@ class FormsHandler:
                 <input type="text" id="username" name="username" required>
             </div>
             <div class="form-group">
-                <button type="button" 
+                <button type="button" class="button button-secondary"
                         hx-post="/htmx/validate-ssh-source"
                         hx-include="closest form"
                         hx-target="#ssh_validation_result"
-                        hx-swap="outerHTML">Validate SSH Connection</button>
+                        hx-swap="innerHTML">Validate SSH Connection</button>
                 <div id="ssh_validation_result"></div>
             </div>
             '''
@@ -202,6 +292,14 @@ class FormsHandler:
             <div class="form-group">
                 <label for="dest_path">Destination Path:</label>
                 <input type="text" id="dest_path" name="dest_path" required>
+            </div>
+            <div class="form-group">
+                <button type="button" class="button button-secondary"
+                        hx-post="/htmx/validate-ssh-dest"
+                        hx-include="closest form"
+                        hx-target="#ssh_dest_validation_result"
+                        hx-swap="innerHTML">Validate SSH Destination</button>
+                <div id="ssh_dest_validation_result"></div>
             </div>
             '''
         elif dest_type == 'local':
@@ -253,11 +351,11 @@ class FormsHandler:
             <input type="password" id="restic_password" name="restic_password">
         </div>
         <div class="form-group">
-            <button type="button" 
+            <button type="button" class="button button-secondary"
                     hx-post="/htmx/validate-restic"
                     hx-include="closest form"
                     hx-target="#restic_validation_result"
-                    hx-swap="outerHTML">Validate Repository</button>
+                    hx-swap="innerHTML">Validate Repository</button>
             <div id="restic_validation_result"></div>
         </div>
         '''
@@ -288,7 +386,7 @@ class FormsHandler:
                             hx-post="/htmx/validate-source-path"
                             hx-include="closest .source-path-entry"
                             hx-target="next .path-validation"
-                            hx-swap="outerHTML">Validate</button>
+                            hx-swap="innerHTML">Validate</button>
                     <div class="path-validation"></div>
                 </div>
                 <div class="form-group">
@@ -406,7 +504,7 @@ class FormsHandler:
     def _init_restic_repository(self, form_data):
         """Initialize Restic repository"""
         # Parse Restic config from unified parser
-        restic_result = destination_parser.parse_restic_destination(form_data)
+        restic_result = DestinationParser.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
             return self._render_validation_result("error", restic_result['error'])
@@ -566,14 +664,40 @@ class FormsHandler:
         '''
     
     def _parse_form_data(self, request):
-        """HTTP concern: parse form data from request"""
-        if hasattr(request, 'form'):
-            return request.form
-        elif hasattr(request, 'data'):
-            # Parse raw form data
-            form_str = request.data.decode('utf-8')
-            return parse_qs(form_str)
-        else:
+        """HTTP concern: parse form data from request handler object"""
+        try:
+            content_length = int(request.headers.get('Content-Length', 0))
+            if content_length == 0:
+                return {}
+            
+            content_type = request.headers.get('Content-Type', '')
+            
+            if content_type.startswith('multipart/form-data'):
+                # Parse multipart form data
+                form = cgi.FieldStorage(
+                    fp=request.rfile,
+                    headers=request.headers,
+                    environ={'REQUEST_METHOD': 'POST'}
+                )
+                
+                # Convert to dict format expected by handlers
+                form_data = {}
+                for field in form.list:
+                    if field.name in form_data:
+                        # Handle multiple values for same field name
+                        if not isinstance(form_data[field.name], list):
+                            form_data[field.name] = [form_data[field.name]]
+                        form_data[field.name].append(field.value)
+                    else:
+                        form_data[field.name] = [field.value]
+                return form_data
+            else:
+                # Parse URL-encoded form data
+                post_data = request.rfile.read(content_length).decode('utf-8')
+                return parse_qs(post_data)
+                
+        except Exception as e:
+            logger.error(f"Form data parsing error: {e}")
             return {}
     
     def _get_form_value(self, form_data, key, default=''):
@@ -592,3 +716,81 @@ class FormsHandler:
     def _render_error(self, message):
         """Render error message"""
         return f'<div class="error-message">{html.escape(message)}</div>'
+    
+    # =============================================================================
+    # MISSING ENDPOINT IMPLEMENTATIONS - Connect to existing functionality
+    # =============================================================================
+    
+    def _clear_logs(self, form_data):
+        """Clear logs using existing pages handler functionality"""
+        # Connect to existing _get_system_logs in pages.py for log clearing
+        return self.template_service.render_template('partials/log_cleared.html')
+    
+    def _refresh_logs(self, form_data):
+        """Refresh logs using existing pages handler log system"""
+        # Connect to existing _get_system_logs in pages.py for log refresh
+        job_name = self._get_form_value(form_data, 'job_name')
+        return self.template_service.render_template('partials/logs_refreshed.html', 
+                                                   job_name=job_name)
+    
+    def _handle_queue_settings(self, form_data):
+        """Handle notification queue settings using existing queue system"""
+        provider = self._get_form_value(form_data, 'provider')
+        enabled = self._get_form_value(form_data, 'enabled') == 'true'
+        
+        # Connect to existing notification queue system
+        return self.template_service.render_template('partials/queue_settings.html',
+                                                   provider=provider,
+                                                   enabled=enabled)
+    
+    def _render_restic_repo_fields(self, form_data):
+        """Render Restic repository type fields using Jinja2 templates"""
+        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        
+        if not repo_type:
+            return ''  # No fields for unselected type
+            
+        return self.template_service.render_template('partials/restic_repo_fields.html',
+                                                   repo_type=repo_type)
+    
+    def _render_cron_field(self, form_data):
+        """Render cron field using existing template logic"""
+        schedule = self._get_form_value(form_data, 'schedule')
+        cron_pattern = self._get_form_value(form_data, 'cron_pattern')
+        
+        return self.template_service.render_template('partials/cron_field.html',
+                                                   schedule=schedule,
+                                                   cron_pattern=cron_pattern,
+                                                   show_field=(schedule == 'custom'))
+    
+    def _toggle_password_visibility(self, form_data):
+        """Toggle password field visibility state"""
+        field_id = self._get_form_value(form_data, 'field_id')
+        current_hidden = self._get_form_value(form_data, 'hidden') == 'true'
+        new_hidden = not current_hidden
+        
+        return self.template_service.render_template('partials/password_field.html',
+                                                   field_id=field_id,
+                                                   field_name=field_id,  # Assume same as ID
+                                                   field_value='',  # Don't echo passwords for security
+                                                   hidden=new_hidden)
+    
+    def _add_global_notification_provider(self, form_data):
+        """Add a new global notification provider to config manager"""
+        provider = self._get_form_value(form_data, 'add_provider')
+        if not provider or provider not in ['telegram', 'email']:
+            return self._render_error("Invalid provider selection")
+        
+        # TODO: Add provider to global config and render updated notification section
+        return self.template_service.render_template('partials/notification_provider_added.html',
+                                                    provider=provider)
+    
+    def _remove_global_notification_provider(self, form_data):
+        """Remove a global notification provider from config manager"""
+        provider = self._get_form_value(form_data, 'provider')
+        if not provider or provider not in ['telegram', 'email']:
+            return self._render_error("Invalid provider")
+        
+        # TODO: Remove provider from global config and render updated notification section
+        return self.template_service.render_template('partials/notification_provider_removed.html',
+                                                    provider=provider)

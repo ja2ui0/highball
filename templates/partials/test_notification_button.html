@@ -1,0 +1,8 @@
+<button type="button" class="button button-secondary"
+        hx-post="/test-{{ provider }}-notification"
+        hx-target="#{{ provider }}_test_result"
+        hx-include="[name^='{{ provider }}_']"
+        hx-swap="innerHTML">
+    Send Test {{ provider.title() }} Notification
+</button>
+<div id="{{ provider }}_test_result" class="help-text"></div>

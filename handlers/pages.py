@@ -46,15 +46,21 @@ class PagesHandler:
             
             job_list = []
             for job_name, job_config in jobs.items():
-                status_info = job_management.get_status(job_name)
+                # Use enabled/disabled status like original, not execution status
+                enabled = job_config.get('enabled', True)
+                status = "enabled" if enabled else "disabled"
+                status_class = "enabled" if enabled else "disabled"
+                
+                # Build display strings with type prefixes like original
+                source_display = self._build_source_display_with_type(job_config)
+                dest_display = self._build_dest_display_with_type(job_config)
                 
                 job_display = {
                     'name': job_name,
-                    'config': job_config,
-                    'status': status_info.get('status', 'unknown'),
-                    'last_run': status_info.get('last_run'),
-                    'last_duration': status_info.get('duration'),
-                    'enabled': job_config.get('enabled', True),
+                    'source_display': source_display,
+                    'dest_display': dest_display,
+                    'status': status.capitalize(),
+                    'status_class': status_class,
                     'schedule': job_config.get('schedule', 'manual')
                 }
                 job_list.append(job_display)
@@ -62,8 +68,12 @@ class PagesHandler:
             # Sort jobs by name
             job_list.sort(key=lambda j: j['name'])
             
+            # Get deleted jobs - pass data to template, not rendered HTML
+            deleted_jobs = self.backup_config.config.get('deleted_jobs', {})
+            
             template_data = {
                 'jobs': job_list,
+                'deleted_jobs': deleted_jobs,
                 'global_settings': global_settings,
                 'page_title': 'Dashboard'
             }
@@ -287,14 +297,18 @@ class PagesHandler:
             from services.management import JobManagementService
             job_management = JobManagementService(self.backup_config)
             status_info = job_management.get_status(job_name)
-            recent_logs = job_management.get_log_entries(job_name, limit=50)
+            recent_logs = job_management.get_log_entries(job_name, max_lines=100)
+            
+            # Format log content as string
+            job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
             
             template_data = {
                 'job_name': job_name,
-                'job_config': job_config,
-                'status_info': status_info,
-                'recent_logs': recent_logs,
-                'page_title': f'Inspect: {job_name}'
+                'job_type': job_config.get('dest_type', 'unknown'),
+                'last_run': status_info.get('last_updated', 'Never'), 
+                'status': status_info.get('status', 'No runs'),
+                'message': status_info.get('details', 'No message'),
+                'job_log_content': job_log_content
             }
             
             html = self.template_service.render_template('pages/job_inspect.html', **template_data)
@@ -504,20 +518,83 @@ class PagesHandler:
         request_handler.send_header('Location', location)
         request_handler.end_headers()
     
+    
+    def _build_source_display_with_type(self, job_config):
+        """Build source display string with type prefix like original"""
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'unknown')
+        
+        if source_type == 'ssh':
+            username = source_config.get('username', '')
+            hostname = source_config.get('hostname', '')
+            source_paths = source_config.get('source_paths', [])
+            
+            # Format like original: SSH: with connection info and indented paths
+            connection = f"{username}@{hostname}:"
+            if source_paths:
+                path_lines = []
+                for path_config in source_paths:
+                    path = path_config.get('path', '')
+                    path_lines.append(f"  {path}")
+                path_display = connection + "\n" + "\n".join(path_lines)
+            else:
+                path_display = connection
+            return f"SSH:\n{path_display}"
+            
+        elif source_type == 'local':
+            source_paths = source_config.get('source_paths', [])
+            if source_paths:
+                path_lines = []
+                for path_config in source_paths:
+                    path = path_config.get('path', '')
+                    path_lines.append(f"  {path}")
+                path_display = "\n".join(path_lines)
+            else:
+                path_display = "Unknown"
+            return f"Local:\n{path_display}"
+        else:
+            return source_type
+    
+    def _build_dest_display_with_type(self, job_config):
+        """Build destination display string with type prefix like original"""
+        dest_config = job_config.get('dest_config', {})
+        dest_type = job_config.get('dest_type', 'unknown')
+        
+        if dest_type == 'ssh':
+            username = dest_config.get('username', '')
+            hostname = dest_config.get('hostname', '')
+            path = dest_config.get('path', '')
+            return f"SSH:\n{username}@{hostname}:{path}"
+        elif dest_type == 'local':
+            path = dest_config.get('path', 'Unknown')
+            return f"Local:\n{path}"
+        elif dest_type == 'rsyncd':
+            hostname = dest_config.get('hostname', 'unknown')
+            share = dest_config.get('share', 'unknown')
+            return f"rsyncd:\nrsync://{hostname}/{share}"
+        elif dest_type == 'restic':
+            repo_uri = dest_config.get('repo_uri', dest_config.get('dest_string', 'unknown'))
+            return f"Restic:\n{repo_uri}"
+        else:
+            return dest_type
+    
+    def _get_status_css_class(self, status):
+        """Get CSS class for job status"""
+        if status == 'completed':
+            return 'status-success'
+        elif status == 'failed':
+            return 'status-error'
+        elif status == 'running':
+            return 'status-warning'
+        else:
+            return 'status-info'
+    
     def _send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response"""
+        """Send error response using template partial"""
         request_handler.send_response(status_code)
         request_handler.send_header('Content-type', 'text/html')
         request_handler.end_headers()
         
-        error_html = f"""
-        <html>
-        <head><title>Error</title></head>
-        <body>
-            <h1>Error</h1>
-            <p>{message}</p>
-            <a href="/dashboard">Return to Dashboard</a>
-        </body>
-        </html>
-        """
+        error_html = self.template_service.render_template('partials/error_page.html', 
+                                                          error_message=message)
         request_handler.wfile.write(error_html.encode())

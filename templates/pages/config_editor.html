@@ -3,7 +3,7 @@
 <head>
     <title>Config Editor - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/nav.js"></script>
 </head>
 <body>
@@ -20,7 +20,7 @@
         <form method="post" action="/save-config/raw" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="config_text">Configuration (YAML format):</label>
-                <textarea id="config_text" name="config_text" class="textarea-config">{{CONFIG_TEXT}}</textarea>
+                <textarea id="config_text" name="config_text" class="textarea-config">{{ config_text }}</textarea>
             </div>
             
             <input type="submit" value="Save Configuration" class="button button-success">

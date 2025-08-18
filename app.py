@@ -160,7 +160,14 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         url_parts = urlparse(self.path)
         path = url_parts.path
 
-        # Read form data - support both multipart and URL-encoded
+        # HTMX routes handle their own form parsing (thin orchestrator)
+        if path.startswith('/htmx/'):
+            action = path[6:]  # Remove '/htmx/' prefix
+            html = self._handlers['forms'].handle_htmx_request(self, action)
+            self._send_htmx_response(html)
+            return
+
+        # Read form data for non-HTMX endpoints - support both multipart and URL-encoded
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             
@@ -215,12 +222,6 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/initialize-restic-repo':
                 self._handlers['api'].initialize_restic_repo(self, form_data)
             
-            # Unified HTMX handler - single dispatch route
-            elif path.startswith('/htmx/'):
-                action = path[6:]  # Remove '/htmx/' prefix
-                html = self._handlers['forms'].handle_htmx_request(self, action)
-                self._send_htmx_response(html)
-                return
             elif path == '/save-config':
                 self._handlers['pages'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':

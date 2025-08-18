@@ -1,0 +1,10 @@
+<tr>
+    <td><strong>{{ job_name }}</strong></td>
+    <td class="source-path">{{ source_path }}</td>
+    <td>Deleted</td>
+    <td>{{ deleted_at }}</td>
+    <td class="action-buttons">
+        <a href="/restore-job?name={{ job_name }}" class="button button-success">Restore</a>
+        <a href="/purge-job?name={{ job_name }}" class="button button-danger">Purge</a>
+    </td>
+</tr>

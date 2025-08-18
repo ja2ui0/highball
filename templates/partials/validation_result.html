@@ -1,0 +1,27 @@
+{% if result.valid %}
+<div class="validation-result success">
+    <span class="status">[✓]</span> {{ result.message or "Valid" }}
+    {% if details %}
+    <div class="status-details">
+        {% for detail in details %}{{ detail }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
+    {% if result.container_runtime %}
+    <input type="hidden" name="container_runtime" value="{{ result.container_runtime }}">
+    {% endif %}
+</div>
+{% else %}
+<div class="validation-result error">
+    {% if details and result.ssh_status == 'OK' %}
+    <div class="status-details">
+        {% for detail in details %}{{ detail }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
+    <span class="status">[✗]</span> {{ result.error or "Validation failed" }}
+    {% if details and result.ssh_status != 'OK' %}
+    <div class="status-details">
+        {% for detail in details %}{{ detail }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}

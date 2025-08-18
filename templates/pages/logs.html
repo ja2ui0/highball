@@ -3,7 +3,7 @@
 <head>
     <title>Inspect System - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/network-scan.js"></script>
@@ -30,12 +30,12 @@
             </div>
         </div>
         
-        {{INCLUDE:restic_browser.html}}
+        {% include 'partials/restic_browser.html' %}
         
         <!-- Log Sources Container -->
         <div class="section-container">
             <h2 class="section-header">Log Sources</h2>
-            {{LOG_BUTTONS}}
+            {{ log_buttons }}
             
             <div class="log-section">
                 <label for="jobSelect">Job Logs:</label>
@@ -46,23 +46,15 @@
                         hx-swap="innerHTML"
                         hx-vals="js:{job: event.target.value || ''}"
                         name="job">
-                    {{JOB_DROPDOWN}}
+                    {{ job_dropdown }}
                 </select>
             </div>
             
-            <div class="log-section">
-                <button class="button" 
-                        hx-get="/logs" 
-                        hx-target="#logContent" 
-                        hx-swap="innerHTML">Refresh</button>
-                <button class="button button-warning" 
-                        hx-post="/htmx/clear-logs" 
-                        hx-target="#logContent" 
-                        hx-swap="outerHTML">Clear Display</button>
-            </div>
+            {% set refresh_endpoint = '/logs' %}
+            {% include 'partials/log_controls.html' %}
             
-            <h3>{{LOG_NAME}}</h3>
-            <div id="logContent" class="log-viewer">{{LOG_CONTENT}}</div>
+            <h3>{{ log_name }}</h3>
+            <div id="logContent" class="log-viewer">{{ log_content }}</div>
         </div>
     </div>
 </body>

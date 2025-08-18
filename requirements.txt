@@ -3,3 +3,4 @@ apscheduler
 validators
 croniter
 notifiers
+Jinja2

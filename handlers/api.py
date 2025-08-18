@@ -213,10 +213,11 @@ class APIHandler:
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
             
-            # List snapshots with job filter
+            # Pass source_config to backup_service so it can handle SSH execution
             filters = {'job_name': job_name}
-            result = backup_service.list_snapshots(dest_config, filters)
+            result = backup_service.list_snapshots(dest_config, filters, source_config)
             
             self._send_json_response(request_handler, result)
             
@@ -247,38 +248,11 @@ class APIHandler:
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
             
-            # Get snapshot details via restic stats command
-            try:
-                import os
-                env = os.environ.copy()
-                env['RESTIC_PASSWORD'] = dest_config['password']
-                
-                cmd = ['restic', '-r', dest_config['repo_uri'], 'stats', snapshot_id, '--json']
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
-                
-                if result.returncode == 0:
-                    stats_data = json.loads(result.stdout)
-                    self._send_json_response(request_handler, {
-                        'success': True,
-                        'stats': stats_data
-                    })
-                else:
-                    self._send_json_response(request_handler, {
-                        'success': False,
-                        'error': f'Stats command failed: {result.stderr}'
-                    })
-                    
-            except subprocess.TimeoutExpired:
-                self._send_json_response(request_handler, {
-                    'success': False,
-                    'error': 'Stats command timeout'
-                })
-            except json.JSONDecodeError:
-                self._send_json_response(request_handler, {
-                    'success': False,
-                    'error': 'Invalid stats data returned'
-                })
+            # Use unified backup service for snapshot statistics
+            result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
+            self._send_json_response(request_handler, result)
             
         except Exception as e:
             logger.error(f"Snapshot stats error: {e}")
@@ -307,43 +281,11 @@ class APIHandler:
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
             
-            # Browse snapshot contents
-            try:
-                import os
-                env = os.environ.copy()
-                env['RESTIC_PASSWORD'] = dest_config['password']
-                
-                cmd = ['restic', '-r', dest_config['repo_uri'], 'ls', snapshot_id, path]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
-                
-                if result.returncode == 0:
-                    # Parse directory listing
-                    entries = []
-                    for line in result.stdout.strip().split('\n'):
-                        if line.strip():
-                            entries.append({
-                                'name': os.path.basename(line),
-                                'path': line,
-                                'type': 'directory' if line.endswith('/') else 'file'
-                            })
-                    
-                    self._send_json_response(request_handler, {
-                        'success': True,
-                        'path': path,
-                        'entries': entries
-                    })
-                else:
-                    self._send_json_response(request_handler, {
-                        'success': False,
-                        'error': f'Browse command failed: {result.stderr}'
-                    })
-                    
-            except subprocess.TimeoutExpired:
-                self._send_json_response(request_handler, {
-                    'success': False,
-                    'error': 'Browse command timeout'
-                })
+            # Use unified backup service for directory browsing
+            result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
+            self._send_json_response(request_handler, result)
             
         except Exception as e:
             logger.error(f"Directory browse error: {e}")

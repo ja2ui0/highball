@@ -1,17 +1,17 @@
             <div id="notifications_container">
                 <div id="notification_providers">
                     <!-- Existing notification providers will be populated here for edit mode -->
-                    {{EXISTING_NOTIFICATION_PROVIDERS_HTML}}
+                    {{ existing_notification_providers_html | safe }}
                 </div>
                 
-                <div id="add_provider_section" class="form-group {{ADD_PROVIDER_CLASS}}">
+                <div id="add_provider_section" class="form-group {{ add_provider_class }}">
                     <label for="add_notification_provider">Add Notification Provider:</label>
                     <select id="add_notification_provider"
                             hx-post="/htmx/add-notification-provider"
                             hx-trigger="change[target.value != '']"
                             hx-vals="js:{provider: event.target.value}">
                         <option value="">Select a provider...</option>
-                        {{AVAILABLE_PROVIDERS_OPTIONS}}
+                        {{ available_providers_options | safe }}
                     </select>
                     <div class="help-text">Configure notifications for this job using globally configured providers</div>
                 </div>

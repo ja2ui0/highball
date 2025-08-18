@@ -5,14 +5,14 @@
                         hx-target="#dest_fields" 
                         hx-include="this">
                     <option value="">Select destination...</option>
-                    <option value="local" {{DEST_LOCAL_SELECTED}}>Local Path</option>
-                    <option value="ssh" {{DEST_SSH_SELECTED}}>SSH Remote</option>
-                    <option value="rsyncd" {{DEST_RSYNCD_SELECTED}}>Rsync Daemon</option>
-                    {{RESTIC_OPTION}}
+                    <option value="local" {% if dest_local_selected %}selected{% endif %}>Local Path</option>
+                    <option value="ssh" {% if dest_ssh_selected %}selected{% endif %}>SSH Remote</option>
+                    <option value="rsyncd" {% if dest_rsyncd_selected %}selected{% endif %}>Rsync Daemon</option>
+                    {{ restic_option | safe }}
                 </select>
             </div>
             
             <div id="dest_fields">
                 <!-- HTMX will populate this based on dest_type selection -->
-                {{DEST_FIELDS_HTML}}
+                {{ dest_fields_html | safe }}
             </div>

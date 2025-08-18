@@ -1,0 +1,15 @@
+<tr>
+    <td>{{ job_name }}</td>
+    <td class="source-path">{{ source_display }}</td>
+    <td class="source-path">{{ dest_display }}</td>
+    <td class="{{ status_class }}">{{ status_text }}</td>
+    <td>{{ schedule }}</td>
+    <td><a href="/inspect?name={{ job_name }}" class="button">Inspect</a></td>
+    <td>
+        <div class="action-buttons">
+            <a href="/edit-job?name={{ job_name }}" class="button">Edit</a>
+            <a href="/run-backup?name={{ job_name }}" class="button">Run</a>
+            <a href="/delete-job?name={{ job_name }}" class="button button-danger">Delete</a>
+        </div>
+    </td>
+</tr>

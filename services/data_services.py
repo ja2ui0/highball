@@ -15,6 +15,62 @@ from services.execution import ExecutionService
 class JobFormDataBuilder:
     """Form data building - ONLY handles JobFormData creation from various sources"""
     
+    def build_empty_form_data(self) -> Dict[str, Any]:
+        """Building concern: create empty form data for new job creation"""
+        return {
+            'job_name': '',
+            'source_type': 'local',
+            'dest_type': 'local',
+            'schedule': 'manual',
+            'enabled': True,
+            'respect_conflicts': True,
+            'auto_maintenance': True,
+            'source_config': {},
+            'dest_config': {},
+            'restic_config': {},
+            'notifications': [],
+            'page_title': 'Add Backup Job',
+            'form_mode': 'add'
+        }
+    
+    def build_form_data_from_job(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Building concern: create form data from existing job for editing"""
+        form_data = self.from_job_config(job_name, job_config)
+        return {
+            'job_name': job_name,
+            'source_type': job_config.get('source_type', 'local'),
+            'dest_type': job_config.get('dest_type', 'local'),
+            'schedule': job_config.get('schedule', 'manual'),
+            'enabled': job_config.get('enabled', True),
+            'respect_conflicts': job_config.get('respect_conflicts', True),
+            'auto_maintenance': job_config.get('auto_maintenance', True),
+            'source_config': job_config.get('source_config', {}),
+            'dest_config': job_config.get('dest_config', {}),
+            'restic_config': self._build_restic_config(job_config.get('dest_type'), job_config.get('dest_config', {})),
+            'notifications': job_config.get('notifications', []),
+            'page_title': f'Edit Job: {job_name}',
+            'form_mode': 'edit'
+        }
+    
+    def build_form_data_with_error(self, form_data: Dict[str, Any], error_message: str) -> Dict[str, Any]:
+        """Building concern: create form data preserving user input with error message"""
+        return {
+            'job_name': form_data.get('job_name', [''])[0],
+            'source_type': form_data.get('source_type', ['local'])[0],
+            'dest_type': form_data.get('dest_type', ['local'])[0],
+            'schedule': form_data.get('schedule', ['manual'])[0],
+            'enabled': 'enabled' in form_data,
+            'respect_conflicts': form_data.get('respect_conflicts', ['on'])[0] == 'on',
+            'auto_maintenance': form_data.get('auto_maintenance', ['on'])[0] == 'on',
+            'source_config': {},
+            'dest_config': {},
+            'restic_config': {},
+            'notifications': [],
+            'error_message': error_message,
+            'page_title': 'Job Configuration Error',
+            'form_mode': 'error'
+        }
+    
     @classmethod
     def from_job_config(cls, job_name: str, job_config: Dict[str, Any]) -> JobFormData:
         """Building concern: create JobFormData from existing job configuration"""

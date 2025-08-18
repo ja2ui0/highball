@@ -3,7 +3,7 @@
 <head>
     <title>Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/nav.js"></script>
 </head>
 <body>
@@ -12,8 +12,9 @@
         
         <h1>Highball Dashboard</h1>
         
-        {{CONFIG_WARNING}}
-        
+        {% if config_warning %}
+        {{ config_warning | safe }}
+        {% endif %}
         
         <h2>Backup Jobs</h2>
         <table class="job-table">
@@ -26,7 +27,11 @@
                 <th>Inspect</th>
                 <th>Actions</th>
             </tr>
-            {{JOB_ROWS}}
+            {% if job_rows %}
+            {{ job_rows | safe }}
+            {% else %}
+            {% include 'partials/empty_job_rows.html' %}
+            {% endif %}
         </table>
         
         <p style="margin-top: 20px;">
@@ -42,7 +47,11 @@
                 <th>Deleted At</th>
                 <th>Actions</th>
             </tr>
-            {{DELETED_ROWS}}
+            {% if deleted_job_rows %}
+            {{ deleted_job_rows | safe }}
+            {% else %}
+            {% include 'partials/empty_deleted_rows.html' %}
+            {% endif %}
         </table>
         
         <p style="margin-top: 10px; color: #888; font-size: 14px;">

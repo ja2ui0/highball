@@ -108,21 +108,27 @@ class SSHValidator:
                 self._cache_result(cache_key, result)
                 return result
             
-            # Test rsync availability
+            # Test rsync availability and get version
             rsync_test = self._test_rsync_availability(hostname, username)
             
-            # Detect container runtime
-            container_runtime = self._detect_container_runtime(hostname, username)
+            # Test container runtimes and get versions
+            podman_test = self._test_container_runtime(hostname, username, 'podman')
+            docker_test = self._test_container_runtime(hostname, username, 'docker')
             
-            # Test path permissions (basic home directory test)
-            path_permissions = self._test_path_permissions(hostname, username, "~")
+            # Determine preferred container runtime
+            container_runtime = None
+            if podman_test['success']:
+                container_runtime = 'podman'
+            elif docker_test['success']:
+                container_runtime = 'docker'
             
             result = {
                 'valid': True,
                 'ssh_status': 'OK',
-                'rsync_status': 'OK' if rsync_test['success'] else 'MISSING',
+                'rsync_status': rsync_test.get('version', 'Available') if rsync_test['success'] else rsync_test.get('error', 'Not found'),
+                'podman_status': podman_test.get('version', 'Available') if podman_test['success'] else podman_test.get('error', 'Not found'), 
+                'docker_status': docker_test.get('version', 'Available') if docker_test['success'] else docker_test.get('error', 'Not found'),
                 'container_runtime': container_runtime,
-                'path_permissions': path_permissions,
                 'tested_at': datetime.now().isoformat()
             }
             
@@ -132,6 +138,55 @@ class SSHValidator:
         except Exception as e:
             logger.error(f"SSH validation error for {hostname}: {e}")
             result = {'valid': False, 'error': f'SSH validation failed: {str(e)}'}
+            self._cache_result(cache_key, result)
+            return result
+    
+    def validate_ssh_destination(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
+        """Validate SSH destination with path permissions (no binary version checking)"""
+        if not hostname or not username or not path:
+            return {'valid': False, 'error': 'Hostname, username, and path are required'}
+        
+        # Check cache first
+        cache_key = f"ssh_dest:{username}@{hostname}:{path}"
+        cached_result = self._get_cached_result(cache_key)
+        if cached_result:
+            return cached_result
+        
+        try:
+            # Test basic SSH connectivity
+            ssh_test = self._test_ssh_connection(hostname, username)
+            if not ssh_test['success']:
+                result = {'valid': False, 'error': ssh_test['error']}
+                self._cache_result(cache_key, result)
+                return result
+            
+            # Test if path exists
+            path_exists = self._test_path_exists(hostname, username, path)
+            if not path_exists['success']:
+                result = {
+                    'valid': False, 
+                    'error': path_exists['error'],
+                    'ssh_status': 'OK'  # Include SSH success details even when path fails
+                }
+                self._cache_result(cache_key, result)
+                return result
+            
+            # Test path permissions
+            path_permissions = self._test_path_permissions(hostname, username, path)
+            
+            result = {
+                'valid': True,
+                'ssh_status': 'OK',
+                'path_status': 'Exists',
+                'path_permissions': path_permissions,
+                'tested_at': datetime.now().isoformat()
+            }
+            
+            self._cache_result(cache_key, result)
+            return result
+            
+        except Exception as e:
+            result = {'valid': False, 'error': f'SSH destination validation failed: {str(e)}'}
             self._cache_result(cache_key, result)
             return result
     
@@ -151,30 +206,83 @@ class SSHValidator:
             return {'success': False, 'error': f'SSH test failed: {str(e)}'}
     
     def _test_rsync_availability(self, hostname: str, username: str) -> Dict[str, Any]:
-        """Test if rsync is available on remote host"""
+        """Test rsync availability and get version on remote host"""
         try:
-            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', 'which rsync']
+            cmd = ['ssh'] + self.config.to_ssh_args() + [
+                f'{username}@{hostname}',
+                'rsync --version 2>/dev/null | head -1 || echo "RSYNC_MISSING"'
+            ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
             
-            return {'success': result.returncode == 0}
-        except Exception:
-            return {'success': False}
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if 'rsync' in output.lower() and 'version' in output.lower():
+                    # Extract just the version info for cleaner display
+                    version_line = output.split('\n')[0].strip()
+                    return {'success': True, 'version': version_line}
+                elif 'RSYNC_MISSING' in output:
+                    return {'success': False, 'error': 'Not found'}
+                else:
+                    return {'success': False, 'error': 'Unexpected output'}
+            else:
+                return {'success': False, 'error': 'Command failed'}
+        except Exception as e:
+            return {'success': False, 'error': f'Test error: {str(e)}'}
+    
+    def _test_container_runtime(self, hostname: str, username: str, runtime: str) -> Dict[str, Any]:
+        """Test container runtime (podman/docker) availability and get version"""
+        try:
+            cmd = ['ssh'] + self.config.to_ssh_args() + [
+                f'{username}@{hostname}',
+                f'{runtime} --version 2>/dev/null || echo "{runtime.upper()}_MISSING"'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
+            
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if f'{runtime} version' in output.lower() or f'{runtime} (podman)' in output.lower():
+                    # Clean up version string - remove trailing commas and extra text
+                    parts = output.split()
+                    if len(parts) >= 3:
+                        version_str = f'{parts[0]} {parts[2].rstrip(",")}'
+                    else:
+                        version_str = parts[0] if parts else runtime
+                    return {'success': True, 'version': version_str}
+                elif f'{runtime.upper()}_MISSING' in output:
+                    return {'success': False, 'error': 'Not found'}
+                else:
+                    return {'success': False, 'error': 'Unexpected output'}
+            else:
+                return {'success': False, 'error': 'Command failed'}
+        except Exception as e:
+            return {'success': False, 'error': f'Test error: {str(e)}'}
     
     def _detect_container_runtime(self, hostname: str, username: str) -> Optional[str]:
-        """Detect available container runtime (docker/podman)"""
+        """Detect available container runtime (docker/podman) - returns preferred runtime only"""
         runtimes = ['podman', 'docker']  # Prefer podman over docker
         
         for runtime in runtimes:
-            try:
-                cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', f'which {runtime}']
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
-                
-                if result.returncode == 0:
-                    return runtime
-            except Exception:
-                continue
+            result = self._test_container_runtime(hostname, username, runtime)
+            if result['success']:
+                return runtime
         
         return None
+    
+    def _test_path_exists(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
+        """Test if remote path exists and is accessible for backup/restore operations"""
+        try:
+            # Test if path exists and is readable (for backup)
+            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', f'test -r "{path}"']
+            result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+            
+            if result.returncode == 0:
+                return {'success': True}
+            else:
+                return {'success': False, 'error': 'Path does not exist or cannot be read'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'Path test error: {str(e)}'}
     
     def _test_path_permissions(self, hostname: str, username: str, path: str) -> str:
         """Test path permissions (RO vs RWX)"""
@@ -509,17 +617,6 @@ class ValidationService:
         self.source_path = SourcePathValidator()
         self.job = JobValidator()
     
-    def validate_ssh_connection(self, hostname: str, username: str) -> Dict[str, Any]:
-        """Validation concern: validate SSH connection parameters and connectivity"""
-        if not hostname or not username:
-            return {'valid': False, 'error': 'Hostname and username are required'}
-        
-        source_config = {'hostname': hostname, 'username': username}
-        return self.ssh.validate_ssh_source(source_config)
-    
-    def validate_ssh_source(self, source_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate SSH source configuration"""
-        return self.ssh.validate_ssh_source(source_config)
     
     def validate_restic_config(self, repo_type: str, repo_uri: str, password: str) -> Dict[str, Any]:
         """Validation concern: validate Restic configuration parameters"""

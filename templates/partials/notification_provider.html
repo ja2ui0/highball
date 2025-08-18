@@ -1,0 +1,111 @@
+<div class="path-group">
+    <h3 class="path-header">
+        <span>{{ provider.title() }} Notifications</span>
+    </h3>
+    
+    {% if provider == 'telegram' %}
+    <div class="form-group">
+        <label for="telegram_token">Bot Token:</label>
+        <input type="text" id="telegram_token" name="telegram_token" 
+               value="{{ config.token }}" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+        <div class="help-text">Get from @BotFather on Telegram</div>
+    </div>
+    
+    <div class="form-group">
+        <label for="telegram_chat_id">Chat ID:</label>
+        <input type="text" id="telegram_chat_id" name="telegram_chat_id" 
+               value="{{ config.chat_id }}" placeholder="-1001234567890">
+        <div class="help-text">Chat or group ID where notifications will be sent</div>
+    </div>
+    
+    {% elif provider == 'email' %}
+    <h4>SMTP Configuration</h4>
+    <div class="form-group">
+        <label for="email_smtp_server">SMTP Server:</label>
+        <input type="text" id="email_smtp_server" name="email_smtp_server" 
+               value="{{ config.smtp_server }}" placeholder="smtp.gmail.com">
+    </div>
+    
+    <div class="form-group">
+        <label for="email_smtp_port">SMTP Port:</label>
+        <input type="number" id="email_smtp_port" name="email_smtp_port" 
+               value="{{ config.smtp_port }}" placeholder="587">
+        <div class="help-text">587 for TLS, 465 for SSL, 25 for plain</div>
+    </div>
+    
+    <div class="form-group">
+        <label>Encryption:</label>
+        <div class="flex-row">
+            <label>
+                <input type="radio" name="email_encryption" value="tls" {% if config.use_tls %}checked{% endif %}> TLS
+            </label>
+            <label>
+                <input type="radio" name="email_encryption" value="ssl" {% if config.use_ssl %}checked{% endif %}> SSL
+            </label>
+            <label>
+                <input type="radio" name="email_encryption" value="none" {% if not config.use_tls and not config.use_ssl %}checked{% endif %}> None
+            </label>
+        </div>
+        <div class="help-text">Choose one encryption method</div>
+    </div>
+    
+    <div class="form-group">
+        <label for="email_from">From Email:</label>
+        <input type="email" id="email_from" name="email_from" 
+               value="{{ config.from_email }}" placeholder="backup@yourcompany.com">
+    </div>
+    
+    <div class="form-group">
+        <label for="email_to">To Email:</label>
+        <input type="email" id="email_to" name="email_to" 
+               value="{{ config.to_email }}" placeholder="admin@yourcompany.com">
+    </div>
+    
+    <div class="form-group">
+        <label for="email_username">SMTP Username:</label>
+        <input type="text" id="email_username" name="email_username" 
+               value="{{ config.username }}" placeholder="your.email@gmail.com">
+        <div class="help-text">Usually your email address</div>
+    </div>
+    
+    <div class="form-group">
+        <label for="email_password">SMTP Password:</label>
+        {% set field_id = 'email_password' %}
+        {% set field_name = 'email_password' %}
+        {% set field_value = config.password %}
+        {% set placeholder = 'your-app-password' %}
+        {% set hidden = true %}
+        {% include 'partials/password_field.html' %}
+        <div class="help-text">Use app password for Gmail</div>
+    </div>
+    {% endif %}
+    
+    <h4>Queue Settings</h4>
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="{{ provider }}_queue_enabled" {% if config.queue_enabled %}checked{% endif %}> 
+            Enable notification queueing
+        </label>
+        <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
+    </div>
+    
+    <div class="form-group">
+        <label for="{{ provider }}_queue_interval">Minimum time between messages (minutes):</label>
+        <input type="number" id="{{ provider }}_queue_interval" name="{{ provider }}_queue_interval" 
+               value="{{ config.queue_interval_minutes }}" placeholder="{% if provider == 'telegram' %}5{% else %}15{% endif %}" min="1" max="1440">
+        <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
+    </div>
+    
+    <div class="form-group">
+        {% set provider = provider %}
+        {% include 'partials/test_notification_button.html' %}
+        <button type="button" class="button button-danger" 
+                hx-post="/htmx/remove-global-notification-provider"
+                hx-vals='{"provider": "{{ provider }}"}'
+                hx-target="#notification-providers"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to remove {{ provider.title() }} notifications? This will delete all configuration.">
+            Remove {{ provider.title() }} Provider
+        </button>
+    </div>
+</div>

@@ -1,0 +1,11 @@
+{% if enabled %}
+<div id="{{ provider }}QueueSettings" class="queue-settings-enabled">
+    <label for="{{ provider }}_queue_interval">Minimum time between messages (minutes):</label>
+    <input type="number" id="{{ provider }}_queue_interval" name="{{ provider }}_queue_interval" 
+           value="{{ queue_interval|default('5' if provider == 'telegram' else '15') }}" 
+           placeholder="{{ '5' if provider == 'telegram' else '15' }}" min="1" max="1440">
+    <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
+</div>
+{% else %}
+<div id="{{ provider }}QueueSettings" class="queue-settings-disabled hidden"></div>
+{% endif %}

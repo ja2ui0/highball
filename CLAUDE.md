@@ -2,10 +2,53 @@
 
 Web-based backup orchestration with scheduling and monitoring. Supports rsync and Restic providers with full connectivity validation.
 
+# 🚨 CRITICAL EXECUTION PATTERNS (READ FIRST)
+
+**CRITICAL**: The command builder factory pattern and SSH execution intelligence are fundamental to backup functionality. These patterns were discovered through painful debugging in 2025-08-18 session after backup execution was completely broken.
+
+## SSH vs Container Execution Intelligence (CRITICAL)
+
+**Pattern**: `_should_use_ssh(source_config, operation_type)` determines execution context:
+- **UI Operations** (snapshot listing, browsing, validation): ALWAYS execute locally from Highball container  
+- **Source Operations** (backup, restore-to-source): ALWAYS execute via SSH+container on source host
+- **Repository Operations** (init, maintenance): Execute via SSH when source is SSH
+
+**Container Runtime Location (CRITICAL)**:
+```yaml
+# CORRECT - container_runtime in source_config
+source_config:
+  container_runtime: docker  # ✅ HERE
+  hostname: host
+  username: user
+
+# WRONG - container_runtime at job level  
+container_runtime: docker  # ❌ NOT HERE
+source_config:
+  hostname: host
+```
+
+**Execution Service Usage (CRITICAL)**:
+- Use existing `ContainerService.build_backup_container_command()` for command building
+- Use existing `ExecutionService.execute_ssh_command()` for SSH execution  
+- **NEVER** try to manually build container commands or SSH execution
+- Services in `services/binaries.py` and `services/execution.py` contain proven patterns
+
+## Primary Critical Testing Requirements (Next Session)
+
+**BEFORE ANY FRAMEWORK MIGRATION**, these core systems must be fixed and tested:
+
+1. **Real backup execution** (not just dry-run) - verify actual data transfer
+2. **Restore operations with overwrite protection** - critical safety feature
+3. **Notification system** (email/telegram success/failure notifications)
+4. **Restic maintenance operations** (discard/prune/check scheduling and execution)
+5. **UI functionality** - forms, validation, basic workflows (functional, not polished)
+6. **Rsync patterns** - multi-provider support verification
+
 ## Architecture
 
 **Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
-**Principles**: Thin handlers, centralized validation in `job_validator.py`, file-based logging, dataclass-driven configuration
+**Pattern**: handlers transform data, templates render HTML, HTMX handles dynamic behavior.
+**Principles**: Thin handlers, centralized validation in `models/validation.py`, file-based logging, dataclass-driven configuration
 
 **Rule: Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings). Definitions contain one or more paths with per-path include/exclude rules. This architecture balances user workflow simplicity with granular control and tool efficiency.
 
@@ -13,11 +56,19 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 **Rule: Container Execution Strategy**: Use official `restic/restic:0.18.0` containers on remote hosts to solve version mismatch problems. Remote hosts may have outdated restic versions (e.g., 0.16.4 missing `--dry-run` for restore) while Highball has 0.18.0. Container execution ensures version consistency across all operations. SSH validation auto-detects docker/podman availability and populates `container_runtime` in job config. **CRITICAL**: `restic/restic:0.18.0` has `restic` as entrypoint - container commands use `-r repository command` NOT `restic -r repository command`.
 
-**Rule: DRY Principle & Provider Separation**: Don't Repeat Yourself. RestoreHandler orchestrates provider-agnostic operations (overwrite detection, validation, progress tracking). Provider-specific runners (ResticRunner, future BorgRunner/KopiaRunner) handle command building and execution. SSH patterns, authentication, environment management shared across all operations. This separation enables cohesive multi-provider support without code duplication.
+**Rule: SSH vs Local Execution Intelligence**: 
+- **UI Operations** (snapshot listing, browsing, validation): Always execute locally from Highball container using local restic binary and credentials
+- **Source Operations** (backup, restore-to-source): Always execute via SSH+container on source host  
+- **Repository Operations** (init, maintenance): Execute via SSH when source is SSH for lock detection and pipeline validation
+- **Pattern**: `_should_use_ssh(source_config, operation_type)` determines execution context - 'ui' operations always local, 'init'/'maintenance' operations use SSH when source is SSH
+
+**Rule: DRY Principle & Provider Separation**: Don't Repeat Yourself. Restore services orchestrate provider-agnostic operations (overwrite detection, validation, progress tracking). Provider-specific functionality is consolidated into unified services. SSH patterns, authentication, environment management shared across all operations. This separation enables cohesive multi-provider support without code duplication.
 
 **Rule: Just In Time, Progressive Disclosure**: User sees what they need when they need it. Ask only what can't be inferred. Do not overwhelm with choices.
 
-**Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Docker, rsync/SSH
+**Rule: Naming is Immutable**: Method, function, variable, class and filenames NEVER change when refactoring. If, during regular development you want to change a name to make it more specific or more broad for context, you MUST stop everything else and update ALL references to that name everywhere it occurs in the code immediately!
+
+**Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Jinja2, Docker, rsync/SSH. HTMX. Javascript requires permission.
 
 ## Architecture Overview
 
@@ -25,21 +76,29 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 - `app.py` (routing), `config.py` (YAML config)
 
 ### HTTP Layer (handlers/)
-- **Job Management**: `job_manager.py`, `dashboard.py`, `inspect_handler.py`
-- **Backup/Restore**: `backup.py`, `backup_executor.py`, `restore_handler.py`
-- **Provider Handlers**: `restic_handler.py`, `filesystem_handler.py` 
-- **Form Parsing**: `*_form_parser.py` (SSH, Restic, local, rsyncd, notification)
-- **Utilities**: `logs.py`, `config_handler.py`, `api_handler.py`, `network.py`
+- **Page Rendering**: `pages.py` (consolidated: dashboard, config, inspection, logs, network)
+- **Operations**: `operations.py` (backup/restore execution and coordination)
+- **Forms**: `forms.py` (HTMX form processing and validation)
+- **API**: `api.py` (REST endpoints and external integrations)
+- **Scheduling**: `scheduler.py` (job scheduling and cron management)
 
 ### Business Logic (services/)
-- **Validation**: `job_validator.py`, `restic_validator.py`, `source_path_validator.py`, `ssh_validator.py`
-- **Execution**: `restic_runner.py`, `backup_client.py`, `*_repository_service.py`
-- **Infrastructure**: `notification_service.py` (coordinator), `scheduler_service.py`, `job_logger.py`
-- **Notification System**: `notification_provider_factory.py`, `notification_message_formatter.py`, `notification_sender.py`, `notification_job_config_manager.py`, `notification_queue_coordinator.py`
-- **Restore System**: `RestoreExecutionService`, `RestoreOverwriteChecker`, `RestoreErrorParser`
-- **Maintenance**: `restic_maintenance_service.py` + 7 specialized services for repository maintenance (discard/check operations)
-- **HTMX Form System**: `htmx_field_renderer.py`, `htmx_validation_coordinator.py`, `htmx_restic_renderer.py`, `htmx_source_path_manager.py`, `htmx_log_manager.py`, `htmx_config_manager.py`, `htmx_maintenance_manager.py`, `htmx_rsyncd_manager.py`, `htmx_notifications_manager.py`
-- **Support**: `template_service.py`, `job_form_data_builder.py`, `binary_checker_service.py`
+- **Execution**: `execution.py` (unified command execution and obfuscation)
+- **Repositories**: `repositories.py` (repository abstraction and filesystem browsing)
+- **Restore**: `restore.py` (restore execution, overwrite checking, error parsing)
+- **Maintenance**: `maintenance.py` (repository maintenance and cleanup operations)
+- **Scheduling**: `scheduling.py` (scheduler management and schedule loading)
+- **Management**: `management.py` (job management and lifecycle operations)
+- **Data Services**: `data_services.py` (form data building and snapshot introspection)
+- **Template**: `template.py` (template rendering and variable substitution)
+- **Binaries**: `binaries.py` (binary availability checking and validation)
+
+### Data Models (models/)
+- **Validation**: `validation.py` (consolidated validation logic and rules)
+- **Forms**: `forms.py` (form data structures and parsing logic)
+- **Backup**: `backup.py` (backup-related data structures and operations)
+- **Notifications**: `notifications.py` (notification system and queue management)
+- **Rsync**: `rsync.py` (rsync-specific models and configurations)
 
 ### Frontend (static/)
 - **Core Features**: `backup-browser.js` (697 lines - file tree navigation), `restore-core.js` + `restore-restic.js` (progress tracking, restore system), `job-inspect.js` (inspection hub, reduced from 265→215 lines)
@@ -62,7 +121,7 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Job Management**: Full CRUD, validation, cron scheduling, per-job conflict avoidance, custom rsync options, multi-path sources
 **Scheduling**: Runtime conflict detection, automatic queuing, configurable defaults
 **Logging**: Per-job logs, SSH validation caching (30min), refresh-based viewing
-**Notifications**: `notifiers` library backend, Telegram/email, spam-prevention queuing with configurable intervals, batch message formatting, per-job integration with template variables, test capabilities, emoji-free. Modular 6-service architecture with `notify_on_success` configured per-job (not global)
+**Notifications**: `notifiers` library backend, Telegram/email, spam-prevention queuing with configurable intervals, batch message formatting, per-job integration with template variables, test capabilities, emoji-free. `notify_on_success` configured per-job (not global)
 **UI**: HTMX server-side forms, real-time validation, share discovery, theming, password toggles, multi-path management, per-job inspection hubs (`/inspect?name=<jobname>`), source path validation buttons with [OK]/[WARN]/[ERROR] feedback
 **Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation
 **Backup Browser**: Multi-provider backup browsing system supporting Restic (repository snapshots), rsync/SSH/local/rsyncd (filesystem directories) with unified interface, provider-specific terminology, and expandable file trees
@@ -75,25 +134,20 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 ### Container Execution Strategy
 - Use official `restic/restic:0.18.0` containers on remote hosts for version consistency
 - SSH validation auto-detects docker/podman availability, populates `container_runtime` in job config
-- **Unified container execution** for all SSH Restic operations: init, backup, and restore via `CommandExecutionService`
-- Local operations use direct subprocess execution as designed for container-centric workflows
+- Local operations use direct subprocess execution
 
 ### Form Processing Architecture
-- **HTMX Server-Side Rendering**: All form operations use server-side HTMX with 13 modular services
-- **Modular Services**: Single responsibility - field rendering, validation coordination, provider-specific operations
-- **Thin Coordinators**: Handlers reduced to coordination only (e.g., 284→35 lines in HTMX form handler)
+- **HTMX Server-Side Rendering**: All form operations use server-side HTMX
 - Multipart form data throughout (not URL-encoded)
-- Dedicated parsers per destination type (`*_form_parser.py`)
 - Source paths as array format: `[{'path': '/path', 'includes': [], 'excludes': []}]`
-- **Parser Resilience Pattern**: Skip empty paths instead of failing (prevents UI errors from default empty form fields)
-- **Error Data Preservation Pattern**: Use parsed config from payload over raw form data when available (validation errors retain all user input)
-- **Template Variables Pattern**: Server data via HTML data attributes to JavaScript (eliminates inline server variables)
+- **Parser Resilience Pattern**: Skip empty paths instead of failing
+- **Error Data Preservation Pattern**: Use parsed config from payload over raw form data when available
+- **Template Variables Pattern**: Server data via HTML data attributes to JavaScript
 
 ### Validation Patterns
 - Real-time validation with dedicated endpoints (`/validate-*`)
-- 30-minute SSH validation caching to avoid repeated connection tests
+- 30-minute SSH validation caching
 - Permission checking: RX (backup capable), RWX (restore-to-source capable)
-- Validators in `services/` (business logic), handlers only coordinate HTTP
 
 ### Frontend Architecture
 - **HTMX-First**: All form operations use server-side HTMX rendering (51% JavaScript reduction: 2,898→1,406 lines)
@@ -119,17 +173,19 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 **Development Environment**: Claude runs in distrobox container with package installation capabilities. Use `./rr` for rebuild/restart during development iterations.
 **Testing Paradigm**: Create unit tests before human testing for dramatic subsystem changes. Test files in `tests/` with mocking patterns to avoid dependency issues. Sequence: unit tests → implementation → human integration testing. Use `test_*_standalone.py` for comprehensive pipeline testing with proper component isolation.
+**Curl Testing Rule**: ALWAYS use `--max-time 3` (or similar short timeout) when testing with curl. NEVER wait more than a few seconds for hanging requests - timeout indicates bugs that need investigation.
 **Decision Authority**: Claude owns technical implementation decisions (patterns, algorithms, code structure). Shane is tech director/product manager - owns design decisions, architectural direction, and product requirements. When uncertain about design preferences or high-level architecture, ask before implementing rather than having changes aborted for clarification. **Present options with reasoned recommendations** - not just choices, but grounded opinions based on sound practice and project cohesiveness.
 **Context Management**: Two-file documentation workflow. **CLAUDE.md** (permanent): architecture, patterns, rules, technical debt. **CHANGES.md** (temporal): current session focus, progress, technical notes, next priorities. Session end: fold architectural insights into CLAUDE.md, update CHANGES.md for next session. Post-compression: feed both files to restore complete context efficiently.
 
 ### Code Architecture
 **Separation of Concerns**: Thin handlers (HTTP coordination), fat services (business logic), validators in `services/` not `handlers/`
-**Modularization**: Proactively break up monolithic components. Single responsibility principle. Extract when files exceed ~500 lines. HTMX form system exemplifies this with 13 specialized services replacing JavaScript form complexity.
+**Modularization**: Proactively break up monolithic components. Single responsibility principle. Extract when files exceed ~500 lines.
 **Data Structures**: Dataclasses everywhere, `pathlib.Path` operations, type hints
-**Multi-provider Pattern**: `services/<engine>_repository_service.py` + `services/<engine>_validator.py` + form parsers
+**Multi-provider Pattern**: Unified services with provider-specific logic consolidated
 
 ### Frontend Standards
 **HTMX**: Server-side form rendering preferred. JavaScript only for complex interactive features (file trees, progress tracking)
+**Templates**: Jinja2 with conditional logic (`{% if %}`, `{% for %}`). Legacy `{{VARIABLE}}` replacement maintained for compatibility. **NO HTML generation in handlers** - pass data variables to templates.
 **JavaScript**: Always in `/static/` files, never inline in templates. Modular single-responsibility architecture.
 **CSS**: Colors ONLY in `/static/themes/{theme}.css`. Structure ONLY in `/static/style.css`
 **Assets**: External only - no emoji, no inline styles/scripts
@@ -137,8 +193,8 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 ### Code Quality
 **Standards**: PEP 8, emoji-free, external assets only
-**Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`
-**Testing**: Standalone tests in `tests/` with mocking patterns. HTMX form tests (`test_htmx_form_system.py`) replace deprecated JavaScript form tests. Use `test_*_standalone.py` for isolated unit tests.
+**Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`, `Jinja2`
+**Testing**: Standalone tests in `tests/` with mocking patterns. Use `test_*_standalone.py` for isolated unit tests.
 **Containers**: Official containers only (`restic/restic`, future `kopia/kopia`)
 
 ## Theming System
@@ -152,19 +208,19 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 ## Architecture Reference (Quick Lookup)
 
-**Templates**: `{{INCLUDE:filename}}` directives, `job_form.html` orchestrates
+**Templates**: Jinja2 environment with autoescape, conditionals (`{% if %}`), loops (`{% for %}`), includes (`{% include %}`)
 **Data**: Dataclasses for all structures (`JobFormData`, `SourceConfig`, `DestConfig`), `pathlib.Path` operations
-**Validation**: SSH 30min cache, `validators` module, centralized in `services/job_validator.py`, `services/restic_validator.py`, `services/source_path_validator.py`
+**Validation**: SSH 30min cache, `validators` module, centralized in `models/validation.py` (consolidated module)
 **Forms**: HTMX server-side rendering, sectioned UI, dedicated parsers per destination (`_safe_get_value`), inline error display (`FormErrorHandler`)
 **UI Paradigm**: Per-job inspection hubs (`/inspect?name=<jobname>`) consolidate logs, status, backup browser, and restore controls into unified interfaces (paradigm shift from separate pages)
-**Container Execution**: Unified container execution for all SSH Restic operations (init, backup, restore) using `CommandExecutionService` with official `restic/restic:0.18.0` containers.
+**Container Execution**: Unified container execution for all SSH Restic operations (init, backup, restore) using `services/execution.py` with official `restic/restic:0.18.0` containers.
 **Backup Browser**: Multi-provider PROVIDERS config (repository vs filesystem), unified JS interface
-**Backup Execution**: Separated concerns - `BackupExecutor`, `BackupCommandBuilder`, `BackupConflictHandler`, `BackupNotificationDispatcher`
-**Restore**: Modular architecture - thin `RestoreHandler` coordinator (140 lines) + specialized services (`RestoreExecutionService`, `RestoreOverwriteChecker`, `RestoreErrorParser`)
-**Notifications**: Modular 6-service architecture - coordinator + specialized services for provider factory, message formatting, sending, job config, queue coordination
+**Backup Execution**: Unified operation handling via `operations.py` with execution delegation to `services/`
+**Restore**: Consolidated restore functionality in `services/restore.py` with unified execution, overwrite checking, and error parsing
+**Notifications**: Consolidated notification system in `models/notifications.py` with unified provider management, message formatting, and queue coordination
 **API**: Query filtering, CORS, field selection, JSON responses, authentication-ready
-**Maintenance System**: Modular 8-service architecture for Restic repository maintenance (discard/check operations), auto-enabled with safe defaults, progressive disclosure UI ready
-**Testing**: Unit coverage with mocking patterns, 22 maintenance tests with 100% pass rate
+**Maintenance System**: Consolidated maintenance operations in `services/maintenance.py` with unified discard/check operations, auto-enabled with safe defaults
+**Testing**: Unit coverage with mocking patterns
 **Development Environment**: Live testing against `yeti.home.arpa` with actual restic repository at `rest:http://yeti.home.arpa:8000/yeti` (not example data)
 
 ## Commands
@@ -251,7 +307,7 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Completed 2025-08-17**: 
-1. ✅ **HTMX Form System Migration** - 51% JavaScript reduction (2,898→1,406 lines), complete form consistency with 13 modular services
+1. ✅ **HTMX Form System Migration** - 51% JavaScript reduction (2,898→1,406 lines), complete form consistency
 2. ✅ **Critical Bug Fixes** - Template rendering artifacts resolved, form data preservation fixed
 3. ✅ **Test Infrastructure Modernization** - HTMX-focused tests, deprecated JavaScript form tests retired
 
@@ -262,25 +318,41 @@ deleted_jobs:  # user can manually restore to backup_jobs
 4. ✅ **JavaScript Standards Compliance** - Extracted all embedded JavaScript from templates to external `/static/` files with modular architecture
 5. ✅ **Backup Logging Enhancement** - Fixed logging to show actual container commands executed instead of simplified restic commands for debugging
 6. ✅ **Command Obfuscation Utility** - Created centralized `services/command_obfuscation.py` for DRY password masking across handlers
-7. ✅ **Notification System Modularization** - Complete refactor from 552-line monolith to 6 specialized services with 63% coordinator reduction
-8. ✅ **RestoreHandler Modularization** - 660-line monolith → thin coordinator (140 lines) + specialized services
-9. ✅ **Restic Repository Maintenance System** - Production-ready maintenance architecture with 8 modular services, safe defaults, and comprehensive test coverage
+7. ✅ **Notification System Consolidation** - Unified notification functionality into `models/notifications.py` with integrated provider management and queue coordination
+8. ✅ **Restore System Consolidation** - Unified restore functionality into `services/restore.py` with integrated execution, overwrite checking, and error parsing
+9. ✅ **Repository Maintenance System** - Consolidated maintenance operations in `services/maintenance.py` with unified discard/check functionality
 
 **Current Priorities**:
-1. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
-2. **UX Polish** - Source path validation styling improvements
+1. **Restore Functionality** - Complete HTMX restore implementation with overwrite checking
+2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
+3. **UX Polish** - Source path validation styling improvements
 
 ## Recent Development Context
 
-**2025-08-17**: HTMX form system migration achieved 51% JavaScript reduction with 13 modular services, critical template rendering bugs fixed, test infrastructure modernized
-**2025-08-16**: Container execution unified, notification system modularized (6 services), RestoreHandler refactored, maintenance system completed
-**2025-08-15**: Repository initialization and validator architecture refactored, container execution strategy foundations implemented
+**2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup (no HTML in handlers), backup browser SSH execution restored, restore overwrite checking implemented with proper HTMX architecture
+**2025-08-17**: HTMX form system migration achieved 51% JavaScript reduction, critical template rendering bugs fixed, test infrastructure modernized
+**2025-08-16**: Container execution unified, notification system consolidated, restore system unified, maintenance system completed
+
+## Legacy Code Reference
+
+**Working Code Location**: `/home/ja2ui0/src/ja2ui0/highball-main/` contains fully functional version of all features. Use as reference when implementing missing functionality - adapt patterns to current consolidated architecture rather than copying files directly.
+
+**Critical SSH Execution Pattern**: Legacy backup browser used separate validator services. Current consolidated architecture implements same functionality via `services/repositories.py` with unified SSH execution patterns.
 
 See CHANGES.md for current session focus and detailed implementation status.
 
 ## Next Session Priority
 
-1. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
-2. **UX Polish** - Source path validation styling improvements
+**CRITICAL**: These core systems must be functional before any FastAPI/Pydantic migration:
+
+1. **Real Backup Execution** - Test actual backup execution (not dry-run) with data transfer verification
+2. **Restore Operations** - Fix and test complete restore workflow with overwrite protection and HTMX integration
+3. **Notification System** - Test email/telegram notifications for job success/failure, queue functionality, template variables
+4. **Restic Maintenance Operations** - Test discard/prune/check operations, scheduling, retention policies  
+5. **UI Functionality** - Fix forms, validation, basic workflows (functional, not polished)
+6. **Rsync Patterns** - Test multi-provider support and rsync execution patterns
+
+**Framework Migration**: Only after core functionality verified → FastAPI/Pydantic migration with confidence
 
 **Future Priorities**: Kopia provider support, enhanced Restic features (progress parsing, retention policies), notification template preview 
+

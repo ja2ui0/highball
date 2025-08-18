@@ -1,0 +1,11 @@
+<div class="log-section">
+    <button class="button" 
+            hx-{% if job_name %}post{% else %}get{% endif %}="{% if job_name %}/htmx/refresh-logs{% else %}{{ refresh_endpoint|default('/dev') }}{% endif %}"
+            {% if job_name %}hx-vals='{"job_name": "{{ job_name }}"}'{% endif %}
+            hx-target="#logContent" 
+            hx-swap="{% if job_name %}outerHTML{% else %}innerHTML{% endif %}">Refresh</button>
+    <button class="button button-warning" 
+            hx-post="/htmx/clear-logs" 
+            hx-target="#logContent" 
+            hx-swap="outerHTML">Clear Display</button>
+</div>

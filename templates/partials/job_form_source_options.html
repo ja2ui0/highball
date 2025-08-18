@@ -9,10 +9,10 @@
                         <div class="form-group">
                             <label for="source_path_0">Path:</label>
                             <input type="text" id="source_path_0" name="source_paths[]" 
-                                   value="{{SOURCE_PATH_0}}" placeholder="/path/to/backup">
+                                   value="{{ source_path_0 }}" placeholder="/path/to/backup">
                             <div class="path-validation-row">
                                 <button type="button" class="validate-path-btn button button-secondary" 
-                                        hx-post="/htmx/validate-single-source-path" 
+                                        hx-post="/htmx/validate-source-path" 
                                         hx-target="#path_validation_0"
                                         hx-vals='{"path_index": "0"}'
                                         hx-include="#source_path_0, [name='source_ssh_hostname'], [name='source_ssh_username']">
@@ -25,7 +25,7 @@
                         <div class="form-group">
                             <label for="source_includes_0">Include Patterns (optional):</label>
                             <textarea id="source_includes_0" name="source_includes[]" 
-                                      placeholder="**/*.jpg&#10;documents/**&#10;config.ini">{{SOURCE_INCLUDES_0}}</textarea>
+                                      placeholder="**/*.jpg&#10;documents/**&#10;config.ini">{{ source_includes_0 }}</textarea>
                             <div class="help-text">
                                 Glob patterns for files to include. Leave empty to include all files.
                             </div>
@@ -34,7 +34,7 @@
                         <div class="form-group">
                             <label for="source_excludes_0">Exclude Patterns (optional):</label>
                             <textarea id="source_excludes_0" name="source_excludes[]" 
-                                      placeholder="**/*.tmp&#10;cache/**&#10;*.log">{{SOURCE_EXCLUDES_0}}</textarea>
+                                      placeholder="**/*.tmp&#10;cache/**&#10;*.log">{{ source_excludes_0 }}</textarea>
                             <div class="help-text">
                                 Glob patterns for files to exclude from backup.
                             </div>

@@ -76,7 +76,7 @@ class JobInspectManager {
         // Validation logic moved to HTMX server-side
     }
     
-    // REMOVED: All validation logic moved to HTMX server-side
+    // All restore functionality handled by HTMX server-side
     // - clearRestoreValidationError() → HTMX validation endpoints
     // - checkOverwriteRisk() → HTMX validation endpoints  
     // - checkForOverwrites() → HTMX validation endpoints
@@ -96,17 +96,7 @@ window.toggleSelectAll = function() {
     }
 };
 
-window.togglePasswordField = function() {
-    if (window.jobInspectManager) {
-        window.jobInspectManager.togglePasswordField();
-    }
-};
-
-window.handleRestoreTargetChange = function() {
-    if (window.jobInspectManager) {
-        window.jobInspectManager.handleRestoreTargetChange();
-    }
-};
+// Restore functions handled by HTMX server-side - no global wrappers needed
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {

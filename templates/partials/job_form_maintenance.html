@@ -6,7 +6,7 @@
                         <!-- First Toggle: Auto vs User -->
                         <div class="toggle-section">
                             <span class="toggle-label">Auto</span>
-                            <button type="button" class="toggle-switch {{MAINTENANCE_FIRST_TOGGLE_CLASS}}" 
+                            <button type="button" class="toggle-switch {{ maintenance_first_toggle_class }}" 
                                     hx-post="/htmx/maintenance-toggle"
                                     hx-target="#maintenance_display"
                                     hx-vals="js:{mode: document.querySelector('#restic_maintenance').value === 'auto' ? 'user' : 'auto'}"
@@ -17,10 +17,10 @@
                         </div>
                         
                         <div id="maintenance_display">
-                            {{MAINTENANCE_DISPLAY_HTML}}
+                            {{ maintenance_display_html }}
                         </div>
                         
                         <!-- Hidden field to track maintenance mode -->
-                        <input type="hidden" id="restic_maintenance" name="restic_maintenance" value="{{MAINTENANCE_MODE}}">
+                        <input type="hidden" id="restic_maintenance" name="restic_maintenance" value="{{ maintenance_mode }}">
                     </div>
                 </div>

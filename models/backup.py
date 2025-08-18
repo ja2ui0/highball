@@ -14,8 +14,21 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import tempfile
 import shlex
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# COMMAND EXECUTION DATA STRUCTURES
+# =============================================================================
+
+@dataclass
+class CommandInfo:
+    """Information about built backup command"""
+    exec_argv: List[str]
+    log_cmd_str: str
+    src_display: str
+    dst_display: str
 
 # =============================================================================
 # BACKUP CONFIGURATION CLASSES
@@ -322,11 +335,27 @@ class ResticRepositoryService:
             
             if result.returncode == 0:
                 try:
-                    snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                    raw_snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                    # Format snapshots for backup browser expectations
+                    formatted_snapshots = []
+                    for snapshot in raw_snapshots:
+                        formatted_snapshot = {
+                            'full_id': snapshot.get('id', ''),
+                            'id': snapshot.get('short_id', snapshot.get('id', '')[:8] if snapshot.get('id') else ''),
+                            'time': snapshot.get('time', ''),
+                            'username': snapshot.get('username', ''),
+                            'hostname': snapshot.get('hostname', ''),
+                            'paths': snapshot.get('paths', []),
+                            'summary': snapshot.get('summary', {}),
+                            'tree': snapshot.get('tree', ''),
+                            'program_version': snapshot.get('program_version', '')
+                        }
+                        formatted_snapshots.append(formatted_snapshot)
+                    
                     return {
                         'success': True,
-                        'snapshots': snapshots,
-                        'count': len(snapshots)
+                        'snapshots': formatted_snapshots,
+                        'count': len(formatted_snapshots)
                     }
                 except json.JSONDecodeError:
                     return {
@@ -350,6 +379,266 @@ class ResticRepositoryService:
             return {
                 'success': False,
                 'error': f'Snapshot listing failed: {str(e)}'
+            }
+    
+    def list_snapshots_with_ssh(self, dest_config: Dict[str, Any], source_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """List snapshots with SSH execution support (like working code)"""
+        try:
+            repo_uri = dest_config.get('repo_uri')
+            password = dest_config.get('password')
+            
+            if not repo_uri or not password:
+                return {
+                    'success': False,
+                    'error': 'Repository URI and password are required'
+                }
+            
+            # Check if we should use SSH execution
+            if source_config and source_config.get('hostname') and source_config.get('username'):
+                return self._list_snapshots_via_ssh(repo_uri, password, source_config)
+            else:
+                # Fall back to local execution
+                return self.list_snapshots(dest_config, filters)
+                
+        except Exception as e:
+            logger.error(f"SSH snapshot listing error: {e}")
+            return {
+                'success': False,
+                'error': f'SSH snapshot listing failed: {str(e)}'
+            }
+    
+    def _list_snapshots_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any]) -> Dict[str, Any]:
+        """List snapshots via SSH execution (implementation from working code)"""
+        import json
+        
+        hostname = source_config.get('hostname')
+        username = source_config.get('username')
+        container_runtime = source_config.get('container_runtime', 'docker')
+        
+        # Build SSH + container command like working code
+        cmd = [
+            'ssh', f'{username}@{hostname}',
+            container_runtime, 'run', '--rm',
+            '-e', f'RESTIC_PASSWORD={password}',
+            'restic/restic:0.18.0',
+            '-r', repo_uri, 'snapshots', '--json'
+        ]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                try:
+                    raw_snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                    # Format snapshots for backup browser expectations
+                    formatted_snapshots = []
+                    for snapshot in raw_snapshots:
+                        formatted_snapshot = {
+                            'full_id': snapshot.get('id', ''),
+                            'id': snapshot.get('short_id', snapshot.get('id', '')[:8] if snapshot.get('id') else ''),
+                            'time': snapshot.get('time', ''),
+                            'username': snapshot.get('username', ''),
+                            'hostname': snapshot.get('hostname', ''),
+                            'paths': snapshot.get('paths', []),
+                            'summary': snapshot.get('summary', {}),
+                            'tree': snapshot.get('tree', ''),
+                            'program_version': snapshot.get('program_version', '')
+                        }
+                        formatted_snapshots.append(formatted_snapshot)
+                    
+                    return {
+                        'success': True,
+                        'snapshots': formatted_snapshots,
+                        'count': len(formatted_snapshots)
+                    }
+                except json.JSONDecodeError:
+                    return {
+                        'success': False,
+                        'error': 'Invalid JSON response from restic'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Restic command failed: {result.stderr}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Snapshot listing timed out'
+            }
+        except Exception as e:
+            logger.error(f"SSH execution error: {e}")
+            return {
+                'success': False,
+                'error': f'SSH execution failed: {str(e)}'
+            }
+    
+    def get_snapshot_statistics(self, dest_config: Dict[str, Any], snapshot_id: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Get detailed statistics for a specific snapshot"""
+        try:
+            repo_uri = dest_config.get('repo_uri')
+            password = dest_config.get('password')
+            
+            if not repo_uri or not password:
+                return {
+                    'success': False,
+                    'error': 'Repository URI and password are required'
+                }
+            
+            # Always execute locally for UI operations per working pattern
+            env = os.environ.copy()
+            env['RESTIC_PASSWORD'] = password
+            
+            # Get snapshot statistics using local restic
+            cmd = ['restic', '-r', repo_uri, 'stats', snapshot_id, '--json']
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env
+            )
+            
+            if result.returncode == 0:
+                try:
+                    stats = json.loads(result.stdout) if result.stdout.strip() else {}
+                    return {
+                        'success': True,
+                        'stats': stats,  # backup browser expects 'stats' not 'statistics'
+                        'snapshot_id': snapshot_id
+                    }
+                except json.JSONDecodeError:
+                    return {
+                        'success': False,
+                        'error': 'Invalid JSON response from restic stats'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Stats command failed: {result.stderr}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Statistics request timed out'
+            }
+        except Exception as e:
+            logger.error(f"Snapshot statistics error: {e}")
+            return {
+                'success': False,
+                'error': f'Statistics failed: {str(e)}'
+            }
+    
+    def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Browse directory contents in a specific snapshot"""
+        try:
+            repo_uri = dest_config.get('repo_uri')
+            password = dest_config.get('password')
+            
+            if not repo_uri or not password:
+                return {
+                    'success': False,
+                    'error': 'Repository URI and password are required'
+                }
+            
+            # Always execute locally for UI operations per working pattern
+            env = os.environ.copy()
+            env['RESTIC_PASSWORD'] = password
+            
+            # Clean path for restic ls command
+            clean_path = path.strip('/') if path and path != '/' else ''
+            
+            # List directory contents using local restic (EXACT working command)
+            cmd = ['restic', '-r', repo_uri, 'ls', snapshot_id, '--json', path]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env
+            )
+            
+            if result.returncode == 0:
+                # Parse using EXACT working method
+                return self._parse_directory_listing(result.stdout, path)
+            else:
+                return {
+                    'success': False,
+                    'error': f'Directory listing failed: {result.stderr}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Directory browsing timed out'
+            }
+        except Exception as e:
+            logger.error(f"Directory browsing error: {e}")
+            return {
+                'success': False,
+                'error': f'Directory browsing failed: {str(e)}'
+            }
+    
+    def _parse_directory_listing(self, json_output: str, current_path: str) -> Dict[str, Any]:
+        """Parse restic ls JSON output into directory listing (EXACT copy from working version)"""
+        try:
+            lines = json_output.strip().split('\n')
+            items = []
+            
+            # Add parent directory entry if not at root
+            if current_path and current_path != '/':
+                parent_path = os.path.dirname(current_path) if current_path != '/' else '/'
+                items.append({
+                    'name': '..',
+                    'type': 'parent',
+                    'path': parent_path,
+                    'size': None
+                })
+            
+            # Parse each JSON line 
+            for line in lines:
+                if not line.strip():
+                    continue
+                    
+                try:
+                    item = json.loads(line)
+                    name = item.get('name', '')
+                    item_type = item.get('type', 'file')
+                    size = item.get('size')
+                    full_path = item.get('path', os.path.join(current_path, name))
+                    
+                    # Skip the current directory entry, empty names, and self-references
+                    if (name == '.' or name == current_path or name == '' or 
+                        full_path == current_path or 
+                        (current_path != '/' and name == os.path.basename(current_path))):
+                        continue
+                    
+                    items.append({
+                        'name': name,
+                        'type': 'directory' if item_type == 'dir' else 'file',
+                        'path': full_path,
+                        'size': size
+                    })
+                    
+                except json.JSONDecodeError:
+                    # Skip malformed JSON lines
+                    continue
+            
+            return {
+                'success': True,
+                'contents': items,
+                'current_path': current_path,
+                'total_items': len(items)
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Failed to parse directory listing: {str(e)}'
             }
 
 # =============================================================================
@@ -535,36 +824,50 @@ class ResticRunner:
     def _run_container_backup(self, config: BackupConfig, backup_args: List[str], dry_run: bool) -> Dict[str, Any]:
         """Run backup using container on remote SSH host"""
         try:
-            # Use command execution service for container operations
+            # Use existing container service for backup operations  
+            from services.binaries import ContainerService
             from services.execution import ExecutionService
             
+            container_service = ContainerService()
             exec_service = ExecutionService()
             
-            # Build container command
-            container_args = [
-                'backup',
-                '-r', config.dest_config['repo_uri']
-            ] + backup_args[2:]  # Skip the repo_uri we already added
+            # Extract configuration
+            repository_url = config.dest_config['repo_uri']
+            source_paths = [path['path'] for path in config.source_config.get('source_paths', [])]
+            environment_vars = {'RESTIC_PASSWORD': config.dest_config['password']}
             
-            # Execute via container
-            result = exec_service.execute_restic_command(
-                config.job_config,
-                container_args,
-                env_vars={'RESTIC_PASSWORD': config.dest_config['password']}
+            # Add dry-run to backup args if needed
+            if dry_run and '--dry-run' not in backup_args:
+                backup_args = backup_args + ['--dry-run']
+            
+            # Build container command using existing service
+            container_command = container_service.build_backup_container_command(
+                repository_url=repository_url,
+                source_paths=source_paths,
+                environment_vars=environment_vars,
+                backup_args=backup_args
             )
             
-            if result['success']:
+            # Execute via SSH using existing execution service
+            source_config = config.source_config
+            result = exec_service.execute_ssh_command(
+                hostname=source_config['hostname'],
+                username=source_config['username'],
+                command=container_command
+            )
+            
+            if result.returncode == 0:
                 return {
                     'success': True,
                     'message': 'Container backup completed successfully',
-                    'output': result.get('output', ''),
+                    'output': result.stdout,
                     'dry_run': dry_run
                 }
             else:
                 return {
                     'success': False,
-                    'error': result.get('error', 'Container backup failed'),
-                    'output': result.get('output', '')
+                    'error': f'Container backup failed: {result.stderr}',
+                    'output': result.stdout
                 }
                 
         except Exception as e:
@@ -718,9 +1021,13 @@ class BackupService:
         """Initialize new repository"""
         return self.repository_service.initialize_repository(dest_config)
     
-    def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """List repository snapshots"""
-        return self.repository_service.list_snapshots(dest_config, filters)
+    def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """List repository snapshots with SSH support"""
+        # Pass source_config to repository service for SSH execution
+        if hasattr(self.repository_service, 'list_snapshots_with_ssh'):
+            return self.repository_service.list_snapshots_with_ssh(dest_config, source_config, filters)
+        else:
+            return self.repository_service.list_snapshots(dest_config, filters)
     
     def analyze_content(self, dest_config: Dict[str, Any], job_name: str = None) -> Dict[str, Any]:
         """Analyze repository content"""
@@ -730,6 +1037,14 @@ class BackupService:
                        config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Run maintenance operation"""
         return self.maintenance_service.run_maintenance_operation(dest_config, operation, config)
+    
+    def get_snapshot_statistics(self, dest_config: Dict[str, Any], snapshot_id: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Get detailed statistics for a specific snapshot"""
+        return self.repository_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
+    
+    def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Browse directory contents in a specific snapshot"""
+        return self.repository_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
 
 # Export the unified service as the main interface
 backup_service = BackupService()

@@ -111,15 +111,15 @@ class OperationsHandler:
             
             # Calculate duration
             end_time = datetime.now()
-            duration = str(end_time - start_time).split('.')[0]  # Remove microseconds
+            duration_seconds = (end_time - start_time).total_seconds()
             
             # Log result
             if result['success']:
-                self.job_management.log_status(job_name, 'completed', f"Backup completed in {duration:.2f}s")
+                self.job_management.log_status(job_name, 'completed', f"Backup completed in {duration_seconds:.2f}s")
                 
                 # Send success notifications if not dry run
                 if not dry_run:
-                    self.notification_service.notify_job_success(job_name, duration, job_config)
+                    self.notification_service.notify_job_success(job_name, duration_seconds, job_config)
             else:
                 self.job_management.log_status(job_name, 'failed', result['error'])
                 

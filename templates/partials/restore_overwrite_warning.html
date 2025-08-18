@@ -1,0 +1,16 @@
+{% if has_overwrites %}
+<div id="overwriteWarning" class="warning-message">
+    <span class="warning-icon">[WARNING]</span>
+    This {% if dry_run %}dry run will test a restore that would{% else %}restore will{% endif %} overwrite existing files in {{ target_text }}.
+</div>
+{% if not dry_run %}
+<div id="confirmationSection" class="confirmation-section">
+    <label>
+        <input type="checkbox" name="confirm_overwrite" required>
+        I understand this will overwrite existing files
+    </label>
+</div>
+{% endif %}
+{% else %}
+<div id="overwriteWarning" class="hidden"></div>
+{% endif %}

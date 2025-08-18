@@ -3,7 +3,7 @@
 <head>
     <title>Configuration Manager - Highball</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="{{THEME_CSS_PATH}}">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
     <!-- config-manager.js, config-notifications.js removed - replaced with HTMX -->
@@ -23,21 +23,21 @@
                 <div class="form-group">
                     <label for="scheduler_timezone">Scheduler Timezone:</label>
                     <input type="text" id="scheduler_timezone" name="scheduler_timezone" 
-                           value="{{SCHEDULER_TIMEZONE}}" placeholder="UTC">
+                           value="{{ scheduler_timezone }}" placeholder="UTC">
                     <div class="help-text">Timezone for scheduled jobs (e.g., America/Denver, UTC)</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="theme">Theme:</label>
                     <select id="theme" name="theme">
-                        {{THEME_OPTIONS}}
+                        {{ theme_options }}
                     </select>
                     <div class="help-text">Visual theme for the interface</div>
                 </div>
                 
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" name="enable_conflict_avoidance" {{ENABLE_CONFLICT_AVOIDANCE}}> 
+                        <input type="checkbox" name="enable_conflict_avoidance" {{ enable_conflict_avoidance }}> 
                         Enable Conflict Avoidance
                     </label>
                     <div class="help-text">Jobs with shared resources will wait for each other to finish</div>
@@ -46,14 +46,14 @@
                 <div class="form-group">
                     <label for="conflict_check_interval">Conflict Check Interval (seconds):</label>
                     <input type="number" id="conflict_check_interval" name="conflict_check_interval" 
-                           value="{{CONFLICT_CHECK_INTERVAL}}" placeholder="300">
+                           value="{{ conflict_check_interval }}" placeholder="300">
                     <div class="help-text">How often to check for conflicting jobs (default: 300)</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="delay_notification_threshold">Delay Notification Threshold (seconds):</label>
                     <input type="number" id="delay_notification_threshold" name="delay_notification_threshold" 
-                           value="{{DELAY_NOTIFICATION_THRESHOLD}}" placeholder="300">
+                           value="{{ delay_notification_threshold }}" placeholder="300">
                     <div class="help-text">Send notification after jobs are delayed this long (default: 300)</div>
                 </div>
             </div>
@@ -66,28 +66,28 @@
                 <div class="form-group">
                     <label for="hourly_default">Hourly Default:</label>
                     <input type="text" id="hourly_default" name="hourly_default" 
-                           value="{{HOURLY_DEFAULT}}" placeholder="0 * * * *">
+                           value="{{ hourly_default }}" placeholder="0 * * * *">
                     <div class="help-text">Default ("0 * * * *" aka: top of every hour)</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="daily_default">Daily Default:</label>
                     <input type="text" id="daily_default" name="daily_default" 
-                           value="{{DAILY_DEFAULT}}" placeholder="0 3 * * *">
+                           value="{{ daily_default }}" placeholder="0 3 * * *">
                     <div class="help-text">Default ("0 3 * * *" aka: 3:00 AM daily)</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="weekly_default">Weekly Default:</label>
                     <input type="text" id="weekly_default" name="weekly_default" 
-                           value="{{WEEKLY_DEFAULT}}" placeholder="0 3 * * 0">
+                           value="{{ weekly_default }}" placeholder="0 3 * * 0">
                     <div class="help-text">Default ("0 3 * * 0" aka: Sunday 3:00 AM)</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="monthly_default">Monthly Default:</label>
                     <input type="text" id="monthly_default" name="monthly_default" 
-                           value="{{MONTHLY_DEFAULT}}" placeholder="0 3 1 * *">
+                           value="{{ monthly_default }}" placeholder="0 3 1 * *">
                     <div class="help-text">Default ("0 3 1 * *" aka: first of month 3:00 AM)</div>
                 </div>
             </div>
@@ -95,164 +95,39 @@
             <!-- Notification Settings -->
             <div class="section-container">
                 <h2 class="section-header">Notification Settings</h2>
-            
-            <!-- Telegram Settings -->
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="enable_telegram" name="enable_telegram" {{TELEGRAM_ENABLED}}
-                               hx-post="/htmx/notification-settings"
-                               hx-target="#telegramSettings"
-                               hx-swap="outerHTML"
-                               hx-include="[name^='telegram_']"
-                               hx-trigger="change"
-                               hx-vals="js:{provider: 'telegram', enabled: event.target.checked}"
-                               value="true"> 
-                        Configure Telegram notifications
-                    </label>
-                </div>
                 
-                <div id="telegramSettings" class="path-group {{TELEGRAM_SETTINGS_CLASS}}">
-                    <div class="form-group">
-                        <label for="telegram_token">Bot Token:</label>
-                        <input type="text" id="telegram_token" name="telegram_token" 
-                               value="{{TELEGRAM_TOKEN}}" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
-                        <div class="help-text">Get from @BotFather on Telegram</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="telegram_chat_id">Chat ID:</label>
-                        <input type="text" id="telegram_chat_id" name="telegram_chat_id" 
-                               value="{{TELEGRAM_CHAT_ID}}" placeholder="-1001234567890">
-                        <div class="help-text">Chat or group ID where notifications will be sent</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="telegram_queue_enabled" name="telegram_queue_enabled" {{TELEGRAM_QUEUE_ENABLED}}
-                                   hx-post="/htmx/queue-settings"
-                                   hx-target="#telegramQueueSettings"
-                                   hx-swap="outerHTML"
-                                   hx-include="[name^='telegram_queue_']"
-                                   hx-trigger="change"
-                                   hx-vals="js:{provider: 'telegram', enabled: event.target.checked}"
-                                   value="true"> 
-                            Enable notification queueing
-                        </label>
-                        <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
-                        <div id="telegramQueueSettings" class="{{TELEGRAM_QUEUE_SETTINGS_CLASS}}">
-                            <label for="telegram_queue_interval">Minimum time between messages (minutes):</label>
-                            <input type="number" id="telegram_queue_interval" name="telegram_queue_interval" 
-                                   value="{{TELEGRAM_QUEUE_INTERVAL}}" placeholder="5" min="1" max="1440">
-                            <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <button type="button" id="test_telegram" class="button button-secondary" onclick="testTelegramNotification()">
-                            Send Test Notification
-                        </button>
-                        <div id="telegram_test_result" class="help-text"></div>
-                    </div>
-                </div>
+                <!-- Configured Providers (show h3 sections for existing providers) -->
+                {% if global_settings.notification.telegram %}
+                {% set provider = 'telegram' %}
+                {% set config = global_settings.notification.telegram %}
+                {% include 'partials/notification_provider.html' %}
+                {% endif %}
                 
-                <!-- Email Settings -->
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="enable_email" name="enable_email" {{EMAIL_ENABLED}}
-                               hx-post="/htmx/notification-settings"
-                               hx-target="#emailSettings"
-                               hx-swap="outerHTML"
-                               hx-include="[name^='email_']"
-                               hx-trigger="change"
-                               hx-vals="js:{provider: 'email', enabled: event.target.checked}"
-                               value="true"> 
-                        Configure email notifications
-                    </label>
-                </div>
+                {% if global_settings.notification.email %}
+                {% set provider = 'email' %}
+                {% set config = global_settings.notification.email %}
+                {% include 'partials/notification_provider.html' %}
+                {% endif %}
                 
-                <div id="emailSettings" class="path-group {{EMAIL_SETTINGS_CLASS}}">
-                    
+                <!-- Add Provider Dropdown (only show unconfigured providers) -->
+                <div id="notification-providers">
+                    <h3>Add Notification Provider</h3>
                     <div class="form-group">
-                        <label for="email_smtp_server">SMTP Server:</label>
-                        <input type="text" id="email_smtp_server" name="email_smtp_server" 
-                               value="{{EMAIL_SMTP_SERVER}}" placeholder="smtp.gmail.com">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email_smtp_port">SMTP Port:</label>
-                        <input type="number" id="email_smtp_port" name="email_smtp_port" 
-                               value="{{EMAIL_SMTP_PORT}}" placeholder="587">
-                        <div class="help-text">587 for TLS, 465 for SSL, 25 for plain</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Encryption:</label>
-                        <div class="flex-row">
-                            <label>
-                                <input type="radio" name="email_encryption" value="tls" {{EMAIL_TLS_CHECKED}}> TLS
-                            </label>
-                            <label>
-                                <input type="radio" name="email_encryption" value="ssl" {{EMAIL_SSL_CHECKED}}> SSL
-                            </label>
-                            <label>
-                                <input type="radio" name="email_encryption" value="none" {{EMAIL_NONE_CHECKED}}> None
-                            </label>
-                        </div>
-                        <div class="help-text">Choose one encryption method</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email_from">From Email:</label>
-                        <input type="email" id="email_from" name="email_from" 
-                               value="{{EMAIL_FROM}}" placeholder="backup@yourcompany.com">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email_to">To Email:</label>
-                        <input type="email" id="email_to" name="email_to" 
-                               value="{{EMAIL_TO}}" placeholder="admin@yourcompany.com">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email_username">SMTP Username:</label>
-                        <input type="text" id="email_username" name="email_username" 
-                               value="{{EMAIL_USERNAME}}" placeholder="your.email@gmail.com">
-                        <div class="help-text">Usually your email address</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email_password">SMTP Password:</label>
-                        <input type="password" id="email_password" name="email_password" 
-                               value="{{EMAIL_PASSWORD}}" placeholder="your-app-password">
-                        <div class="help-text">Use app password for Gmail</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="email_queue_enabled" name="email_queue_enabled" {{EMAIL_QUEUE_ENABLED}}
-                                   hx-post="/htmx/queue-settings"
-                                   hx-target="#emailQueueSettings"
-                                   hx-swap="outerHTML"
-                                   hx-include="[name^='email_queue_']"
-                                   hx-trigger="change"
-                                   hx-vals="js:{provider: 'email', enabled: event.target.checked}"
-                                   value="true"> 
-                            Enable notification queueing
-                        </label>
-                        <div class="help-text">Spam prevention - batches messages to avoid frequent notifications</div>
-                        <div id="emailQueueSettings" class="{{EMAIL_QUEUE_SETTINGS_CLASS}}">
-                            <label for="email_queue_interval">Minimum time between messages (minutes):</label>
-                            <input type="number" id="email_queue_interval" name="email_queue_interval" 
-                                   value="{{EMAIL_QUEUE_INTERVAL}}" placeholder="15" min="1" max="1440">
-                            <div class="help-text">Messages will be batched and sent no more frequently than this interval</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <button type="button" id="test_email" class="button button-secondary" onclick="testEmailNotification()">
-                            Send Test Notification
-                        </button>
-                        <div id="email_test_result" class="help-text"></div>
+                        <label for="add_provider">Select Provider:</label>
+                        <select id="add_provider" name="add_provider"
+                                hx-post="/htmx/add-global-notification-provider"
+                                hx-target="#notification-providers"
+                                hx-swap="outerHTML"
+                                hx-trigger="change[target.value != '']">
+                            <option value="">Choose a provider to configure...</option>
+                            {% if not global_settings.notification.telegram %}
+                            <option value="telegram">Telegram</option>
+                            {% endif %}
+                            {% if not global_settings.notification.email %}
+                            <option value="email">Email</option>
+                            {% endif %}
+                        </select>
+                        <div class="help-text">Each provider can only be configured once</div>
                     </div>
                 </div>
             </div>

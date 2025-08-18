@@ -16,12 +16,12 @@
                 
                 <div class="form-group">
                     <label for="restic_password">Repository Password:</label>
-                    <div class="password-input-container">
-                        <input type="password" id="restic_password" name="restic_password" value="{{RESTIC_PASSWORD}}" placeholder="Strong repository password">
-                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('restic_password')" aria-label="Toggle password visibility">
-                            <span class="password-toggle-icon" data-target="restic_password">Show</span>
-                        </button>
-                    </div>
+                    {% set field_id = 'restic_password' %}
+                    {% set field_name = 'restic_password' %}
+                    {% set field_value = restic_password %}
+                    {% set placeholder = 'Strong repository password' %}
+                    {% set hidden = true %}
+                    {% include 'partials/password_field.html' %}
                     <div class="help-text">This password encrypts your entire backup repository. Store it securely!</div>
                 </div>
                 
@@ -32,7 +32,7 @@
                 
                 <div id="restic_local" class="hidden mt-10">
                     <label for="restic_local_path">Local Repository Path:</label>
-                    <input type="text" name="restic_local_path" value="{{RESTIC_LOCAL_PATH}}" placeholder="/var/backups/restic-repo">
+                    <input type="text" name="restic_local_path" value="{{ restic_local_path }}" placeholder="/var/backups/restic-repo">
                     <div class="help-text config-note">
                         <strong>Local Path Requirements:</strong><br>
                         • Must exist and persist via bind mount or named volume<br>
@@ -44,33 +44,33 @@
                 <div id="restic_rest" class="hidden mt-10">
                     <div class="form-group">
                         <label for="restic_rest_hostname">REST Server Hostname:</label>
-                        <input type="text" name="restic_rest_hostname" value="{{RESTIC_REST_HOSTNAME}}" placeholder="backup.example.com">
+                        <input type="text" name="restic_rest_hostname" value="{{ restic_rest_hostname }}" placeholder="backup.example.com">
                     </div>
                     
                     <div class="form-group">
                         <label for="restic_rest_port">Port:</label>
-                        <input type="number" name="restic_rest_port" value="{{RESTIC_REST_PORT}}" placeholder="8000">
+                        <input type="number" name="restic_rest_port" value="{{ restic_rest_port }}" placeholder="8000">
                     </div>
                     
                     <div class="form-group">
                         <label for="restic_rest_path">Path (optional):</label>
-                        <input type="text" name="restic_rest_path" value="{{RESTIC_REST_PATH}}" placeholder="/my-backups">
+                        <input type="text" name="restic_rest_path" value="{{ restic_rest_path }}" placeholder="/my-backups">
                     </div>
                     
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" name="restic_rest_use_https" {{RESTIC_REST_USE_HTTPS_CHECKED}}> Use HTTPS
+                            <input type="checkbox" name="restic_rest_use_https" {% if restic_rest_use_https %}checked{% endif %}> Use HTTPS
                         </label>
                     </div>
                     
                     <div class="form-group">
                         <label for="restic_rest_username">Username (optional):</label>
-                        <input type="text" name="restic_rest_username" value="{{RESTIC_REST_USERNAME}}" placeholder="backup-user">
+                        <input type="text" name="restic_rest_username" value="{{ restic_rest_username }}" placeholder="backup-user">
                     </div>
                     
                     <div class="form-group">
                         <label for="restic_rest_password">Password (optional):</label>
-                        <input type="password" name="restic_rest_password" value="{{RESTIC_REST_PASSWORD}}" placeholder="server-password">
+                        <input type="password" name="restic_rest_password" value="{{ restic_rest_password }}" placeholder="server-password">
                         <div class="help-text">Credentials are optional - some REST servers don't require authentication</div>
                     </div>
                     
@@ -81,19 +81,19 @@
                 
                 <div id="restic_s3" class="hidden mt-10">
                     <label for="restic_s3_endpoint">S3 Endpoint:</label>
-                    <input type="text" name="restic_s3_endpoint" value="{{RESTIC_S3_ENDPOINT}}" placeholder="s3.amazonaws.com">
+                    <input type="text" name="restic_s3_endpoint" value="{{ restic_s3_endpoint }}" placeholder="s3.amazonaws.com">
                     
                     <label for="restic_s3_bucket">Bucket Name:</label>
-                    <input type="text" name="restic_s3_bucket" value="{{RESTIC_S3_BUCKET}}" placeholder="my-backup-bucket">
+                    <input type="text" name="restic_s3_bucket" value="{{ restic_s3_bucket }}" placeholder="my-backup-bucket">
                     
                     <label for="restic_s3_prefix">Prefix (optional):</label>
-                    <input type="text" name="restic_s3_prefix" value="{{RESTIC_S3_PREFIX}}" placeholder="restic">
+                    <input type="text" name="restic_s3_prefix" value="{{ restic_s3_prefix }}" placeholder="restic">
                     
                     <label for="restic_aws_access_key">AWS Access Key ID:</label>
-                    <input type="text" name="restic_aws_access_key" value="{{RESTIC_AWS_ACCESS_KEY}}" placeholder="AKIAIOSFODNN7EXAMPLE">
+                    <input type="text" name="restic_aws_access_key" value="{{ restic_aws_access_key }}" placeholder="AKIAIOSFODNN7EXAMPLE">
                     
                     <label for="restic_aws_secret_key">AWS Secret Access Key:</label>
-                    <input type="password" name="restic_aws_secret_key" value="{{RESTIC_AWS_SECRET_KEY}}" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">
+                    <input type="password" name="restic_aws_secret_key" value="{{ restic_aws_secret_key }}" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">
                     
                     <div class="help-text">
                         <strong>Generated URI:</strong> <span id="s3_uri_preview">s3:s3.amazonaws.com/bucket/prefix</span>
@@ -102,10 +102,10 @@
                 
                 <div id="restic_rclone" class="hidden mt-10">
                     <label for="restic_rclone_remote">rclone Remote Name:</label>
-                    <input type="text" name="restic_rclone_remote" value="{{RESTIC_RCLONE_REMOTE}}" placeholder="gdrive">
+                    <input type="text" name="restic_rclone_remote" value="{{ restic_rclone_remote }}" placeholder="gdrive">
                     
                     <label for="restic_rclone_path">Path:</label>
-                    <input type="text" name="restic_rclone_path" value="{{RESTIC_RCLONE_PATH}}" placeholder="backups">
+                    <input type="text" name="restic_rclone_path" value="{{ restic_rclone_path }}" placeholder="backups">
                     
                     <div class="help-text config-note">
                         <strong>rclone Setup Required:</strong><br>
@@ -121,13 +121,13 @@
                 
                 <div id="restic_sftp" class="hidden mt-10">
                     <label for="restic_sftp_hostname">SFTP Hostname:</label>
-                    <input type="text" name="restic_sftp_hostname" value="{{RESTIC_SFTP_HOSTNAME}}" placeholder="sftp.example.com">
+                    <input type="text" name="restic_sftp_hostname" value="{{ restic_sftp_hostname }}" placeholder="sftp.example.com">
                     
                     <label for="restic_sftp_username">Username:</label>
-                    <input type="text" name="restic_sftp_username" value="{{RESTIC_SFTP_USERNAME}}" placeholder="backup-user">
+                    <input type="text" name="restic_sftp_username" value="{{ restic_sftp_username }}" placeholder="backup-user">
                     
                     <label for="restic_sftp_path">Path:</label>
-                    <input type="text" name="restic_sftp_path" value="{{RESTIC_SFTP_PATH}}" placeholder="/home/backup/repo">
+                    <input type="text" name="restic_sftp_path" value="{{ restic_sftp_path }}" placeholder="/home/backup/repo">
                     
                     <div class="help-text">
                         <strong>Generated URI:</strong> <span id="sftp_uri_preview">sftp:user@hostname:/path</span>
@@ -155,5 +155,5 @@
                 <script src="/static/restic-utils.js"></script>
                 
                 <!-- Repository Maintenance -->
-                {{INCLUDE:job_form_maintenance.html}}
+                {% include 'partials/job_form_maintenance.html' %}
             </div>
