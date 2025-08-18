@@ -89,7 +89,9 @@ class PagesHandler:
         """Show add job form"""
         try:
             form_data = self.job_form_builder.build_empty_form_data()
-            html = self.template_service.render_template('partials/job_form.html', **form_data)
+            form_data['page_title'] = 'Add Job'
+            form_data['form_title'] = 'Add New Backup Job'
+            html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -110,7 +112,9 @@ class PagesHandler:
             
             job_config = jobs[job_name]
             form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
-            html = self.template_service.render_template('partials/job_form.html', **form_data)
+            form_data['page_title'] = f'Edit Job: {job_name}'
+            form_data['form_title'] = f'Edit Backup Job: {job_name}'
+            html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -128,7 +132,15 @@ class PagesHandler:
                 error_form_data = self.job_form_builder.build_form_data_with_error(
                     form_data, job_result['error']
                 )
-                html = self.template_service.render_template('partials/job_form.html', **error_form_data)
+                # Determine if this is add or edit based on job_name
+                job_name_from_form = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name', []), list) else form_data.get('job_name', '')
+                if job_name_from_form:
+                    error_form_data['page_title'] = f'Edit Job: {job_name_from_form}'
+                    error_form_data['form_title'] = f'Edit Backup Job: {job_name_from_form}'
+                else:
+                    error_form_data['page_title'] = 'Add Job'
+                    error_form_data['form_title'] = 'Add New Backup Job'
+                html = self.template_service.render_template('pages/job_form.html', **error_form_data)
                 self._send_html_response(request_handler, html)
                 return
             
@@ -159,7 +171,13 @@ class PagesHandler:
                 error_form_data = self.job_form_builder.build_form_data_with_error(
                     form_data, "Failed to save job configuration"
                 )
-                html = self.template_service.render_template('partials/job_form.html', **error_form_data)
+                if job_name:
+                    error_form_data['page_title'] = f'Edit Job: {job_name}'
+                    error_form_data['form_title'] = f'Edit Backup Job: {job_name}'
+                else:
+                    error_form_data['page_title'] = 'Add Job'
+                    error_form_data['form_title'] = 'Add New Backup Job'
+                html = self.template_service.render_template('pages/job_form.html', **error_form_data)
                 self._send_html_response(request_handler, html)
                 
         except Exception as e:
@@ -167,7 +185,14 @@ class PagesHandler:
             error_form_data = self.job_form_builder.build_form_data_with_error(
                 form_data, f"Save error: {str(e)}"
             )
-            html = self.template_service.render_template('partials/job_form.html', **error_form_data)
+            job_name_from_form = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name', []), list) else form_data.get('job_name', '')
+            if job_name_from_form:
+                error_form_data['page_title'] = f'Edit Job: {job_name_from_form}'
+                error_form_data['form_title'] = f'Edit Backup Job: {job_name_from_form}'
+            else:
+                error_form_data['page_title'] = 'Add Job'
+                error_form_data['form_title'] = 'Add New Backup Job'
+            html = self.template_service.render_template('pages/job_form.html', **error_form_data)
             self._send_html_response(request_handler, html)
     
     def delete_backup_job(self, request_handler, job_name: str):
@@ -195,11 +220,36 @@ class PagesHandler:
     def show_config_manager(self, request_handler):
         """Show configuration management page"""
         try:
+            from models.notifications import PROVIDER_FIELD_SCHEMAS
+            
             global_settings = self.backup_config.get_global_settings()
             
+            # Extract individual field values for template population
+            default_schedule_times = global_settings.get('default_schedule_times', {})
+            
+            # Get available themes for template to handle
+            available_themes = self._get_available_themes()
+            current_theme = global_settings.get('theme', 'dark')
+            
             template_data = {
+                # Keep global_settings for partials that use it
                 'global_settings': global_settings,
-                'page_title': 'Configuration'
+                'provider_schemas': PROVIDER_FIELD_SCHEMAS,
+                'page_title': 'Configuration',
+                
+                # Individual field values for form population
+                'scheduler_timezone': global_settings.get('scheduler_timezone', 'UTC'),
+                'available_themes': available_themes,
+                'current_theme': current_theme,
+                'enable_conflict_avoidance': 'checked' if global_settings.get('enable_conflict_avoidance', True) else '',
+                'conflict_check_interval': str(global_settings.get('conflict_check_interval', 300)),
+                'delay_notification_threshold': str(global_settings.get('delay_notification_threshold', 300)),
+                
+                # Schedule defaults (for legacy field names)
+                'hourly_default': default_schedule_times.get('hourly', '0 * * * *'),
+                'daily_default': default_schedule_times.get('daily', '0 3 * * *'),
+                'weekly_default': default_schedule_times.get('weekly', '0 3 * * 0'),
+                'monthly_default': default_schedule_times.get('monthly', '0 3 1 * *'),
             }
             
             html = self.template_service.render_template('pages/config_manager.html', **template_data)
@@ -208,6 +258,24 @@ class PagesHandler:
         except Exception as e:
             logger.error(f"Config manager error: {e}")
             self._send_error(request_handler, f"Config error: {str(e)}")
+    
+    def _get_available_themes(self):
+        """Get list of available themes by scanning theme directory"""
+        import os
+        themes = []
+        theme_dir = 'static/themes'
+        
+        if os.path.exists(theme_dir):
+            for file in os.listdir(theme_dir):
+                if file.endswith('.css'):
+                    theme_name = file[:-4]  # Remove .css extension
+                    themes.append(theme_name)
+        
+        # Always ensure 'dark' is available as fallback
+        if 'dark' not in themes:
+            themes.append('dark')
+        
+        return sorted(themes)
     
     def show_raw_editor(self, request_handler):
         """Show raw YAML configuration editor"""
@@ -235,13 +303,164 @@ class PagesHandler:
     def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
         """Save structured configuration from form"""
         try:
-            # Parse configuration form data
-            # This would need implementation based on config form structure
+            # Update global settings
+            global_settings = self.backup_config.config.setdefault('global_settings', {})
+            
+            # Basic settings
+            global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
+            
+            # Theme setting (only save if not default 'dark')
+            theme = self._get_form_value(form_data, 'theme', 'dark')
+            if theme != 'dark':
+                global_settings['theme'] = theme
+            elif 'theme' in global_settings:
+                # Remove theme key if set back to default
+                del global_settings['theme']
+            
+            global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
+            global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
+            global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
+            
+            # Default schedule times
+            default_schedule_times = global_settings.setdefault('default_schedule_times', {})
+            default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
+            default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
+            default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
+            default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
+            
+            # Notification settings - delegate to notification form parser
+            self._update_notification_settings(global_settings, form_data)
+            
+            # Save configuration
+            self.backup_config.save_config()
+            
+            # Redirect back to config page
             self._send_redirect(request_handler, '/config')
             
         except Exception as e:
             logger.error(f"Save config error: {e}")
             self._send_error(request_handler, f"Save error: {str(e)}")
+    
+    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
+        """Preview configuration changes without saving"""
+        try:
+            # Build the configuration that would be saved (without actually saving)
+            preview_config = {}
+            global_settings = preview_config.setdefault('global_settings', {})
+            
+            # Basic settings
+            global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
+            
+            # Theme setting
+            theme = self._get_form_value(form_data, 'theme', 'dark')
+            if theme != 'dark':
+                global_settings['theme'] = theme
+            
+            global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
+            global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
+            global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
+            
+            # Default schedule times
+            default_schedule_times = global_settings.setdefault('default_schedule_times', {})
+            default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
+            default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
+            default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
+            default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
+            
+            # Notification settings
+            self._build_notification_preview(global_settings, form_data)
+            
+            # Convert to YAML for display
+            import yaml
+            preview_yaml = yaml.dump(preview_config, default_flow_style=False, indent=2)
+            
+            # Render preview partial
+            html = self.template_service.render_template('partials/config_preview.html', 
+                                                       preview_yaml=preview_yaml,
+                                                       success=True)
+            self._send_html_response(request_handler, html)
+            
+        except Exception as e:
+            logger.error(f"Preview config error: {e}")
+            # Render error preview
+            html = self.template_service.render_template('partials/config_preview.html',
+                                                       error_message=f"Preview error: {str(e)}",
+                                                       success=False)
+            self._send_html_response(request_handler, html)
+    
+    def _build_notification_preview(self, global_settings: dict, form_data: Dict[str, Any]):
+        """Build notification settings for preview (without modifying actual config)"""
+        notification_config = global_settings.setdefault('notification', {})
+        
+        # Process each provider using the schema-driven approach
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = notification_config.setdefault(provider_name, {})
+            
+            # Process top-level fields (including enabled checkbox)
+            for field_info in schema.get('fields', []):
+                self._process_notification_field(provider_config, provider_name, field_info, form_data)
+            
+            # Handle all sections (smtp_config, queue_settings, etc.)
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
+    
+    def _update_notification_settings(self, global_settings: dict, form_data: Dict[str, Any]):
+        """Update notification settings from form data"""
+        notification_config = global_settings.setdefault('notification', {})
+        
+        # Process each provider using the schema-driven approach
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = notification_config.setdefault(provider_name, {})
+            
+            # Process top-level fields (including enabled checkbox)
+            for field_info in schema.get('fields', []):
+                self._process_notification_field(provider_config, provider_name, field_info, form_data)
+            
+            # Handle all sections (smtp_config, queue_settings, etc.)
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
+    
+    def _process_notification_field(self, provider_config: dict, provider_name: str, field_info: dict, form_data: Dict[str, Any]):
+        """Process a single notification field based on its type"""
+        field_name = f"{provider_name}_{field_info['name']}"
+        
+        if field_info['type'] == 'checkbox':
+            provider_config[field_info['name']] = field_name in form_data
+        elif field_info['type'] == 'select' and 'options' in field_info:
+            # Handle select with config_field mapping (e.g., encryption)
+            select_value = self._get_form_value(form_data, field_name, field_info.get('default', ''))
+            # Reset all boolean options first
+            for option in field_info['options']:
+                if 'config_field' in option:
+                    provider_config[option['config_field']] = False
+            # Set the selected option to True
+            for option in field_info['options']:
+                if option['value'] == select_value and 'config_field' in option:
+                    provider_config[option['config_field']] = True
+        elif field_info['type'] == 'number':
+            value = self._get_form_value(form_data, field_name, str(field_info.get('placeholder', '0')))
+            try:
+                provider_config[field_info['name']] = int(value)
+            except ValueError:
+                provider_config[field_info['name']] = int(field_info.get('placeholder', '0'))
+        else:
+            # text, email, password fields
+            provider_config[field_info['name']] = self._get_form_value(form_data, field_name, '')
+    
+    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
+        """Helper to safely get form values handling both list and string formats"""
+        value = form_data.get(field_name, [default])
+        if isinstance(value, list):
+            return value[0] if value else default
+        return str(value)
     
     def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
         """Save raw YAML configuration"""

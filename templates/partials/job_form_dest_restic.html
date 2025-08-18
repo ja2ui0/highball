@@ -33,12 +33,13 @@
                 <div id="restic_local" class="hidden mt-10">
                     <label for="restic_local_path">Local Repository Path:</label>
                     <input type="text" name="restic_local_path" value="{{ restic_local_path }}" placeholder="/var/backups/restic-repo">
-                    <div class="help-text config-note">
-                        <strong>Local Path Requirements:</strong><br>
-                        • Must exist and persist via bind mount or named volume<br>
-                        • Data will be lost when container restarts without proper mounting<br>
-                        • Example: <code>-v /host/backup:/var/backups</code>
-                    </div>
+                    {% set title = "Local Path Requirements" %}
+                    {% set help_lines = [
+                        "Must exist and persist via bind mount or named volume",
+                        "Data will be lost when container restarts without proper mounting"
+                    ] %}
+                    {% set example_command = "-v /host/backup:/var/backups" %}
+                    {% include 'partials/config_help_text.html' %}
                 </div>
                 
                 <div id="restic_rest" class="hidden mt-10">
@@ -107,12 +108,13 @@
                     <label for="restic_rclone_path">Path:</label>
                     <input type="text" name="restic_rclone_path" value="{{ restic_rclone_path }}" placeholder="backups">
                     
-                    <div class="help-text config-note">
-                        <strong>rclone Setup Required:</strong><br>
-                        • Run <code>rclone config</code> on source system to configure remote<br>
-                        • Test with <code>rclone listremotes</code> and <code>rclone lsd remote:</code><br>
-                        • Common remotes: Google Drive, Dropbox, OneDrive, S3-compatible services
-                    </div>
+                    {% set title = "rclone Setup Required" %}
+                    {% set help_lines = [
+                        "Run <code>rclone config</code> on source system to configure remote",
+                        "Test with <code>rclone listremotes</code> and <code>rclone lsd remote:</code>",
+                        "Common remotes: Google Drive, Dropbox, OneDrive, S3-compatible services"
+                    ] %}
+                    {% include 'partials/config_help_text.html' %}
                     
                     <div class="help-text">
                         <strong>Generated URI:</strong> <span id="rclone_uri_preview">rclone:remote:path</span>
@@ -134,22 +136,11 @@
                     </div>
                 </div>
                 
-                <div class="mt-15">
-                    <button type="button" 
-                            hx-post="/htmx/validate-restic"
-                            hx-target="#restic_validation_status"
-                            hx-include="form"
-                            class="button button-warning">
-                        Validate Restic Configuration
-                    </button>
-                </div>
-                
-                <div class="validation-section mt-15">
-                    <h3 class="validation-header">Validation Results</h3>
-                    <div class="validation-content">
-                        <div id="restic_validation_status"></div>
-                    </div>
-                </div>
+                {% set endpoint = "/htmx/validate-restic" %}
+                {% set target = "#restic_validation_status" %}
+                {% set target_id = "restic_validation_status" %}
+                {% set button_text = "Validate Restic Configuration" %}
+                {% include 'partials/validation_button_with_results.html' %}
                 
                 <!-- Include Restic utilities for initialization -->
                 <script src="/static/restic-utils.js"></script>

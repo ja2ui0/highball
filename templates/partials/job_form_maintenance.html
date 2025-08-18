@@ -4,17 +4,14 @@
                         <label>Repository Maintenance:</label>
                         
                         <!-- First Toggle: Auto vs User -->
-                        <div class="toggle-section">
-                            <span class="toggle-label">Auto</span>
-                            <button type="button" class="toggle-switch {{ maintenance_first_toggle_class }}" 
-                                    hx-post="/htmx/maintenance-toggle"
-                                    hx-target="#maintenance_display"
-                                    hx-vals="js:{mode: document.querySelector('#restic_maintenance').value === 'auto' ? 'user' : 'auto'}"
-                                    hx-include="[name^='maintenance_'], [name^='keep_']">
-                                <div class="toggle-button"></div>
-                            </button>
-                            <span class="toggle-label">User</span>
-                        </div>
+                        {% set left_label = "Auto" %}
+                        {% set right_label = "User" %}
+                        {% set toggle_class = maintenance_first_toggle_class %}
+                        {% set endpoint = "/htmx/maintenance-toggle" %}
+                        {% set target = "#maintenance_display" %}
+                        {% set vals = "js:{mode: document.querySelector('#restic_maintenance').value === 'auto' ? 'user' : 'auto'}" %}
+                        {% set include_selector = "[name^='maintenance_'], [name^='keep_']" %}
+                        {% include 'partials/toggle_switch.html' %}
                         
                         <div id="maintenance_display">
                             {{ maintenance_display_html }}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ page_title }} - Highball</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>{{ form_title }}</h1>
+        
+        <form method="post" action="/save-job" enctype="multipart/form-data">
+            {{ hidden_fields | safe }}
+            
+            {% include 'partials/job_identity_section.html' %}
+            {% include 'partials/job_destination_section.html' %}
+            {% include 'partials/job_source_options_section.html' %}
+            {% include 'partials/job_notifications_section.html' %}
+            {% include 'partials/job_actions_section.html' %}
+        </form>
+        
+        {% if delete_form %}{{ delete_form | safe }}{% endif %}
+    </div>
+</body>
+</html>

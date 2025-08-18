@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="{{ theme_css_path }}">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
-    <!-- config-manager.js, config-notifications.js removed - replaced with HTMX -->
 </head>
 <body>
     <div class="container">
@@ -17,133 +16,20 @@
         <form method="post" action="/save-config" enctype="multipart/form-data">
             
             <!-- Global Settings -->
-            <div class="section-container">
-                <h2 class="section-header">Global Settings</h2>
-                
-                <div class="form-group">
-                    <label for="scheduler_timezone">Scheduler Timezone:</label>
-                    <input type="text" id="scheduler_timezone" name="scheduler_timezone" 
-                           value="{{ scheduler_timezone }}" placeholder="UTC">
-                    <div class="help-text">Timezone for scheduled jobs (e.g., America/Denver, UTC)</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="theme">Theme:</label>
-                    <select id="theme" name="theme">
-                        {{ theme_options }}
-                    </select>
-                    <div class="help-text">Visual theme for the interface</div>
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="enable_conflict_avoidance" {{ enable_conflict_avoidance }}> 
-                        Enable Conflict Avoidance
-                    </label>
-                    <div class="help-text">Jobs with shared resources will wait for each other to finish</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="conflict_check_interval">Conflict Check Interval (seconds):</label>
-                    <input type="number" id="conflict_check_interval" name="conflict_check_interval" 
-                           value="{{ conflict_check_interval }}" placeholder="300">
-                    <div class="help-text">How often to check for conflicting jobs (default: 300)</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="delay_notification_threshold">Delay Notification Threshold (seconds):</label>
-                    <input type="number" id="delay_notification_threshold" name="delay_notification_threshold" 
-                           value="{{ delay_notification_threshold }}" placeholder="300">
-                    <div class="help-text">Send notification after jobs are delayed this long (default: 300)</div>
-                </div>
-            </div>
+            {% include 'partials/global_settings_section.html' %}
             
             <!-- Schedule Defaults -->
-            <div class="section-container">
-                <h2 class="section-header">Default Schedule Times</h2>
-                <p>These are the default times used when you select "Daily", "Weekly", or "Hourly" schedules.</p>
-                
-                <div class="form-group">
-                    <label for="hourly_default">Hourly Default:</label>
-                    <input type="text" id="hourly_default" name="hourly_default" 
-                           value="{{ hourly_default }}" placeholder="0 * * * *">
-                    <div class="help-text">Default ("0 * * * *" aka: top of every hour)</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="daily_default">Daily Default:</label>
-                    <input type="text" id="daily_default" name="daily_default" 
-                           value="{{ daily_default }}" placeholder="0 3 * * *">
-                    <div class="help-text">Default ("0 3 * * *" aka: 3:00 AM daily)</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="weekly_default">Weekly Default:</label>
-                    <input type="text" id="weekly_default" name="weekly_default" 
-                           value="{{ weekly_default }}" placeholder="0 3 * * 0">
-                    <div class="help-text">Default ("0 3 * * 0" aka: Sunday 3:00 AM)</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="monthly_default">Monthly Default:</label>
-                    <input type="text" id="monthly_default" name="monthly_default" 
-                           value="{{ monthly_default }}" placeholder="0 3 1 * *">
-                    <div class="help-text">Default ("0 3 1 * *" aka: first of month 3:00 AM)</div>
-                </div>
-            </div>
+            {% include 'partials/schedule_defaults_section.html' %}
             
             <!-- Notification Settings -->
-            <div class="section-container">
-                <h2 class="section-header">Notification Settings</h2>
-                
-                <!-- Configured Providers (show h3 sections for existing providers) -->
-                {% if global_settings.notification.telegram %}
-                {% set provider = 'telegram' %}
-                {% set config = global_settings.notification.telegram %}
-                {% include 'partials/notification_provider.html' %}
-                {% endif %}
-                
-                {% if global_settings.notification.email %}
-                {% set provider = 'email' %}
-                {% set config = global_settings.notification.email %}
-                {% include 'partials/notification_provider.html' %}
-                {% endif %}
-                
-                <!-- Add Provider Dropdown (only show unconfigured providers) -->
-                <div id="notification-providers">
-                    <h3>Add Notification Provider</h3>
-                    <div class="form-group">
-                        <label for="add_provider">Select Provider:</label>
-                        <select id="add_provider" name="add_provider"
-                                hx-post="/htmx/add-global-notification-provider"
-                                hx-target="#notification-providers"
-                                hx-swap="outerHTML"
-                                hx-trigger="change[target.value != '']">
-                            <option value="">Choose a provider to configure...</option>
-                            {% if not global_settings.notification.telegram %}
-                            <option value="telegram">Telegram</option>
-                            {% endif %}
-                            {% if not global_settings.notification.email %}
-                            <option value="email">Email</option>
-                            {% endif %}
-                        </select>
-                        <div class="help-text">Each provider can only be configured once</div>
-                    </div>
-                </div>
-            </div>
+            {% include 'partials/notification_section.html' %}
             
-            <input type="submit" value="Save Configuration" class="button button-success">
-            <a href="/" class="button">Cancel</a>
+            {% include 'partials/config_form_actions.html' %}
             
         </form>
         
         <!-- Advanced Options -->
-        <div class="section-container">
-            <h2 class="section-header">Advanced Options</h2>
-            <a href="/config/raw" class="button">Edit Raw YAML</a>
-            <a href="/reload-config" class="button">Reload from File</a>
-            <a href="/backup-config" class="button button-warning">Download Backup</a>
-        </div>
+        {% include 'partials/advanced_options_section.html' %}
     </div>
     
 </body>

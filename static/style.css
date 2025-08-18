@@ -857,6 +857,12 @@ tr:hover {
     padding: var(--space-xl);
     background-color: var(--bg-quaternary);
     position: relative;
+    margin-bottom: var(--space-xl);
+}
+
+/* Remove bottom margin from last path-group to avoid double spacing */
+.path-group:last-of-type {
+    margin-bottom: 0;
 }
 
 .path-header {

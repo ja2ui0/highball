@@ -222,6 +222,8 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/initialize-restic-repo':
                 self._handlers['api'].initialize_restic_repo(self, form_data)
             
+            elif path == '/preview-config-changes':
+                self._handlers['pages'].preview_config_changes(self, form_data)
             elif path == '/save-config':
                 self._handlers['pages'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':

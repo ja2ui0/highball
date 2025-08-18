@@ -1,46 +1,10 @@
             <div id="source_paths_container">
                 <!-- First path entry with template variables for existing data -->
-                <div class="path-entry" data-path-index="0">
-                    <div class="path-group">
-                        <h3 class="path-header">
-                            <span>Source Path 1</span>
-                        </h3>
-                        
-                        <div class="form-group">
-                            <label for="source_path_0">Path:</label>
-                            <input type="text" id="source_path_0" name="source_paths[]" 
-                                   value="{{ source_path_0 }}" placeholder="/path/to/backup">
-                            <div class="path-validation-row">
-                                <button type="button" class="validate-path-btn button button-secondary" 
-                                        hx-post="/htmx/validate-source-path" 
-                                        hx-target="#path_validation_0"
-                                        hx-vals='{"path_index": "0"}'
-                                        hx-include="#source_path_0, [name='source_ssh_hostname'], [name='source_ssh_username']">
-                                    Validate Path
-                                </button>
-                                <div id="path_validation_0" class="path-validation-result"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="source_includes_0">Include Patterns (optional):</label>
-                            <textarea id="source_includes_0" name="source_includes[]" 
-                                      placeholder="**/*.jpg&#10;documents/**&#10;config.ini">{{ source_includes_0 }}</textarea>
-                            <div class="help-text">
-                                Glob patterns for files to include. Leave empty to include all files.
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="source_excludes_0">Exclude Patterns (optional):</label>
-                            <textarea id="source_excludes_0" name="source_excludes[]" 
-                                      placeholder="**/*.tmp&#10;cache/**&#10;*.log">{{ source_excludes_0 }}</textarea>
-                            <div class="help-text">
-                                Glob patterns for files to exclude from backup.
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {% set path_index = 0 %}
+                {% set path_value = source_path_0 %}
+                {% set includes_value = source_includes_0 %}
+                {% set excludes_value = source_excludes_0 %}
+                {% include 'partials/source_path_entry.html' %}
                 
                 <!-- Additional paths will be added here by HTMX -->
                 
