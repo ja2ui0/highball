@@ -3,12 +3,96 @@ Consolidated Form Parsing Module
 Merges all form parsers into single module with clean class-based organization
 Replaces: job_form_parser.py, ssh_form_parser.py, restic_form_parser.py, local_form_parser.py, 
          rsyncd_form_parser.py, notification_form_parser.py, maintenance_form_parser.py
+Also includes form data structures moved from services/form_data_service.py
 """
 
 from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, field
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# **FORM DATA STRUCTURES** - Configuration dataclasses for form handling
+# =============================================================================
+
+@dataclass
+class SourceConfig:
+    """Form concern: source configuration data structure"""
+    source_type: str = ""
+    local_path: str = ""
+    ssh_hostname: str = ""
+    ssh_username: str = ""
+    ssh_path: str = ""
+    
+    # Multi-path support
+    source_paths: list = field(default_factory=list)
+
+
+@dataclass  
+class DestConfig:
+    """Form concern: standard destination configuration data structure"""
+    dest_type: str = ""
+    local_path: str = ""
+    ssh_hostname: str = ""
+    ssh_username: str = ""
+    ssh_path: str = ""
+    rsyncd_hostname: str = ""
+    rsyncd_share: str = ""
+    rsync_options: str = ""
+
+
+@dataclass
+class ResticConfig:
+    """Form concern: Restic repository configuration data structure"""
+    repo_type: str = ""
+    password: str = ""
+    
+    # Repository type specific fields
+    local_path: str = ""
+    
+    # REST fields
+    rest_hostname: str = ""
+    rest_port: str = "8000"
+    rest_path: str = ""
+    rest_use_https: bool = True
+    
+    # S3 fields
+    s3_bucket: str = ""
+    s3_region: str = ""
+    s3_prefix: str = ""
+    
+    # SFTP fields
+    sftp_hostname: str = ""
+    sftp_path: str = ""
+    
+    # Rclone fields
+    rclone_config: str = ""
+
+
+@dataclass
+class NotificationConfig:
+    """Form concern: notification provider configuration data structure"""
+    provider_type: str = ""
+    notify_on_success: bool = False
+    notify_on_failure: bool = True
+    success_message: str = ""
+    failure_message: str = ""
+
+
+@dataclass
+class JobFormData:
+    """Form concern: complete job form data structure"""
+    job_name: str = ""
+    source_config: SourceConfig = field(default_factory=SourceConfig)
+    dest_config: DestConfig = field(default_factory=DestConfig)
+    restic_config: ResticConfig = field(default_factory=ResticConfig)
+    schedule: str = ""
+    enabled: bool = True
+    respect_conflicts: bool = True
+    auto_maintenance: bool = True
+    notifications: List[NotificationConfig] = field(default_factory=list)
 
 # =============================================================================
 # UTILITY FUNCTIONS - Common form parsing helpers

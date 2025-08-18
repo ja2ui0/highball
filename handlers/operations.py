@@ -20,8 +20,7 @@ from models.rsync import rsync_service
 from models.notifications import create_notification_service
 
 # Import services
-from services.job_logger import JobLogger
-from services.job_conflict_manager import JobConflictManager
+from services.management import JobManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,7 @@ class OperationsHandler:
     def __init__(self, backup_config, template_service):
         self.backup_config = backup_config
         self.template_service = template_service
-        self.job_logger = JobLogger()
-        self.conflict_manager = JobConflictManager()
+        self.job_management = JobManagementService(backup_config)
         self.notification_service = create_notification_service(backup_config.get_global_settings())
     
     # =============================================================================
@@ -46,7 +44,7 @@ class OperationsHandler:
                 self._send_error(request_handler, "Job name is required")
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_error(request_handler, f"Job '{job_name}' not found")
                 return
@@ -60,10 +58,10 @@ class OperationsHandler:
             
             # Check for conflicts if required
             if job_config.get('respect_conflicts', True):
-                if self.conflict_manager.has_conflicts(job_name):
-                    conflicting_jobs = self.conflict_manager.get_conflicting_jobs(job_name)
+                conflicts = self.job_management.check_conflicts(job_name)
+                if conflicts:
                     self._send_error(request_handler, 
-                                   f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicting_jobs)}")
+                                   f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}")
                     return
             
             # Start backup in background thread
@@ -93,10 +91,10 @@ class OperationsHandler:
         
         try:
             # Register running job
-            self.conflict_manager.register_running_job(job_name)
+            self.job_management.register_running_job(job_name)
             
             # Log job start
-            self.job_logger.log_job_start(job_name, dry_run)
+            self.job_management.log_execution(job_name, f"Starting backup job (dry_run={dry_run})")
             
             # Execute backup based on destination type
             dest_type = job_config.get('dest_type')
@@ -117,25 +115,25 @@ class OperationsHandler:
             
             # Log result
             if result['success']:
-                self.job_logger.log_job_success(job_name, duration, result.get('stats', {}))
+                self.job_management.log_status(job_name, 'completed', f"Backup completed in {duration:.2f}s")
                 
                 # Send success notifications if not dry run
                 if not dry_run:
                     self.notification_service.notify_job_success(job_name, duration, job_config)
             else:
-                self.job_logger.log_job_failure(job_name, result['error'])
+                self.job_management.log_status(job_name, 'failed', result['error'])
                 
                 # Send failure notifications
                 self.notification_service.notify_job_failure(job_name, result['error'], job_config)
             
         except Exception as e:
             logger.error(f"Async backup error for {job_name}: {e}")
-            self.job_logger.log_job_failure(job_name, str(e))
+            self.job_management.log_status(job_name, 'failed', str(e))
             self.notification_service.notify_job_failure(job_name, str(e), job_config)
         
         finally:
             # Unregister running job
-            self.conflict_manager.unregister_running_job(job_name)
+            self.job_management.unregister_running_job(job_name)
     
     # =============================================================================
     # RESTORE OPERATIONS
@@ -157,7 +155,7 @@ class OperationsHandler:
                 self._send_error(request_handler, "Snapshot ID is required")
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_error(request_handler, f"Job '{job_name}' not found")
                 return
@@ -289,7 +287,7 @@ class OperationsHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -385,14 +383,14 @@ class OperationsHandler:
                 self._send_error(request_handler, "Job name is required")
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_error(request_handler, f"Job '{job_name}' not found")
                 return
             
             # Add job to scheduler
-            from services.scheduler_service import SchedulerService
-            scheduler = SchedulerService()
+            from services.scheduling import SchedulingService
+            scheduler = SchedulingService()
             
             job_config = jobs[job_name]
             schedule = job_config.get('schedule', 'manual')

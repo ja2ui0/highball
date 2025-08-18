@@ -536,9 +536,9 @@ class ResticRunner:
         """Run backup using container on remote SSH host"""
         try:
             # Use command execution service for container operations
-            from services.command_execution_service import CommandExecutionService
+            from services.execution import ExecutionService
             
-            exec_service = CommandExecutionService()
+            exec_service = ExecutionService()
             
             # Build container command
             container_args = [

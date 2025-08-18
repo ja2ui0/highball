@@ -10,7 +10,7 @@ import sys
 import os
 import json
 from typing import Dict, Any, Optional, List
-from services.job_logger import JobLogger
+from services.management import JobManagementService
 
 
 class RestoreErrorParser:
@@ -194,7 +194,7 @@ class RestoreOverwriteChecker:
     """Service for checking restore overwrite conflicts"""
     
     def __init__(self):
-        self.job_logger = JobLogger()
+        self.job_management = JobManagementService()
     
     def check_restore_overwrites(self, restore_target: str, source_type: str, source_config: Dict[str, Any], 
                                 check_paths: List[str], select_all: bool = False) -> bool:
@@ -208,7 +208,7 @@ class RestoreOverwriteChecker:
                 return False
                 
         except Exception as e:
-            self.job_logger.log_job_execution('system', f'Error checking destination files: {str(e)}', 'WARNING')
+            self.job_management.log_execution('system', f'Error checking destination files: {str(e)}', 'WARNING')
             return False  # Default to no overwrites if check fails
     
     def _check_highball_overwrites(self, check_paths: List[str]) -> bool:
@@ -360,7 +360,7 @@ class RestoreOverwriteChecker:
                     overwrite_paths = [f"Remote: {path}" for path in actual_paths]
         
         except Exception as e:
-            self.job_logger.log_job_execution('system', f'Error getting overwrite paths: {str(e)}', 'WARNING')
+            self.job_management.log_execution('system', f'Error getting overwrite paths: {str(e)}', 'WARNING')
         
         return overwrite_paths
 
@@ -369,7 +369,7 @@ class RestoreExecutionService:
     """Service for executing restore operations with progress tracking"""
     
     def __init__(self):
-        self.job_logger = JobLogger()
+        self.job_management = JobManagementService()
         self.active_restores = {}  # Track active restore operations
         self.error_parser = RestoreErrorParser()
     
@@ -377,8 +377,7 @@ class RestoreExecutionService:
         """Execute dry run restore and return results"""
         try:
             from models.backup import ResticRunner
-            from services.command_execution_service import CommandExecutionService, ExecutionConfig
-            from services.command_obfuscation import obfuscate_password_in_command
+            from services.execution import ExecutionService, ExecutionConfig, obfuscate_password_in_command
             
             job_name = restore_config['job_name']
             
@@ -396,7 +395,7 @@ class RestoreExecutionService:
             
             # Execute using container execution for consistency with backup operations
             config = ExecutionConfig(timeout=300)  # 5 minutes for dry runs
-            executor = CommandExecutionService(config)
+            executor = ExecutionService(config)
             
             # Execute based on transport type
             if restore_command.transport.value == 'ssh':
@@ -417,12 +416,12 @@ class RestoreExecutionService:
             # Log the dry run (obfuscate password)
             job_password = job_config.get('dest_config', {}).get('password', '')
             safe_command = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
-            self.job_logger.log_job_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
-            self.job_logger.log_job_execution(job_name, f"Dry run result: {result.returncode}")
+            self.job_management.log_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
+            self.job_management.log_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
-                self.job_logger.log_job_execution(job_name, f"Dry run stdout: {result.stdout}")
+                self.job_management.log_execution(job_name, f"Dry run stdout: {result.stdout}")
             if result.stderr:
-                self.job_logger.log_job_execution(job_name, f"Dry run stderr: {result.stderr}")
+                self.job_management.log_execution(job_name, f"Dry run stderr: {result.stderr}")
             
             # Get safe command for API response
             safe_command_for_api = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
@@ -459,7 +458,7 @@ class RestoreExecutionService:
         }
         
         # Update job status to show restore in progress
-        self.job_logger.log_job_status(job_name, 'restoring', 'Restore operation starting...')
+        self.job_management.log_status(job_name, 'restoring', 'Restore operation starting...')
         
         # Start background thread
         restore_thread = threading.Thread(
@@ -510,7 +509,7 @@ class RestoreExecutionService:
             # Log restore start
             job_password = job_config.get('dest_config', {}).get('password', '')
             safe_command = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
-            self.job_logger.log_job_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
+            self.job_management.log_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
             # Execute with progress tracking
             process = subprocess.Popen(
@@ -529,9 +528,9 @@ class RestoreExecutionService:
             stderr_output = process.stderr.read()
             
             # Log completion
-            self.job_logger.log_job_execution(job_name, f"Restore completed with code: {return_code}")
+            self.job_management.log_execution(job_name, f"Restore completed with code: {return_code}")
             if stderr_output:
-                self.job_logger.log_job_execution(job_name, f"Restore stderr: {stderr_output}")
+                self.job_management.log_execution(job_name, f"Restore stderr: {stderr_output}")
             
             if return_code == 0:
                 self._finish_restore_success(job_name)
@@ -572,7 +571,7 @@ class RestoreExecutionService:
                 has_started = True
                 
                 # Log output
-                self.job_logger.log_job_execution(job_name, f"Restore output: {output.strip()}")
+                self.job_management.log_execution(job_name, f"Restore output: {output.strip()}")
                 
                 # Try to parse JSON progress (if available)
                 if output.strip().startswith('{'):
@@ -587,7 +586,7 @@ class RestoreExecutionService:
                 
                 if not has_started and time_since_last_output > initial_response_timeout:
                     # Process hasn't started producing output within initial timeout
-                    self.job_logger.log_job_execution(job_name, 
+                    self.job_management.log_execution(job_name, 
                         f"Process appears stuck - no initial output after {initial_response_timeout} seconds", "WARNING")
                     process.terminate()
                     try:
@@ -598,7 +597,7 @@ class RestoreExecutionService:
                 
                 elif has_started and time_since_last_output > ongoing_timeout:
                     # Process was working but stopped producing output
-                    self.job_logger.log_job_execution(job_name, 
+                    self.job_management.log_execution(job_name, 
                         f"Process appears stuck - no output for {ongoing_timeout} seconds", "WARNING")
                     process.terminate()
                     try:
@@ -631,18 +630,18 @@ class RestoreExecutionService:
                 })
                 
                 # Update job status
-                self.job_logger.log_job_status(job_name, 'restoring', f'Restoring... {progress}% ({files_restored}/{total_files} files)')
+                self.job_management.log_status(job_name, 'restoring', f'Restoring... {progress}% ({files_restored}/{total_files} files)')
         
         except Exception as e:
-            self.job_logger.log_job_execution(job_name, f"Progress update error: {str(e)}")
+            self.job_management.log_execution(job_name, f"Progress update error: {str(e)}")
     
     def _finish_restore_success(self, job_name: str):
         """Mark restore as completed successfully"""
         if job_name in self.active_restores:
             del self.active_restores[job_name]
         
-        self.job_logger.log_job_status(job_name, 'restore_completed', 'Restore operation completed successfully')
-        self.job_logger.log_job_execution(job_name, "Restore completed successfully")
+        self.job_management.log_status(job_name, 'restore_completed', 'Restore operation completed successfully')
+        self.job_management.log_execution(job_name, "Restore completed successfully")
     
     def _finish_restore_with_error(self, job_name: str, error_message: str):
         """Mark restore as failed with error"""
@@ -652,8 +651,8 @@ class RestoreExecutionService:
         # Parse error message for clean user display
         clean_message = self.error_parser.parse_error_message(error_message)
         
-        self.job_logger.log_job_status(job_name, 'restore_failed', f'Restore failed: {clean_message}')
-        self.job_logger.log_job_execution(job_name, f"Restore failed: {error_message}", "ERROR")
+        self.job_management.log_status(job_name, 'restore_failed', f'Restore failed: {clean_message}')
+        self.job_management.log_execution(job_name, f"Restore failed: {error_message}", "ERROR")
     
     def get_restore_status(self, job_name: str) -> Dict[str, Any]:
         """Get current restore status for a job"""

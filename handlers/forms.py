@@ -6,7 +6,7 @@ Delegates all business logic to appropriate services
 import logging
 from models.validation import ValidationService
 from models.forms import JobFormParser
-from services.template_service import TemplateService
+from services.template import TemplateService
 
 logger = logging.getLogger(__name__)
 

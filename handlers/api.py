@@ -42,15 +42,15 @@ class APIHandler:
             state_filter = params.get('state', [None])[0]
             fields_filter = params.get('fields', [None])[0]
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             
             # Get job status information
-            from services.job_logger import JobLogger
-            job_logger = JobLogger()
+            from services.management import JobManagementService
+            job_management = JobManagementService(self.backup_config)
             
             job_list = []
             for job_name, job_config in jobs.items():
-                status_info = job_logger.get_job_status(job_name)
+                status_info = job_management.get_status(job_name)
                 
                 job_data = {
                     'name': job_name,
@@ -107,7 +107,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -170,7 +170,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -203,7 +203,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -237,7 +237,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -297,7 +297,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,
@@ -362,7 +362,7 @@ class APIHandler:
                 })
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_json_response(request_handler, {
                     'success': False,

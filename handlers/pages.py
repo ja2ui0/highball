@@ -17,9 +17,8 @@ from models.validation import validation_service
 from models.forms import job_parser
 
 # Import services
-from services.template_service import TemplateService
-from services.job_form_data_builder import JobFormDataBuilder
-from services.form_data_service import FormDataService
+from services.template import TemplateService
+from services.data_services import JobFormDataBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ class PagesHandler:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = JobFormDataBuilder()
-        self.form_data_service = FormDataService()
     
     # =============================================================================
     # DASHBOARD PAGES
@@ -39,16 +37,16 @@ class PagesHandler:
     def show_dashboard(self, request_handler):
         """Show main dashboard with job list"""
         try:
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             global_settings = self.backup_config.get_global_settings()
             
             # Get job status information
-            from services.job_logger import JobLogger
-            job_logger = JobLogger()
+            from services.management import JobManagementService
+            job_management = JobManagementService(self.backup_config)
             
             job_list = []
             for job_name, job_config in jobs.items():
-                status_info = job_logger.get_job_status(job_name)
+                status_info = job_management.get_status(job_name)
                 
                 job_display = {
                     'name': job_name,
@@ -70,7 +68,7 @@ class PagesHandler:
                 'page_title': 'Dashboard'
             }
             
-            html = self.template_service.render_template('dashboard.html', template_data)
+            html = self.template_service.render_template('pages/dashboard.html', **template_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -81,7 +79,7 @@ class PagesHandler:
         """Show add job form"""
         try:
             form_data = self.job_form_builder.build_empty_form_data()
-            html = self.template_service.render_template('job_form.html', form_data)
+            html = self.template_service.render_template('partials/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -95,14 +93,14 @@ class PagesHandler:
                 self._send_error(request_handler, "Job name is required")
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_error(request_handler, f"Job '{job_name}' not found")
                 return
             
             job_config = jobs[job_name]
             form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
-            html = self.template_service.render_template('job_form.html', form_data)
+            html = self.template_service.render_template('partials/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -120,7 +118,7 @@ class PagesHandler:
                 error_form_data = self.job_form_builder.build_form_data_with_error(
                     form_data, job_result['error']
                 )
-                html = self.template_service.render_template('job_form.html', error_form_data)
+                html = self.template_service.render_template('partials/job_form.html', **error_form_data)
                 self._send_html_response(request_handler, html)
                 return
             
@@ -151,7 +149,7 @@ class PagesHandler:
                 error_form_data = self.job_form_builder.build_form_data_with_error(
                     form_data, "Failed to save job configuration"
                 )
-                html = self.template_service.render_template('job_form.html', error_form_data)
+                html = self.template_service.render_template('partials/job_form.html', **error_form_data)
                 self._send_html_response(request_handler, html)
                 
         except Exception as e:
@@ -159,7 +157,7 @@ class PagesHandler:
             error_form_data = self.job_form_builder.build_form_data_with_error(
                 form_data, f"Save error: {str(e)}"
             )
-            html = self.template_service.render_template('job_form.html', error_form_data)
+            html = self.template_service.render_template('partials/job_form.html', **error_form_data)
             self._send_html_response(request_handler, html)
     
     def delete_backup_job(self, request_handler, job_name: str):
@@ -194,7 +192,7 @@ class PagesHandler:
                 'page_title': 'Configuration'
             }
             
-            html = self.template_service.render_template('config.html', template_data)
+            html = self.template_service.render_template('pages/config_manager.html', **template_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -217,7 +215,7 @@ class PagesHandler:
                 'page_title': 'Raw Configuration Editor'
             }
             
-            html = self.template_service.render_template('config_raw.html', template_data)
+            html = self.template_service.render_template('pages/config_editor.html', **template_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -278,7 +276,7 @@ class PagesHandler:
                 self._send_error(request_handler, "Job name is required")
                 return
             
-            jobs = self.backup_config.get_jobs()
+            jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
                 self._send_error(request_handler, f"Job '{job_name}' not found")
                 return
@@ -286,10 +284,10 @@ class PagesHandler:
             job_config = jobs[job_name]
             
             # Get job status and logs
-            from services.job_logger import JobLogger
-            job_logger = JobLogger()
-            status_info = job_logger.get_job_status(job_name)
-            recent_logs = job_logger.get_recent_logs(job_name, limit=50)
+            from services.management import JobManagementService
+            job_management = JobManagementService(self.backup_config)
+            status_info = job_management.get_status(job_name)
+            recent_logs = job_management.get_log_entries(job_name, limit=50)
             
             template_data = {
                 'job_name': job_name,
@@ -299,7 +297,7 @@ class PagesHandler:
                 'page_title': f'Inspect: {job_name}'
             }
             
-            html = self.template_service.render_template('job_inspect.html', template_data)
+            html = self.template_service.render_template('pages/job_inspect.html', **template_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -322,7 +320,7 @@ class PagesHandler:
                 'page_title': f'Debug Logs: {log_type}'
             }
             
-            html = self.template_service.render_template('dev_logs.html', template_data)
+            html = self.template_service.render_template('pages/dev_logs.html', **template_data)
             self._send_html_response(request_handler, html)
             
         except Exception as e:
@@ -401,7 +399,7 @@ class PagesHandler:
                 'page_title': 'Network Scan Results'
             }
             
-            html = self.template_service.render_template('network_scan.html', template_data)
+            html = f"<html><body><h1>Network Scan</h1><pre>{str(template_data)}</pre></body></html>"
             self._send_html_response(request_handler, html)
             
         except subprocess.TimeoutExpired:

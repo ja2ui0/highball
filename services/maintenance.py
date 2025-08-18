@@ -265,8 +265,8 @@ class MaintenanceExecutor:
     """Service for executing maintenance operations"""
     
     def __init__(self):
-        from services.job_logger import JobLogger
-        self.job_logger = JobLogger()
+        from services.management import JobManagementService
+        self.job_management = JobManagementService()
     
     def execute_discard(self, operation: MaintenanceOperation) -> MaintenanceResult:
         """Execute discard operation (combines forget+prune)"""
@@ -369,16 +369,16 @@ class MaintenanceExecutor:
         # Log the command (with password obfuscation)
         from services.command_obfuscation import CommandObfuscationService
         obfuscated_command = CommandObfuscationService.obfuscate_command_array(cmd_array)
-        self.job_logger.log_job_execution(job_name, f"Executing {operation_type}: {' '.join(obfuscated_command)}", 'INFO')
+        self.job_management.log_execution(job_name, f"Executing {operation_type}: {' '.join(obfuscated_command)}", 'INFO')
         
         # Execute via subprocess
         try:
             result = subprocess.run(cmd_array, capture_output=True, text=True, timeout=3600)
             
             if result.returncode == 0:
-                self.job_logger.log_job_execution(job_name, f"Maintenance {operation_type} completed successfully", 'INFO')
+                self.job_management.log_execution(job_name, f"Maintenance {operation_type} completed successfully", 'INFO')
                 if result.stdout.strip():
-                    self.job_logger.log_job_execution(job_name, f"Output: {result.stdout.strip()}", 'INFO')
+                    self.job_management.log_execution(job_name, f"Output: {result.stdout.strip()}", 'INFO')
                 return result.stdout.strip()
             else:
                 error_msg = f"Maintenance {operation_type} failed with exit code {result.returncode}"
@@ -389,7 +389,7 @@ class MaintenanceExecutor:
         except subprocess.TimeoutExpired:
             raise Exception(f"Maintenance {operation_type} timed out after 1 hour")
         except Exception as e:
-            self.job_logger.log_job_execution(job_name, f"Maintenance {operation_type} error: {str(e)}", 'ERROR')
+            self.job_management.log_execution(job_name, f"Maintenance {operation_type} error: {str(e)}", 'ERROR')
             raise
     
     def _add_maintenance_priority(self, command: List[str]) -> List[str]:

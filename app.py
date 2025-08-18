@@ -16,11 +16,11 @@ from handlers.api import APIHandler
 from handlers.forms import FormsHandler
 
 # Legacy handlers for compatibility
-from handlers.job_scheduler import JobSchedulerHandler
+from handlers.scheduler import JobSchedulerHandler
 
 # Services
-from services.template_service import TemplateService
-from services.scheduler_service import SchedulerService
+from services.template import TemplateService
+from services.scheduling import SchedulingService
 # NOTE: we import bootstrap_schedules lazily inside _initialize_services()
 # so a scheduler import error won't take down the whole UI.
 
@@ -53,12 +53,11 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         cls._backup_config = cls._backup_config or BackupConfig(config_path)
         cls._template_service = cls._template_service or TemplateService(cls._backup_config)
         if cls._scheduler_service is None:
-            cls._scheduler_service = SchedulerService()
+            cls._scheduler_service = SchedulingService()
 
         # Register schedules (do not bring down UI if this fails)
         try:
-            from services.schedule_loader import bootstrap_schedules
-            count = bootstrap_schedules(cls._backup_config, cls._scheduler_service)
+            count = cls._scheduler_service.bootstrap_schedules(cls._backup_config)
             print(f"Scheduled {count} backup job(s) from config.")
         except Exception as e:
             print(f"[SCHEDULER] disabled at startup: {e}")

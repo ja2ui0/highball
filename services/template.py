@@ -136,44 +136,6 @@ class TemplateService:
         </html>
         """
     
-    @staticmethod
-    def send_html_response(handler, html_content):
-        """Send HTML response through request handler"""
-        handler.send_response(200)
-        handler.send_header('Content-type', 'text/html')
-        handler.end_headers()
-        handler.wfile.write(html_content.encode())
-    
-    @staticmethod
-    def send_redirect(handler, location):
-        """Send redirect response"""
-        handler.send_response(302)
-        handler.send_header('Location', location)
-        handler.end_headers()
-    
-    @staticmethod
-    def send_json_response(handler, data, status_code=200):
-        """Send JSON response"""
-        import json
-        handler.send_response(status_code)
-        handler.send_header('Content-type', 'application/json')
-        handler.end_headers()
-        handler.wfile.write(json.dumps(data).encode())
-    
-    @staticmethod
-    def send_error_response(handler, message, status_code=400):
-        """Send error response"""
-        html_content = f"""
-        <html>
-        <head><title>Error</title></head>
-        <body>
-            <h1>Error</h1>
-            <p>{html.escape(message)}</p>
-            <a href="/">Back to Dashboard</a>
-        </body>
-        </html>
-        """
-        handler.send_response(status_code)
-        handler.send_header('Content-type', 'text/html')
-        handler.end_headers()
-        handler.wfile.write(html_content.encode())
+    # REMOVED: All HTTP response methods moved to handlers
+    # Template service is now pure template rendering only
+    # HTTP concerns belong in handler layer, not template service
