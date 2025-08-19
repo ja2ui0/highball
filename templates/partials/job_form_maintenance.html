@@ -1,23 +1,24 @@
-                <!-- Repository Maintenance -->
-                <div id="maintenance_section" class="mt-15">
-                    <div class="form-group">
-                        <label>Repository Maintenance:</label>
-                        
-                        <!-- First Toggle: Auto vs User -->
-                        {% set left_label = "Auto" %}
-                        {% set right_label = "User" %}
-                        {% set toggle_class = maintenance_first_toggle_class %}
-                        {% set endpoint = "/htmx/maintenance-toggle" %}
-                        {% set target = "#maintenance_display" %}
-                        {% set vals = "js:{mode: document.querySelector('#restic_maintenance').value === 'auto' ? 'user' : 'auto'}" %}
-                        {% set include_selector = "[name^='maintenance_'], [name^='keep_']" %}
-                        {% include 'partials/toggle_switch.html' %}
-                        
-                        <div id="maintenance_display">
-                            {{ maintenance_display_html }}
-                        </div>
-                        
-                        <!-- Hidden field to track maintenance mode -->
-                        <input type="hidden" id="restic_maintenance" name="restic_maintenance" value="{{ maintenance_mode }}">
-                    </div>
-                </div>
+<!-- Repository Maintenance -->
+<div class="path-group">
+    <h3 class="path-header">
+        <span>Repository Maintenance</span>
+    </h3>
+    
+    <div class="form-group">
+        <label for="restic_maintenance">Maintenance Mode:</label>
+        <select id="restic_maintenance" name="restic_maintenance"
+                hx-post="/htmx/maintenance-fields"
+                hx-target="#maintenance_display"
+                hx-trigger="change"
+                hx-include="[name^='maintenance_'], [name^='keep_']">
+            <option value="auto" {% if maintenance_mode == 'auto' %}selected{% endif %}>Auto (Recommended)</option>
+            <option value="user" {% if maintenance_mode == 'user' %}selected{% endif %}>User Configured</option>
+            <option value="off" {% if maintenance_mode == 'off' %}selected{% endif %}>Disabled</option>
+        </select>
+        <div class="help-text">Choose how repository maintenance is handled</div>
+        
+        <div id="maintenance_display">
+            {{ maintenance_display_html | safe }}
+        </div>
+    </div>
+</div>

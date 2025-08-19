@@ -1,3 +1,10 @@
 <div class="validation-result {{ status_class }}">
-    <span class="status">{{ status_label }}</span> {{ message }}
+    <span class="status">{{ status_label }}</span>
+    {% if details %}
+        {% for detail in details %}
+            {% if loop.first %}{{ detail }}{% else %}<br>{{ detail }}{% endif %}
+        {% endfor %}
+    {% else %}
+        {{ message }}
+    {% endif %}
 </div>

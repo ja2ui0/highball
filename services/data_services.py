@@ -24,7 +24,7 @@ class JobFormDataBuilder:
             'schedule': 'manual',
             'enabled': True,
             'respect_conflicts': True,
-            'auto_maintenance': True,
+            'restic_maintenance': 'auto',
             'source_config': {},
             'dest_config': {},
             'restic_config': {},
@@ -43,7 +43,7 @@ class JobFormDataBuilder:
             'schedule': job_config.get('schedule', 'manual'),
             'enabled': job_config.get('enabled', True),
             'respect_conflicts': job_config.get('respect_conflicts', True),
-            'auto_maintenance': job_config.get('auto_maintenance', True),
+            'restic_maintenance': job_config.get('restic_maintenance', 'auto'),
             'source_config': job_config.get('source_config', {}),
             'dest_config': job_config.get('dest_config', {}),
             'restic_config': self._build_restic_config(job_config.get('dest_type'), job_config.get('dest_config', {})),
@@ -61,7 +61,7 @@ class JobFormDataBuilder:
             'schedule': form_data.get('schedule', ['manual'])[0],
             'enabled': 'enabled' in form_data,
             'respect_conflicts': form_data.get('respect_conflicts', ['on'])[0] == 'on',
-            'auto_maintenance': form_data.get('auto_maintenance', ['on'])[0] == 'on',
+            'restic_maintenance': form_data.get('restic_maintenance', ['auto'])[0],
             'source_config': {},
             'dest_config': {},
             'restic_config': {},
@@ -115,7 +115,7 @@ class JobFormDataBuilder:
             schedule=job_config.get('schedule', 'manual'),
             enabled=job_config.get('enabled', True),
             respect_conflicts=job_config.get('respect_conflicts', True),
-            auto_maintenance=job_config.get('auto_maintenance', True),
+            restic_maintenance=job_config.get('restic_maintenance', 'auto'),
             notifications=notifications
         )
     
@@ -134,7 +134,7 @@ class JobFormDataBuilder:
             schedule=schedule,
             enabled=form_data.get('enabled', False),
             respect_conflicts=form_data.get('respect_conflicts', True),
-            auto_maintenance=form_data.get('auto_maintenance', True)
+            restic_maintenance=form_data.get('restic_maintenance', 'auto')
         )
     
     @classmethod

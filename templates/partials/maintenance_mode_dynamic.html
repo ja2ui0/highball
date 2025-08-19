@@ -1,0 +1,39 @@
+{% if maintenance_mode and maintenance_schemas[maintenance_mode] %}
+{% set schema = maintenance_schemas[maintenance_mode] %}
+
+<div class="help-text">{{ schema.help_text }}</div>
+
+{% if schema.fields %}
+{% for field in schema.fields %}
+<div class="form-group">
+    {% if field.type == 'text' %}
+    <label for="{{ field.name }}">{{ field.label }}:</label>
+    <input type="text" 
+           id="{{ field.name }}" 
+           name="{{ field.name }}" 
+           value="{{ field_values[field.name] if field_values and field.name in field_values else field.default }}"
+           {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+           {% if field.required %}required{% endif %}>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'number' %}
+    <label for="{{ field.name }}">{{ field.label }}:</label>
+    <input type="number" 
+           id="{{ field.name }}" 
+           name="{{ field.name }}" 
+           value="{{ field_values[field.name] if field_values and field.name in field_values else field.default }}"
+           {% if field.min %}min="{{ field.min }}"{% endif %}
+           {% if field.max %}max="{{ field.max }}"{% endif %}
+           {% if field.required %}required{% endif %}>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% endif %}

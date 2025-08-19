@@ -83,6 +83,9 @@ class FormsHandler:
             'restic-repo-fields': self._render_restic_repo_fields,
             'cron-field': self._render_cron_field,
             'toggle-password-visibility': self._toggle_password_visibility,
+            
+            # URI preview
+            'restic-uri-preview': self._generate_restic_uri_preview,
         }
         
         handler_func = actions.get(action)
@@ -232,10 +235,30 @@ class FormsHandler:
     
     def _validate_restic(self, form_data):
         """HTTP coordination: extract params, delegate restic validation, render response"""
-        # HTTP concern: extract parameters from request
-        repo_type = self._get_form_value(form_data, 'repo_type')
-        repo_uri = self._get_form_value(form_data, 'repo_uri') 
-        password = self._get_form_value(form_data, 'password')
+        # HTTP concern: extract parameters from request using correct field names
+        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        password = self._get_form_value(form_data, 'restic_password')
+        
+        if not repo_type:
+            return self.template_service.render_validation_status('restic', {
+                'valid': False, 'error': 'Repository type is required'
+            })
+        
+        if not password:
+            return self.template_service.render_validation_status('restic', {
+                'valid': False, 'error': 'Repository password is required'
+            })
+        
+        # Build URI from individual repository fields using existing URI builder
+        from models.forms import DestinationParser
+        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+        
+        if not uri_result.get('valid'):
+            return self.template_service.render_validation_status('restic', {
+                'valid': False, 'error': uri_result.get('error', 'Invalid repository configuration')
+            })
+        
+        repo_uri = uri_result['uri']
         
         # Business logic concern: delegate to validation service
         result = self.validation_service.validate_restic_config(repo_type, repo_uri, password)
@@ -316,36 +339,12 @@ class FormsHandler:
         current_paths = form_data.get('source_paths[]', [])
         path_index = len(current_paths)
         
-        return f'''
-        <div id="source_path_{path_index}" class="source-path-entry">
-            <div class="path-group">
-                <h3>Source Path {path_index + 1}
-                    <button type="button" class="remove-path-btn button button-danger"
-                            hx-post="/htmx/remove-source-path"
-                            hx-target="#source_path_{path_index}"
-                            hx-swap="outerHTML">Remove</button>
-                </h3>
-                <div class="form-group">
-                    <label>Path:</label>
-                    <input type="text" name="source_paths[]" required>
-                    <button type="button" 
-                            hx-post="/htmx/validate-source-path"
-                            hx-include="closest .source-path-entry"
-                            hx-target="next .path-validation"
-                            hx-swap="innerHTML">Validate</button>
-                    <div class="path-validation"></div>
-                </div>
-                <div class="form-group">
-                    <label>Include patterns (one per line):</label>
-                    <textarea name="source_includes[]" placeholder="*.txt&#10;documents/"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Exclude patterns (one per line):</label>
-                    <textarea name="source_excludes[]" placeholder="*.tmp&#10;.git/"></textarea>
-                </div>
-            </div>
-        </div>
-        '''
+        return self.template_service.render_template('partials/source_path_entry.html',
+                                                   path_index=path_index,
+                                                   path_value='',
+                                                   includes_value='',
+                                                   excludes_value='',
+                                                   validation_result='')
     
     def _remove_source_path(self, form_data):
         """Remove a source path entry"""
@@ -461,11 +460,22 @@ class FormsHandler:
     # =============================================================================
     
     def _render_maintenance_fields(self, form_data):
-        """Render maintenance configuration fields"""
-        auto_maintenance = self._get_form_value(form_data, 'auto_maintenance', 'true') == 'true'
+        """Render maintenance configuration fields based on selected mode"""
+        maintenance_mode = self._get_form_value(form_data, 'restic_maintenance', 'auto')
         
-        return self.template_service.render_template('partials/maintenance_auto_fields.html',
-                                                   auto_maintenance=auto_maintenance)
+        from models.backup import MAINTENANCE_MODE_SCHEMAS
+        
+        # Extract current field values from form data or use defaults
+        field_values = {}
+        if maintenance_mode == 'user':
+            schema = MAINTENANCE_MODE_SCHEMAS.get('user', {})
+            for field in schema.get('fields', []):
+                field_values[field['name']] = self._get_form_value(form_data, field['name'], field.get('default', ''))
+        
+        return self.template_service.render_template('partials/maintenance_mode_dynamic.html',
+                                                   maintenance_mode=maintenance_mode,
+                                                   maintenance_schemas=MAINTENANCE_MODE_SCHEMAS,
+                                                   field_values=field_values)
     
     def _render_rsyncd_fields(self, form_data):
         """Render rsyncd-specific fields based on current state"""
@@ -671,3 +681,32 @@ class FormsHandler:
         # TODO: Remove provider from global config and render updated notification section
         return self.template_service.render_template('partials/notification_provider_removed.html',
                                                     provider=provider)
+    
+    def _generate_restic_uri_preview(self, form_data):
+        """Generate real-time URI preview for repository configuration"""
+        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        
+        if not repo_type:
+            return self.template_service.render_template('partials/uri_preview.html',
+                                                       uri='Select repository type to see URI preview')
+        
+        # Use existing URI builder from forms module
+        from models.forms import DestinationParser
+        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+        
+        if uri_result.get('valid'):
+            # Mask password in display
+            uri = uri_result['uri']
+            if ':' in uri and '@' in uri:
+                # Replace password with *** for display
+                parts = uri.split('@')
+                if len(parts) == 2:
+                    auth_part = parts[0]
+                    if ':' in auth_part:
+                        scheme_and_user = auth_part.rsplit(':', 1)[0]
+                        uri = f"{scheme_and_user}:***@{parts[1]}"
+            
+            return self.template_service.render_template('partials/uri_preview.html', uri=uri)
+        else:
+            return self.template_service.render_template('partials/uri_preview.html',
+                                                       uri=uri_result.get('error', 'Invalid configuration'))

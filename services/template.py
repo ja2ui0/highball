@@ -167,9 +167,27 @@ class TemplateService:
                         details.append(f"Path permissions: {permissions}")
                 # Removed redundant path_status - the main error message already indicates path issues
         
+        # Determine status class and label
+        if result.get('valid', False):
+            status_class = 'success'
+            status_label = '[OK]'
+        else:
+            status_class = 'error'
+            status_label = '[ERROR]'
+        
+        # Build message from details or error
+        if details:
+            # Pass details as a list for proper formatting in template
+            message = None
+        else:
+            message = result.get('error', 'Validation failed')
+            details = None
+        
         # Use Jinja2 template to render the result
         return self.render_template('partials/validation_result.html', 
-                                   result=result, 
+                                   status_class=status_class,
+                                   status_label=status_label,
+                                   message=message,
                                    details=details)
     
     

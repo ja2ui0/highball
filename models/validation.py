@@ -333,7 +333,7 @@ class ResticValidator:
                 return {'valid': False, 'error': 'Repository password is required'}
             
             # Test repository access via service
-            from services.restic_repository_service import ResticRepositoryService
+            from models.backup import ResticRepositoryService
             repo_service = ResticRepositoryService()
             repo_test = repo_service.test_repository_access({'dest_config': restic_config})
             

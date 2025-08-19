@@ -155,11 +155,66 @@ PROVIDER_FIELD_SCHEMAS = {
 </div>
 ```
 
+## Maintenance System Migration Achievements
+
+**Problem Solved**: Replaced legacy `auto_maintenance` boolean with proper three-mode system (`restic_maintenance: auto|user|off`)
+
+### **Schema-Driven Maintenance System**
+- **`MAINTENANCE_MODE_SCHEMAS`** in `models/backup.py` defines all three modes with field definitions
+- **Auto mode**: No fields, uses defaults from `MaintenanceDefaults` class
+- **User mode**: 8 configurable fields (schedules + retention policy) with proper min/max validation
+- **Off mode**: No fields, disables maintenance completely
+
+### **Form Parser Migration**
+**Fixed**: `models/forms.py` - `MaintenanceParser.parse_maintenance_config()` now handles:
+- `restic_maintenance` field extraction (auto|user|off)
+- User mode custom field parsing (schedules, retention policy)
+- Only saves non-default values to config (auto uses hardcoded defaults)
+
+### **Data Structure Migration** 
+**Updated**: All dataclasses and services migrated from `auto_maintenance: bool` to `restic_maintenance: str`
+- `JobFormData.restic_maintenance: str = "auto"`
+- `services/data_services.py` - all form builders updated
+- `services/maintenance.py` - bootstrap and scheduling logic updated
+
+### **Maintenance Template System**
+**Template Structure**: Simple dropdown replaces complex toggle system for immediate functionality
+```html
+<select id="restic_maintenance" name="restic_maintenance" hx-post="/htmx/maintenance-fields">
+  <option value="auto">Auto (Recommended)</option>
+  <option value="user">User Configured</option>
+  <option value="off">Disabled</option>
+</select>
+```
+
+### **Handler Implementation Status**
+**Partial**: `handlers/forms.py._render_maintenance_fields()` - logic implemented but needs schema-driven template:
+- Extracts `restic_maintenance` mode from form
+- Calls appropriate template based on mode
+- Passes field defaults from schema for user mode
+
+**NEXT CRITICAL STEP**: Create universal maintenance template using schema pattern like `restic_repo_fields_dynamic.html`:
+1. Create `templates/partials/maintenance_mode_dynamic.html` 
+2. Use `MAINTENANCE_MODE_SCHEMAS` to render fields dynamically
+3. Update handler to pass schema data to template
+4. Test dropdown functionality and field rendering
+
+### **Legacy Cleanup Completed**
+- ✅ Removed all `auto_maintenance` references from codebase
+- ✅ Updated bootstrap logic to use `restic_maintenance in ['auto', 'user']`
+- ✅ Updated config documentation in CLAUDE.md
+
 ## Next Session Continuation
 
-**Immediate Priority**: All HTML extraction COMPLETED for forms.py
+**IMMEDIATE PRIORITY**: Complete maintenance system with universal schema-driven template
+
+**Critical Next Steps**:
+1. **Create universal maintenance template** - `maintenance_mode_dynamic.html` using schema pattern
+2. **Update handler** - pass `MAINTENANCE_MODE_SCHEMAS` and current values to template  
+3. **Test dropdown functionality** - verify mode switching and field rendering
+4. **Remove old templates** - `maintenance_auto_fields.html` no longer needed
 
 **Future Priorities**:
 1. **Test Core Functionality** - backup execution, restore operations, notifications
-2. **Apply patterns to remaining pages** - job_inspect.html, dev_logs.html, logs.html
+2. **Apply patterns to remaining pages** - job_inspect.html, dev_logs.html, logs.html  
 3. **Framework migration** - Only after core functionality verified

@@ -16,7 +16,13 @@
            {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
            {% if field.min %}min="{{ field.min }}"{% endif %}
            {% if field.max %}max="{{ field.max }}"{% endif %}
-           {% if field.required %}required{% endif %}>
+           {% if field.required %}required{% endif %}
+           {% if repo_type == 'rest' %}
+           hx-post="/htmx/restic-uri-preview"
+           hx-target="#uri_preview_container"
+           hx-include="[name='restic_repo_type'], [name^='rest_']"
+           hx-trigger="input delay:300ms"
+           {% endif %}>
     {% if field.help %}
     <div class="help-text">{{ field.help }}</div>
     {% endif %}
@@ -37,7 +43,13 @@
     <label>
         <input type="checkbox" 
                name="{{ field.name }}" 
-               {% if field_values and field_values[field.name] %}checked{% endif %}> 
+               {% if field_values and field_values[field.name] %}checked{% endif %}
+               {% if repo_type == 'rest' %}
+               hx-post="/htmx/restic-uri-preview"
+               hx-target="#uri_preview_container"
+               hx-include="[name='restic_repo_type'], [name^='rest_']"
+               hx-trigger="change"
+               {% endif %}> 
         {{ field.label }}
     </label>
     {% if field.help %}
@@ -47,5 +59,16 @@
     {% endif %}
 </div>
 {% endfor %}
+
+{% if repo_type == 'rest' %}
+    <div class="form-group">
+        <label>Generated URI:</label>
+        <div id="uri_preview_container" class="uri-preview">
+            <code>http://hostname:8000/repo</code>
+        </div>
+        <div class="help-text">This is the URI that will be used for the repository</div>
+    </div>
+{% endif %}
+
 </div>
 {% endif %}

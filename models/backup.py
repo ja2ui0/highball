@@ -95,12 +95,39 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'max': 65535
             },
             {
-                'name': 'rest_repo_name',
+                'name': 'rest_path',
                 'type': 'text',
-                'label': 'Repository Name',
-                'help': 'Name/path of the repository on the REST server',
-                'placeholder': 'my-backup-repo',
-                'required': True
+                'label': 'Repository Path',
+                'help': 'Path to the repository on the REST server',
+                'placeholder': '/my-backup-repo'
+            },
+            {
+                'name': 'rest_use_root',
+                'type': 'checkbox',
+                'label': 'Use Repository Root',
+                'help': 'Connect to repository served directly from server root (no additional path)',
+                'default': False
+            },
+            {
+                'name': 'rest_use_https',
+                'type': 'checkbox',
+                'label': 'Use HTTPS',
+                'help': 'Use HTTPS instead of HTTP (recommended for production)',
+                'default': False
+            },
+            {
+                'name': 'rest_username',
+                'type': 'text',
+                'label': 'Username (Optional)',
+                'help': 'HTTP Basic Auth username if server requires authentication',
+                'placeholder': 'username'
+            },
+            {
+                'name': 'rest_password',
+                'type': 'password',
+                'label': 'Password (Optional)',
+                'help': 'HTTP Basic Auth password if server requires authentication',
+                'placeholder': 'password'
             }
         ]
     },
@@ -179,6 +206,99 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             }
         ]
+    }
+}
+
+# Maintenance mode schemas for dynamic form generation
+MAINTENANCE_MODE_SCHEMAS = {
+    'auto': {
+        'display_name': 'Auto (Recommended)',
+        'description': 'Use safe defaults for maintenance schedules and retention',
+        'help_text': 'Automatic maintenance uses safe defaults: daily cleanup at 3am, weekly integrity checks Sunday 2am, keeps last 7 snapshots plus 7 daily, 4 weekly, 6 monthly.',
+        'fields': []
+    },
+    'user': {
+        'display_name': 'User Configured',
+        'description': 'Configure custom maintenance schedules and retention policies',
+        'help_text': 'Configure your own maintenance schedules and retention policies. These will override the defaults when saved.',
+        'fields': [
+            {
+                'name': 'maintenance_discard_schedule',
+                'type': 'text',
+                'label': 'Discard Schedule (Cron)',
+                'help': 'When to run cleanup (forget + prune operations)',
+                'placeholder': '0 3 * * *',
+                'default': '0 3 * * *'
+            },
+            {
+                'name': 'maintenance_check_schedule',
+                'type': 'text',
+                'label': 'Check Schedule (Cron)',
+                'help': 'When to run integrity checks',
+                'placeholder': '0 2 * * 0',
+                'default': '0 2 * * 0'
+            },
+            {
+                'name': 'keep_last',
+                'type': 'number',
+                'label': 'Keep Last',
+                'help': 'Always keep this many recent snapshots',
+                'default': '7',
+                'min': 1,
+                'max': 100
+            },
+            {
+                'name': 'keep_hourly',
+                'type': 'number',
+                'label': 'Keep Hourly',
+                'help': 'Keep this many hourly snapshots',
+                'default': '6',
+                'min': 0,
+                'max': 100
+            },
+            {
+                'name': 'keep_daily',
+                'type': 'number',
+                'label': 'Keep Daily',
+                'help': 'Keep this many daily snapshots',
+                'default': '7',
+                'min': 0,
+                'max': 100
+            },
+            {
+                'name': 'keep_weekly',
+                'type': 'number',
+                'label': 'Keep Weekly',
+                'help': 'Keep this many weekly snapshots',
+                'default': '4',
+                'min': 0,
+                'max': 100
+            },
+            {
+                'name': 'keep_monthly',
+                'type': 'number',
+                'label': 'Keep Monthly',
+                'help': 'Keep this many monthly snapshots',
+                'default': '6',
+                'min': 0,
+                'max': 100
+            },
+            {
+                'name': 'keep_yearly',
+                'type': 'number',
+                'label': 'Keep Yearly',
+                'help': 'Keep this many yearly snapshots',
+                'default': '0',
+                'min': 0,
+                'max': 100
+            }
+        ]
+    },
+    'off': {
+        'display_name': 'Disabled',
+        'description': 'Disable automatic maintenance completely',
+        'help_text': 'Repository maintenance is disabled. This may cause your repository to grow without bounds and potential corruption may go undetected. Only disable if you handle maintenance externally.',
+        'fields': []
     }
 }
 

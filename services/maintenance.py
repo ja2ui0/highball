@@ -168,11 +168,13 @@ class MaintenanceConfigManager:
         if job_config.get('dest_type') != 'restic':
             return {'applicable': False, 'reason': 'Not a Restic job'}
         
-        auto_maintenance = job_config.get('auto_maintenance', True)
+        maintenance_mode = job_config.get('restic_maintenance', 'auto')
+        maintenance_enabled = maintenance_mode in ['auto', 'user']
         
         return {
             'applicable': True,
-            'auto_maintenance_enabled': auto_maintenance,
+            'maintenance_enabled': maintenance_enabled,
+            'maintenance_mode': maintenance_mode,
             'discard_schedule': self.get_discard_schedule(job_name),
             'check_schedule': self.get_check_schedule(job_name),
             'retention_policy': self.get_retention_policy(job_name)
@@ -578,9 +580,10 @@ def bootstrap_maintenance_schedules(backup_config, scheduler_service, notificati
     scheduled_count = 0
     
     for job_name, job_config in jobs.items():
-        # Only schedule for Restic jobs with auto maintenance enabled
+        # Only schedule for Restic jobs with maintenance enabled (auto or user mode)
+        maintenance_mode = job_config.get('restic_maintenance', 'auto')
         if (job_config.get('dest_type') == 'restic' and 
-            job_config.get('auto_maintenance', True)):
+            maintenance_mode in ['auto', 'user']):
             
             maintenance_service.schedule_job_maintenance(job_name)
             scheduled_count += 1
@@ -597,14 +600,15 @@ def update_job_maintenance_schedule(job_name: str, job_config: dict, backup_conf
         notification_service=notification_service
     )
     
-    # Reschedule if it's a Restic job, otherwise unschedule
+    # Reschedule if it's a Restic job with maintenance enabled, otherwise unschedule
+    maintenance_mode = job_config.get('restic_maintenance', 'auto')
     if (job_config.get('dest_type') == 'restic' and 
-        job_config.get('auto_maintenance', True)):
+        maintenance_mode in ['auto', 'user']):
         maintenance_service.reschedule_job_maintenance(job_name)
-        print(f"INFO: Updated maintenance schedule for job '{job_name}'")
+        print(f"INFO: Updated maintenance schedule for job '{job_name}' (mode: {maintenance_mode})")
     else:
         maintenance_service.unschedule_job_maintenance(job_name)
-        print(f"INFO: Unscheduled maintenance for job '{job_name}'")
+        print(f"INFO: Unscheduled maintenance for job '{job_name}' (mode: {maintenance_mode})")
 
 
 def remove_job_maintenance_schedule(job_name: str, backup_config, scheduler_service):

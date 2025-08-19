@@ -56,7 +56,10 @@ class ResticConfig:
     rest_hostname: str = ""
     rest_port: str = "8000"
     rest_path: str = ""
+    rest_use_root: bool = False
     rest_use_https: bool = True
+    rest_username: str = ""
+    rest_password: str = ""
     
     # S3 fields
     s3_bucket: str = ""
@@ -91,7 +94,7 @@ class JobFormData:
     schedule: str = ""
     enabled: bool = True
     respect_conflicts: bool = True
-    auto_maintenance: bool = True
+    restic_maintenance: str = "auto"
     notifications: List[NotificationConfig] = field(default_factory=list)
 
 # =============================================================================
@@ -245,14 +248,43 @@ class DestinationParser:
         elif repo_type == 'rest':
             hostname = safe_get_value(form_data, 'rest_hostname')
             port = safe_get_value(form_data, 'rest_port', '8000')
-            repo_name = safe_get_value(form_data, 'rest_repo_name')
+            path = safe_get_value(form_data, 'rest_path', '')
+            use_root = safe_get_value(form_data, 'rest_use_root') == 'on'
+            use_https = safe_get_value(form_data, 'rest_use_https') == 'on'
+            username = safe_get_value(form_data, 'rest_username', '')
+            password = safe_get_value(form_data, 'rest_password', '')
             
             if not hostname:
                 return {'valid': False, 'error': 'REST server hostname is required'}
-            if not repo_name:
-                return {'valid': False, 'error': 'REST repository name is required'}
             
-            return {'valid': True, 'uri': f'rest:http://{hostname}:{port}/{repo_name}'}
+            # Validate path logic: either path OR use_root must be true, but not both, not neither
+            has_path = bool(path.strip())
+            if has_path and use_root:
+                return {'valid': False, 'error': 'Cannot specify both repository path and use repository root - choose one'}
+            if not has_path and not use_root:
+                return {'valid': False, 'error': 'Must specify either a repository path or check "Use Repository Root"'}
+            
+            # Build URI components
+            scheme = 'https' if use_https else 'http'
+            
+            # Build authority (user:pass@host:port or just host:port)
+            authority = f'{hostname}:{port}'
+            if username and password:
+                authority = f'{username}:{password}@{authority}'
+            elif username:
+                authority = f'{username}@{authority}'
+            
+            # Build path
+            if use_root:
+                uri_path = ''  # No trailing slash for repository root
+            else:
+                # Ensure path starts with /
+                clean_path = path.strip()
+                if not clean_path.startswith('/'):
+                    clean_path = '/' + clean_path
+                uri_path = clean_path
+            
+            return {'valid': True, 'uri': f'rest:{scheme}://{authority}{uri_path}'}
             
         elif repo_type == 's3':
             bucket = safe_get_value(form_data, 's3_bucket')
@@ -402,18 +434,34 @@ class MaintenanceParser:
     @staticmethod
     def parse_maintenance_config(form_data):
         """Parse maintenance configuration from form data"""
-        auto_maintenance = 'auto_maintenance' in form_data
+        maintenance_mode = safe_get_value(form_data, 'restic_maintenance', 'auto')
         
-        # Default maintenance config if auto-maintenance is enabled
-        if auto_maintenance:
-            maintenance_config = {
-                'auto_maintenance': True,
-                # Could add custom schedules here if form provides them
-                # 'discard_schedule': safe_get_value(form_data, 'maintenance_discard_schedule'),
-                # 'check_schedule': safe_get_value(form_data, 'maintenance_check_schedule'),
-            }
-        else:
-            maintenance_config = {'auto_maintenance': False}
+        maintenance_config = {'restic_maintenance': maintenance_mode}
+        
+        # If user mode, include custom schedules and retention if provided
+        if maintenance_mode == 'user':
+            # Custom schedules
+            discard_schedule = safe_get_value(form_data, 'maintenance_discard_schedule')
+            if discard_schedule:
+                maintenance_config['maintenance_discard_schedule'] = discard_schedule
+                
+            check_schedule = safe_get_value(form_data, 'maintenance_check_schedule') 
+            if check_schedule:
+                maintenance_config['maintenance_check_schedule'] = check_schedule
+            
+            # Custom retention policy
+            retention_fields = ['keep_last', 'keep_hourly', 'keep_daily', 'keep_weekly', 'keep_monthly', 'keep_yearly']
+            retention_policy = {}
+            for field in retention_fields:
+                value = safe_get_value(form_data, field)
+                if value:
+                    try:
+                        retention_policy[field] = int(value)
+                    except ValueError:
+                        pass  # Skip invalid values
+            
+            if retention_policy:
+                maintenance_config['retention_policy'] = retention_policy
         
         return {'valid': True, 'maintenance_config': maintenance_config}
 
