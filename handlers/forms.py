@@ -252,78 +252,45 @@ class FormsHandler:
         source_type = form_data.get('source_type', [''])[0]
         
         if source_type == 'ssh':
-            return '''
-            <div class="form-group">
-                <label for="hostname">Hostname:</label>
-                <input type="text" id="hostname" name="hostname" required>
-            </div>
-            <div class="form-group">
-                <label for="username">Username:</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <button type="button" class="button button-secondary"
-                        hx-post="/htmx/validate-ssh-source"
-                        hx-include="closest form"
-                        hx-target="#ssh_validation_result"
-                        hx-swap="innerHTML">Validate SSH Connection</button>
-                <div id="ssh_validation_result"></div>
-            </div>
-            '''
+            hostname = self._get_form_value(form_data, 'hostname')
+            username = self._get_form_value(form_data, 'username')
+            return self.template_service.render_template('partials/source_ssh_fields.html',
+                                                       hostname=hostname,
+                                                       username=username)
         elif source_type == 'local':
-            return '<div class="info-message">Local filesystem source - no additional configuration needed</div>'
+            return self.template_service.render_template('partials/info_message.html',
+                                                       message='Local filesystem source - no additional configuration needed')
         else:
-            return '<div class="info-message">Select a source type to configure</div>'
+            return self.template_service.render_template('partials/info_message.html',
+                                                       message='Select a source type to configure')
     
     def _render_dest_fields(self, form_data):
         """Render destination-specific fields based on destination type"""
         dest_type = form_data.get('dest_type', [''])[0]
         
         if dest_type == 'ssh':
-            return '''
-            <div class="form-group">
-                <label for="dest_hostname">Hostname:</label>
-                <input type="text" id="dest_hostname" name="dest_hostname" required>
-            </div>
-            <div class="form-group">
-                <label for="dest_username">Username:</label>
-                <input type="text" id="dest_username" name="dest_username" required>
-            </div>
-            <div class="form-group">
-                <label for="dest_path">Destination Path:</label>
-                <input type="text" id="dest_path" name="dest_path" required>
-            </div>
-            <div class="form-group">
-                <button type="button" class="button button-secondary"
-                        hx-post="/htmx/validate-ssh-dest"
-                        hx-include="closest form"
-                        hx-target="#ssh_dest_validation_result"
-                        hx-swap="innerHTML">Validate SSH Destination</button>
-                <div id="ssh_dest_validation_result"></div>
-            </div>
-            '''
+            dest_hostname = self._get_form_value(form_data, 'dest_hostname')
+            dest_username = self._get_form_value(form_data, 'dest_username')
+            dest_path = self._get_form_value(form_data, 'dest_path')
+            return self.template_service.render_template('partials/dest_ssh_fields.html',
+                                                       dest_hostname=dest_hostname,
+                                                       dest_username=dest_username,
+                                                       dest_path=dest_path)
         elif dest_type == 'local':
-            return '''
-            <div class="form-group">
-                <label for="dest_path">Destination Path:</label>
-                <input type="text" id="dest_path" name="dest_path" required>
-            </div>
-            '''
+            dest_path = self._get_form_value(form_data, 'dest_path')
+            return self.template_service.render_template('partials/dest_local_fields.html',
+                                                       dest_path=dest_path)
         elif dest_type == 'rsyncd':
-            return '''
-            <div class="form-group">
-                <label for="rsyncd_hostname">Hostname:</label>
-                <input type="text" id="rsyncd_hostname" name="rsyncd_hostname" required>
-            </div>
-            <div class="form-group">
-                <label for="rsyncd_share">Share:</label>
-                <input type="text" id="rsyncd_share" name="rsyncd_share" required>
-            </div>
-            '''
+            rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
+            rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
+            return self.template_service.render_template('partials/dest_rsyncd_fields.html',
+                                                       rsyncd_hostname=rsyncd_hostname,
+                                                       rsyncd_share=rsyncd_share)
         elif dest_type == 'restic':
             return self._render_restic_fields(form_data)
         else:
-            return '<div class="info-message">Select a destination type to configure</div>'
+            return self.template_service.render_template('partials/info_message.html',
+                                                       message='Select a destination type to configure')
     
     def _render_restic_fields(self, form_data):
         """Render Restic repository configuration fields using template"""
@@ -449,32 +416,20 @@ class FormsHandler:
         """Toggle success message field visibility"""
         # Check if checkbox is checked
         enabled = 'notify_on_success[]' in form_data
+        success_message = self._get_form_value(form_data, 'notification_success_messages[]')
         
-        if enabled:
-            return '''
-            <div class="success-message-group">
-                <input type="text" name="notification_success_messages[]" 
-                       placeholder="Job '{job_name}' completed successfully in {duration}">
-                <div class="help-text">Custom success message (leave blank for default)</div>
-            </div>
-            '''
-        else:
-            return '<div class="success-message-group hidden"></div>'
+        return self.template_service.render_template('partials/notification_success_message.html',
+                                                   enabled=enabled,
+                                                   success_message=success_message)
     
     def _toggle_failure_message(self, form_data):
         """Toggle failure message field visibility"""
         enabled = 'notify_on_failure[]' in form_data
+        failure_message = self._get_form_value(form_data, 'notification_failure_messages[]')
         
-        if enabled:
-            return '''
-            <div class="failure-message-group">
-                <input type="text" name="notification_failure_messages[]" 
-                       placeholder="Job '{job_name}' failed: {error_message}">
-                <div class="help-text">Custom failure message (leave blank for default)</div>
-            </div>
-            '''
-        else:
-            return '<div class="failure-message-group hidden"></div>'
+        return self.template_service.render_template('partials/notification_failure_message.html',
+                                                   enabled=enabled,
+                                                   failure_message=failure_message)
     
     # =============================================================================
     # REPOSITORY MANAGEMENT - Direct operations
@@ -507,28 +462,19 @@ class FormsHandler:
     
     def _render_maintenance_fields(self, form_data):
         """Render maintenance configuration fields"""
-        return '''
-        <div class="form-group">
-            <label>
-                <input type="checkbox" name="auto_maintenance" checked> 
-                Automatic Repository Maintenance
-            </label>
-            <div class="help-text">Automatically run forget/prune/check operations</div>
-        </div>
-        '''
+        auto_maintenance = self._get_form_value(form_data, 'auto_maintenance', 'true') == 'true'
+        
+        return self.template_service.render_template('partials/maintenance_auto_fields.html',
+                                                   auto_maintenance=auto_maintenance)
     
     def _render_rsyncd_fields(self, form_data):
         """Render rsyncd-specific fields based on current state"""
-        return '''
-        <div class="form-group">
-            <label for="rsyncd_hostname">Hostname:</label>
-            <input type="text" id="rsyncd_hostname" name="rsyncd_hostname" required>
-        </div>
-        <div class="form-group">
-            <label for="rsyncd_share">Share:</label>
-            <input type="text" id="rsyncd_share" name="rsyncd_share" required>
-        </div>
-        '''
+        rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
+        rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
+        
+        return self.template_service.render_template('partials/dest_rsyncd_fields.html',
+                                                   rsyncd_hostname=rsyncd_hostname,
+                                                   rsyncd_share=rsyncd_share)
     
     # =============================================================================
     # UTILITY METHODS - Inline rendering helpers
@@ -536,6 +482,8 @@ class FormsHandler:
     
     def _render_validation_result(self, status, message):
         """Render validation result with consistent styling"""
+        import html
+        
         status_class = {
             'success': 'success',
             'error': 'error', 
@@ -548,99 +496,42 @@ class FormsHandler:
             'warning': '[WARN]'
         }.get(status, '[INFO]')
         
-        return f'''
-        <div class="validation-result {status_class}">
-            <span class="status">{status_label}</span> {html.escape(message)}
-        </div>
-        '''
+        return self.template_service.render_template('partials/validation_result.html',
+                                                   status_class=status_class,
+                                                   status_label=status_label,
+                                                   message=html.escape(message))
     
     def _render_notification_provider(self, config, index, provider_id=None):
         """Render a single notification provider configuration"""
+        import html
         provider_name = config.get('provider', '')
         display_name = provider_name.capitalize()
         
         if not provider_id:
             provider_id = f"notification_{provider_name}_{index}"
         
-        success_checked = 'checked' if config.get('notify_on_success', False) else ''
-        success_class = '' if config.get('notify_on_success', False) else 'hidden'
+        notify_on_success = config.get('notify_on_success', False)
         success_message = html.escape(config.get('success_message', ''))
         
-        failure_checked = 'checked' if config.get('notify_on_failure', False) else ''
-        failure_class = '' if config.get('notify_on_failure', False) else 'hidden'
+        notify_on_failure = config.get('notify_on_failure', False)
         failure_message = html.escape(config.get('failure_message', ''))
         
-        return f'''
-        <div id="{provider_id}" class="notification-provider">
-            <div class="path-group">
-                <h3 class="provider-header">
-                    <span class="provider-name">{display_name}</span>
-                    <button type="button" class="remove-provider-btn button button-danger"
-                            hx-post="/htmx/remove-notification-provider"
-                            hx-target="#add_provider_section"
-                            hx-swap="outerHTML">Remove</button>
-                </h3>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="notify_on_success[]" {success_checked}
-                               hx-post="/htmx/toggle-success-message"
-                               hx-target="next .success-message-group"
-                               hx-trigger="change"
-                               hx-swap="outerHTML"> 
-                        Notify on Success
-                    </label>
-                    <div class="success-message-group {success_class}">
-                        <input type="text" name="notification_success_messages[]" 
-                               value="{success_message}" placeholder="Job '{{job_name}}' completed successfully in {{duration}}">
-                        <div class="help-text">Custom success message (leave blank for default)</div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="notify_on_failure[]" {failure_checked}
-                               hx-post="/htmx/toggle-failure-message"
-                               hx-target="next .failure-message-group"
-                               hx-trigger="change"
-                               hx-swap="outerHTML"> 
-                        Notify on Failure
-                    </label>
-                    <div class="failure-message-group {failure_class}">
-                        <input type="text" name="notification_failure_messages[]" 
-                               value="{failure_message}" placeholder="Job '{{job_name}}' failed: {{error_message}}">
-                        <div class="help-text">Custom failure message (leave blank for default)</div>
-                    </div>
-                </div>
-                
-                <input type="hidden" name="notification_providers[]" value="{provider_name}">
-            </div>
-        </div>
-        '''
+        return self.template_service.render_template('partials/notification_provider_config.html',
+                                                   provider_id=provider_id,
+                                                   provider_name=provider_name,
+                                                   display_name=display_name,
+                                                   notify_on_success=notify_on_success,
+                                                   success_message=success_message,
+                                                   notify_on_failure=notify_on_failure,
+                                                   failure_message=failure_message)
     
     def _render_provider_selection(self, available_providers):
         """Render provider selection dropdown"""
         # Filter out configured providers
         available_options = [p for p in available_providers if p not in self.configured_providers]
         
-        options_html = ''.join([
-            f'<option value="{provider}">{provider.capitalize()}</option>'
-            for provider in available_options
-        ])
-        
-        display_style = 'style="display: none;"' if not available_options else ''
-        
-        return f'''
-        <div id="add_provider_section" class="form-group" {display_style}>
-            <label for="add_notification_provider">Add Notification Provider:</label>
-            <select id="add_notification_provider" name="provider"
-                    hx-post="/htmx/add-notification-provider"
-                    hx-trigger="change[target.value != '']">
-                <option value="">Select a provider...</option>
-                {options_html}
-            </select>
-        </div>
-        '''
+        return self.template_service.render_template('partials/provider_selection_dropdown.html',
+                                                   available_options=available_options)
     
     def _parse_form_data(self, request):
         """HTTP concern: parse form data from request handler object"""
@@ -690,11 +581,15 @@ class FormsHandler:
     
     def _send_error(self, message):
         """Send error response"""
-        return f'<div class="error-message">{html.escape(message)}</div>'
+        import html
+        return self.template_service.render_template('partials/error_message.html',
+                                                   message=html.escape(message))
     
     def _render_error(self, message):
         """Render error message"""
-        return f'<div class="error-message">{html.escape(message)}</div>'
+        import html
+        return self.template_service.render_template('partials/error_message.html',
+                                                   message=html.escape(message))
     
     # =============================================================================
     # MISSING ENDPOINT IMPLEMENTATIONS - Connect to existing functionality
