@@ -1,0 +1,12 @@
+<div id="add_provider_section" class="form-group" {% if not available_options %}style="display: none;"{% endif %}>
+    <label for="add_notification_provider">Add Notification Provider:</label>
+    <select id="add_notification_provider" name="provider"
+            hx-post="/htmx/add-notification-provider"
+            hx-trigger="change[target.value != '']">
+        <option value="">Select a provider...</option>
+        {% for provider in available_options %}
+        <option value="{{ provider }}">{{ provider.capitalize() }}</option>
+        {% endfor %}
+    </select>
+    <div class="help-text">Configure notifications for this job using globally configured providers</div>
+</div>

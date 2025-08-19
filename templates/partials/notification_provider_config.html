@@ -1,0 +1,45 @@
+<div id="{{ provider_id }}" class="notification-provider">
+    <div class="path-group">
+        <h3 class="provider-header">
+            <span class="provider-name">{{ display_name }}</span>
+            <button type="button" class="remove-provider-btn button button-danger"
+                    hx-post="/htmx/remove-notification-provider"
+                    hx-target="#add_provider_section"
+                    hx-swap="outerHTML">Remove</button>
+        </h3>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="notify_on_success[]" {% if notify_on_success %}checked{% endif %}
+                       hx-post="/htmx/toggle-success-message"
+                       hx-target="next .success-message-group"
+                       hx-trigger="change"
+                       hx-swap="outerHTML"> 
+                Notify on Success
+            </label>
+            <div class="success-message-group {% if not notify_on_success %}hidden{% endif %}">
+                <input type="text" name="notification_success_messages[]" 
+                       value="{{ success_message }}" placeholder="Job '{{job_name}}' completed successfully in {{duration}}">
+                <div class="help-text">Custom success message (leave blank for default)</div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="notify_on_failure[]" {% if notify_on_failure %}checked{% endif %}
+                       hx-post="/htmx/toggle-failure-message"
+                       hx-target="next .failure-message-group"
+                       hx-trigger="change"
+                       hx-swap="outerHTML"> 
+                Notify on Failure
+            </label>
+            <div class="failure-message-group {% if not notify_on_failure %}hidden{% endif %}">
+                <input type="text" name="notification_failure_messages[]" 
+                       value="{{ failure_message }}" placeholder="Job '{{job_name}}' failed: {{error_message}}">
+                <div class="help-text">Custom failure message (leave blank for default)</div>
+            </div>
+        </div>
+        
+        <input type="hidden" name="notification_providers[]" value="{{ provider_name }}">
+    </div>
+</div>

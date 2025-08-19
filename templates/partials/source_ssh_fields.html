@@ -1,0 +1,16 @@
+<div class="form-group">
+    <label for="hostname">Hostname:</label>
+    <input type="text" id="hostname" name="hostname" value="{{ hostname }}" required>
+</div>
+<div class="form-group">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" value="{{ username }}" required>
+</div>
+<div class="form-group">
+    <button type="button" class="button button-secondary"
+            hx-post="/htmx/validate-ssh-source"
+            hx-include="closest form"
+            hx-target="#ssh_validation_result"
+            hx-swap="innerHTML">Validate SSH Connection</button>
+    <div id="ssh_validation_result"></div>
+</div>

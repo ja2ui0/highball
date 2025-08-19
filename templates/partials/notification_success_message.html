@@ -1,0 +1,10 @@
+{% if enabled %}
+<div class="success-message-group">
+    <input type="text" name="notification_success_messages[]" 
+           value="{{ success_message }}"
+           placeholder="Job '{job_name}' completed successfully in {duration}">
+    <div class="help-text">Custom success message (leave blank for default)</div>
+</div>
+{% else %}
+<div class="success-message-group hidden"></div>
+{% endif %}
