@@ -1,0 +1,56 @@
+<!-- Schema-driven source path entry for array management -->
+<div class="path-entry" data-path-index="{{ path_index }}">
+    <div class="path-group">
+        <h3 class="path-header">
+            <span>{{ source_path_schema.display_name }}</span>
+            {% if path_index > 0 %}
+            <button type="button" class="button button-danger path-remove-btn" 
+                    hx-post="/htmx/remove-source-path"
+                    hx-vals='{"path_index": "{{ path_index }}"}'
+                    hx-target="#path_entry_{{ path_index }}"
+                    hx-swap="outerHTML">
+                Remove
+            </button>
+            {% endif %}
+        </h3>
+        
+        {% for field in source_path_schema.fields %}
+        <div class="form-group">
+            <label for="source_{{ field.name }}_{{ path_index }}">{{ field.label }}:</label>
+            
+            {% if field.type == 'text' %}
+            <input type="text" 
+                   id="source_{{ field.name }}_{{ path_index }}" 
+                   name="source_{{ field.name }}[]" 
+                   value="{{ path_data.get(field.name, '') if path_data else '' }}"
+                   placeholder="{{ field.placeholder }}"
+                   {% if field.required %}required{% endif %}>
+            
+            {% elif field.type == 'textarea' %}
+            <textarea id="source_{{ field.name }}_{{ path_index }}" 
+                      name="source_{{ field.name }}[]"
+                      rows="{{ field.get('rows', 3) }}"
+                      placeholder="{{ field.placeholder }}">{% if path_data and path_data.get(field.name) %}{{ path_data[field.name] | join('\n') if path_data[field.name] is iterable and path_data[field.name] is not string else path_data[field.name] }}{% endif %}</textarea>
+            {% endif %}
+            
+            {% if field.help %}
+            <div class="help-text">{{ field.help }}</div>
+            {% endif %}
+            
+            {% if field.name == 'path' %}
+            <!-- Add validation button for path field -->
+            <div class="path-validation-row">
+                <button type="button" class="validate-path-btn button button-secondary" 
+                        hx-post="/htmx/validate-source-path" 
+                        hx-target="#path_validation_{{ path_index }}"
+                        hx-vals='{"path_index": "{{ path_index }}"}'
+                        hx-include="#source_{{ field.name }}_{{ path_index }}, [name='hostname'], [name='username']">
+                    Validate Path
+                </button>
+                <div id="path_validation_{{ path_index }}" class="path-validation-result"></div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>

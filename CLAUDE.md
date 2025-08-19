@@ -103,7 +103,8 @@ source_config:
 ### Frontend (static/)
 - **Core Features**: `backup-browser.js` (697 lines - file tree navigation), `restore-core.js` + `restore-restic.js` (progress tracking, restore system), `job-inspect.js` (inspection hub, reduced from 265→215 lines)
 - **Utilities**: `nav.js`, `network-scan.js`
-- **HTMX Migration Complete**: 51% JavaScript reduction (2,898→1,406 lines) - all form operations now server-side HTMX
+- **HTMX Architecture Complete**: Schema-driven forms with dynamic field rendering, complete separation of HTML from handlers, modular partial system
+- **Multi-Path Management**: Dynamic source path arrays with safe add/remove operations, automatic array reindexing, DOM-safe HTMX targeting
 
 ## Data Storage
 
@@ -122,8 +123,8 @@ source_config:
 **Scheduling**: Runtime conflict detection, automatic queuing, configurable defaults
 **Logging**: Per-job logs, SSH validation caching (30min), refresh-based viewing
 **Notifications**: `notifiers` library backend, Telegram/email, spam-prevention queuing with configurable intervals, batch message formatting, per-job integration with template variables, test capabilities, emoji-free. `notify_on_success` configured per-job (not global)
-**UI**: HTMX server-side forms, real-time validation, share discovery, theming, password toggles, multi-path management, per-job inspection hubs (`/inspect?name=<jobname>`), source path validation buttons with [OK]/[WARN]/[ERROR] feedback
-**Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation
+**UI**: Schema-driven HTMX forms with dynamic field rendering, real-time validation, complete separation of HTML from handlers, modular partial template system, theming, password toggles, multi-path management, per-job inspection hubs (`/inspect?name=<jobname>`), source path validation buttons with [OK]/[WARN]/[ERROR] feedback
+**Restic Integration**: Repository connectivity testing, binary availability checking, existing repository detection, content fingerprinting, complete repository browser with snapshot statistics and file tree navigation, three-mode maintenance system (auto/user/off) with schema-driven configuration
 **Backup Browser**: Multi-provider backup browsing system supporting Restic (repository snapshots), rsync/SSH/local/rsyncd (filesystem directories) with unified interface, provider-specific terminology, and expandable file trees
 **Restore System**: Complete Restic restore functionality with intelligent overwrite protection, dual restore targets (safe Highball `/restore` vs. risky source location), pre-flight risk assessment via `/check-restore-overwrites` endpoint, progressive disclosure confirmation system (no modals), dry run capability (default enabled), background execution with progress tracking, and modular JavaScript architecture extensible to future providers (rsync, borg, kopia) - full implementation with smart safety controls
 **REST API**: GET `/api/highball/jobs` endpoint for external dashboard widgets with query filtering (`state`, `fields`), CORS support, and authentication-ready architecture
@@ -137,7 +138,9 @@ source_config:
 - Local operations use direct subprocess execution
 
 ### Form Processing Architecture
-- **HTMX Server-Side Rendering**: All form operations use server-side HTMX
+- **Schema-Driven HTMX Architecture**: All form operations use server-side HTMX with dynamic field rendering based on schemas
+- **Complete HTML Separation**: Zero HTML in handlers - all presentation logic in Jinja2 templates
+- **Dynamic Field Systems**: Repository types, maintenance modes, and notification providers use schema-driven field generation
 - Multipart form data throughout (not URL-encoded)
 - Source paths as array format: `[{'path': '/path', 'includes': [], 'excludes': []}]`
 - **Parser Resilience Pattern**: Skip empty paths instead of failing
@@ -150,7 +153,9 @@ source_config:
 - Permission checking: RX (backup capable), RWX (restore-to-source capable)
 
 ### Frontend Architecture
-- **HTMX-First**: All form operations use server-side HTMX rendering (51% JavaScript reduction: 2,898→1,406 lines)
+- **Schema-Driven HTMX**: All form operations use server-side HTMX with dynamic field rendering
+- **Complete HTML Separation**: Zero HTML in handlers - all presentation logic in Jinja2 templates using schema definitions
+- **Modular Partial System**: 50+ reusable template components for consistent UI patterns
 - **Remaining JavaScript**: Stable, functional features - `backup-browser.js` (file tree), `restore-core.js` (progress tracking), utilities
 - No inline scripts in templates - external modules only
 - **Data Flow Pattern**: Server data flows through HTML data attributes to JavaScript (e.g., `data-source-paths='{{SOURCE_PATHS_JSON}}'` → `container.dataset.sourcePaths`)
@@ -162,10 +167,19 @@ source_config:
 - Conditional UI elements (e.g., init button appears only for empty repositories)
 - No modals - inline confirmation flows instead
 
+### Multi-Path Source Management (CRITICAL HTMX Pattern)
+- **DOM-Safe HTMX**: Never target parent containers that contain the triggering button - causes DOM corruption and HTMX re-scanning failures
+- **Add Operation**: Button targets child list (`#source_paths_list`) with `hx-swap="beforeend"` to append new entries
+- **Remove Operation**: Button targets own container (`#path_entry_{{ index }}`) with `hx-swap="outerHTML"` for clean removal
+- **Form Array Safety**: HTML forms auto-reindex `name="field[]"` arrays, eliminating index gaps from removals
+- **JavaScript Index Generation**: Uses `document.querySelectorAll().length` for unique DOM IDs, not form logic
+- **Protection**: Path 0 never shows remove button (`{% if path_index > 0 %}`), ensuring at least one path remains
+
 ## Known Issues & Technical Debt
 
 - **Source Path Validation Styling**: Functional but needs UX polish
 - **Dashboard Restore Status**: No polling/progress display in main job table yet
+- **Global Notification Config**: HTMX endpoints exist but not fully implemented (placeholder responses with TODO comments)
 
 ## Development Rules (Critical - Reference First)
 
@@ -184,12 +198,13 @@ source_config:
 **Multi-provider Pattern**: Unified services with provider-specific logic consolidated
 
 ### Frontend Standards
-**HTMX**: Server-side form rendering preferred. JavaScript only for complex interactive features (file trees, progress tracking)
-**Templates**: Jinja2 with conditional logic (`{% if %}`, `{% for %}`). Legacy `{{VARIABLE}}` replacement maintained for compatibility. **NO HTML generation in handlers** - pass data variables to templates.
+**HTMX**: Schema-driven server-side form rendering with dynamic field generation. JavaScript only for complex interactive features (file trees, progress tracking)
+**Templates**: Pure Jinja2 with conditional logic (`{% if %}`, `{% for %}`). **ABSOLUTE RULE: NO HTML in handlers** - all presentation logic in templates using schema definitions.
+**Schemas**: `RESTIC_REPOSITORY_TYPE_SCHEMAS`, `MAINTENANCE_MODE_SCHEMAS`, `PROVIDER_FIELD_SCHEMAS` drive dynamic field rendering
 **JavaScript**: Always in `/static/` files, never inline in templates. Modular single-responsibility architecture.
 **CSS**: Colors ONLY in `/static/themes/{theme}.css`. Structure ONLY in `/static/style.css`
 **Assets**: External only - no emoji, no inline styles/scripts
-**Forms**: HTMX server-side rendering, multipart form data, dedicated parsers, real-time validation
+**Forms**: Schema-driven HTMX rendering, multipart form data, dedicated parsers, real-time validation
 
 ### Code Quality
 **Standards**: PEP 8, emoji-free, external assets only
@@ -306,10 +321,17 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Roadmap
 
-**Completed 2025-08-17**: 
-1. ✅ **HTMX Form System Migration** - 51% JavaScript reduction (2,898→1,406 lines), complete form consistency
-2. ✅ **Critical Bug Fixes** - Template rendering artifacts resolved, form data preservation fixed
-3. ✅ **Test Infrastructure Modernization** - HTMX-focused tests, deprecated JavaScript form tests retired
+**Completed 2025-08-19**:
+1. ✅ **Schema-Driven Form Architecture** - Complete separation of HTML from handlers, dynamic field rendering based on schemas
+2. ✅ **HTMX Recursion Bug Fixes** - Fixed duplicate UI elements in repository type selection  
+3. ✅ **Three-Mode Maintenance System** - Migrated from boolean `auto_maintenance` to `restic_maintenance: auto|user|off` with schema-driven configuration
+4. ✅ **Template Consolidation** - Removed unused static templates, consolidated container templates with their content
+5. ✅ **REST Server Authentication** - Added HTTPS checkbox, username/password fields, URI preview, proper validation
+
+**Completed 2025-08-18**: 
+1. ✅ **Jinja2 Template Migration** - Complete migration from legacy `{{VARIABLE}}` syntax to pure Jinja2
+2. ✅ **SSH Execution Recovery** - Fixed fundamental backup execution bugs, restored core functionality
+3. ✅ **Template Architecture Overhaul** - Established modular partial system with 50+ reusable components
 
 **Completed 2025-08-16**: 
 1. ✅ **Container-Based Backup Execution** - Unified container execution for all SSH Restic operations via `CommandExecutionService`
@@ -329,9 +351,9 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Recent Development Context
 
-**2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup (no HTML in handlers), backup browser SSH execution restored, restore overwrite checking implemented with proper HTMX architecture
-**2025-08-17**: HTMX form system migration achieved 51% JavaScript reduction, critical template rendering bugs fixed, test infrastructure modernized
-**2025-08-16**: Container execution unified, notification system consolidated, restore system unified, maintenance system completed
+**2025-08-19**: Schema-driven form architecture completed - zero HTML in handlers, dynamic field rendering via schemas, three-mode maintenance system, HTMX recursion bugs fixed, REST server authentication enhanced, template consolidation completed
+**2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup, backup browser SSH execution restored, restore overwrite checking implemented  
+**2025-08-16-17**: Container execution unified, notification system consolidated, restore system unified, HTMX form system established
 
 ## Legacy Code Reference
 

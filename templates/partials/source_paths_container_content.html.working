@@ -1,0 +1,79 @@
+<div id="source_paths_list">
+    <!-- Iterate over source_paths array using schema-driven template -->
+    {% if source_paths and source_paths | length > 0 %}
+        {% for path_data in source_paths %}
+            {% set path_index = loop.index0 %}
+            {% include 'partials/source_path_entry_dynamic.html' with context %}
+        {% endfor %}
+    {% else %}
+        <!-- Default empty path entry for new jobs -->
+        {% set path_index = 0 %}
+        {% set path_data = {} %}
+        {% include 'partials/source_path_entry_dynamic.html' with context %}
+    {% endif %}
+</div>
+
+<div class="add-path-section">
+    <button type="button" class="button button-secondary" 
+            onclick="addSourcePath()">
+        <span class="button-icon">+</span> Add Another Path
+    </button>
+
+<script>
+function addSourcePath() {
+    // Collect form data
+    const formData = new FormData();
+    const pathFields = document.querySelectorAll('[name="source_path[]"]');
+    const includeFields = document.querySelectorAll('[name="source_includes[]"]');
+    const excludeFields = document.querySelectorAll('[name="source_excludes[]"]');
+    
+    pathFields.forEach(field => formData.append('source_path[]', field.value));
+    includeFields.forEach(field => formData.append('source_includes[]', field.value));
+    excludeFields.forEach(field => formData.append('source_excludes[]', field.value));
+    
+    // Make AJAX request
+    fetch('/htmx/add-source-path', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('source_paths_container').innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function removeSourcePath(pathIndex) {
+    // Collect form data
+    const formData = new FormData();
+    const pathFields = document.querySelectorAll('[name="source_path[]"]');
+    const includeFields = document.querySelectorAll('[name="source_includes[]"]');
+    const excludeFields = document.querySelectorAll('[name="source_excludes[]"]');
+    
+    pathFields.forEach(field => formData.append('source_path[]', field.value));
+    includeFields.forEach(field => formData.append('source_includes[]', field.value));
+    excludeFields.forEach(field => formData.append('source_excludes[]', field.value));
+    
+    // Add the path index to remove
+    formData.append('path_index', pathIndex);
+    
+    // Make AJAX request
+    fetch('/htmx/remove-source-path', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('source_paths_container').innerHTML = html;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script>
+    <div class="help-text">
+        Add multiple source paths to backup different directories in a single job.
+    </div>
+</div>

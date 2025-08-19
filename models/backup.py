@@ -209,6 +209,40 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
     }
 }
 
+# Source path schema for universal path/include/exclude handling across all providers
+SOURCE_PATH_SCHEMA = {
+    'display_name': 'Source Path',
+    'description': 'Configure backup source with path and optional include/exclude patterns',
+    'fields': [
+        {
+            'name': 'path',
+            'type': 'text',
+            'label': 'Path',
+            'help': 'Directory or file path to backup',
+            'placeholder': '/path/to/backup',
+            'required': True
+        },
+        {
+            'name': 'includes',
+            'type': 'textarea',
+            'label': 'Include Patterns (optional)',
+            'help': 'Glob patterns for files to include. Leave empty to include all files.',
+            'placeholder': '**/*.jpg\ndocuments/**\nconfig.ini',
+            'required': False,
+            'rows': 3
+        },
+        {
+            'name': 'excludes', 
+            'type': 'textarea',
+            'label': 'Exclude Patterns (optional)',
+            'help': 'Glob patterns for files to exclude from backup.',
+            'placeholder': '**/*.tmp\ncache/**\n*.log',
+            'required': False,
+            'rows': 3
+        }
+    ]
+}
+
 # Maintenance mode schemas for dynamic form generation
 MAINTENANCE_MODE_SCHEMAS = {
     'auto': {

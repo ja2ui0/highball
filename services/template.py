@@ -180,7 +180,11 @@ class TemplateService:
             # Pass details as a list for proper formatting in template
             message = None
         else:
-            message = result.get('error', 'Validation failed')
+            # Use appropriate message based on validation result
+            if result.get('valid', False):
+                message = result.get('message', 'Validation successful')
+            else:
+                message = result.get('error', 'Validation failed')
             details = None
         
         # Use Jinja2 template to render the result

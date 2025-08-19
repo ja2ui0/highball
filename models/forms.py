@@ -336,7 +336,7 @@ class SourcePathsParser:
     @staticmethod
     def parse_multi_path_options(form_data):
         """Parse multi-path source options from form data"""
-        source_paths = safe_get_list(form_data, 'source_paths[]')
+        source_paths = safe_get_list(form_data, 'source_path[]')
         source_includes = safe_get_list(form_data, 'source_includes[]') 
         source_excludes = safe_get_list(form_data, 'source_excludes[]')
         

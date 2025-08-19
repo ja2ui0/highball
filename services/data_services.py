@@ -5,6 +5,7 @@ Replaces: job_form_data_builder.py, snapshot_introspection_service.py
 """
 from typing import Dict, List, Optional, Any
 from models.forms import JobFormData, SourceConfig, DestConfig, ResticConfig, NotificationConfig
+from models.backup import SOURCE_PATH_SCHEMA
 from services.execution import ExecutionService
 
 
@@ -29,6 +30,8 @@ class JobFormDataBuilder:
             'dest_config': {},
             'restic_config': {},
             'notifications': [],
+            'source_paths': [{'path': '', 'includes': [], 'excludes': []}],  # Start with one empty path
+            'source_path_schema': SOURCE_PATH_SCHEMA,
             'page_title': 'Add Backup Job',
             'form_mode': 'add'
         }
@@ -36,6 +39,11 @@ class JobFormDataBuilder:
     def build_form_data_from_job(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Building concern: create form data from existing job for editing"""
         form_data = self.from_job_config(job_name, job_config)
+        
+        # Extract source_paths from source_config
+        source_config = job_config.get('source_config', {})
+        source_paths = source_config.get('source_paths', [])
+        
         return {
             'job_name': job_name,
             'source_type': job_config.get('source_type', 'local'),
@@ -44,16 +52,22 @@ class JobFormDataBuilder:
             'enabled': job_config.get('enabled', True),
             'respect_conflicts': job_config.get('respect_conflicts', True),
             'restic_maintenance': job_config.get('restic_maintenance', 'auto'),
-            'source_config': job_config.get('source_config', {}),
+            'source_config': source_config,
             'dest_config': job_config.get('dest_config', {}),
             'restic_config': self._build_restic_config(job_config.get('dest_type'), job_config.get('dest_config', {})),
             'notifications': job_config.get('notifications', []),
+            'source_paths': source_paths,  # Extracted array for template iteration
+            'source_path_schema': SOURCE_PATH_SCHEMA,
             'page_title': f'Edit Job: {job_name}',
             'form_mode': 'edit'
         }
     
     def build_form_data_with_error(self, form_data: Dict[str, Any], error_message: str) -> Dict[str, Any]:
         """Building concern: create form data preserving user input with error message"""
+        
+        # Reconstruct source_paths array from form data
+        source_paths = self._extract_source_paths_from_form(form_data)
+        
         return {
             'job_name': form_data.get('job_name', [''])[0],
             'source_type': form_data.get('source_type', ['local'])[0],
@@ -66,10 +80,33 @@ class JobFormDataBuilder:
             'dest_config': {},
             'restic_config': {},
             'notifications': [],
+            'source_paths': source_paths,  # Preserve user input
+            'source_path_schema': SOURCE_PATH_SCHEMA,
             'error_message': error_message,
             'page_title': 'Job Configuration Error',
             'form_mode': 'error'
         }
+    
+    def _extract_source_paths_from_form(self, form_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract source_paths array from form submission data"""
+        source_paths = []
+        
+        # Get arrays from form data
+        paths = form_data.get('source_path[]', [])
+        includes = form_data.get('source_includes[]', [])
+        excludes = form_data.get('source_excludes[]', [])
+        
+        # Build array of path objects
+        for i in range(len(paths)):
+            if i < len(paths) and paths[i].strip():  # Only include non-empty paths
+                path_data = {
+                    'path': paths[i],
+                    'includes': includes[i].split('\n') if i < len(includes) and includes[i] else [],
+                    'excludes': excludes[i].split('\n') if i < len(excludes) and excludes[i] else []
+                }
+                source_paths.append(path_data)
+        
+        return source_paths
     
     @classmethod
     def from_job_config(cls, job_name: str, job_config: Dict[str, Any]) -> JobFormData:

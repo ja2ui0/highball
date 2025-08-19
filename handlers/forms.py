@@ -7,6 +7,7 @@ import cgi
 import html
 import logging
 import time
+from typing import Dict, Any
 from urllib.parse import parse_qs
 from models.validation import ValidationService
 from models.forms import JobFormParser, DestinationParser
@@ -221,17 +222,89 @@ class FormsHandler:
                                                     dry_run=dry_run)
     
     def _validate_source_path(self, form_data):
-        """HTTP coordination: extract params, delegate path validation, render response"""
-        # HTTP concern: extract parameters from request
-        path = self._get_form_value(form_data, 'path')
-        hostname = self._get_form_value(form_data, 'hostname')
-        username = self._get_form_value(form_data, 'username')
+        """HTTP coordination: robust path validation with proper user workflow handling"""
+        try:
+            # Extract path from array format
+            path_array = form_data.get('source_path[]', [])
+            path_index = int(self._get_form_value(form_data, 'path_index', '0'))
+            path = path_array[path_index] if path_index < len(path_array) else ''
+            
+            if not path or not path.strip():
+                result = {'valid': False, 'error': 'Please enter a path'}
+                return self.template_service.render_validation_status('source_path', result)
+            
+            # Extract source configuration
+            source_type = self._get_form_value(form_data, 'source_type')
+            hostname = self._get_form_value(form_data, 'hostname')
+            username = self._get_form_value(form_data, 'username')
+            
+            # Validate based on source type (robust handling from working version)
+            if source_type == 'ssh':
+                result = self._check_ssh_path(hostname, username, path)
+            elif source_type == 'local':
+                result = self._check_local_path(path)
+            else:
+                result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
+            
+            return self.template_service.render_validation_status('source_path', result)
+            
+        except Exception as e:
+            result = {'valid': False, 'error': f'Validation error: {str(e)}'}
+            return self.template_service.render_validation_status('source_path', result)
+    
+    def _check_ssh_path(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
+        """Check SSH path permissions with robust RX/RWX analysis (from working version)"""
+        if not hostname or not username:
+            return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
         
-        # Business logic concern: delegate to validation service
-        result = self.validation_service.validate_source_path_with_ssh(hostname, username, path)
-        
-        # View concern: delegate to template service
-        return self.template_service.render_validation_status('source_path', result)
+        try:
+            from services.execution import ExecutionService
+            executor = ExecutionService()
+            
+            # Test RX permissions (required for backup) + write test in one command
+            test_cmd = f'[ -d "{path}" ] && [ -r "{path}" ] && [ -x "{path}" ] && echo "RX_OK" && ([ -w "{path}" ] && echo "W_OK" || echo "W_FAIL") || echo "RX_FAIL"'
+            result = executor.execute_ssh_command(hostname, username, ['bash', '-c', test_cmd])
+            
+            if result.returncode != 0:
+                return {'valid': False, 'error': f'SSH connection failed: {result.stderr}'}
+            
+            output = result.stdout.strip()
+            
+            if 'RX_OK' not in output:
+                return {'valid': False, 'error': f'Path not accessible (missing read/execute permissions or does not exist)'}
+            
+            has_write = 'W_OK' in output
+            if has_write:
+                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+            else:
+                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
+    
+    def _check_local_path(self, path: str) -> Dict[str, Any]:
+        """Check local path permissions with robust RX/RWX analysis (from working version)"""
+        try:
+            import os
+            
+            if not os.path.exists(path):
+                return {'valid': False, 'error': 'Path does not exist'}
+            
+            if not os.path.isdir(path):
+                return {'valid': False, 'error': 'Path is not a directory'}
+            
+            # Check RX permissions
+            if not (os.access(path, os.R_OK) and os.access(path, os.X_OK)):
+                return {'valid': False, 'error': 'Missing read/execute permissions'}
+            
+            has_write = os.access(path, os.W_OK)
+            if has_write:
+                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+            else:
+                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
     
     def _validate_restic(self, form_data):
         """HTTP coordination: extract params, delegate restic validation, render response"""
@@ -335,20 +408,29 @@ class FormsHandler:
     
     def _add_source_path(self, form_data):
         """Add a new source path entry"""
-        # Get current path count
-        current_paths = form_data.get('source_paths[]', [])
-        path_index = len(current_paths)
+        from models.backup import SOURCE_PATH_SCHEMA
         
-        return self.template_service.render_template('partials/source_path_entry.html',
-                                                   path_index=path_index,
-                                                   path_value='',
-                                                   includes_value='',
-                                                   excludes_value='',
-                                                   validation_result='')
+        # Get path count from JavaScript via hx-vals
+        path_count = int(self._get_form_value(form_data, 'path_count', '0'))
+        new_path_index = path_count  # Next sequential index
+        
+        # Create new empty path data
+        path_data = {'path': '', 'includes': [], 'excludes': []}
+        source_paths = ['', '']  # Always show remove button for new paths
+        
+        # Return just the new path entry wrapped in its container
+        return self.template_service.render_template('partials/source_path_entry_container.html',
+                                                   path_index=new_path_index,
+                                                   path_data=path_data,
+                                                   source_paths=source_paths,
+                                                   source_path_schema=SOURCE_PATH_SCHEMA)
     
     def _remove_source_path(self, form_data):
-        """Remove a source path entry"""
-        return ""  # Empty response removes the element
+        """Remove a source path entry - returns empty response for DELETE"""
+        # Since we're using hx-delete and hx-swap="outerHTML", 
+        # the target element will be removed automatically.
+        # We just need to return an empty response.
+        return ""
     
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling

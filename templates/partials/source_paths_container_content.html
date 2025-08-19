@@ -1,0 +1,19 @@
+<div id="source_paths_list">
+    <!-- Iterate over source_paths array using schema-driven template -->
+    {% if source_paths and source_paths | length > 0 %}
+        {% for path_data in source_paths %}
+            {% set path_index = loop.index0 %}
+            <div id="path_entry_{{ path_index }}" class="path-entry-container">
+                {% include 'partials/source_path_entry_dynamic.html' with context %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <!-- Default empty path entry for new jobs -->
+        {% set path_index = 0 %}
+        {% set path_data = {} %}
+        <div id="path_entry_0" class="path-entry-container">
+            {% include 'partials/source_path_entry_dynamic.html' with context %}
+        </div>
+    {% endif %}
+</div>
+
