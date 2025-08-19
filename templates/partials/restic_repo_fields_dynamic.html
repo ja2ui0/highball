@@ -1,0 +1,50 @@
+{% if repo_type and repo_schemas[repo_type] %}
+{% set schema = repo_schemas[repo_type] %}
+<div class="form-group mt-10">
+    <h4>{{ schema.display_name }} Configuration</h4>
+    <div class="help-text">{{ schema.description }}</div>
+</div>
+
+{% for field in schema.fields %}
+<div class="form-group">
+    {% if field.type == 'text' or field.type == 'email' or field.type == 'number' %}
+    <label for="{{ field.name }}">{{ field.label }}:</label>
+    <input type="{{ field.type }}" 
+           id="{{ field.name }}" 
+           name="{{ field.name }}" 
+           value="{{ field_values[field.name] if field_values and field.name in field_values else '' }}"
+           {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+           {% if field.min %}min="{{ field.min }}"{% endif %}
+           {% if field.max %}max="{{ field.max }}"{% endif %}
+           {% if field.required %}required{% endif %}>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'password' %}
+    <label for="{{ field.name }}">{{ field.label }}:</label>
+    {% set field_id = field.name %}
+    {% set field_name = field.name %}
+    {% set field_value = field_values[field.name] if field_values and field.name in field_values else '' %}
+    {% set placeholder = field.placeholder %}
+    {% set hidden = true %}
+    {% include 'partials/password_field.html' %}
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% elif field.type == 'checkbox' %}
+    <label>
+        <input type="checkbox" 
+               name="{{ field.name }}" 
+               {% if field_values and field_values[field.name] %}checked{% endif %}> 
+        {{ field.label }}
+    </label>
+    {% if field.help %}
+    <div class="help-text">{{ field.help }}</div>
+    {% endif %}
+    
+    {% endif %}
+</div>
+{% endfor %}
+{% endif %}

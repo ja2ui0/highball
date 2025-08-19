@@ -52,6 +52,137 @@ DESTINATION_TYPE_SCHEMAS = {
 }
 
 # =============================================================================
+# RESTIC REPOSITORY TYPE SCHEMAS
+# =============================================================================
+
+RESTIC_REPOSITORY_TYPE_SCHEMAS = {
+    'local': {
+        'display_name': 'Local Path',
+        'description': 'Store repository on local filesystem',
+        'always_available': True,
+        'fields': [
+            {
+                'name': 'local_path',
+                'type': 'text',
+                'label': 'Local Repository Path',
+                'help': 'Local filesystem path where the repository will be stored',
+                'placeholder': '/path/to/repository',
+                'required': True
+            }
+        ]
+    },
+    'rest': {
+        'display_name': 'REST Server',
+        'description': 'Store repository on REST server',
+        'always_available': True,
+        'fields': [
+            {
+                'name': 'rest_hostname',
+                'type': 'text',
+                'label': 'REST Server Hostname',
+                'help': 'Hostname or IP address of the REST server',
+                'placeholder': 'rest-server.example.com',
+                'required': True
+            },
+            {
+                'name': 'rest_port',
+                'type': 'number',
+                'label': 'REST Server Port',
+                'help': 'Port number (default: 8000)',
+                'placeholder': '8000',
+                'default': '8000',
+                'min': 1,
+                'max': 65535
+            },
+            {
+                'name': 'rest_repo_name',
+                'type': 'text',
+                'label': 'Repository Name',
+                'help': 'Name/path of the repository on the REST server',
+                'placeholder': 'my-backup-repo',
+                'required': True
+            }
+        ]
+    },
+    's3': {
+        'display_name': 'Amazon S3',
+        'description': 'Store repository in Amazon S3 bucket',
+        'always_available': True,
+        'fields': [
+            {
+                'name': 's3_bucket',
+                'type': 'text',
+                'label': 'S3 Bucket',
+                'help': 'Amazon S3 bucket name',
+                'placeholder': 'my-backup-bucket',
+                'required': True
+            },
+            {
+                'name': 's3_prefix',
+                'type': 'text',
+                'label': 'S3 Key Prefix (optional)',
+                'help': 'Optional prefix for repository keys within the bucket',
+                'placeholder': 'backups/'
+            }
+        ]
+    },
+    'sftp': {
+        'display_name': 'SFTP',
+        'description': 'Store repository via SFTP',
+        'always_available': True,
+        'fields': [
+            {
+                'name': 'sftp_hostname',
+                'type': 'text',
+                'label': 'SFTP Host',
+                'help': 'SFTP server hostname',
+                'placeholder': 'sftp.example.com',
+                'required': True
+            },
+            {
+                'name': 'sftp_username',
+                'type': 'text',
+                'label': 'SFTP Username',
+                'help': 'Username for SFTP authentication',
+                'placeholder': 'username',
+                'required': True
+            },
+            {
+                'name': 'sftp_path',
+                'type': 'text',
+                'label': 'SFTP Path',
+                'help': 'Path on the SFTP server',
+                'placeholder': '/backups/repo',
+                'required': True
+            }
+        ]
+    },
+    'rclone': {
+        'display_name': 'rclone Remote',
+        'description': 'Store repository via rclone remote',
+        'always_available': True,
+        'fields': [
+            {
+                'name': 'rclone_remote',
+                'type': 'text',
+                'label': 'rclone Remote',
+                'help': 'rclone remote name (configure with "rclone config")',
+                'placeholder': 'myremote',
+                'required': True
+            },
+            {
+                'name': 'rclone_path',
+                'type': 'text',
+                'label': 'Remote Path',
+                'help': 'Path within the rclone remote',
+                'placeholder': 'backup/repo',
+                'required': True
+            }
+        ]
+    }
+}
+
+# =============================================================================
 # COMMAND EXECUTION DATA STRUCTURES
 # =============================================================================
 

@@ -18,7 +18,7 @@ from models.forms import job_parser
 
 # Import services
 from services.template import TemplateService
-from services.data_services import JobFormDataBuilder, destination_type_service
+from services.data_services import JobFormDataBuilder, DestinationTypeService
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,8 @@ class PagesHandler:
             form_data['form_title'] = 'Add New Backup Job'
             
             # Add available destination types
-            form_data['available_destination_types'] = destination_type_service.get_available_destination_types()
+            destination_service = DestinationTypeService()
+            form_data['available_destination_types'] = destination_service.get_available_destination_types()
             
             html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
@@ -121,7 +122,8 @@ class PagesHandler:
             
             # Add available destination types (could be context-aware based on source)
             source_config = job_config.get('source_config', {})
-            form_data['available_destination_types'] = destination_type_service.get_available_destination_types(source_config)
+            destination_service = DestinationTypeService()
+            form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
             
             html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)

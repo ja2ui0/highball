@@ -326,39 +326,18 @@ class FormsHandler:
             return '<div class="info-message">Select a destination type to configure</div>'
     
     def _render_restic_fields(self, form_data):
-        """Render Restic repository configuration fields"""
-        return '''
-        <div class="form-group">
-            <label for="repo_type">Repository Type:</label>
-            <select id="repo_type" name="repo_type" required 
-                    hx-post="/htmx/restic-fields"
-                    hx-include="closest form"
-                    hx-target="#restic_repo_fields"
-                    hx-swap="outerHTML">
-                <option value="">Select repository type...</option>
-                <option value="local">Local</option>
-                <option value="rest">REST Server</option>
-                <option value="s3">Amazon S3</option>
-                <option value="rclone">rclone</option>
-                <option value="sftp">SFTP</option>
-            </select>
-        </div>
-        <div id="restic_repo_fields">
-            <div class="info-message">Select a repository type to configure</div>
-        </div>
-        <div class="form-group">
-            <label for="restic_password">Repository Password:</label>
-            <input type="password" id="restic_password" name="restic_password">
-        </div>
-        <div class="form-group">
-            <button type="button" class="button button-secondary"
-                    hx-post="/htmx/validate-restic"
-                    hx-include="closest form"
-                    hx-target="#restic_validation_result"
-                    hx-swap="innerHTML">Validate Repository</button>
-            <div id="restic_validation_result"></div>
-        </div>
-        '''
+        """Render Restic repository configuration fields using template"""
+        from services.data_services import ResticRepositoryTypeService
+        
+        repo_service = ResticRepositoryTypeService()
+        available_repository_types = repo_service.get_available_repository_types()
+        
+        return self.template_service.render_template('partials/job_form_dest_restic.html',
+                                                   restic_password='',
+                                                   restic_repo_type='',
+                                                   available_repository_types=available_repository_types,
+                                                   selected_repo_type='',
+                                                   show_wrapper=False)
     
     # =============================================================================
     # SOURCE PATH MANAGEMENT - Direct array manipulation
@@ -744,14 +723,17 @@ class FormsHandler:
                                                    enabled=enabled)
     
     def _render_restic_repo_fields(self, form_data):
-        """Render Restic repository type fields using Jinja2 templates"""
+        """Render Restic repository type fields using schema-driven templates"""
         repo_type = self._get_form_value(form_data, 'restic_repo_type')
         
         if not repo_type:
             return ''  # No fields for unselected type
             
-        return self.template_service.render_template('partials/restic_repo_fields.html',
-                                                   repo_type=repo_type)
+        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        
+        return self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
+                                                   repo_type=repo_type,
+                                                   repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS)
     
     def _render_cron_field(self, form_data):
         """Render cron field using existing template logic"""

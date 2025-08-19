@@ -463,7 +463,26 @@ class DestinationTypeService:
             logger.warning(f"Error checking restic availability: {e}")
             return False
 
-# Legacy compatibility
-job_form_data_builder = DataService()
-snapshot_introspection_service = DataService()
-destination_type_service = DestinationTypeService()
+class ResticRepositoryTypeService:
+    """Service for managing restic repository type availability and options"""
+    
+    def get_available_repository_types(self) -> List[Dict[str, Any]]:
+        """Get list of available restic repository types with their metadata"""
+        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        
+        available_types = []
+        
+        for repo_type, schema in RESTIC_REPOSITORY_TYPE_SCHEMAS.items():
+            if self._is_repository_type_available(repo_type, schema):
+                available_types.append({
+                    'value': repo_type,
+                    'display_name': schema['display_name'],
+                    'description': schema['description']
+                })
+        
+        return available_types
+    
+    def _is_repository_type_available(self, repo_type: str, schema: Dict[str, Any]) -> bool:
+        """Check if a repository type is available"""
+        # All repository types are always available - no special requirements
+        return schema.get('always_available', True)

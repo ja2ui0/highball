@@ -191,6 +191,28 @@ def _process_notification_field(self, provider_config, provider_name, field_info
 
 **Error Symptom**: `expected token 'end of statement block', got 'with'` indicates invalid Jinja2 syntax.
 
+## CRITICAL HTMX BUG - Still Broken (2025-08-18)
+
+**Issue**: Selecting "REST Server" from Repository Type dropdown creates DUPLICATE repository type dropdowns and password fields on the page.
+
+**What was tried (didn't work)**:
+- `hx-include="this"` instead of `hx-include="form"`
+- `hx-trigger="change"` 
+- `hx-swap="innerHTML"` 
+- Removing static fields to use pure HTMX
+
+**Current State**:
+- File: `templates/partials/job_form_dest_restic.html`
+- HTMX config: `hx-post="/htmx/restic-repo-fields" hx-target="#restic_repo_fields_container" hx-swap="innerHTML" hx-trigger="change" hx-include="this"`
+- HTMX endpoint works correctly in isolation (returns only REST URL field)
+- Problem: Somehow creates duplicate UI elements when triggered
+
+**Next Steps**:
+1. Check if template service is somehow returning more than just the target template
+2. Verify target container is unique and correctly targeted
+3. Consider that HTMX might be including parent elements despite innerHTML swap
+4. Debug actual browser behavior with dev tools network tab
+
 ## Next Session Continuation
 
 To continue this pattern with other pages:
