@@ -91,10 +91,16 @@ function loadBackupJob() {
     const snapshotSection = document.getElementById('snapshotSection');
     const errorDiv = document.getElementById('browserError');
     
+    // Check if backup browser elements exist (may not be loaded yet via HTMX)
+    if (!backupJobSelect) {
+        console.log('Backup browser not loaded yet, skipping loadBackupJob');
+        return;
+    }
+    
     // Clear previous state
     hideAllSections();
     clearSelectionForNewJob();
-    errorDiv.classList.add('hidden');
+    if (errorDiv) errorDiv.classList.add('hidden');
     
     if (backupJobSelect.value) {
         currentJob = backupJobSelect.value;
@@ -661,9 +667,13 @@ function updateSelectionDisplay() {
 }
 
 function hideAllSections() {
-    document.getElementById('snapshotSection').classList.add('hidden');
-    document.getElementById('snapshotDetails').classList.add('hidden');
-    document.getElementById('fileTree').classList.add('hidden');
+    const snapshotSection = document.getElementById('snapshotSection');
+    const snapshotDetails = document.getElementById('snapshotDetails');
+    const fileTree = document.getElementById('fileTree');
+    
+    if (snapshotSection) snapshotSection.classList.add('hidden');
+    if (snapshotDetails) snapshotDetails.classList.add('hidden');
+    if (fileTree) fileTree.classList.add('hidden');
 }
 
 function showError(message) {

@@ -123,12 +123,13 @@ h2 {
     margin-bottom: var(--space-xxl);
 }
 
-/* Form Sections */
-.form-section {
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius);
-    margin-bottom: var(--space-xxxl);
+/* Unified Section System */
+.section-container {
+    background: var(--bg-tertiary);
+    padding: var(--space-xxl);
+    margin: var(--space-xxl) 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
 }
 
 .section-header {
@@ -138,16 +139,13 @@ h2 {
     /* h2 inherits the correct size naturally */
 }
 
-.section-content {
-    padding: var(--space-xxl);
-}
-
-/* Validation Sections */
-.validation-section {
+/* Special validation section variant */
+.section-container.validation {
     background-color: var(--bg-primary);
     border: 1px solid var(--border-secondary);
     border-radius: var(--radius);
     overflow: hidden;
+    padding: 0; /* validation sections have special inner padding */
 }
 
 .validation-header {
@@ -255,8 +253,8 @@ input[type="checkbox"] {
     text-align: left;
 }
 
-/* Maintenance form: reuse validation-section for manual options container */
-.validation-section h4 {
+/* Maintenance form headers */
+.section-container.validation h4 {
     color: var(--text-primary);
     margin: 0 0 var(--space-lg) 0;
     font-size: var(--font-lg);
@@ -363,24 +361,29 @@ tr:hover {
     line-height: 1.2;
 }
 
-/* Status indicators - consolidated */
-.status-success, .enabled {
+/* Status indicators - unified system */
+.status-success {
     color: var(--success);
     font-weight: bold;
+    font-size: var(--font-sm);
 }
 
-.status-error, .disabled {
+.status-error {
     color: var(--danger);
     font-weight: bold;
+    font-size: var(--font-sm);
 }
 
-.status-warning, .status-running {
+.status-warning {
     color: var(--warning);
     font-weight: bold;
+    font-size: var(--font-sm);
+    font-style: italic;
 }
 
 .status-info {
     color: var(--text-secondary);
+    font-size: var(--font-sm);
 }
 
 /* Small accent labels - reusable */
@@ -678,14 +681,7 @@ tr:hover {
     border-radius: var(--radius);
 }
 
-/* Base section container - reusable */
-.section-container {
-    background: var(--bg-tertiary);
-    padding: var(--space-xxl);
-    margin: var(--space-xxl) 0;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-}
+/* Section container defined above - removing duplicate */
 
 
 .config-nav {
@@ -718,21 +714,7 @@ tr:hover {
     flex-grow: 1;
 }
 
-.validation-success {
-    color: var(--success-text);
-    font-size: var(--font-sm);
-}
-
-.validation-error {
-    color: var(--error-text);
-    font-size: var(--font-sm);
-}
-
-.validation-pending {
-    color: var(--text-secondary);
-    font-size: var(--font-sm);
-    font-style: italic;
-}
+/* Validation classes - REMOVED - use .status-* instead */
 
 /* Large textarea (config editor) */
 .textarea-config {
@@ -814,11 +796,9 @@ tr:hover {
 }
 
 /* Width utilities for specific inputs */
-/* Remove - use proper component classes instead */
-/* .w-150 { width: 150px; } */
+/* Width utility removed - use semantic classes instead */
 
-/* Secondary background color alias */
-.bg-light { background-color: var(--bg-secondary); }
+/* Background color alias removed - use CSS variables directly */
 
 /* Status classes already defined above - removing duplicates */
 
@@ -909,7 +889,7 @@ tr:hover {
    RESTORE FUNCTIONALITY STYLES
    ============================================================================= */
 
-/* Restore Controls - reuse section-container pattern */
+/* Restore Controls */
 .restore-controls {
     margin-top: var(--space-xl);
     padding: var(--space-xl);

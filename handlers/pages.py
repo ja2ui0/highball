@@ -49,7 +49,7 @@ class PagesHandler:
                 # Use enabled/disabled status like original, not execution status
                 enabled = job_config.get('enabled', True)
                 status = "enabled" if enabled else "disabled"
-                status_class = "enabled" if enabled else "disabled"
+                status_class = "status-success" if enabled else "status-error"
                 
                 # Build display strings with type prefixes like original
                 source_display = self._build_source_display_with_type(job_config)
