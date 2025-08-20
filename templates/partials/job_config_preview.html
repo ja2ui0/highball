@@ -1,0 +1,11 @@
+<div class="config-preview-container">
+    <h3>Job Configuration Preview</h3>
+    {% if preview_content %}
+        <div class="log-viewer">{{ preview_content }}</div>
+        <div class="help-text">
+            This preview shows the job configuration that would be written to config.yaml
+        </div>
+    {% else %}
+        <div class="error-message">No preview content available</div>
+    {% endif %}
+</div>

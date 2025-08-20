@@ -91,10 +91,17 @@ class PagesHandler:
             form_data = self.job_form_builder.build_empty_form_data()
             form_data['page_title'] = 'Add Job'
             form_data['form_title'] = 'Add New Backup Job'
+            form_data['submit_button_text'] = 'Create Job'
             
             # Add available destination types
             destination_service = DestinationTypeService()
             form_data['available_destination_types'] = destination_service.get_available_destination_types()
+            
+            # Add notification configuration
+            form_data.update(self._build_notification_form_data([]))
+            
+            # Add schedule configuration
+            form_data.update(self._build_schedule_form_data({}))
             
             html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
@@ -119,11 +126,127 @@ class PagesHandler:
             form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
             form_data['page_title'] = f'Edit Job: {job_name}'
             form_data['form_title'] = f'Edit Backup Job: {job_name}'
+            form_data['submit_button_text'] = 'Commit Changes'
+            form_data['form_has_changes'] = False  # Initially no changes
+            
+            # Store original config for change detection (as JSON string)
+            import json
+            form_data['original_job_config'] = json.dumps(job_config, sort_keys=True)
             
             # Add available destination types (could be context-aware based on source)
             source_config = job_config.get('source_config', {})
             destination_service = DestinationTypeService()
             form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
+            
+            # Pre-select source and destination types for edit mode
+            source_type = job_config.get('source_type', 'local')
+            form_data['selected_source_type'] = source_type
+            form_data['source_local_selected'] = (source_type == 'local')
+            form_data['source_ssh_selected'] = (source_type == 'ssh')
+            form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
+            
+            # Pre-populate source fields for edit mode using schema-driven approach
+            from models.backup import SOURCE_TYPE_SCHEMAS
+            
+            if source_type in SOURCE_TYPE_SCHEMAS:
+                schema = SOURCE_TYPE_SCHEMAS[source_type]
+                
+                # Check if this source type has additional fields requiring a template
+                if schema.get('fields'):
+                    template_name = f'partials/source_{source_type}_fields.html'
+                    try:
+                        form_data['source_fields_html'] = self.template_service.render_template(
+                            template_name,
+                            **source_config
+                        )
+                    except Exception:
+                        # Template doesn't exist, no additional fields to render
+                        form_data['source_fields_html'] = ''
+                else:
+                    # No additional fields needed (e.g., local)
+                    form_data['source_fields_html'] = ''
+            else:
+                form_data['source_fields_html'] = ''
+            
+            # Pre-populate destination fields for edit mode using schema-driven approach
+            from models.backup import DESTINATION_TYPE_SCHEMAS
+            
+            dest_type = job_config.get('dest_type', 'local')
+            dest_config = job_config.get('dest_config', {})
+            
+            # Special handling for restic (has sub-types)
+            if dest_type == 'restic':
+                from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+                
+                # Get restic config 
+                restic_config = form_data.get('restic_config', {})
+                
+                # Build repository type options
+                available_repository_types = []
+                for repo_type, schema in RESTIC_REPOSITORY_TYPE_SCHEMAS.items():
+                    available_repository_types.append({
+                        'value': repo_type,
+                        'display_name': schema['display_name']
+                    })
+                
+                # Get selected repository type and password
+                selected_repo_type = dest_config.get('repo_type', '')
+                restic_password = dest_config.get('password', '')
+                
+                # Build repository-specific fields for the selected type
+                repo_fields_html = ''
+                if selected_repo_type:
+                    repo_fields_html = self.template_service.render_template(
+                        'partials/restic_repo_fields_dynamic.html',
+                        repo_type=selected_repo_type,
+                        repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
+                        field_values=dest_config  # Pass the actual config values for pre-population
+                    )
+                
+                # Build the destination fields HTML for the selected type
+                dest_fields_html = self.template_service.render_template(
+                    'partials/job_form_dest_restic.html',
+                    restic_config=restic_config,
+                    available_repository_types=available_repository_types,
+                    selected_repo_type=selected_repo_type,
+                    restic_password=restic_password,
+                    repo_fields_html=repo_fields_html,  # Pre-rendered fields
+                    show_wrapper=False
+                )
+                form_data['dest_fields_html'] = dest_fields_html
+            
+            # Schema-driven handling for other destination types
+            elif dest_type in DESTINATION_TYPE_SCHEMAS:
+                # Build template name from destination type
+                template_name = f'partials/dest_{dest_type}_fields.html'
+                
+                try:
+                    # Use schema mapping to translate config field names to template field names
+                    schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+                    template_values = {}
+                    
+                    if 'fields' in schema:
+                        for field_name, field_config in schema['fields'].items():
+                            config_key = field_config.get('config_key', field_name)
+                            template_values[field_name] = dest_config.get(config_key, '')
+                    
+                    dest_fields_html = self.template_service.render_template(
+                        template_name,
+                        **template_values  # Pass mapped values for pre-population
+                    )
+                    form_data['dest_fields_html'] = dest_fields_html
+                except Exception:
+                    # Template doesn't exist, no fields to render
+                    form_data['dest_fields_html'] = ''
+            else:
+                form_data['dest_fields_html'] = ''
+            
+            # Add notification configuration
+            existing_notifications = job_config.get('notifications', [])
+            form_data.update(self._build_notification_form_data(existing_notifications))
+            
+            # Add schedule configuration
+            form_data.update(self._build_schedule_form_data(job_config))
             
             html = self.template_service.render_template('pages/job_form.html', **form_data)
             self._send_html_response(request_handler, html)
@@ -818,6 +941,89 @@ class PagesHandler:
             return 'status-warning'
         else:
             return 'status-info'
+    
+    def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Build notification form data for templates"""
+        # Get available providers from global config
+        global_settings = self.backup_config.get_global_settings()
+        notification_config = global_settings.get('notification', {})
+        
+        # Find enabled providers
+        available_providers = []
+        for provider, config in notification_config.items():
+            if isinstance(config, dict) and config.get('enabled', False):
+                available_providers.append(provider)
+        
+        # Render existing notification providers HTML
+        existing_html = ""
+        configured_provider_names = []
+        
+        for i, notification in enumerate(existing_notifications):
+            provider_name = notification.get('provider', '')
+            if provider_name:
+                configured_provider_names.append(provider_name)
+                
+                # Use the template to render each existing provider
+                provider_html = self.template_service.render_template(
+                    'partials/notification_provider_config.html',
+                    provider_id=f"notification_{provider_name}_{i}",
+                    provider_name=provider_name,
+                    display_name=provider_name.capitalize(),
+                    notify_on_success=notification.get('notify_on_success', False),
+                    success_message=notification.get('success_message', ''),
+                    notify_on_failure=notification.get('notify_on_failure', False),
+                    failure_message=notification.get('failure_message', ''),
+                    notify_on_maintenance_failure=notification.get('notify_on_maintenance_failure', False)
+                )
+                existing_html += provider_html
+        
+        # Filter available providers to exclude already configured ones
+        remaining_providers = [p for p in available_providers if p not in configured_provider_names]
+        
+        # Render provider selection dropdown options
+        options_html = ""
+        for provider in remaining_providers:
+            options_html += f'<option value="{provider}">{provider.capitalize()}</option>'
+        
+        return {
+            'existing_notification_providers_html': existing_html,
+            'available_providers_options': options_html,
+            'add_provider_class': 'hidden' if not remaining_providers else ''
+        }
+    
+    def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build schedule form data for templates"""
+        schedule = job_config.get('schedule', 'manual')
+        enabled = job_config.get('enabled', True)
+        respect_conflicts = job_config.get('respect_conflicts', True)
+        
+        # Parse schedule to determine if it's a predefined type or custom cron
+        if schedule in ['manual', 'hourly', 'daily', 'weekly', 'monthly']:
+            schedule_type = schedule
+            cron_pattern = ''
+        else:
+            # Custom cron pattern
+            schedule_type = 'custom'
+            cron_pattern = schedule
+        
+        return {
+            # Schedule selection state
+            'schedule_manual_selected': 'selected' if schedule_type == 'manual' else '',
+            'schedule_hourly_selected': 'selected' if schedule_type == 'hourly' else '',
+            'schedule_daily_selected': 'selected' if schedule_type == 'daily' else '',
+            'schedule_weekly_selected': 'selected' if schedule_type == 'weekly' else '',
+            'schedule_monthly_selected': 'selected' if schedule_type == 'monthly' else '',
+            'schedule_custom_selected': 'selected' if schedule_type == 'custom' else '',
+            
+            # Cron pattern for custom schedules
+            'cron_pattern': cron_pattern,
+            
+            # Checkbox states
+            'enabled_checked': 'checked' if enabled else '',
+            'conflicts_checked': 'checked' if respect_conflicts else '',
+            
+            # Note: submit_button_text handled at handler level
+        }
     
     def _send_error(self, request_handler, message: str, status_code: int = 500):
         """Send error response using template partial"""

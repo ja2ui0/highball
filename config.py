@@ -168,6 +168,11 @@ class BackupConfig:
         self.config['backup_jobs'][job_name] = job_config
         self.save_config()
     
+    def save_job(self, job_name, job_config):
+        """Save a backup job (alias for add_backup_job)"""
+        self.add_backup_job(job_name, job_config)
+        return True  # Return True for success indication
+    
     def delete_backup_job(self, job_name):
         """Delete a backup job"""
         if 'backup_jobs' in self.config and job_name in self.config['backup_jobs']:

@@ -1,0 +1,30 @@
+<!-- Form Actions - at parent container level -->
+<div class="form-group">
+    <input type="submit" 
+           value="{{ submit_button_text }}" 
+           class="button button-success"
+           id="submit-button"
+           {% if submit_button_text == 'Commit Changes' and not form_has_changes %}disabled{% endif %}>
+    <button type="button" class="button" 
+            hx-post="/htmx/preview-config"
+            hx-include="closest form"
+            hx-target="#config_preview"
+            hx-swap="innerHTML">Preview Config</button>
+    <a href="/" class="button">Cancel</a>
+</div>
+
+{% if submit_button_text == 'Commit Changes' %}
+<!-- Hidden field to track original form state -->
+<input type="hidden" name="original_job_config" value="{{ original_job_config | e }}">
+
+<!-- HTMX change detection -->
+<div hx-post="/htmx/check-form-changes"
+     hx-trigger="input from:form, change from:form"
+     hx-include="closest form"
+     hx-target="#submit-button"
+     hx-swap="outerHTML"
+     style="display:none;"></div>
+{% endif %}
+
+<!-- Config Preview Section -->
+<div id="config_preview"></div>

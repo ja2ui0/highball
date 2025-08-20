@@ -20,6 +20,7 @@ class FormsHandler:
     
     def __init__(self, backup_config, template_service):
         # HTTP coordination only - no business logic state
+        self.backup_config = backup_config
         self.validation_service = ValidationService(backup_config)
         self.form_parser = JobFormParser()
         self.template_service = template_service
@@ -87,6 +88,10 @@ class FormsHandler:
             
             # URI preview
             'restic-uri-preview': self._generate_restic_uri_preview,
+            
+            # Config preview
+            'preview-config': self._preview_config,
+            'check-form-changes': self._check_form_changes,
         }
         
         handler_func = actions.get(action)
@@ -347,46 +352,71 @@ class FormsHandler:
         """Render source-specific fields based on source type"""
         source_type = form_data.get('source_type', [''])[0]
         
-        if source_type == 'ssh':
-            hostname = self._get_form_value(form_data, 'hostname')
-            username = self._get_form_value(form_data, 'username')
-            return self.template_service.render_template('partials/source_ssh_fields.html',
-                                                       hostname=hostname,
-                                                       username=username)
-        elif source_type == 'local':
-            return self.template_service.render_template('partials/info_message.html',
-                                                       message='Local filesystem source - no additional configuration needed')
-        else:
+        # Schema-driven source field rendering
+        from models.backup import SOURCE_TYPE_SCHEMAS
+        
+        if source_type not in SOURCE_TYPE_SCHEMAS:
             return self.template_service.render_template('partials/info_message.html',
                                                        message='Select a source type to configure')
+        
+        schema = SOURCE_TYPE_SCHEMAS[source_type]
+        
+        # Check if this source type has additional fields requiring a template
+        if schema.get('fields'):
+            template_name = f'partials/source_{source_type}_fields.html'
+            try:
+                # Extract field values using schema field definitions
+                template_values = {}
+                for field_name, field_config in schema['fields'].items():
+                    config_key = field_config.get('config_key', field_name)
+                    template_values[config_key] = self._get_form_value(form_data, config_key)
+                
+                return self.template_service.render_template(template_name, **template_values)
+            except Exception:
+                # Template doesn't exist or failed to render
+                return self.template_service.render_template('partials/info_message.html',
+                                                           message=f'{schema["display_name"]} source configuration')
+        else:
+            # No additional fields needed (e.g., local)
+            return self.template_service.render_template('partials/info_message.html',
+                                                       message=f'{schema["display_name"]} source - no additional configuration needed')
     
     def _render_dest_fields(self, form_data):
         """Render destination-specific fields based on destination type"""
         dest_type = form_data.get('dest_type', [''])[0]
         
-        if dest_type == 'ssh':
-            dest_hostname = self._get_form_value(form_data, 'dest_hostname')
-            dest_username = self._get_form_value(form_data, 'dest_username')
-            dest_path = self._get_form_value(form_data, 'dest_path')
-            return self.template_service.render_template('partials/dest_ssh_fields.html',
-                                                       dest_hostname=dest_hostname,
-                                                       dest_username=dest_username,
-                                                       dest_path=dest_path)
-        elif dest_type == 'local':
-            dest_path = self._get_form_value(form_data, 'dest_path')
-            return self.template_service.render_template('partials/dest_local_fields.html',
-                                                       dest_path=dest_path)
-        elif dest_type == 'rsyncd':
-            rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
-            rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
-            return self.template_service.render_template('partials/dest_rsyncd_fields.html',
-                                                       rsyncd_hostname=rsyncd_hostname,
-                                                       rsyncd_share=rsyncd_share)
-        elif dest_type == 'restic':
-            return self._render_restic_fields(form_data)
-        else:
+        # Schema-driven destination field rendering
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        
+        if dest_type not in DESTINATION_TYPE_SCHEMAS:
             return self.template_service.render_template('partials/info_message.html',
                                                        message='Select a destination type to configure')
+        
+        # Special handling for restic (has complex sub-types)
+        if dest_type == 'restic':
+            return self._render_restic_fields(form_data)
+        
+        schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+        
+        # Check if this destination type has fields requiring a template
+        if schema.get('fields'):
+            template_name = f'partials/dest_{dest_type}_fields.html'
+            try:
+                # Extract field values using schema field definitions
+                template_values = {}
+                for field_name, field_config in schema['fields'].items():
+                    # Use the form field name directly (already mapped in schema)
+                    template_values[field_name] = self._get_form_value(form_data, field_name)
+                
+                return self.template_service.render_template(template_name, **template_values)
+            except Exception:
+                # Template doesn't exist or failed to render
+                return self.template_service.render_template('partials/info_message.html',
+                                                           message=f'{schema["display_name"]} destination configuration')
+        else:
+            # No fields defined in schema
+            return self.template_service.render_template('partials/info_message.html',
+                                                       message=f'{schema["display_name"]} destination - configuration needed')
     
     def _render_restic_fields(self, form_data):
         """Render Restic repository configuration fields using template"""
@@ -438,7 +468,8 @@ class FormsHandler:
     
     def _render_notification_providers(self, form_data):
         """Render notification providers section"""
-        available_providers = ['telegram', 'email']  # From global config
+        # Get available providers from global config
+        available_providers = self._get_enabled_global_providers()
         existing_notifications = []  # Parse from form if editing
         
         # Build provider configurations
@@ -449,12 +480,9 @@ class FormsHandler:
         # Build provider selection dropdown
         selection_html = self._render_provider_selection(available_providers)
         
-        return f'''
-        <div id="notification_providers">
-            {provider_html}
-        </div>
-        {selection_html}
-        '''
+        return self.template_service.render_template('partials/notification_providers_section.html',
+                                                   provider_html=provider_html,
+                                                   selection_html=selection_html)
     
     def _add_notification_provider(self, form_data):
         """Add a new notification provider"""
@@ -469,29 +497,50 @@ class FormsHandler:
         new_provider_html = self._render_notification_provider({
             'provider': provider_name,
             'notify_on_success': False,
-            'notify_on_failure': False,
+            'notify_on_failure': True,  # Default to True for failures
+            'notify_on_maintenance_failure': False,
             'success_message': '',
             'failure_message': ''
         }, timestamp, provider_id)
         
-        # Update dropdown 
-        available_providers = ['telegram', 'email']
-        self.configured_providers.append(provider_name)
+        # Get currently configured providers from form data instead of instance state
+        current_providers = self._get_form_providers(form_data)
+        current_providers.append(provider_name)
+        
+        # Update dropdown with remaining providers
+        available_providers = self._get_enabled_global_providers()
+        self.configured_providers = current_providers  # Update state
         updated_selection = self._render_provider_selection(available_providers)
         
-        return f'''
-        <div id="notification_providers" hx-swap-oob="beforeend">
-            {new_provider_html}
-        </div>
-        <div id="add_provider_section" hx-swap-oob="true">
-            {updated_selection}
-        </div>
-        '''
+        return self.template_service.render_template('partials/notification_provider_added_response.html',
+                                                   new_provider_html=new_provider_html,
+                                                   updated_selection_html=updated_selection)
     
     def _remove_notification_provider(self, form_data):
         """Remove a notification provider"""
-        available_providers = ['telegram', 'email']
-        return self._render_provider_selection(available_providers)
+        provider_id = form_data.get('provider_id', [''])[0]
+        
+        # Extract provider name from ID (format: notification_{provider}_{timestamp})
+        provider_name = None
+        if provider_id and '_' in provider_id:
+            parts = provider_id.split('_')
+            if len(parts) >= 2:
+                provider_name = parts[1]
+        
+        # Get current providers from form and remove this one
+        current_providers = self._get_form_providers(form_data)
+        if provider_name and provider_name in current_providers:
+            current_providers.remove(provider_name)
+        
+        # Update state and render dropdown
+        self.configured_providers = current_providers
+        available_providers = self._get_enabled_global_providers()
+        updated_selection = self._render_provider_selection(available_providers)
+        
+        # Return response that removes provider config and updates dropdown
+        return self.template_service.render_template('partials/notification_provider_removed_response.html',
+                                                   provider_id=provider_id,
+                                                   updated_selection_html=updated_selection)
     
     def _toggle_success_message(self, form_data):
         """Toggle success message field visibility"""
@@ -608,6 +657,8 @@ class FormsHandler:
         notify_on_failure = config.get('notify_on_failure', False)
         failure_message = html.escape(config.get('failure_message', ''))
         
+        notify_on_maintenance_failure = config.get('notify_on_maintenance_failure', False)
+        
         return self.template_service.render_template('partials/notification_provider_config.html',
                                                    provider_id=provider_id,
                                                    provider_name=provider_name,
@@ -615,7 +666,28 @@ class FormsHandler:
                                                    notify_on_success=notify_on_success,
                                                    success_message=success_message,
                                                    notify_on_failure=notify_on_failure,
-                                                   failure_message=failure_message)
+                                                   failure_message=failure_message,
+                                                   notify_on_maintenance_failure=notify_on_maintenance_failure)
+    
+    def _get_enabled_global_providers(self):
+        """Get list of globally enabled notification providers"""
+        global_settings = self.backup_config.get_global_settings()
+        notification_config = global_settings.get('notification', {})
+        
+        enabled_providers = []
+        for provider, config in notification_config.items():
+            if isinstance(config, dict) and config.get('enabled', False):
+                enabled_providers.append(provider)
+        
+        return enabled_providers
+    
+    def _get_form_providers(self, form_data):
+        """Get currently configured providers from form data"""
+        providers = form_data.get('notification_providers[]', [])
+        # Handle both single string and list formats
+        if isinstance(providers, str):
+            return [providers] if providers else []
+        return [p for p in providers if p]  # Filter out empty strings
     
     def _render_provider_selection(self, available_providers):
         """Render provider selection dropdown"""
@@ -792,3 +864,105 @@ class FormsHandler:
         else:
             return self.template_service.render_template('partials/uri_preview.html',
                                                        uri=uri_result.get('error', 'Invalid configuration'))
+    
+    def _preview_config(self, form_data):
+        """Generate and display job config preview"""
+        try:
+            if not form_data:
+                return self.template_service.render_template('partials/job_config_preview.html',
+                                                           preview_content="Error: No form data received")
+            
+            # Parse the form data using the existing parser
+            from models.forms import JobFormParser
+            parser = JobFormParser()
+            
+            result = parser.parse_job_form(form_data)
+            
+            if not result.get('valid', False):
+                error_msg = result.get('error', 'Unknown parsing error')
+                # Add some debug info to the error
+                from models.forms import safe_get_value
+                restic_repo_type = safe_get_value(form_data, 'restic_repo_type')
+                dest_type = safe_get_value(form_data, 'dest_type')
+                
+                debug_error = f"Form Validation Error: {error_msg}\n\n"
+                debug_error += f"Debug Info:\n"
+                debug_error += f"- restic_repo_type extracted: '{restic_repo_type}'\n"
+                debug_error += f"- dest_type extracted: '{dest_type}'\n"
+                debug_error += f"- Form data keys: {list(form_data.keys())}\n"
+                
+                return self.template_service.render_template('partials/job_config_preview.html',
+                                                           preview_content=debug_error)
+            
+            # Parse the form data using the existing parser  
+            from models.forms import JobFormParser
+            parser = JobFormParser()
+            
+            result = parser.parse_job_form(form_data)
+            
+            if not result.get('valid', False):
+                error_msg = result.get('error', 'Unknown parsing error')
+                return self.template_service.render_template('partials/job_config_preview.html',
+                                                           preview_content=f"Form Validation Error: {error_msg}")
+            
+            # Build the job config as it would appear in config.yaml
+            job_data = result.copy()
+            if 'valid' in job_data:
+                del job_data['valid']  # Remove the validation flag
+            
+            # Format as YAML for display
+            import yaml
+            yaml_content = yaml.dump({job_data.get('job_name', 'unnamed_job'): job_data}, 
+                                   default_flow_style=False, sort_keys=False)
+            
+            return self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=yaml_content)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.")
+    
+    def _check_form_changes(self, form_data):
+        """Check if form has changes compared to original config"""
+        try:
+            import json
+            from models.forms import job_parser
+            
+            # Get original config from hidden field
+            original_config_str = self._get_form_value(form_data, 'original_job_config')
+            if not original_config_str:
+                # No original config means this is add mode, always enable
+                return self.template_service.render_template('partials/submit_button.html',
+                                                           button_text='Create Job',
+                                                           enabled=True)
+            
+            # Parse current form data
+            current_result = job_parser.parse_job_form(form_data)
+            if not current_result['valid']:
+                # Form is invalid, disable button
+                return self.template_service.render_template('partials/submit_button.html',
+                                                           button_text='Commit Changes',
+                                                           enabled=False)
+            
+            # Compare configs (normalize for comparison)
+            original_config = json.loads(original_config_str)
+            current_config = current_result.copy()
+            if 'valid' in current_config:
+                del current_config['valid']
+            
+            # Compare as JSON strings for deep equality
+            original_json = json.dumps(original_config, sort_keys=True)
+            current_json = json.dumps(current_config, sort_keys=True)
+            
+            has_changes = original_json != current_json
+            return self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=has_changes)
+            
+        except Exception as e:
+            # On error, default to enabled
+            return self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=True)

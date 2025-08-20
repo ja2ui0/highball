@@ -161,7 +161,7 @@ class JobFormDataBuilder:
         """Building concern: create JobFormData from form submission"""
         # Parse schedule
         schedule = form_data.get('schedule', 'manual')
-        if schedule == 'cron':
+        if schedule == 'custom':
             cron_pattern = form_data.get('cron_pattern', '').strip()
             if cron_pattern:
                 schedule = cron_pattern
@@ -181,7 +181,7 @@ class JobFormDataBuilder:
             return schedule_value or 'manual', ''
         else:
             # Custom cron pattern
-            return 'cron', schedule_value
+            return 'custom', schedule_value
     
     @classmethod
     def _build_restic_config(cls, dest_type: str, dest_config: Dict[str, Any]) -> ResticConfig:
@@ -201,6 +201,9 @@ class JobFormDataBuilder:
             s3_bucket=dest_config.get('s3_bucket', ''),
             s3_region=dest_config.get('s3_region', ''),
             s3_prefix=dest_config.get('s3_prefix', ''),
+            s3_access_key=dest_config.get('s3_access_key', ''),
+            s3_secret_key=dest_config.get('s3_secret_key', ''),
+            s3_endpoint=dest_config.get('s3_endpoint', ''),
             sftp_hostname=dest_config.get('sftp_hostname', ''),
             sftp_path=dest_config.get('sftp_path', ''),
             rclone_config=dest_config.get('rclone_config', '')

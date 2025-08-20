@@ -860,8 +860,8 @@ tr:hover {
     margin-bottom: var(--space-xl);
 }
 
-/* Remove bottom margin from last path-group to avoid double spacing */
-.path-group:last-of-type {
+/* Remove bottom margin from last path-group to avoid double spacing - but not in notification providers */
+.path-group:last-of-type:not(.notification-provider .path-group) {
     margin-bottom: 0;
 }
 

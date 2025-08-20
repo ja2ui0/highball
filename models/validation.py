@@ -525,15 +525,25 @@ class JobValidator:
         source_type = job_config['source_type']
         source_config = job_config['source_config']
         
+        # Schema-driven source validation
+        from models.backup import SOURCE_TYPE_SCHEMAS
+        
+        if source_type not in SOURCE_TYPE_SCHEMAS:
+            return ValidationResult(valid=False, error=f'Unknown source type: {source_type}')
+        
+        schema = SOURCE_TYPE_SCHEMAS[source_type]
+        
+        # Validate required fields based on schema
+        for field in schema.get('required_fields', []):
+            if not source_config.get(field):
+                return ValidationResult(valid=False, error=f'{schema["display_name"]} source missing {field}')
+        
+        # Type-specific validation (still needed for complex validation like SSH connectivity)
         if source_type == 'ssh':
             ssh_result = self.ssh_validator.validate_ssh_source(source_config)
             if not ssh_result['valid']:
                 return ValidationResult(valid=False, error=f"SSH source validation failed: {ssh_result['error']}")
-        elif source_type == 'local':
-            # Local sources need minimal validation
-            pass
-        else:
-            return ValidationResult(valid=False, error=f'Unknown source type: {source_type}')
+        # Local sources have no additional validation beyond required fields
         
         return ValidationResult(valid=True)
     
@@ -546,23 +556,19 @@ class JobValidator:
             restic_result = self.restic_validator.validate_restic_destination(job_config)
             if not restic_result['success']:
                 return ValidationResult(valid=False, error=restic_result['message'])
-        elif dest_type in ['ssh', 'local', 'rsyncd']:
-            # Basic validation for other destination types
-            if dest_type == 'ssh':
-                required = ['hostname', 'username', 'path']
-                for field in required:
-                    if not dest_config.get(field):
-                        return ValidationResult(valid=False, error=f'SSH destination missing {field}')
-            elif dest_type == 'local':
-                if not dest_config.get('path'):
-                    return ValidationResult(valid=False, error='Local destination missing path')
-            elif dest_type == 'rsyncd':
-                required = ['hostname', 'share']
-                for field in required:
-                    if not dest_config.get(field):
-                        return ValidationResult(valid=False, error=f'Rsyncd destination missing {field}')
         else:
-            return ValidationResult(valid=False, error=f'Unknown destination type: {dest_type}')
+            # Schema-driven destination validation  
+            from models.backup import DESTINATION_TYPE_SCHEMAS
+            
+            if dest_type not in DESTINATION_TYPE_SCHEMAS:
+                return ValidationResult(valid=False, error=f'Unknown destination type: {dest_type}')
+            
+            schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+            
+            # Validate required fields based on schema
+            for field in schema.get('required_fields', []):
+                if not dest_config.get(field):
+                    return ValidationResult(valid=False, error=f'{schema["display_name"]} destination missing {field}')
         
         return ValidationResult(valid=True)
     

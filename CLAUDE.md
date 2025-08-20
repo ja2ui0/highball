@@ -35,14 +35,15 @@ source_config:
 
 ## Primary Critical Testing Requirements (Next Session)
 
-**BEFORE ANY FRAMEWORK MIGRATION**, these core systems must be fixed and tested:
+**BEFORE ANY FRAMEWORK MIGRATION**, these core systems must be tested:
 
 1. **Real backup execution** (not just dry-run) - verify actual data transfer
 2. **Restore operations with overwrite protection** - critical safety feature
 3. **Notification system** (email/telegram success/failure notifications)
 4. **Restic maintenance operations** (discard/prune/check scheduling and execution)
-5. **UI functionality** - forms, validation, basic workflows (functional, not polished)
-6. **Rsync patterns** - multi-provider support verification
+5. **Rsync patterns** - multi-provider support verification
+
+**UI functionality** - forms, validation, basic workflows are now FULLY FUNCTIONAL as of 2025-08-19.
 
 ## Architecture
 
@@ -137,10 +138,12 @@ source_config:
 - SSH validation auto-detects docker/podman availability, populates `container_runtime` in job config
 - Local operations use direct subprocess execution
 
-### Form Processing Architecture
+### Form Processing Architecture (COMPLETED 2025-08-19)
 - **Schema-Driven HTMX Architecture**: All form operations use server-side HTMX with dynamic field rendering based on schemas
 - **Complete HTML Separation**: Zero HTML in handlers - all presentation logic in Jinja2 templates
 - **Dynamic Field Systems**: Repository types, maintenance modes, and notification providers use schema-driven field generation
+- **Dual Storage Pattern**: Store both constructed URIs (execution) and discrete fields (editing) for perfect round-trip data integrity
+- **Smart Edit Forms**: "Code agent" auto-populates ALL fields from config, dynamic button text ("Create Job" vs "Commit Changes"), real-time change detection
 - Multipart form data throughout (not URL-encoded)
 - Source paths as array format: `[{'path': '/path', 'includes': [], 'excludes': []}]`
 - **Parser Resilience Pattern**: Skip empty paths instead of failing
@@ -179,7 +182,6 @@ source_config:
 
 - **Source Path Validation Styling**: Functional but needs UX polish
 - **Dashboard Restore Status**: No polling/progress display in main job table yet
-- **Global Notification Config**: HTMX endpoints exist but not fully implemented (placeholder responses with TODO comments)
 
 ## Development Rules (Critical - Reference First)
 
@@ -304,13 +306,13 @@ backup_jobs:
           includes: []
           excludes: ["*.log"]
     dest_type: "ssh|local|rsyncd|restic"  # restic fully functional
-    dest_config: {hostname, share} | {repo_type, repo_uri, password}  # explicit destinations
+    dest_config: {hostname, share} | {repo_type, repo_uri, password, discrete_fields...}  # dual storage: URIs + fields
     schedule: "daily|weekly|hourly|monthly|cron_pattern"
     enabled: true
     respect_conflicts: true     # wait for conflicting jobs (default: true)
     container_runtime: "docker|podman"  # detected during SSH validation, used for restic container execution
-    auto_maintenance: true              # automatic repository maintenance (default: true, Restic only)
-    # Optional per-job maintenance overrides:
+    restic_maintenance: auto            # automatic repository maintenance (auto|user|off, Restic only)
+    # Optional per-job maintenance overrides (user mode only):
     # maintenance_discard_schedule: "0 4 * * *"     # custom discard schedule
     # retention_policy: {keep_last: 10, ...}        # custom retention policy
     # maintenance_check_schedule: "0 1 * * 0"       # custom check schedule
@@ -322,11 +324,11 @@ deleted_jobs:  # user can manually restore to backup_jobs
 ## Roadmap
 
 **Completed 2025-08-19**:
-1. ✅ **Schema-Driven Form Architecture** - Complete separation of HTML from handlers, dynamic field rendering based on schemas
-2. ✅ **HTMX Recursion Bug Fixes** - Fixed duplicate UI elements in repository type selection  
-3. ✅ **Three-Mode Maintenance System** - Migrated from boolean `auto_maintenance` to `restic_maintenance: auto|user|off` with schema-driven configuration
-4. ✅ **Template Consolidation** - Removed unused static templates, consolidated container templates with their content
-5. ✅ **REST Server Authentication** - Added HTTPS checkbox, username/password fields, URI preview, proper validation
+1. ✅ **Job Form System Complete** - Schema-driven form architecture, dual storage pattern, smart edit forms with change detection
+2. ✅ **Dual Storage Pattern** - Store both URIs (execution) and discrete fields (editing) for perfect round-trip data integrity
+3. ✅ **Smart Edit UX** - "Code agent" auto-populates fields, dynamic button text, HTMX change detection
+4. ✅ **Complete S3 Support** - Added all required authentication fields (region, access_key, secret_key, endpoint)
+5. ✅ **Three-Mode Maintenance System** - Migrated from boolean `auto_maintenance` to `restic_maintenance: auto|user|off`
 
 **Completed 2025-08-18**: 
 1. ✅ **Jinja2 Template Migration** - Complete migration from legacy `{{VARIABLE}}` syntax to pure Jinja2
@@ -345,13 +347,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 9. ✅ **Repository Maintenance System** - Consolidated maintenance operations in `services/maintenance.py` with unified discard/check functionality
 
 **Current Priorities**:
-1. **Restore Functionality** - Complete HTMX restore implementation with overwrite checking
+1. **Core Backup Testing** - Real backup execution, restore operations, notifications, maintenance operations (per testing requirements above)
 2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
 3. **UX Polish** - Source path validation styling improvements
 
 ## Recent Development Context
 
-**2025-08-19**: Schema-driven form architecture completed - zero HTML in handlers, dynamic field rendering via schemas, three-mode maintenance system, HTMX recursion bugs fixed, REST server authentication enhanced, template consolidation completed
+**2025-08-19**: Job form system completed - dual storage pattern for round-trip data integrity, smart edit forms with "code agent" auto-population, HTMX change detection, complete S3 support, three-mode maintenance system
 **2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup, backup browser SSH execution restored, restore overwrite checking implemented  
 **2025-08-16-17**: Container execution unified, notification system consolidated, restore system unified, HTMX form system established
 
@@ -365,14 +367,13 @@ See CHANGES.md for current session focus and detailed implementation status.
 
 ## Next Session Priority
 
-**CRITICAL**: These core systems must be functional before any FastAPI/Pydantic migration:
+**CRITICAL**: These core systems must be tested before any FastAPI/Pydantic migration:
 
 1. **Real Backup Execution** - Test actual backup execution (not dry-run) with data transfer verification
-2. **Restore Operations** - Fix and test complete restore workflow with overwrite protection and HTMX integration
+2. **Restore Operations** - Test complete restore workflow with overwrite protection 
 3. **Notification System** - Test email/telegram notifications for job success/failure, queue functionality, template variables
 4. **Restic Maintenance Operations** - Test discard/prune/check operations, scheduling, retention policies  
-5. **UI Functionality** - Fix forms, validation, basic workflows (functional, not polished)
-6. **Rsync Patterns** - Test multi-provider support and rsync execution patterns
+5. **Rsync Patterns** - Test multi-provider support and rsync execution patterns
 
 **Framework Migration**: Only after core functionality verified → FastAPI/Pydantic migration with confidence
 

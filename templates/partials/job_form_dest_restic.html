@@ -30,6 +30,7 @@
     <!-- Container for HTMX-rendered repository fields -->
     <div id="restic_repo_fields_container">
         <!-- Repository-specific fields will be rendered here by HTMX -->
+        {{ repo_fields_html | safe }}
     </div>
     
     {% set endpoint = "/htmx/validate-restic" %}

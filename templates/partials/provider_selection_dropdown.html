@@ -2,7 +2,9 @@
     <label for="add_notification_provider">Add Notification Provider:</label>
     <select id="add_notification_provider" name="provider"
             hx-post="/htmx/add-notification-provider"
-            hx-trigger="change[target.value != '']">
+            hx-trigger="change[target.value != '']"
+            hx-include="closest form"
+            hx-vals="js:{provider: event.target.value}">
         <option value="">Select a provider...</option>
         {% for provider in available_options %}
         <option value="{{ provider }}">{{ provider.capitalize() }}</option>

@@ -65,6 +65,9 @@ class ResticConfig:
     s3_bucket: str = ""
     s3_region: str = ""
     s3_prefix: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_endpoint: str = ""
     
     # SFTP fields
     sftp_hostname: str = ""
@@ -215,7 +218,7 @@ class DestinationParser:
     @staticmethod
     def parse_restic_destination(form_data):
         """Parse Restic destination configuration with all repository types"""
-        repo_type = safe_get_value(form_data, 'repo_type')
+        repo_type = safe_get_value(form_data, 'restic_repo_type')
         password = safe_get_value(form_data, 'restic_password')
         
         if not repo_type:
@@ -228,11 +231,15 @@ class DestinationParser:
         if not uri_result['valid']:
             return uri_result
         
+        # Base config with URI and password
         config = {
             'repo_type': repo_type,
             'repo_uri': uri_result['uri'],
             'password': password
         }
+        
+        # Store discrete fields for form editing round-trip
+        DestinationParser._store_discrete_fields(config, repo_type, form_data)
         
         return {'valid': True, 'config': config}
     
@@ -289,9 +296,18 @@ class DestinationParser:
         elif repo_type == 's3':
             bucket = safe_get_value(form_data, 's3_bucket')
             prefix = safe_get_value(form_data, 's3_prefix', '')
+            region = safe_get_value(form_data, 's3_region')
+            access_key = safe_get_value(form_data, 's3_access_key')
+            secret_key = safe_get_value(form_data, 's3_secret_key')
             
             if not bucket:
                 return {'valid': False, 'error': 'S3 bucket name is required'}
+            if not region:
+                return {'valid': False, 'error': 'S3 region is required'}
+            if not access_key:
+                return {'valid': False, 'error': 'S3 access key is required'}
+            if not secret_key:
+                return {'valid': False, 'error': 'S3 secret key is required'}
             
             uri = f's3:{bucket}'
             if prefix:
@@ -325,6 +341,27 @@ class DestinationParser:
         
         else:
             return {'valid': False, 'error': f'Unknown repository type: {repo_type}'}
+    
+    @staticmethod
+    def _store_discrete_fields(config, repo_type, form_data):
+        """Store discrete fields for form editing round-trip data integrity using schema"""
+        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        
+        if repo_type in RESTIC_REPOSITORY_TYPE_SCHEMAS:
+            schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
+            
+            # Iterate through schema fields and extract values
+            for field_def in schema.get('fields', []):
+                field_name = field_def['name']
+                
+                # Handle different field types
+                if field_def.get('type') == 'checkbox':
+                    # Checkbox fields use 'on' for checked
+                    config[field_name] = safe_get_value(form_data, field_name) == 'on'
+                else:
+                    # Text/number fields use placeholder as default or empty string
+                    default_value = field_def.get('placeholder', '')
+                    config[field_name] = safe_get_value(form_data, field_name, default_value)
 
 # =============================================================================
 # SOURCE PATHS PARSER
@@ -494,7 +531,7 @@ class JobFormParser:
         
         # Handle schedule
         schedule = safe_get_value(form_data, 'schedule', 'manual')
-        if schedule == 'cron':
+        if schedule == 'custom':
             cron_pattern = safe_get_value(form_data, 'cron_pattern').strip()
             if cron_pattern:
                 schedule = cron_pattern
@@ -544,13 +581,19 @@ class JobFormParser:
         if not source_type:
             return {'valid': False, 'error': 'Source type is required'}
         
-        # Parse basic source config (connection details)
-        if source_type == 'local':
-            source_result = SourceParser.parse_local_source(form_data)
-        elif source_type == 'ssh':
-            source_result = SourceParser.parse_ssh_source(form_data)
-        else:
+        # Schema-driven source parsing
+        from models.backup import SOURCE_TYPE_SCHEMAS
+        
+        if source_type not in SOURCE_TYPE_SCHEMAS:
             return {'valid': False, 'error': f'Unknown source type: {source_type}'}
+        
+        # Parse using type-specific parser (following naming convention)
+        parser_method_name = f'parse_{source_type}_source'
+        if hasattr(SourceParser, parser_method_name):
+            parser_method = getattr(SourceParser, parser_method_name)
+            source_result = parser_method(form_data)
+        else:
+            return {'valid': False, 'error': f'No parser available for source type: {source_type}'}
         
         if not source_result['valid']:
             return source_result
@@ -574,16 +617,19 @@ class JobFormParser:
         if not dest_type:
             return {'valid': False, 'error': 'Destination type is required'}
         
-        if dest_type == 'local':
-            dest_result = DestinationParser.parse_local_destination(form_data)
-        elif dest_type == 'ssh':
-            dest_result = DestinationParser.parse_ssh_destination(form_data)
-        elif dest_type == 'rsyncd':
-            dest_result = DestinationParser.parse_rsyncd_destination(form_data)
-        elif dest_type == 'restic':
-            dest_result = DestinationParser.parse_restic_destination(form_data)
-        else:
+        # Schema-driven destination parsing
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        
+        if dest_type not in DESTINATION_TYPE_SCHEMAS:
             return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
+        
+        # Parse using type-specific parser (following naming convention)
+        parser_method_name = f'parse_{dest_type}_destination'
+        if hasattr(DestinationParser, parser_method_name):
+            parser_method = getattr(DestinationParser, parser_method_name)
+            dest_result = parser_method(form_data)
+        else:
+            return {'valid': False, 'error': f'No parser available for destination type: {dest_type}'}
         
         if not dest_result['valid']:
             return dest_result

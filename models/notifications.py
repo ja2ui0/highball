@@ -81,6 +81,7 @@ class NotificationConfig:
 PROVIDER_FIELD_SCHEMAS = {
     'telegram': {
         'display_name': 'Telegram',
+        'required_fields': ['token', 'chat_id'],
         'fields': [
             {
                 'name': 'enabled',
@@ -131,6 +132,7 @@ PROVIDER_FIELD_SCHEMAS = {
     },
     'email': {
         'display_name': 'Email',
+        'required_fields': ['smtp_server', 'smtp_port', 'from_email', 'to_email'],
         'fields': [
             {
                 'name': 'enabled',
@@ -252,18 +254,16 @@ class NotificationProviderFactory:
         
         provider = get_notifier(provider_name)
         
-        # Validate required configuration
-        if provider_name == 'telegram':
-            required_fields = ['token', 'chat_id']
+        # Schema-driven provider validation
+        if provider_name in PROVIDER_FIELD_SCHEMAS:
+            schema = PROVIDER_FIELD_SCHEMAS[provider_name]
+            required_fields = schema.get('required_fields', [])
+            
             for field in required_fields:
                 if not provider_config.get(field):
-                    raise Exception(f"Telegram provider missing required field: {field}")
-        
-        elif provider_name == 'email':
-            required_fields = ['smtp_server', 'from_email', 'to_email']
-            for field in required_fields:
-                if not provider_config.get(field):
-                    raise Exception(f"Email provider missing required field: {field}")
+                    raise Exception(f"{schema['display_name']} provider missing required field: {field}")
+        else:
+            raise Exception(f"Unknown notification provider: {provider_name}")
         
         self._providers[provider_name] = provider
         return provider

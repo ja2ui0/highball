@@ -1,4 +1,4 @@
-{% if show_field or schedule == 'cron' %}
+{% if show_field or schedule == 'custom' %}
 <div id="cron_field" class="mt-10">
     <label for="cron_pattern">Cron Pattern:</label>
     <input type="text" name="cron_pattern" value="{{ cron_pattern }}" placeholder="0 3 * * *" 

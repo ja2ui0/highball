@@ -21,6 +21,8 @@
             {% include 'partials/job_source_options_section.html' %}
             {% include 'partials/job_notifications_section.html' %}
             {% include 'partials/job_actions_section.html' %}
+            
+            {% include 'partials/job_form_buttons.html' %}
         </form>
         
         {% if delete_form %}{{ delete_form | safe }}{% endif %}

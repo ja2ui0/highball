@@ -1,0 +1,7 @@
+<!-- Remove the provider configuration -->
+<div id="{{ provider_id }}" hx-swap-oob="delete"></div>
+
+<!-- Update the provider selection dropdown -->
+<div id="add_provider_section" hx-swap-oob="true">
+    {{ updated_selection_html | safe }}
+</div>
