@@ -1,10 +1,13 @@
 <tr>
-    <td><strong>{{ job_name }}</strong></td>
-    <td class="source-path">{{ source_path }}</td>
-    <td>Deleted</td>
+    <td>{{ job_name }}</td>
+    <td class="source-path">{{ source_display }}</td>
+    <td class="source-path">{{ dest_display }}</td>
+    <td class="disabled">Deleted</td>
     <td>{{ deleted_at }}</td>
-    <td class="action-buttons">
-        <a href="/restore-job?name={{ job_name }}" class="button button-success">Restore</a>
-        <a href="/purge-job?name={{ job_name }}" class="button button-danger">Purge</a>
+    <td colspan="2">
+        <div class="action-buttons">
+            <a href="/restore-job?name={{ job_name }}" class="button button-success">Restore</a>
+            <a href="/purge-job?name={{ job_name }}" class="button button-danger">Purge</a>
+        </div>
     </td>
 </tr>

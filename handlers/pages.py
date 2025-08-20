@@ -68,12 +68,38 @@ class PagesHandler:
             # Sort jobs by name
             job_list.sort(key=lambda j: j['name'])
             
-            # Get deleted jobs - pass data to template, not rendered HTML
+            # Process deleted jobs into display format
             deleted_jobs = self.backup_config.config.get('deleted_jobs', {})
+            deleted_job_rows = ""
+            
+            if deleted_jobs:
+                for job_name, job_config in deleted_jobs.items():
+                    # Build source and destination displays same way as active jobs
+                    source_display = self._build_source_display_with_type(job_config)
+                    dest_display = self._build_dest_display_with_type(job_config)
+                    
+                    # Format deleted_at timestamp (break into date and time)
+                    deleted_at_raw = job_config.get('deleted_at', 'Unknown')
+                    if deleted_at_raw != 'Unknown' and ' ' in deleted_at_raw:
+                        # Split "2025-08-20 14:30:45" into "2025-08-20\n14:30:45"
+                        date_part, time_part = deleted_at_raw.split(' ', 1)
+                        deleted_at = f"{date_part}\n{time_part}"
+                    else:
+                        deleted_at = deleted_at_raw
+                    
+                    # Render each deleted job row
+                    row_html = self.template_service.render_template(
+                        'partials/deleted_job_row.html',
+                        job_name=job_name,
+                        source_display=source_display,
+                        dest_display=dest_display,
+                        deleted_at=deleted_at
+                    )
+                    deleted_job_rows += row_html
             
             template_data = {
                 'jobs': job_list,
-                'deleted_jobs': deleted_jobs,
+                'deleted_job_rows': deleted_job_rows,
                 'global_settings': global_settings,
                 'page_title': 'Dashboard'
             }
@@ -336,7 +362,7 @@ class PagesHandler:
                 self._send_error(request_handler, "Job name is required")
                 return
             
-            success = self.backup_config.delete_job(job_name)
+            success = self.backup_config.delete_backup_job(job_name)
             
             if success:
                 self._send_redirect(request_handler, '/dashboard')
@@ -1025,6 +1051,208 @@ class PagesHandler:
             # Note: submit_button_text handled at handler level
         }
     
+    def check_repository_availability_htmx(self, request_handler, job_name=None):
+        """HTMX endpoint for repository availability check"""
+        try:
+            # Get job name from parameter or query parameters
+            if not job_name:
+                from urllib.parse import urlparse, parse_qs
+                url_parts = urlparse(request_handler.path)
+                params = parse_qs(url_parts.query)
+                job_name = params.get('job', [''])[0]
+            
+            if not job_name:
+                content = self.template_service.render_template('partials/htmx_error.html',
+                    error_message='Job name is required'
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                return
+            
+            # Implement actual repository availability check logic
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                content = self.template_service.render_template('partials/htmx_error.html',
+                    error_message=f"Job '{job_name}' not found"
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                return
+
+            job_config = jobs[job_name]
+            dest_type = job_config.get('dest_type')
+            
+            if dest_type == 'restic':
+                # Use the quick check for restic repositories
+                dest_config = job_config.get('dest_config', {})
+                repo_uri = dest_config.get('repo_uri')
+                
+                if repo_uri:
+                    from models.backup import backup_service
+                    check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
+                    
+                    if check_success:
+                        # Repository is available - load backup browser
+                        content = self.template_service.render_template('partials/repository_available.html',
+                            job_name=job_name,
+                            job_type=dest_type
+                        )
+                        request_handler.send_response(200)
+                        request_handler.send_header('Content-type', 'text/html')
+                        request_handler.end_headers()
+                        request_handler.wfile.write(content.encode())
+                    else:
+                        # Repository error - determine type and render appropriate template
+                        if check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower()):
+                            # Repository locked - render unlock interface
+                            content = self.template_service.render_template('partials/repository_locked_error.html',
+                                job_name=job_name,
+                                error_message=check_message
+                            )
+                            request_handler.send_response(200)
+                            request_handler.send_header('Content-type', 'text/html')
+                            request_handler.end_headers()
+                            request_handler.wfile.write(content.encode())
+                        else:
+                            # Other error - render error template
+                            content = self.template_service.render_template('partials/repository_error.html',
+                                job_name=job_name,
+                                error_type='connection_error',
+                                error_message=check_message or 'Unknown error'
+                            )
+                            request_handler.send_response(200)
+                            request_handler.send_header('Content-type', 'text/html')
+                            request_handler.end_headers()
+                            request_handler.wfile.write(content.encode())
+                else:
+                    content = self.template_service.render_template('partials/htmx_error.html',
+                        error_message='Repository URI not configured'
+                    )
+                    request_handler.send_response(200)
+                    request_handler.send_header('Content-type', 'text/html')
+                    request_handler.end_headers()
+                    request_handler.wfile.write(content.encode())
+            else:
+                # Non-restic repositories - assume available for now
+                content = self.template_service.render_template('partials/repository_available.html',
+                    job_name=job_name,
+                    job_type=dest_type
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            content = self.template_service.render_template('partials/htmx_error.html',
+                error_message=f'Error: {str(e)}'
+            )
+            request_handler.send_response(500)
+            request_handler.send_header('Content-type', 'text/html')
+            request_handler.end_headers()
+            request_handler.wfile.write(content.encode())
+    
+    def unlock_repository_htmx(self, request_handler, job_name=None):
+        """HTMX endpoint for repository unlock"""
+        try:
+            # Get job name from parameter or query parameters
+            if not job_name:
+                from urllib.parse import urlparse, parse_qs
+                url_parts = urlparse(request_handler.path)
+                params = parse_qs(url_parts.query)
+                job_name = params.get('job', [''])[0]
+            
+            if not job_name:
+                content = self.template_service.render_template('partials/htmx_error.html',
+                    error_message='Job name is required'
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                return
+            
+            # Directly implement the unlock logic
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                content = self.template_service.render_template('partials/htmx_error.html',
+                    error_message=f"Job '{job_name}' not found"
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                return
+
+            job_config = jobs[job_name]
+            dest_type = job_config.get('dest_type')
+            
+            if dest_type != 'restic':
+                content = self.template_service.render_template('partials/htmx_error.html',
+                    error_message='Unlock is only supported for restic repositories'
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                return
+
+            # Execute restic unlock command
+            dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
+            
+            from models.backup import backup_service
+            result = backup_service.unlock_repository(dest_config, source_config)
+            
+            if result.get('success'):
+                # Unlock successful - automatically retry availability check
+                self.check_repository_availability_htmx(request_handler, job_name)
+            else:
+                # Unlock failed - show error
+                content = self.template_service.render_template('partials/repository_error.html',
+                    job_name=job_name,
+                    error_type='unlock_failed',
+                    error_message=result.get('error', 'Unlock operation failed')
+                )
+                request_handler.send_response(200)
+                request_handler.send_header('Content-type', 'text/html')
+                request_handler.end_headers()
+                request_handler.wfile.write(content.encode())
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            content = self.template_service.render_template('partials/htmx_error.html',
+                error_message=f'Unlock failed: {str(e)}'
+            )
+            request_handler.send_response(500)
+            request_handler.send_header('Content-type', 'text/html')
+            request_handler.end_headers()
+            request_handler.wfile.write(content.encode())
+    
+    def _send_htmx_partial(self, request_handler, template_path: str, data: Dict[str, Any]):
+        """Send HTMX partial response"""
+        try:
+            content = self.template_service.render_template(template_path, data)
+            request_handler.send_response(200)
+            request_handler.send_header('Content-type', 'text/html')
+            request_handler.end_headers()
+            request_handler.wfile.write(content.encode())
+        except Exception as e:
+            logger.error(f"HTMX partial error: {e}")
+            self._send_htmx_error(request_handler, f"Template error: {str(e)}")
+    
+    def _send_htmx_error(self, request_handler, message: str):
+        """Send HTMX error response using template"""
+        template_data = {'error_message': message}
+        self._send_htmx_partial(request_handler, 'partials/htmx_error.html', template_data)
+
     def _send_error(self, request_handler, message: str, status_code: int = 500):
         """Send error response using template partial"""
         request_handler.send_response(status_code)

@@ -4,6 +4,7 @@
     <title>Highball</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="{{ theme_css_path }}">
+    <script src="/static/htmx.min.js"></script>
     <script src="/static/nav.js"></script>
 </head>
 <body>
@@ -16,47 +17,9 @@
         {{ config_warning | safe }}
         {% endif %}
         
-        <h2>Backup Jobs</h2>
-        <table class="job-table">
-            <tr>
-                <th>Job Name</th>
-                <th>Source</th>
-                <th>Destination</th>
-                <th>Status</th>
-                <th>Schedule</th>
-                <th>Inspect</th>
-                <th>Actions</th>
-            </tr>
-            {% if job_rows %}
-            {{ job_rows | safe }}
-            {% else %}
-            {% include 'partials/empty_job_rows.html' %}
-            {% endif %}
-        </table>
+        {% include 'partials/backup_jobs_section.html' %}
         
-        <p style="margin-top: 20px;">
-            <a href="/add-job" class="button button-success">Add New Backup Job</a>
-        </p>
-        
-        <h2>Deleted Jobs</h2>
-        <table class="deleted-table">
-            <tr>
-                <th>Job Name</th>
-                <th>Source Path</th>
-                <th>Status</th>
-                <th>Deleted At</th>
-                <th>Actions</th>
-            </tr>
-            {% if deleted_job_rows %}
-            {{ deleted_job_rows | safe }}
-            {% else %}
-            {% include 'partials/empty_deleted_rows.html' %}
-            {% endif %}
-        </table>
-        
-        <p style="margin-top: 10px; color: #888; font-size: 14px;">
-            <strong>Note:</strong> Deleted jobs are moved here and can be restored. Use "Purge" to permanently delete.
-        </p>
+        {% include 'partials/deleted_jobs_section.html' %}
     </div>
 </body>
 </html>

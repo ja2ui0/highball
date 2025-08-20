@@ -1,0 +1,36 @@
+<!-- Repository Locked Error Partial -->
+<div id="repositoryStatus" class="repository-lock-error">
+    <h4>Repository Locked</h4>
+    <p><strong>The repository is currently locked and cannot be accessed.</strong></p>
+    <p>This usually happens when a backup operation was interrupted or crashed, leaving a stale lock.</p>
+    
+    <details style="margin: 15px 0;">
+        <summary>Technical Details</summary>
+        <div style="background: var(--bg-darker); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 8px;">
+            {{ error_message }}
+        </div>
+    </details>
+    
+    <div class="unlock-warning" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px; border-radius: 4px; margin: 15px 0;">
+        <strong>Important Warning:</strong><br>
+        Only unlock if you are certain no backup operations are currently running on this repository. 
+        Unlocking a repository that is actively being used by another process could cause data corruption.
+    </div>
+    
+    <div style="margin-top: 15px;">
+        <button hx-post="/unlock-repository?job={{ job_name }}"
+                hx-target="#repositoryStatus"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to unlock this repository? Only proceed if you're certain no backup operations are running."
+                class="button button-warning" 
+                style="margin-right: 10px;">
+            Unlock Repository
+        </button>
+        <button hx-get="/check-repository-availability?job={{ job_name }}"
+                hx-target="#repositoryStatus"
+                hx-swap="outerHTML"
+                class="button button-secondary">
+            Retry Without Unlocking
+        </button>
+    </div>
+</div>

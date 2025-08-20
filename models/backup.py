@@ -101,6 +101,14 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         'display_name': 'Local Path',
         'description': 'Store repository on local filesystem',
         'always_available': True,
+        'quick_check': {
+            'command': ['test', '-d', '{local_path_parent}'],
+            'expected_returncode': 0,
+            'timeout': 3,
+            'variables': {
+                'local_path_parent': 'dirname {local_path}'
+            }
+        },
         'fields': [
             {
                 'name': 'local_path',
@@ -116,6 +124,14 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         'display_name': 'REST Server',
         'description': 'Store repository on REST server',
         'always_available': True,
+        'quick_check': {
+            'command': ['restic', '-r', '{repo_uri}', 'check', '--read-data-subset=0.1%'],
+            'expected_returncode': 0,
+            'timeout': 10,
+            'env': {
+                'RESTIC_PASSWORD': '{password}'
+            }
+        },
         'fields': [
             {
                 'name': 'rest_hostname',
@@ -176,6 +192,12 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         'display_name': 'Amazon S3',
         'description': 'Store repository in Amazon S3 bucket',
         'always_available': True,
+        'quick_check': {
+            'command': ['curl', '--max-time', '3', '-s', '-I', '{s3_endpoint}'],
+            'expected_returncode': 0,
+            'timeout': 5,
+            'skip_if_empty': ['s3_endpoint']
+        },
         'fields': [
             {
                 'name': 's3_bucket',
@@ -229,6 +251,11 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         'display_name': 'SFTP',
         'description': 'Store repository via SFTP',
         'always_available': True,
+        'quick_check': {
+            'command': ['ssh', '-o', 'ConnectTimeout=3', '-o', 'BatchMode=yes', '{sftp_username}@{sftp_hostname}', 'echo', 'connected'],
+            'expected_stdout': 'connected',
+            'timeout': 5
+        },
         'fields': [
             {
                 'name': 'sftp_hostname',
@@ -260,6 +287,11 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         'display_name': 'rclone Remote',
         'description': 'Store repository via rclone remote',
         'always_available': True,
+        'quick_check': {
+            'command': ['rclone', 'lsd', '{rclone_remote}:', '--max-depth', '1'],
+            'expected_returncode': 0,
+            'timeout': 10
+        },
         'fields': [
             {
                 'name': 'rclone_remote',
@@ -915,7 +947,7 @@ class ResticRepositoryService:
             
             # Check if we should use SSH execution
             if source_config and source_config.get('hostname') and source_config.get('username'):
-                return self._list_snapshots_via_ssh(repo_uri, password, source_config)
+                return self._list_snapshots_via_ssh(repo_uri, password, source_config, dest_config)
             else:
                 # Fall back to local execution
                 return self.list_snapshots(dest_config, filters)
@@ -927,9 +959,113 @@ class ResticRepositoryService:
                 'error': f'SSH snapshot listing failed: {str(e)}'
             }
     
-    def _list_snapshots_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_template_variables(self, variables: Dict[str, str], context: Dict[str, Any]) -> Dict[str, str]:
+        """Execute template variable transformations"""
+        resolved = {}
+        for var_name, template in variables.items():
+            if template.startswith('remove_prefix '):
+                # Format: "remove_prefix rest: {repo_uri}"
+                parts = template.split(' ', 2)
+                prefix = parts[1]
+                source_var = parts[2].strip('{}')
+                source_value = context.get(source_var, '')
+                resolved[var_name] = source_value[len(prefix):] if source_value.startswith(prefix) else source_value
+            elif template.startswith('dirname '):
+                # Format: "dirname {local_path}"
+                source_var = template.split(' ', 1)[1].strip('{}')
+                source_value = context.get(source_var, '')
+                from pathlib import Path
+                resolved[var_name] = str(Path(source_value).parent)
+            else:
+                # Direct template substitution
+                resolved[var_name] = template.format(**context)
+        return resolved
+
+    def _quick_repository_check(self, repo_uri: str, dest_config: Dict[str, Any]) -> Tuple[bool, str]:
+        """Schema-driven quick check for repository accessibility"""
+        repo_type = dest_config.get('repo_type')
+        
+        if not repo_type or repo_type not in RESTIC_REPOSITORY_TYPE_SCHEMAS:
+            return True, "Unknown repository type, skipping check"
+        
+        schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
+        quick_check = schema.get('quick_check')
+        
+        if not quick_check:
+            return True, "No quick check defined for this repository type"
+        
+        try:
+            # Prepare context with repo_uri and all dest_config fields
+            context = dict(dest_config)
+            context['repo_uri'] = repo_uri
+            
+            # Check if we should skip due to empty required fields
+            skip_if_empty = quick_check.get('skip_if_empty', [])
+            for field in skip_if_empty:
+                if not context.get(field):
+                    return True, f"Skipping check: {field} not specified"
+            
+            # Execute template variables if defined
+            variables = quick_check.get('variables', {})
+            if variables:
+                resolved_vars = self._execute_template_variables(variables, context)
+                context.update(resolved_vars)
+            
+            # Build command with template substitution
+            command_template = quick_check['command']
+            command = [arg.format(**context) for arg in command_template]
+            
+            # Prepare environment variables
+            env = os.environ.copy()
+            env_template = quick_check.get('env', {})
+            for env_key, env_value in env_template.items():
+                env[env_key] = env_value.format(**context)
+            
+            # Execute command
+            timeout = quick_check.get('timeout', 10)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=env)
+            
+            # Check expected results
+            if 'expected_returncode' in quick_check:
+                expected_code = quick_check['expected_returncode']
+                success = result.returncode == expected_code
+                if success:
+                    return success, f"Command returned {result.returncode} (expected: {expected_code})"
+                else:
+                    error_details = f"Command returned {result.returncode} (expected: {expected_code})"
+                    if result.stderr:
+                        error_details += f" - stderr: {result.stderr.strip()}"
+                    if result.stdout:
+                        error_details += f" - stdout: {result.stdout.strip()}"
+                    return success, error_details
+            
+            elif 'expected_stdout' in quick_check:
+                expected_out = quick_check['expected_stdout']
+                actual_out = result.stdout.strip()
+                success = actual_out == expected_out
+                return success, f"Output: '{actual_out}' (expected: '{expected_out}')"
+            
+            else:
+                # Default: success if returncode is 0
+                success = result.returncode == 0
+                return success, f"Command {'succeeded' if success else 'failed'} (code: {result.returncode})"
+                
+        except subprocess.TimeoutExpired:
+            return False, f"Quick check timed out after {quick_check.get('timeout', 10)}s"
+        except Exception as e:
+            return False, f"Quick check failed: {str(e)}"
+
+    def _list_snapshots_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any], dest_config: Dict[str, Any]) -> Dict[str, Any]:
         """List snapshots via SSH execution (implementation from working code)"""
         import json
+        
+        # Quick pre-check using schema-driven approach
+        check_success, check_message = self._quick_repository_check(repo_uri, dest_config)
+        if not check_success:
+            return {
+                'success': False,
+                'error': f'Repository endpoint check failed: {check_message}'
+            }
         
         hostname = source_config.get('hostname')
         username = source_config.get('username')
@@ -1050,6 +1186,108 @@ class ResticRepositoryService:
             return {
                 'success': False,
                 'error': f'Statistics failed: {str(e)}'
+            }
+    
+    def unlock_repository(self, dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Unlock a restic repository"""
+        try:
+            repo_uri = dest_config.get('repo_uri')
+            password = dest_config.get('password')
+            
+            if not repo_uri or not password:
+                return {
+                    'success': False,
+                    'error': 'Repository URI and password are required'
+                }
+            
+            # Check if we should use SSH execution (same pattern as other operations)
+            if source_config and source_config.get('hostname') and source_config.get('username'):
+                return self._unlock_repository_via_ssh(repo_uri, password, source_config)
+            else:
+                # Fall back to local execution
+                return self._unlock_repository_local(repo_uri, password)
+                
+        except Exception as e:
+            logger.error(f"Repository unlock error: {e}")
+            return {
+                'success': False,
+                'error': f'Repository unlock failed: {str(e)}'
+            }
+    
+    def _unlock_repository_local(self, repo_uri: str, password: str) -> Dict[str, Any]:
+        """Unlock repository using local restic execution"""
+        try:
+            # Set environment
+            env = os.environ.copy()
+            env['RESTIC_PASSWORD'] = password
+            
+            # Build unlock command
+            cmd = ['restic', '-r', repo_uri, 'unlock']
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+            
+            if result.returncode == 0:
+                return {
+                    'success': True,
+                    'message': 'Repository unlocked successfully'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Unlock failed: {result.stderr}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Repository unlock timed out'
+            }
+        except Exception as e:
+            logger.error(f"Local unlock error: {e}")
+            return {
+                'success': False,
+                'error': f'Local unlock failed: {str(e)}'
+            }
+    
+    def _unlock_repository_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Unlock repository via SSH execution (for consistency with other operations)"""
+        try:
+            hostname = source_config.get('hostname')
+            username = source_config.get('username')
+            container_runtime = source_config.get('container_runtime', 'docker')
+            
+            # Build SSH + container command for unlock
+            cmd = [
+                'ssh', f'{username}@{hostname}',
+                container_runtime, 'run', '--rm',
+                '-e', f'RESTIC_PASSWORD={password}',
+                'restic/restic:0.18.0',
+                '-r', repo_uri, 'unlock'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return {
+                    'success': True,
+                    'message': 'Repository unlocked successfully via SSH'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'SSH unlock failed: {result.stderr}'
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'SSH unlock timed out'
+            }
+        except Exception as e:
+            logger.error(f"SSH unlock error: {e}")
+            return {
+                'success': False,
+                'error': f'SSH unlock failed: {str(e)}'
             }
     
     def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -1561,6 +1799,10 @@ class BackupService:
     def get_snapshot_statistics(self, dest_config: Dict[str, Any], snapshot_id: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get detailed statistics for a specific snapshot"""
         return self.repository_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
+    
+    def unlock_repository(self, dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Unlock a locked restic repository"""
+        return self.repository_service.unlock_repository(dest_config, source_config)
     
     def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Browse directory contents in a specific snapshot"""

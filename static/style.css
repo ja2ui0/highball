@@ -308,12 +308,13 @@ tr:hover {
 .job-table th:nth-child(6), .job-table td:nth-child(6) { width: 8%; min-width: 60px; }
 .job-table th:nth-child(7), .job-table td:nth-child(7) { width: 20%; min-width: 200px; }
 
-/* Deleted jobs table layout */
-.deleted-table th:nth-child(1), .deleted-table td:nth-child(1) { width: 15%; min-width: 100px; }
-.deleted-table th:nth-child(2), .deleted-table td:nth-child(2) { width: 40%; min-width: 200px; word-break: break-all; }
-.deleted-table th:nth-child(3), .deleted-table td:nth-child(3) { width: 10%; min-width: 70px; }
-.deleted-table th:nth-child(4), .deleted-table td:nth-child(4) { width: 15%; min-width: 120px; }
-.deleted-table th:nth-child(5), .deleted-table td:nth-child(5) { width: 20%; min-width: 150px; }
+/* Deleted jobs table layout - 6 columns to match active jobs */
+.deleted-table th:nth-child(1), .deleted-table td:nth-child(1) { width: 12%; min-width: 100px; }
+.deleted-table th:nth-child(2), .deleted-table td:nth-child(2) { width: 22%; min-width: 150px; word-break: break-all; }
+.deleted-table th:nth-child(3), .deleted-table td:nth-child(3) { width: 22%; min-width: 150px; word-break: break-all; }
+.deleted-table th:nth-child(4), .deleted-table td:nth-child(4) { width: 8%; min-width: 70px; }
+.deleted-table th:nth-child(5), .deleted-table td:nth-child(5) { width: 8%; min-width: 60px; }
+.deleted-table th:nth-child(6), .deleted-table td:nth-child(6) { width: 28%; min-width: 260px; } /* Combined Inspect+Actions width */
 
 /* Monospace text - reusable */
 .monospace, .source-path {

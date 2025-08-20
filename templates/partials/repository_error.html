@@ -1,0 +1,29 @@
+<!-- Generic Repository Error Partial -->
+<div id="repositoryStatus" class="repository-error">
+    <h4>Repository Unavailable</h4>
+    <p><strong>Unable to access the repository for browsing.</strong></p>
+    
+    {% if error_type == 'wrong_password' %}
+        <p>The repository password appears to be incorrect. Please check the job configuration.</p>
+    {% elif error_type == 'repository_not_found' %}
+        <p>The repository does not exist at the specified location. You may need to initialize it first.</p>
+    {% else %}
+        <p>An unexpected error occurred while checking repository availability.</p>
+    {% endif %}
+    
+    <details style="margin: 15px 0;">
+        <summary>Technical Details</summary>
+        <div style="background: var(--bg-darker); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 8px;">
+            {{ error_message }}
+        </div>
+    </details>
+    
+    <div style="margin-top: 15px;">
+        <button hx-get="/check-repository-availability?job={{ job_name }}"
+                hx-target="#repositoryStatus"
+                hx-swap="outerHTML"
+                class="button button-secondary">
+            Retry Check
+        </button>
+    </div>
+</div>

@@ -9,7 +9,12 @@
         <div class="action-buttons">
             <a href="/edit-job?name={{ job_name }}" class="button">Edit</a>
             <a href="/run-backup?name={{ job_name }}" class="button">Run</a>
-            <a href="/delete-job?name={{ job_name }}" class="button button-danger">Delete</a>
+            <button hx-post="/delete-job" 
+                    hx-vals='{"job_name": "{{ job_name }}"}'
+                    hx-target="body"
+                    hx-swap="outerHTML"
+                    hx-confirm="Are you sure you want to delete job '{{ job_name }}'? It will be moved to deleted jobs and can be restored later."
+                    class="button button-danger">Delete</button>
         </div>
     </td>
 </tr>

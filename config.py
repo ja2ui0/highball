@@ -174,9 +174,25 @@ class BackupConfig:
         return True  # Return True for success indication
     
     def delete_backup_job(self, job_name):
-        """Delete a backup job"""
+        """Delete a backup job (move to deleted_jobs section)"""
         if 'backup_jobs' in self.config and job_name in self.config['backup_jobs']:
+            # Move entire job config from backup_jobs to deleted_jobs
+            job_config = self.config['backup_jobs'][job_name].copy()
+            
+            # Initialize deleted_jobs section if it doesn't exist
+            if 'deleted_jobs' not in self.config:
+                self.config['deleted_jobs'] = {}
+            
+            # Add deleted_at timestamp
+            from datetime import datetime
+            job_config['deleted_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Move job to deleted_jobs (entire config branch with timestamp)
+            self.config['deleted_jobs'][job_name] = job_config
+            
+            # Remove from active backup_jobs
             del self.config['backup_jobs'][job_name]
+            
             self.save_config()
             return True
         return False

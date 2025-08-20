@@ -80,8 +80,34 @@ source_config:
 - **Page Rendering**: `pages.py` (consolidated: dashboard, config, inspection, logs, network)
 - **Operations**: `operations.py` (backup/restore execution and coordination)
 - **Forms**: `forms.py` (HTMX form processing and validation)
-- **API**: `api.py` (REST endpoints and external integrations)
+- **API**: `api.py` (JSON endpoints for HTMX updates, external integrations, repository introspection)
 - **Scheduling**: `scheduler.py` (job scheduling and cron management)
+
+## API Handler Usage Rules (CRITICAL - Unplanned Evolution)
+
+**IMPORTANT**: `api.py` has evolved beyond its original scope of read-only dashboard widgets. These rules govern its usage going forward:
+
+### ✅ GREEN LIGHTS (belongs in api.py):
+- **Public API Endpoints** (`/api/highball/*`): External dashboard widgets (require bearer token)
+- **Internal HTMX Endpoints** (no `/api/` prefix): Dynamic UI updates for internal app use (session auth)
+- **Repository Introspection**: Read-only operations like snapshot listing, browsing, availability checks
+- **Real-Time Form Validation**: Endpoints that validate form data and return JSON responses
+- **Non-destructive Repository Operations**: Quick checks, unlock operations, validation
+
+### ❌ RED FLAGS (belongs elsewhere):
+- **Primary Form Submission**: Main form processing belongs in `forms.py` 
+- **Page Rendering**: HTML page generation belongs in `pages.py`
+- **Complex Business Operations**: Multi-step operations belong in `operations.py`
+- **Job Management**: CRUD operations belong in appropriate handlers
+
+### 🔍 Decision Framework:
+1. **Does it return JSON?** → Likely api.py
+2. **Is it for HTMX dynamic updates?** → Likely api.py  
+3. **Is it repository introspection?** → Likely api.py
+4. **Is it primary user workflow?** → Likely other handlers
+5. **Does it render HTML pages?** → Definitely other handlers
+
+**Rationale**: HTMX architecture requires JSON endpoints for dynamic UI updates. Repository introspection operations enable progressive disclosure UX patterns. This separation maintains clean concerns while supporting modern web patterns.
 
 ### Business Logic (services/)
 - **Execution**: `execution.py` (unified command execution and obfuscation)
@@ -115,7 +141,6 @@ source_config:
 - `/var/log/highball/jobs/{job_name}.log` - detailed execution logs
 - `/var/log/highball/job_validation.yaml` - SSH validation timestamps
 - `/var/log/highball/running_jobs.txt` - currently running jobs for conflict detection
-- `/var/log/highball/deleted_jobs.yaml` - deleted job tracking with timestamps (separate from config)
 - `/var/log/highball/notification_queues/{provider}_state.yaml` - notification queue state and pending messages
 
 ## Features
@@ -208,11 +233,33 @@ source_config:
 **Assets**: External only - no emoji, no inline styles/scripts
 **Forms**: Schema-driven HTMX rendering, multipart form data, dedicated parsers, real-time validation
 
+### HTMX DOM-Safe Targeting (CRITICAL)
+**Pattern**: HTMX buttons must NEVER target their own parent container - causes DOM destruction and event handling failures
+**Add Operations**: `hx-target="#list_container"` + `hx-swap="beforeend"` (preserve triggering button)
+**Remove Operations**: `hx-target="#item_{{ index }}"` + `hx-swap="outerHTML"` (self-destruct pattern)
+**Form Integration**: `hx-include="closest form"` for smart form data gathering
+**Protection Pattern**: `{% if index > 0 %}` prevents deletion of required elements
+
 ### Code Quality
 **Standards**: PEP 8, emoji-free, external assets only
 **Dependencies**: `dataclasses`, `pathlib`, `validators`, `croniter`, `notifiers`, `Jinja2`
 **Testing**: Standalone tests in `tests/` with mocking patterns. Use `test_*_standalone.py` for isolated unit tests.
 **Containers**: Official containers only (`restic/restic`, future `kopia/kopia`)
+
+### Schema-Driven Architecture Guidelines
+**GREEN LIGHTS** (Schema-worthy patterns):
+- Type-based dispatch (source types, destination types, providers)
+- Field validation patterns repeated across types
+- Form rendering based on type selection
+- Configuration parsing with type-specific rules
+
+**RED FLAGS** (Don't schema-ize):
+- Simple binary choices (enabled/disabled, true/false)
+- One-off conditional logic with no variants
+- Complex business logic that doesn't follow type patterns
+- Error handling or exception cases
+
+**Testing Protocol**: Test schema changes immediately - verify all affected job types and combinations work
 
 ## Theming System
 
@@ -323,6 +370,12 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Roadmap
 
+**Completed 2025-08-20**:
+1. ✅ **Schema-Driven Architecture Migration** - Eliminated 100+ lines of hardcoded if/elif logic across 8 files
+2. ✅ **Type-Based Dispatch System** - SOURCE_TYPE_SCHEMAS and enhanced DESTINATION_TYPE_SCHEMAS with complete field coverage  
+3. ✅ **Smart Pattern Recognition** - Guidelines for appropriate schema application vs preserving complex business logic
+4. ✅ **Comprehensive Testing Protocol** - 15+ pathway tests ensuring regression-free migration
+
 **Completed 2025-08-19**:
 1. ✅ **Job Form System Complete** - Schema-driven form architecture, dual storage pattern, smart edit forms with change detection
 2. ✅ **Dual Storage Pattern** - Store both URIs (execution) and discrete fields (editing) for perfect round-trip data integrity
@@ -347,12 +400,13 @@ deleted_jobs:  # user can manually restore to backup_jobs
 9. ✅ **Repository Maintenance System** - Consolidated maintenance operations in `services/maintenance.py` with unified discard/check functionality
 
 **Current Priorities**:
-1. **Core Backup Testing** - Real backup execution, restore operations, notifications, maintenance operations (per testing requirements above)
-2. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table  
-3. **UX Polish** - Source path validation styling improvements
+1. **Inspect Endpoint Development** - Per-job management interface with integrated backup browser, restore controls, and status monitoring
+2. **Core Backup Testing** - Real backup execution, restore operations, notifications, maintenance operations  
+3. **Dashboard Status Integration** - Add restore status polling and display "Restoring... N%" in main dashboard job table
 
 ## Recent Development Context
 
+**2025-08-20**: Schema-driven architecture migration completed - eliminated 100+ lines of hardcoded type logic, established schema appropriateness guidelines, comprehensive testing protocol applied  
 **2025-08-19**: Job form system completed - dual storage pattern for round-trip data integrity, smart edit forms with "code agent" auto-population, HTMX change detection, complete S3 support, three-mode maintenance system
 **2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup, backup browser SSH execution restored, restore overwrite checking implemented  
 **2025-08-16-17**: Container execution unified, notification system consolidated, restore system unified, HTMX form system established

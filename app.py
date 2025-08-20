@@ -149,6 +149,12 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['job_scheduler'].list_jobs(self)
             elif path == '/api/highball/jobs':
                 self._handlers['api'].get_jobs(self)
+            elif path == '/check-repository-availability':
+                job_name = params.get('job', [''])[0]
+                self._handlers['pages'].check_repository_availability_htmx(self, job_name)
+            elif path == '/unlock-repository':
+                job_name = params.get('job', [''])[0]
+                self._handlers['pages'].unlock_repository_htmx(self, job_name)
             else:
                 self._send_404()
         except Exception as e:
@@ -239,6 +245,11 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['api'].test_telegram_notification(self, form_data)
             elif path == '/test-email-notification':
                 self._handlers['api'].test_email_notification(self, form_data)
+            elif path == '/unlock-repository':
+                url_parts = urlparse(self.path)
+                params = parse_qs(url_parts.query)
+                job_name = params.get('job', [''])[0]
+                self._handlers['pages'].unlock_repository_htmx(self, job_name)
             else:
                 self._send_404()
         except Exception as e:

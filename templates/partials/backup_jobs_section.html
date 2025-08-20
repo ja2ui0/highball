@@ -1,0 +1,21 @@
+<h2>Backup Jobs</h2>
+<table class="job-table backup-jobs">
+    <tr>
+        <th>Job Name</th>
+        <th>Source</th>
+        <th>Destination</th>
+        <th>Status</th>
+        <th>Schedule</th>
+        <th>Inspect</th>
+        <th>Actions</th>
+    </tr>
+    {% if job_rows %}
+    {{ job_rows | safe }}
+    {% else %}
+    {% include 'partials/empty_job_rows.html' %}
+    {% endif %}
+</table>
+
+<p style="margin-top: 20px;">
+    <a href="/add-job" class="button button-success">Add New Backup Job</a>
+</p>

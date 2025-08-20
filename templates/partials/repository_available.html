@@ -1,0 +1,113 @@
+<!-- Repository Available - Load Backup Browser -->
+<div id="repositoryStatus">
+    <script>window.jobTypes = {"{{ job_name }}": "{{ job_type }}"};</script>
+    <!-- Hidden pre-selected dropdown for JavaScript compatibility -->
+    <select id="backupJobSelect" onchange="loadBackupJob()" style="display: none;">
+        <option value="{{ job_name }}" selected>{{ job_name }}</option>
+    </select>
+    
+    <div id="browserContent" class="hidden backup-browser">
+        <div id="repositoryInfo" class="help-text">
+            <!-- Repository/job information will be displayed here -->
+        </div>
+        
+        <div id="snapshotSection" class="hidden">
+            <h3 id="snapshotSectionTitle">Select Snapshot/Archive:</h3>
+            <select id="snapshotSelect" onchange="loadSnapshotDetails()">
+                <option value="">Select a snapshot...</option>
+            </select>
+        </div>
+        
+        <div id="snapshotDetails" class="hidden snapshot-details">
+            <h4 id="snapshotDetailsTitle">Details</h4>
+            <div id="snapshotInfo"></div>
+        </div>
+        
+        <div id="fileTree" class="hidden file-tree">
+            <h3>File Browser</h3>
+            
+            <div id="selectionInfo" class="selection-info">
+                <span id="selectionCount">0 items selected</span>
+                <label>
+                    <input type="checkbox" id="selectAllToggle" onchange="toggleSelectAll()">
+                    Select All (Full Snapshot Restore)
+                </label>
+                <button onclick="clearSelection()" class="button button-warning">Clear Selection</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div id="treeContainer" class="tree-container">
+                    <!-- File tree will be populated here -->
+                </div>
+                <div id="selectionPane" class="selection-pane">
+                    <div class="selection-header">Selected Items</div>
+                    <div id="selectionList">
+                        <div style="text-align: center; color: var(--text-muted); font-style: italic;">No items selected</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mode Toggle Switch -->
+            <div class="toggle-switch">
+                <span class="toggle-switch-label">Mode:</span>
+                <div class="toggle-container left" id="modeToggle" onclick="toggleMode()">
+                    <div class="toggle-slider"></div>
+                    <span class="toggle-option left">View</span>
+                    <span class="toggle-option right">Restore</span>
+                </div>
+            </div>
+            
+            <!-- Restore Controls -->
+            <div id="restoreControls" class="restore-controls hidden">
+                <div class="restore-options">
+                    <div>
+                        <label>Restore Target:</label>
+                        <select id="restoreTarget" 
+                                hx-post="/htmx/restore-target-change"
+                                hx-target="#overwriteWarning"
+                                hx-swap="outerHTML"
+                                hx-include="#dryRunToggle, #selectAllToggle"
+                                hx-vals='{"job_name": "{{ job_name }}"}'>
+                            <option value="highball">Restore to Highball (/restore)</option>
+                            <option value="source">Restore to Source (original location)</option>
+                        </select>
+                    </div>
+                    <div class="mt-15">
+                        <label>
+                            <input type="checkbox" id="dryRunToggle" checked 
+                                   hx-post="/htmx/restore-dry-run-change"
+                                   hx-target="#overwriteWarning"
+                                   hx-swap="outerHTML"
+                                   hx-include="#restoreTarget, #selectAllToggle"
+                                   hx-vals='{"job_name": "{{ job_name }}"}'>
+                            Dry Run (safe preview - uncheck to perform actual restore)
+                        </label>
+                    </div>
+                    <div id="overwriteWarning" class="mt-15 hidden">
+                        <div class="alert alert-warning">
+                            <strong>Warning:</strong> <span id="overwriteWarningText">This restore will overwrite existing files.</span>
+                        </div>
+                    </div>
+                    <div id="confirmationSection" class="mt-15 hidden">
+                        <label for="overwriteConfirmation">Type "OVERWRITE" to confirm data replacement:</label>
+                        <input type="text" id="overwriteConfirmation" class="w-full" placeholder="Type OVERWRITE to confirm">
+                    </div>
+                    <div class="mt-15">
+                        <button id="startRestore" class="button button-success">Start Restore</button>
+                        <div id="restoreValidationError" class="hidden" style="margin-top: 8px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="browserError" class="hidden error-message">
+        <!-- Error messages will be displayed here -->
+    </div>
+    
+    <script>
+        // Initialize backup browser when repository is available (HTMX loaded content)
+        if (typeof loadBackupJob === 'function') {
+            loadBackupJob();
+        }
+    </script>
+</div>

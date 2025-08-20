@@ -193,6 +193,122 @@ class APIHandler:
                 'error': f'Repository info failed: {str(e)}'
             })
     
+    def check_repository_availability(self, request_handler, job_name: str):
+        """Check if repository is available for browsing (pre-flight check for HTMX)"""
+        try:
+            if not job_name:
+                self._send_json_response(request_handler, {
+                    'success': False,
+                    'error': 'Job name is required'
+                })
+                return
+
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                self._send_json_response(request_handler, {
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
+                return
+
+            job_config = jobs[job_name]
+            dest_type = job_config.get('dest_type')
+            
+            if dest_type == 'restic':
+                # Use the quick check for restic repositories
+                dest_config = job_config.get('dest_config', {})
+                repo_uri = dest_config.get('repo_uri')
+                
+                if repo_uri:
+                    check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
+                    
+                    if check_success:
+                        self._send_json_response(request_handler, {
+                            'success': True,
+                            'available': True,
+                            'job_type': dest_type
+                        })
+                    else:
+                        # Parse for specific error types to enable targeted UI responses
+                        error_type = 'unknown'
+                        if 'Command returned 11' in check_message and 'locked' in check_message:
+                            error_type = 'repository_locked'
+                        elif 'Command returned 12' in check_message:
+                            error_type = 'wrong_password'
+                        elif 'Command returned 10' in check_message:
+                            error_type = 'repository_not_found'
+                        
+                        self._send_json_response(request_handler, {
+                            'success': True,
+                            'available': False,
+                            'error_type': error_type,
+                            'error_message': check_message,
+                            'job_type': dest_type
+                        })
+                else:
+                    self._send_json_response(request_handler, {
+                        'success': False,
+                        'error': 'Repository URI not configured'
+                    })
+            else:
+                # For non-restic jobs (rsync, etc), assume available for now
+                # Could add filesystem checks here later
+                self._send_json_response(request_handler, {
+                    'success': True,
+                    'available': True,
+                    'job_type': dest_type
+                })
+
+        except Exception as e:
+            logger.error(f"Repository availability check error: {e}")
+            self._send_json_response(request_handler, {
+                'success': False,
+                'error': f'Availability check failed: {str(e)}'
+            })
+
+    def unlock_repository(self, request_handler, job_name: str):
+        """Unlock a locked restic repository (HTMX endpoint)"""
+        try:
+            if not job_name:
+                self._send_json_response(request_handler, {
+                    'success': False,
+                    'error': 'Job name is required'
+                })
+                return
+
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                self._send_json_response(request_handler, {
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
+                return
+
+            job_config = jobs[job_name]
+            dest_type = job_config.get('dest_type')
+            
+            if dest_type != 'restic':
+                self._send_json_response(request_handler, {
+                    'success': False,
+                    'error': 'Unlock is only supported for restic repositories'
+                })
+                return
+
+            # Execute restic unlock command using the same patterns as other operations
+            dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
+            
+            result = backup_service.unlock_repository(dest_config, source_config)
+            
+            self._send_json_response(request_handler, result)
+
+        except Exception as e:
+            logger.error(f"Repository unlock error: {e}")
+            self._send_json_response(request_handler, {
+                'success': False,
+                'error': f'Repository unlock failed: {str(e)}'
+            })
+    
     def list_snapshots(self, request_handler, job_name: str):
         """List snapshots for a job"""
         try:
