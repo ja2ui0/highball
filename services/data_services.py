@@ -240,7 +240,7 @@ class SnapshotIntrospectionService:
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str],
+        dest_config: Dict[str, Any],
         ssh_config: Optional[Dict[str, str]] = None,
         container_runtime: str = 'docker'
     ) -> List[str]:
@@ -249,13 +249,13 @@ class SnapshotIntrospectionService:
             if ssh_config:
                 # Execute via SSH using container (restic not installed on remote hosts)
                 result = self._execute_via_ssh(
-                    snapshot_id, repository_url, environment_vars,
+                    snapshot_id, repository_url, dest_config,
                     ssh_config, container_runtime
                 )
             else:
                 # Execute locally
                 result = self._execute_locally(
-                    snapshot_id, repository_url, environment_vars
+                    snapshot_id, repository_url, dest_config
                 )
             
             if result.get('success'):
@@ -272,29 +272,44 @@ class SnapshotIntrospectionService:
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str],
+        dest_config: Dict[str, Any],
         ssh_config: Optional[Dict[str, str]] = None,
         container_runtime: str = 'docker'
     ) -> Dict[str, Any]:
         """Introspection concern: get detailed metadata for a snapshot"""
         try:
-            # Build show command for metadata
-            show_command = [
-                container_runtime, 'run', '--rm',
-                '-e', f'RESTIC_PASSWORD={environment_vars.get("RESTIC_PASSWORD", "")}',
-                'restic/restic:0.18.0',
-                '-r', repository_url,
-                'snapshots', '--json', snapshot_id
-            ]
+            from models.backup import ResticArgumentBuilder
             
             if ssh_config:
+                # SSH operations - use centralized S3 credential system
+                env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
+                
+                show_command = [
+                    container_runtime, 'run', '--rm'
+                ] + env_flags + [
+                    'restic/restic:0.18.0',
+                    '-r', repository_url,
+                    'snapshots', '--json', snapshot_id
+                ]
+                
                 result = self.executor.execute_ssh_command(
                     ssh_config['hostname'],
                     ssh_config['username'],
                     show_command
                 )
             else:
-                result = self.executor.execute_local_command(show_command)
+                # Local operations - use centralized environment builder
+                environment_vars = ResticArgumentBuilder.build_environment(dest_config)
+                
+                show_command = [
+                    'restic', '-r', repository_url,
+                    'snapshots', '--json', snapshot_id
+                ]
+                
+                result = self.executor.execute_local_command(
+                    show_command,
+                    environment_vars=environment_vars
+                )
             
             if result.returncode == 0:
                 import json
@@ -312,16 +327,21 @@ class SnapshotIntrospectionService:
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str],
+        dest_config: Dict[str, Any],
         ssh_config: Dict[str, str],
         container_runtime: str
     ) -> Dict[str, Any]:
         """Introspection concern: execute snapshot command via SSH using container"""
         try:
+            from models.backup import ResticArgumentBuilder
+            
+            # Use centralized S3 credential system for SSH operations
+            env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
+            
             # Build container command for listing snapshot root paths
             list_command = [
-                container_runtime, 'run', '--rm',
-                '-e', f'RESTIC_PASSWORD={environment_vars.get("RESTIC_PASSWORD", "")}',
+                container_runtime, 'run', '--rm'
+            ] + env_flags + [
                 'restic/restic:0.18.0',
                 '-r', repository_url,
                 'ls', snapshot_id, '--long'
@@ -345,10 +365,15 @@ class SnapshotIntrospectionService:
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str]
+        dest_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Introspection concern: execute snapshot command locally"""
         try:
+            from models.backup import ResticArgumentBuilder
+            
+            # Use centralized environment builder for local operations
+            environment_vars = ResticArgumentBuilder.build_environment(dest_config)
+            
             # Use restic directly for local execution
             list_command = [
                 'restic', '-r', repository_url,
@@ -424,26 +449,26 @@ class DataService:
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str],
+        dest_config: Dict[str, Any],
         ssh_config: Optional[Dict[str, str]] = None,
         container_runtime: str = 'docker'
     ) -> List[str]:
         """Delegation: get snapshot source paths"""
         return self.introspection.get_snapshot_source_paths(
-            snapshot_id, repository_url, environment_vars, ssh_config, container_runtime
+            snapshot_id, repository_url, dest_config, ssh_config, container_runtime
         )
     
     def get_snapshot_metadata(
         self,
         snapshot_id: str,
         repository_url: str,
-        environment_vars: Dict[str, str],
+        dest_config: Dict[str, Any],
         ssh_config: Optional[Dict[str, str]] = None,
         container_runtime: str = 'docker'
     ) -> Dict[str, Any]:
         """Delegation: get snapshot metadata"""
         return self.introspection.get_snapshot_metadata(
-            snapshot_id, repository_url, environment_vars, ssh_config, container_runtime
+            snapshot_id, repository_url, dest_config, ssh_config, container_runtime
         )
 
 

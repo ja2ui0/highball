@@ -202,12 +202,11 @@ class ContainerCommandBuilder:
         mounts = []
         
         if strategy == MountStrategy.BACKUP_SOURCES:
-            # Mount source paths for backup operations
+            # Mount source paths for backup operations preserving original paths
             if source_paths:
-                for i, source_path in enumerate(source_paths):
-                    # Mount each source path to /backup-source-N in container
-                    mount_target = f'/backup-source-{i}'
-                    mounts.append(f'{source_path}:{mount_target}:ro')
+                for source_path in source_paths:
+                    # Mount each source path to same path in container to preserve repository paths
+                    mounts.append(f'{source_path}:{source_path}:ro')
         
         elif strategy == MountStrategy.RESTORE_TO_HIGHBALL:
             # Mount Highball's restore directory
@@ -257,9 +256,8 @@ class ContainerCommandBuilder:
         """Container concern: build backup-specific container command"""
         args = backup_args or []
         
-        # Add source mount paths to backup command
-        for i in range(len(source_paths)):
-            args.append(f'/backup-source-{i}')
+        # Add actual source paths to backup command (paths are preserved in container via volume mounts)
+        args.extend(source_paths)
         
         return self.build_container_command(
             command_type='backup',

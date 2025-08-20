@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 # Import unified models
-from models.backup import backup_service
+from models.backup import backup_service, ResticArgumentBuilder
 from models.rsync import rsync_service
 from models.notifications import create_notification_service
 
@@ -50,6 +50,8 @@ class OperationsHandler:
                 return
             
             job_config = jobs[job_name]
+            # Add job name to config for proper tagging
+            job_config['job_name'] = job_name
             
             # Check if job is enabled
             if not job_config.get('enabled', True):
@@ -233,9 +235,7 @@ class OperationsHandler:
             restore_args.extend(['--verbose'])
             
             # Execute restore command
-            import os
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = dest_config['password']
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             cmd = ['restic'] + restore_args
             result = subprocess.run(

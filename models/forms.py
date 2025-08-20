@@ -296,20 +296,28 @@ class DestinationParser:
         elif repo_type == 's3':
             bucket = safe_get_value(form_data, 's3_bucket')
             prefix = safe_get_value(form_data, 's3_prefix', '')
-            region = safe_get_value(form_data, 's3_region')
+            endpoint = safe_get_value(form_data, 's3_endpoint', '')
+            region = safe_get_value(form_data, 's3_region', 'us-east-1')  # Default for compatibility
             access_key = safe_get_value(form_data, 's3_access_key')
             secret_key = safe_get_value(form_data, 's3_secret_key')
             
             if not bucket:
                 return {'valid': False, 'error': 'S3 bucket name is required'}
-            if not region:
-                return {'valid': False, 'error': 'S3 region is required'}
             if not access_key:
                 return {'valid': False, 'error': 'S3 access key is required'}
             if not secret_key:
                 return {'valid': False, 'error': 'S3 secret key is required'}
             
-            uri = f's3:{bucket}'
+            # Build URI using restic S3 format
+            if endpoint:
+                # Custom S3-compatible endpoint (Cloudflare R2, MinIO, etc.)
+                # Format: s3:https://endpoint/bucket
+                uri = f's3:{endpoint}/{bucket}'
+            else:
+                # AWS S3 - use region-based endpoint
+                # Format: s3:s3.region.amazonaws.com/bucket  
+                uri = f's3:s3.{region}.amazonaws.com/{bucket}'
+            
             if prefix:
                 uri += f'/{prefix}'
             return {'valid': True, 'uri': uri}

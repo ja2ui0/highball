@@ -205,22 +205,31 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'label': 'S3 Bucket',
                 'help': 'Amazon S3 bucket name',
                 'placeholder': 'my-backup-bucket',
-                'required': True
+                'required': True,
+                'htmx_trigger': 'input delay:300ms',
+                'htmx_post': '/htmx/restic-uri-preview',
+                'htmx_target': '#uri_preview_container',
+                'htmx_include': "[name='restic_repo_type'], [name^='s3_']"
             },
             {
                 'name': 's3_prefix',
                 'type': 'text',
                 'label': 'S3 Key Prefix (optional)',
                 'help': 'Optional prefix for repository keys within the bucket',
-                'placeholder': 'backups/'
+                'placeholder': 'backups/',
+                'htmx_trigger': 'input delay:300ms',
+                'htmx_post': '/htmx/restic-uri-preview',
+                'htmx_target': '#uri_preview_container',
+                'htmx_include': "[name='restic_repo_type'], [name^='s3_']"
             },
             {
                 'name': 's3_region',
                 'type': 'text',
-                'label': 'AWS Region',
-                'help': 'AWS region where the bucket is located',
+                'label': 'AWS Region (optional)',
+                'help': 'AWS region (defaults to us-east-1). Not required for non-AWS S3-compatible services like Cloudflare R2, MinIO',
                 'placeholder': 'us-east-1',
-                'required': True
+                'required': False,
+                'default': 'us-east-1'
             },
             {
                 'name': 's3_access_key',
@@ -241,9 +250,13 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
             {
                 'name': 's3_endpoint',
                 'type': 'text',
-                'label': 'Custom Endpoint (optional)',
-                'help': 'Custom S3-compatible endpoint URL (for MinIO, etc.)',
-                'placeholder': 'https://minio.example.com'
+                'label': 'S3 Endpoint',
+                'help': 'AWS: https://s3.us-east-1.amazonaws.com | Cloudflare R2: your account endpoint | MinIO/other: custom endpoint',
+                'placeholder': 'https://s3.us-east-1.amazonaws.com',
+                'htmx_trigger': 'input delay:300ms',
+                'htmx_post': '/htmx/restic-uri-preview',
+                'htmx_target': '#uri_preview_container',
+                'htmx_include': "[name='restic_repo_type'], [name^='s3_']"
             }
         ]
     },
@@ -632,10 +645,8 @@ class ResticArgumentBuilder:
         for path_config in source_paths:
             args.append(path_config['path'])
         
-        # Include/exclude patterns
+        # Exclude patterns only (restic doesn't support --include)
         for path_config in source_paths:
-            for include in path_config.get('includes', []):
-                args.extend(['--include', include])
             for exclude in path_config.get('excludes', []):
                 args.extend(['--exclude', exclude])
         
@@ -716,6 +727,51 @@ class ResticArgumentBuilder:
             args.append('prune')
             
         return args
+    
+    @staticmethod
+    def build_environment(dest_config: Dict[str, Any]) -> Dict[str, str]:
+        """Build complete environment for restic operations with all credentials"""
+        import os
+        env = os.environ.copy()
+        
+        # Always required
+        env['RESTIC_PASSWORD'] = dest_config['password']
+        
+        # Add S3 credentials if S3 repository
+        if dest_config.get('repo_type') == 's3':
+            if 's3_access_key' in dest_config:
+                env['AWS_ACCESS_KEY_ID'] = dest_config['s3_access_key']
+            if 's3_secret_key' in dest_config:
+                env['AWS_SECRET_ACCESS_KEY'] = dest_config['s3_secret_key']
+        
+        # Future: Add other cloud provider credentials here
+        # elif dest_config.get('repo_type') == 'azure':
+        #     env['AZURE_ACCOUNT_NAME'] = dest_config.get('azure_account_name', '')
+        #     env['AZURE_ACCOUNT_KEY'] = dest_config.get('azure_account_key', '')
+        
+        return env
+    
+    @staticmethod 
+    def build_ssh_environment_flags(dest_config: Dict[str, Any]) -> List[str]:
+        """Build environment flags for SSH container commands"""
+        flags = []
+        
+        # Always required
+        flags.extend(['-e', f'RESTIC_PASSWORD={dest_config["password"]}'])
+        
+        # Add S3 credentials if S3 repository
+        if dest_config.get('repo_type') == 's3':
+            if 's3_access_key' in dest_config:
+                flags.extend(['-e', f'AWS_ACCESS_KEY_ID={dest_config["s3_access_key"]}'])
+            if 's3_secret_key' in dest_config:
+                flags.extend(['-e', f'AWS_SECRET_ACCESS_KEY={dest_config["s3_secret_key"]}'])
+        
+        # Future: Add other cloud provider credentials here
+        # elif dest_config.get('repo_type') == 'azure':
+        #     flags.extend(['-e', f'AZURE_ACCOUNT_NAME={dest_config.get("azure_account_name", "")}'])
+        #     flags.extend(['-e', f'AZURE_ACCOUNT_KEY={dest_config.get("azure_account_key", "")}'])
+        
+        return flags
 
 # =============================================================================
 # RESTIC REPOSITORY SERVICE - Repository operations
@@ -740,9 +796,8 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Test repository access with snapshots list
             cmd = ['restic', '-r', repo_uri, 'snapshots', '--json']
@@ -819,9 +874,8 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Initialize repository
             cmd = ['restic', '-r', repo_uri, 'init']
@@ -869,9 +923,8 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Build command
             args = self.command_builder.build_list_args(repo_uri, filters)
@@ -1071,11 +1124,12 @@ class ResticRepositoryService:
         username = source_config.get('username')
         container_runtime = source_config.get('container_runtime', 'docker')
         
-        # Build SSH + container command like working code
+        # Build SSH + container command with proper credentials
+        env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
         cmd = [
             'ssh', f'{username}@{hostname}',
-            container_runtime, 'run', '--rm',
-            '-e', f'RESTIC_PASSWORD={password}',
+            container_runtime, 'run', '--rm'
+        ] + env_flags + [
             'restic/restic:0.18.0',
             '-r', repo_uri, 'snapshots', '--json'
         ]
@@ -1143,8 +1197,7 @@ class ResticRepositoryService:
                 }
             
             # Always execute locally for UI operations per working pattern
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Get snapshot statistics using local restic
             cmd = ['restic', '-r', repo_uri, 'stats', snapshot_id, '--json']
@@ -1202,10 +1255,10 @@ class ResticRepositoryService:
             
             # Check if we should use SSH execution (same pattern as other operations)
             if source_config and source_config.get('hostname') and source_config.get('username'):
-                return self._unlock_repository_via_ssh(repo_uri, password, source_config)
+                return self._unlock_repository_via_ssh(dest_config, source_config)
             else:
                 # Fall back to local execution
-                return self._unlock_repository_local(repo_uri, password)
+                return self._unlock_repository_local(dest_config)
                 
         except Exception as e:
             logger.error(f"Repository unlock error: {e}")
@@ -1214,12 +1267,13 @@ class ResticRepositoryService:
                 'error': f'Repository unlock failed: {str(e)}'
             }
     
-    def _unlock_repository_local(self, repo_uri: str, password: str) -> Dict[str, Any]:
+    def _unlock_repository_local(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
         """Unlock repository using local restic execution"""
         try:
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            repo_uri = dest_config.get('repo_uri')
+            
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Build unlock command
             cmd = ['restic', '-r', repo_uri, 'unlock']
@@ -1249,18 +1303,20 @@ class ResticRepositoryService:
                 'error': f'Local unlock failed: {str(e)}'
             }
     
-    def _unlock_repository_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _unlock_repository_via_ssh(self, dest_config: Dict[str, Any], source_config: Dict[str, Any]) -> Dict[str, Any]:
         """Unlock repository via SSH execution (for consistency with other operations)"""
         try:
+            repo_uri = dest_config.get('repo_uri')
             hostname = source_config.get('hostname')
             username = source_config.get('username')
             container_runtime = source_config.get('container_runtime', 'docker')
             
-            # Build SSH + container command for unlock
+            # Build SSH + container command with proper credentials
+            env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
             cmd = [
                 'ssh', f'{username}@{hostname}',
-                container_runtime, 'run', '--rm',
-                '-e', f'RESTIC_PASSWORD={password}',
+                container_runtime, 'run', '--rm'
+            ] + env_flags + [
                 'restic/restic:0.18.0',
                 '-r', repo_uri, 'unlock'
             ]
@@ -1303,8 +1359,7 @@ class ResticRepositoryService:
                 }
             
             # Always execute locally for UI operations per working pattern
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Clean path for restic ls command
             clean_path = path.strip('/') if path and path != '/' else ''
@@ -1551,9 +1606,8 @@ class ResticRunner:
     def _run_local_backup(self, config: BackupConfig, backup_args: List[str], dry_run: bool) -> Dict[str, Any]:
         """Run backup locally"""
         try:
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = config.dest_config['password']
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(config.dest_config)
             
             # Execute backup
             cmd = ['restic', 'backup'] + backup_args
@@ -1592,7 +1646,7 @@ class ResticRunner:
             # Extract configuration
             repository_url = config.dest_config['repo_uri']
             source_paths = [path['path'] for path in config.source_config.get('source_paths', [])]
-            environment_vars = {'RESTIC_PASSWORD': config.dest_config['password']}
+            environment_vars = ResticArgumentBuilder.build_environment(config.dest_config)
             
             # Add dry-run to backup args if needed
             if dry_run and '--dry-run' not in backup_args:
@@ -1700,9 +1754,8 @@ class ResticMaintenanceService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment
-            env = os.environ.copy()
-            env['RESTIC_PASSWORD'] = password
+            # Set environment using centralized builder
+            env = ResticArgumentBuilder.build_environment(dest_config)
             
             # Build command
             args = self.argument_builder.build_maintenance_args(repo_uri, operation, config)
