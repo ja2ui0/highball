@@ -274,19 +274,10 @@ class GETHandlers:
         return notification_data
         
     def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build schedule form data structure"""
-        schedule = job_config.get('schedule', 'daily')
-        enabled = job_config.get('enabled', True)
-        respect_conflicts = job_config.get('respect_conflicts', True)
-        
-        # Note: submit_button_text handled at handler level
-        return {
-            'schedule': schedule,
-            'enabled': enabled,
-            'respect_conflicts': respect_conflicts
-            
-            # Note: submit_button_text handled at handler level
-        }
+        """Build schedule form data structure (delegated to service)"""
+        from services.schedule_form_builder import ScheduleFormDataBuilder
+        builder = ScheduleFormDataBuilder()
+        return builder.build_schedule_context(job_config)
     
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, request_handler, job_name: str):
