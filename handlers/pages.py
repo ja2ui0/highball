@@ -614,60 +614,20 @@ class POSTHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+    
+    def _send_html_response(self, request_handler, html: str):
+        """Send HTML response"""
+        request_handler.send_response(200)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        request_handler.wfile.write(html.encode())
+    
+    def _send_redirect(self, request_handler, location: str):
+        """Send redirect response"""
+        request_handler.send_response(302)
+        request_handler.send_header('Location', location)
+        request_handler.end_headers()
 
-class ValidationHandlers:
-    """Handler for all validation endpoints and AJAX operations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = job_form_builder
-
-class PagesHandler:
-    """Unified handler for all page rendering operations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = JobFormDataBuilder()
-        
-        # Initialize specialized handlers
-        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
-        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
-        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
-    
-    # =============================================================================
-    # DELEGATED METHODS - GET HANDLERS
-    # =============================================================================
-    
-    def show_dashboard(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_dashboard(request_handler)
-    
-    def show_add_job_form(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_add_job_form(request_handler)
-    
-    def show_edit_job_form(self, request_handler, job_name: str):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_edit_job_form(request_handler, job_name)
-    
-    def show_config_manager(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_config_manager(request_handler)
-    
-    def show_raw_editor(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_raw_editor(request_handler)
-    
-    def show_job_inspect(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_job_inspect(request_handler)
-    
-    def show_dev_logs(self, request_handler, log_type: str = 'app'):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_dev_logs(request_handler, log_type)
-    
     @handle_page_errors("Save job")
     def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
         """Save backup job from form submission"""
@@ -726,20 +686,81 @@ class PagesHandler:
                 error_form_data['form_title'] = 'Add New Backup Job'
             html = self.template_service.render_template('pages/job_form.html', **error_form_data)
             self._send_html_response(request_handler, html)
-    
+
     @handle_page_errors("Delete job")
     def delete_backup_job(self, request_handler, job_name: str):
         """Delete backup job"""
         if not job_name:
-            self._send_error(request_handler, "Job name is required")
-            return
+            raise ValueError("Job name is required")
         
         success = self.backup_config.delete_backup_job(job_name)
         
         if success:
             self._send_redirect(request_handler, '/dashboard')
         else:
-            self._send_error(request_handler, f"Failed to delete job '{job_name}'")
+            raise Exception(f"Failed to delete job '{job_name}'")
+
+
+class ValidationHandlers:
+    """Handler for all validation endpoints and AJAX operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
+class PagesHandler:
+    """Unified handler for all page rendering operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = JobFormDataBuilder()
+        
+        # Initialize specialized handlers
+        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
+        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
+        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
+    
+    # =============================================================================
+    # DELEGATED METHODS - GET HANDLERS
+    # =============================================================================
+    
+    def show_dashboard(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_dashboard(request_handler)
+    
+    def show_add_job_form(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_add_job_form(request_handler)
+    
+    def show_edit_job_form(self, request_handler, job_name: str):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_edit_job_form(request_handler, job_name)
+    
+    def show_config_manager(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_config_manager(request_handler)
+    
+    def show_raw_editor(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_raw_editor(request_handler)
+    
+    def show_job_inspect(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_job_inspect(request_handler)
+    
+    def show_dev_logs(self, request_handler, log_type: str = 'app'):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_dev_logs(request_handler, log_type)
+    
+    def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
+        """Delegate to POSTHandlers"""
+        return self.post_handlers.save_backup_job(request_handler, form_data)
+    
+    def delete_backup_job(self, request_handler, job_name: str):
+        """Delegate to POSTHandlers"""
+        return self.post_handlers.delete_backup_job(request_handler, job_name)
     
     # =============================================================================
     # CONFIGURATION PAGES
