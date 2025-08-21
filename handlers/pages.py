@@ -880,202 +880,31 @@ class ValidationHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+    
+    def _send_json_response(self, request_handler, data: Dict[str, Any]):
+        """Send JSON response"""
+        import json
+        request_handler.send_response(200)
+        request_handler.send_header('Content-type', 'application/json')
+        request_handler.end_headers()
+        request_handler.wfile.write(json.dumps(data).encode())
+    
+    def _send_htmx_partial(self, request_handler, template_path: str, data: Dict[str, Any]):
+        """Send HTMX partial template response"""
+        html = self.template_service.render_template(template_path, **data)
+        request_handler.send_response(200)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        request_handler.wfile.write(html.encode())
+    
+    def _send_htmx_error(self, request_handler, message: str):
+        """Send HTMX error response"""
+        html = self.template_service.render_template('partials/htmx_error.html', error_message=message)
+        request_handler.send_response(200)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        request_handler.wfile.write(html.encode())
 
-class PagesHandler:
-    """Unified handler for all page rendering operations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = JobFormDataBuilder()
-        
-        # Initialize specialized handlers
-        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
-        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
-        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
-    
-    # =============================================================================
-    # DELEGATED METHODS - GET HANDLERS
-    # =============================================================================
-    
-    def show_dashboard(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_dashboard(request_handler)
-    
-    def show_add_job_form(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_add_job_form(request_handler)
-    
-    def show_edit_job_form(self, request_handler, job_name: str):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_edit_job_form(request_handler, job_name)
-    
-    def show_config_manager(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_config_manager(request_handler)
-    
-    def show_raw_editor(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_raw_editor(request_handler)
-    
-    def show_job_inspect(self, request_handler):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_job_inspect(request_handler)
-    
-    def show_dev_logs(self, request_handler, log_type: str = 'app'):
-        """Delegate to GETHandlers"""
-        return self.get_handlers.show_dev_logs(request_handler, log_type)
-    
-    def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
-        """Delegate to POSTHandlers"""
-        return self.post_handlers.save_backup_job(request_handler, form_data)
-    
-    def delete_backup_job(self, request_handler, job_name: str):
-        """Delegate to POSTHandlers"""
-        return self.post_handlers.delete_backup_job(request_handler, job_name)
-    
-    def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
-        """Delegate to POSTHandlers"""
-        return self.post_handlers.save_raw_config(request_handler, form_data)
-    
-    def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
-        """Delegate to POSTHandlers"""
-        return self.post_handlers.save_structured_config(request_handler, form_data)
-    
-    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
-        """Delegate to POSTHandlers"""
-        return self.post_handlers.preview_config_changes(request_handler, form_data)
-    
-    # =============================================================================
-    # CONFIGURATION PAGES
-    # =============================================================================
-    
-    @handle_page_errors("Config manager")
-    def show_config_manager(self, request_handler):
-        """Show configuration management page"""
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
-        
-        global_settings = self.backup_config.get_global_settings()
-        
-        # Extract individual field values for template population
-        default_schedule_times = global_settings.get('default_schedule_times', {})
-        
-        # Get available themes for template to handle
-        available_themes = self._get_available_themes()
-        current_theme = global_settings.get('theme', 'dark')
-        
-        template_data = {
-            # Keep global_settings for partials that use it
-            'global_settings': global_settings,
-            'provider_schemas': PROVIDER_FIELD_SCHEMAS,
-            'page_title': 'Configuration',
-            
-            # Individual field values for form population
-            'scheduler_timezone': global_settings.get('scheduler_timezone', 'UTC'),
-            'available_themes': available_themes,
-            'current_theme': current_theme,
-            'enable_conflict_avoidance': 'checked' if global_settings.get('enable_conflict_avoidance', True) else '',
-            'conflict_check_interval': str(global_settings.get('conflict_check_interval', 300)),
-            'delay_notification_threshold': str(global_settings.get('delay_notification_threshold', 300)),
-            
-            # Schedule defaults (for legacy field names)
-            'hourly_default': default_schedule_times.get('hourly', '0 * * * *'),
-            'daily_default': default_schedule_times.get('daily', '0 3 * * *'),
-            'weekly_default': default_schedule_times.get('weekly', '0 3 * * 0'),
-            'monthly_default': default_schedule_times.get('monthly', '0 3 1 * *'),
-        }
-            
-        html = self.template_service.render_template('pages/config_manager.html', **template_data)
-        self._send_html_response(request_handler, html)
-    
-    def _get_available_themes(self):
-        """Get list of available themes by scanning theme directory"""
-        import os
-        themes = []
-        theme_dir = 'static/themes'
-        
-        if os.path.exists(theme_dir):
-            for file in os.listdir(theme_dir):
-                if file.endswith('.css'):
-                    theme_name = file[:-4]  # Remove .css extension
-                    themes.append(theme_name)
-        
-        # Always ensure 'dark' is available as fallback
-        if 'dark' not in themes:
-            themes.append('dark')
-        
-        return sorted(themes)
-    
-    @handle_page_errors("Raw editor")
-    def show_raw_editor(self, request_handler):
-        """Show raw YAML configuration editor"""
-        config_path = self.backup_config.config_file
-        raw_config = ""
-        
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                raw_config = f.read()
-        
-        template_data = {
-            'raw_config': raw_config,
-            'config_path': config_path,
-            'page_title': 'Raw Configuration Editor'
-        }
-        
-        html = self.template_service.render_template('pages/config_editor.html', **template_data)
-        self._send_html_response(request_handler, html)
-    
-    # =============================================================================
-    # INSPECTION PAGES
-    # =============================================================================
-    
-    # =============================================================================
-    # NETWORK UTILITIES
-    # =============================================================================
-    
-    @handle_page_errors("Network scan")
-    def scan_network_for_rsyncd(self, request_handler, network_range: str):
-        """Scan network for rsyncd services"""
-        # Basic network scanning functionality
-        import subprocess
-        
-        try:
-            # Use nmap to scan for rsyncd (port 873)
-            cmd = ['nmap', '-p', '873', '--open', network_range]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            scan_results = []
-            if result.returncode == 0:
-                lines = result.stdout.split('\n')
-                current_host = None
-                
-                for line in lines:
-                    line = line.strip()
-                    if 'Nmap scan report for' in line:
-                        current_host = line.split('for ')[-1]
-                    elif '873/tcp open' in line and current_host:
-                        scan_results.append({
-                            'host': current_host,
-                            'port': 873,
-                            'service': 'rsyncd'
-                        })
-            
-            template_data = {
-                'network_range': network_range,
-                'scan_results': scan_results,
-                'page_title': 'Network Scan Results'
-            }
-            
-            html = f"<html><body><h1>Network Scan</h1><pre>{str(template_data)}</pre></body></html>"
-            self._send_html_response(request_handler, html)
-            
-        except subprocess.TimeoutExpired:
-            self._send_error(request_handler, "Network scan timeout")
-    
-    # =============================================================================
-    # VALIDATION ENDPOINTS
-    # =============================================================================
-    
     @handle_page_errors("SSH validation")
     def validate_ssh_source(self, request_handler, source: str):
         """Validate SSH source configuration"""
@@ -1091,9 +920,11 @@ class PagesHandler:
         ssh_config = {'username': username, 'hostname': hostname}
         
         # Use unified validation service
+        from services.validation import ValidationService
+        validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
         self._send_json_response(request_handler, result)
-    
+
     @handle_page_errors("Path validation")
     def validate_source_paths(self, request_handler, form_data: Dict[str, Any]):
         """Validate source paths from form"""
@@ -1108,6 +939,9 @@ class PagesHandler:
         # Validate each path
         source_type = form_data.get('source_type', ['local'])[0]
         validation_results = []
+        
+        from services.validation import ValidationService
+        validation_service = ValidationService()
         
         for path_config in paths_result['source_paths']:
             if source_type == 'ssh':
@@ -1129,186 +963,50 @@ class PagesHandler:
             'valid': True,
             'results': validation_results
         })
-    
-    # =============================================================================
-    # UTILITY METHODS
-    # =============================================================================
-    
+
     def _send_html_response(self, request_handler, html: str):
         """Send HTML response"""
         request_handler.send_response(200)
         request_handler.send_header('Content-type', 'text/html')
         request_handler.end_headers()
         request_handler.wfile.write(html.encode())
-    
-    def _send_json_response(self, request_handler, data: Dict[str, Any]):
-        """Send JSON response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'application/json')
-        request_handler.end_headers()
-        request_handler.wfile.write(json.dumps(data).encode())
-    
-    def _send_redirect(self, request_handler, location: str):
-        """Send redirect response"""
-        request_handler.send_response(302)
-        request_handler.send_header('Location', location)
-        request_handler.end_headers()
-    
-    
-    def _build_source_display_with_type(self, job_config):
-        """Build source display string with type prefix like original"""
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'unknown')
+
+    @handle_page_errors("Network scan")
+    def scan_network_for_rsyncd(self, request_handler, network_range: str):
+        """Scan network for rsyncd services"""
+        # Basic network scanning functionality
+        import subprocess
         
-        if source_type == 'ssh':
-            username = source_config.get('username', '')
-            hostname = source_config.get('hostname', '')
-            source_paths = source_config.get('source_paths', [])
+        # Use nmap to scan for rsyncd (port 873)
+        cmd = ['nmap', '-p', '873', '--open', network_range]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        scan_results = []
+        if result.returncode == 0:
+            lines = result.stdout.split('\n')
+            current_host = None
             
-            # Format like original: SSH: with connection info and indented paths
-            connection = f"{username}@{hostname}:"
-            if source_paths:
-                path_lines = []
-                for path_config in source_paths:
-                    path = path_config.get('path', '')
-                    path_lines.append(f"  {path}")
-                path_display = connection + "\n" + "\n".join(path_lines)
-            else:
-                path_display = connection
-            return f"SSH:\n{path_display}"
-            
-        elif source_type == 'local':
-            source_paths = source_config.get('source_paths', [])
-            if source_paths:
-                path_lines = []
-                for path_config in source_paths:
-                    path = path_config.get('path', '')
-                    path_lines.append(f"  {path}")
-                path_display = "\n".join(path_lines)
-            else:
-                path_display = "Unknown"
-            return f"Local:\n{path_display}"
-        else:
-            return source_type
-    
-    def _build_dest_display_with_type(self, job_config):
-        """Build destination display string with type prefix like original"""
-        dest_config = job_config.get('dest_config', {})
-        dest_type = job_config.get('dest_type', 'unknown')
+            for line in lines:
+                line = line.strip()
+                if 'Nmap scan report for' in line:
+                    current_host = line.split('for ')[-1]
+                elif '873/tcp open' in line and current_host:
+                    scan_results.append({
+                        'host': current_host,
+                        'port': 873,
+                        'service': 'rsyncd'
+                    })
         
-        if dest_type == 'ssh':
-            username = dest_config.get('username', '')
-            hostname = dest_config.get('hostname', '')
-            path = dest_config.get('path', '')
-            return f"SSH:\n{username}@{hostname}:{path}"
-        elif dest_type == 'local':
-            path = dest_config.get('path', 'Unknown')
-            return f"Local:\n{path}"
-        elif dest_type == 'rsyncd':
-            hostname = dest_config.get('hostname', 'unknown')
-            share = dest_config.get('share', 'unknown')
-            return f"rsyncd:\nrsync://{hostname}/{share}"
-        elif dest_type == 'restic':
-            repo_uri = dest_config.get('repo_uri', dest_config.get('dest_string', 'unknown'))
-            return f"Restic:\n{repo_uri}"
-        else:
-            return dest_type
-    
-    def _get_status_css_class(self, status):
-        """Get CSS class for job status"""
-        if status == 'completed':
-            return 'status-success'
-        elif status == 'failed':
-            return 'status-error'
-        elif status == 'running':
-            return 'status-warning'
-        else:
-            return 'status-info'
-    
-    def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Build notification form data for templates"""
-        # Get available providers from global config
-        global_settings = self.backup_config.get_global_settings()
-        notification_config = global_settings.get('notification', {})
-        
-        # Find enabled providers
-        available_providers = []
-        for provider, config in notification_config.items():
-            if isinstance(config, dict) and config.get('enabled', False):
-                available_providers.append(provider)
-        
-        # Render existing notification providers HTML
-        existing_html = ""
-        configured_provider_names = []
-        
-        for i, notification in enumerate(existing_notifications):
-            provider_name = notification.get('provider', '')
-            if provider_name:
-                configured_provider_names.append(provider_name)
-                
-                # Use the template to render each existing provider
-                provider_html = self.template_service.render_template(
-                    'partials/notification_provider_config.html',
-                    provider_id=f"notification_{provider_name}_{i}",
-                    provider_name=provider_name,
-                    display_name=provider_name.capitalize(),
-                    notify_on_success=notification.get('notify_on_success', False),
-                    success_message=notification.get('success_message', ''),
-                    notify_on_failure=notification.get('notify_on_failure', False),
-                    failure_message=notification.get('failure_message', ''),
-                    notify_on_maintenance_failure=notification.get('notify_on_maintenance_failure', False)
-                )
-                existing_html += provider_html
-        
-        # Filter available providers to exclude already configured ones
-        remaining_providers = [p for p in available_providers if p not in configured_provider_names]
-        
-        # Render provider selection dropdown options
-        options_html = ""
-        for provider in remaining_providers:
-            options_html += f'<option value="{provider}">{provider.capitalize()}</option>'
-        
-        return {
-            'existing_notification_providers_html': existing_html,
-            'available_providers_options': options_html,
-            'add_provider_class': 'hidden' if not remaining_providers else ''
+        template_data = {
+            'network_range': network_range,
+            'scan_results': scan_results,
+            'page_title': 'Network Scan Results'
         }
-    
-    def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build schedule form data for templates"""
-        schedule = job_config.get('schedule', 'manual')
-        enabled = job_config.get('enabled', True)
-        respect_conflicts = job_config.get('respect_conflicts', True)
         
-        # Parse schedule to determine if it's a predefined type or custom cron
-        if schedule in ['manual', 'hourly', 'daily', 'weekly', 'monthly']:
-            schedule_type = schedule
-            cron_pattern = ''
-        else:
-            # Custom cron pattern
-            schedule_type = 'custom'
-            cron_pattern = schedule
-        
-        return {
-            # Schedule selection state
-            'schedule_manual_selected': 'selected' if schedule_type == 'manual' else '',
-            'schedule_hourly_selected': 'selected' if schedule_type == 'hourly' else '',
-            'schedule_daily_selected': 'selected' if schedule_type == 'daily' else '',
-            'schedule_weekly_selected': 'selected' if schedule_type == 'weekly' else '',
-            'schedule_monthly_selected': 'selected' if schedule_type == 'monthly' else '',
-            'schedule_custom_selected': 'selected' if schedule_type == 'custom' else '',
-            
-            # Cron pattern for custom schedules
-            'cron_pattern': cron_pattern,
-            
-            # Checkbox states
-            'enabled_checked': 'checked' if enabled else '',
-            'conflicts_checked': 'checked' if respect_conflicts else '',
-            
-            # Note: submit_button_text handled at handler level
-        }
-    
-    @handle_page_errors("Repository availability check")
+        html = self.template_service.render_template('pages/network_scan.html', **template_data)
+        self._send_html_response(request_handler, html)
+
+    @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, request_handler, job_name=None):
         """HTMX endpoint for repository availability check"""
         # Get job name from parameter or query parameters
@@ -1319,25 +1017,13 @@ class PagesHandler:
             job_name = params.get('job', [''])[0]
         
         if not job_name:
-            content = self.template_service.render_template('partials/htmx_error.html',
-                error_message='Job name is required'
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
+            self._send_htmx_error(request_handler, 'Job name is required')
             return
         
         # Implement actual repository availability check logic
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            content = self.template_service.render_template('partials/htmx_error.html',
-                error_message=f"Job '{job_name}' not found"
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
+            self._send_htmx_error(request_handler, f"Job '{job_name}' not found")
             return
 
         job_config = jobs[job_name]
@@ -1354,56 +1040,34 @@ class PagesHandler:
                 
                 if check_success:
                     # Repository is available - load backup browser
-                    content = self.template_service.render_template('partials/repository_available.html',
-                        job_name=job_name,
-                        job_type=dest_type
-                    )
-                    request_handler.send_response(200)
-                    request_handler.send_header('Content-type', 'text/html')
-                    request_handler.end_headers()
-                    request_handler.wfile.write(content.encode())
+                    self._send_htmx_partial(request_handler, 'partials/repository_available.html', {
+                        'job_name': job_name,
+                        'job_type': dest_type
+                    })
                 else:
                     # Repository error - determine type and render appropriate template
                     if check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower()):
                         # Repository locked - render unlock interface
-                        content = self.template_service.render_template('partials/repository_locked_error.html',
-                            job_name=job_name,
-                            error_message=check_message
-                        )
-                        request_handler.send_response(200)
-                        request_handler.send_header('Content-type', 'text/html')
-                        request_handler.end_headers()
-                        request_handler.wfile.write(content.encode())
+                        self._send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
+                            'job_name': job_name,
+                            'error_message': check_message
+                        })
                     else:
                         # Other error - render error template
-                        content = self.template_service.render_template('partials/repository_error.html',
-                            job_name=job_name,
-                            error_type='connection_error',
-                            error_message=check_message or 'Unknown error'
-                        )
-                        request_handler.send_response(200)
-                        request_handler.send_header('Content-type', 'text/html')
-                        request_handler.end_headers()
-                        request_handler.wfile.write(content.encode())
+                        self._send_htmx_partial(request_handler, 'partials/repository_error.html', {
+                            'job_name': job_name,
+                            'error_type': 'connection_error',
+                            'error_message': check_message or 'Unknown error'
+                        })
             else:
-                content = self.template_service.render_template('partials/htmx_error.html',
-                    error_message='Repository URI not configured'
-                )
-                request_handler.send_response(200)
-                request_handler.send_header('Content-type', 'text/html')
-                request_handler.end_headers()
-                request_handler.wfile.write(content.encode())
+                self._send_htmx_error(request_handler, 'Repository URI not configured')
         else:
             # Non-restic repositories - assume available for now
-            content = self.template_service.render_template('partials/repository_available.html',
-                job_name=job_name,
-                job_type=dest_type
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
-    
+            self._send_htmx_partial(request_handler, 'partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': dest_type
+            })
+
     @handle_page_errors("Repository unlock")
     def unlock_repository_htmx(self, request_handler, job_name=None):
         """HTMX endpoint for repository unlock"""
@@ -1415,38 +1079,20 @@ class PagesHandler:
             job_name = params.get('job', [''])[0]
         
         if not job_name:
-            content = self.template_service.render_template('partials/htmx_error.html',
-                error_message='Job name is required'
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
+            self._send_htmx_error(request_handler, 'Job name is required')
             return
         
         # Directly implement the unlock logic
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            content = self.template_service.render_template('partials/htmx_error.html',
-                error_message=f"Job '{job_name}' not found"
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
+            self._send_htmx_error(request_handler, f"Job '{job_name}' not found")
             return
 
         job_config = jobs[job_name]
         dest_type = job_config.get('dest_type')
         
         if dest_type != 'restic':
-            content = self.template_service.render_template('partials/htmx_error.html',
-                error_message='Unlock is only supported for restic repositories'
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
+            self._send_htmx_error(request_handler, 'Unlock is only supported for restic repositories')
             return
 
         # Execute restic unlock command
@@ -1461,39 +1107,10 @@ class PagesHandler:
             self.check_repository_availability_htmx(request_handler, job_name)
         else:
             # Unlock failed - show error
-            content = self.template_service.render_template('partials/repository_error.html',
-                job_name=job_name,
-                error_type='unlock_failed',
-                error_message=result.get('error', 'Unlock operation failed')
-            )
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
-    
-    def _send_htmx_partial(self, request_handler, template_path: str, data: Dict[str, Any]):
-        """Send HTMX partial response"""
-        try:
-            content = self.template_service.render_template(template_path, data)
-            request_handler.send_response(200)
-            request_handler.send_header('Content-type', 'text/html')
-            request_handler.end_headers()
-            request_handler.wfile.write(content.encode())
-        except Exception as e:
-            logger.error(f"HTMX partial error: {e}")
-            self._send_htmx_error(request_handler, f"Template error: {str(e)}")
-    
-    def _send_htmx_error(self, request_handler, message: str):
-        """Send HTMX error response using template"""
-        template_data = {'error_message': message}
-        self._send_htmx_partial(request_handler, 'partials/htmx_error.html', template_data)
+            self._send_htmx_partial(request_handler, 'partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'unlock_failed',
+                'error_message': result.get('error', 'Unlock operation failed')
+            })
 
-    def _send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response using template partial"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        
-        error_html = self.template_service.render_template('partials/error_page.html', 
-                                                          error_message=message)
-        request_handler.wfile.write(error_html.encode())
+

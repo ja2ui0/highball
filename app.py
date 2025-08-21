@@ -9,8 +9,8 @@ import cgi
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-# Consolidated Handlers
-from handlers.pages import PagesHandler
+# Specialized Handlers
+from handlers.pages import GETHandlers, POSTHandlers, ValidationHandlers
 from handlers.operations import OperationsHandler
 from handlers.api import APIHandler
 from handlers.forms import FormsHandler
@@ -64,8 +64,14 @@ class BackupWebHandler(BaseHTTPRequestHandler):
 
         # Build handler map last; if this throws, leave _handlers=None so we retry next request
         try:
+            # Initialize JobFormDataBuilder once for sharing
+            from services.data_services import JobFormDataBuilder
+            job_form_builder = JobFormDataBuilder()
+            
             cls._handlers = {
-                'pages': PagesHandler(cls._backup_config, cls._template_service),
+                'get_pages': GETHandlers(cls._backup_config, cls._template_service, job_form_builder),
+                'post_pages': POSTHandlers(cls._backup_config, cls._template_service, job_form_builder),
+                'validation_pages': ValidationHandlers(cls._backup_config, cls._template_service, job_form_builder),
                 'operations': OperationsHandler(cls._backup_config, cls._template_service),
                 'api': APIHandler(cls._backup_config, cls._template_service),
                 'forms': FormsHandler(cls._backup_config, cls._template_service),
@@ -97,29 +103,29 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._serve_favicon()
                 return
 
-            # Route to consolidated handlers
+            # Route to specialized handlers
             if path in ['/', '/dashboard']:
-                self._handlers['pages'].show_dashboard(self)
+                self._handlers['get_pages'].show_dashboard(self)
             elif path == '/add-job':
-                self._handlers['pages'].show_add_job_form(self)
+                self._handlers['get_pages'].show_add_job_form(self)
             elif path == '/edit-job':
                 job_name = params.get('name', [''])[0]
-                self._handlers['pages'].show_edit_job_form(self, job_name)
+                self._handlers['get_pages'].show_edit_job_form(self, job_name)
             elif path == '/config':
-                self._handlers['pages'].show_config_manager(self)
+                self._handlers['get_pages'].show_config_manager(self)
             elif path == '/config/raw':
-                self._handlers['pages'].show_raw_editor(self)
+                self._handlers['get_pages'].show_raw_editor(self)
             elif path == '/dev':
                 log_type = params.get('type', ['app'])[0]
-                self._handlers['pages'].show_dev_logs(self, log_type)
+                self._handlers['get_pages'].show_dev_logs(self, log_type)
             elif path == '/inspect':
-                self._handlers['pages'].show_job_inspect(self)
+                self._handlers['get_pages'].show_job_inspect(self)
             elif path == '/scan-network':
                 network_range = params.get('range', ['192.168.1.0/24'])[0]
-                self._handlers['pages'].scan_network_for_rsyncd(self, network_range)
+                self._handlers['validation_pages'].scan_network_for_rsyncd(self, network_range)
             elif path == '/validate-ssh':
                 source = params.get('source', [''])[0]
-                self._handlers['pages'].validate_ssh_source(self, source)
+                self._handlers['validation_pages'].validate_ssh_source(self, source)
             elif path == '/validate-restic':
                 job_name = params.get('job', [''])[0]
                 self._handlers['api'].validate_restic_job(self, job_name)
@@ -151,10 +157,10 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 self._handlers['api'].get_jobs(self)
             elif path == '/check-repository-availability':
                 job_name = params.get('job', [''])[0]
-                self._handlers['pages'].check_repository_availability_htmx(self, job_name)
+                self._handlers['validation_pages'].check_repository_availability_htmx(self, job_name)
             elif path == '/unlock-repository':
                 job_name = params.get('job', [''])[0]
-                self._handlers['pages'].unlock_repository_htmx(self, job_name)
+                self._handlers['validation_pages'].unlock_repository_htmx(self, job_name)
             else:
                 self._send_404()
         except Exception as e:
@@ -209,12 +215,12 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Route to consolidated handlers
+            # Route to specialized handlers
             if path == '/save-job':
-                self._handlers['pages'].save_backup_job(self, form_data)
+                self._handlers['post_pages'].save_backup_job(self, form_data)
             elif path == '/delete-job':
                 job_name = form_data.get('job_name', [''])[0]
-                self._handlers['pages'].delete_backup_job(self, job_name)
+                self._handlers['post_pages'].delete_backup_job(self, job_name)
             elif path == '/run-backup':
                 job_name = form_data.get('job_name', [''])[0]
                 self._handlers['operations'].run_backup_job(self, job_name, dry_run=False)
@@ -224,16 +230,16 @@ class BackupWebHandler(BaseHTTPRequestHandler):
             elif path == '/validate-restic-form':
                 self._handlers['api'].validate_restic_form(self, form_data)
             elif path == '/validate-source-paths':
-                self._handlers['pages'].validate_source_paths(self, form_data)
+                self._handlers['validation_pages'].validate_source_paths(self, form_data)
             elif path == '/initialize-restic-repo':
                 self._handlers['api'].initialize_restic_repo(self, form_data)
             
             elif path == '/preview-config-changes':
-                self._handlers['pages'].preview_config_changes(self, form_data)
+                self._handlers['post_pages'].preview_config_changes(self, form_data)
             elif path == '/save-config':
-                self._handlers['pages'].save_structured_config(self, form_data)
+                self._handlers['post_pages'].save_structured_config(self, form_data)
             elif path == '/save-config/raw':
-                self._handlers['pages'].save_raw_config(self, form_data)
+                self._handlers['post_pages'].save_raw_config(self, form_data)
             elif path == '/schedule-job':
                 self._handlers['operations'].schedule_job(self, form_data)
             elif path == '/restore':
@@ -248,7 +254,7 @@ class BackupWebHandler(BaseHTTPRequestHandler):
                 url_parts = urlparse(self.path)
                 params = parse_qs(url_parts.query)
                 job_name = params.get('job', [''])[0]
-                self._handlers['pages'].unlock_repository_htmx(self, job_name)
+                self._handlers['validation_pages'].unlock_repository_htmx(self, job_name)
             else:
                 self._send_404()
         except Exception as e:
