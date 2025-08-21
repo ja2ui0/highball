@@ -211,10 +211,15 @@ class OperationsHandler:
                 source_paths = job_config['source_config'].get('source_paths', [])
                 if not source_paths:
                     return {'success': False, 'error': 'No source paths defined for restore'}
-                target_path = source_paths[0]['path']  # Use first source path
+                
+                # For same-as-origin restores, use container root since paths match mounts
+                if dest_config.get('repo_type') == 'same_as_origin':
+                    target_path = '/'
+                else:
+                    target_path = source_paths[0]['path']  # Use first source path
             
             # Use backup service for restore
-            from services.restic_repository_service import ResticRepositoryService
+            from models.backup import ResticRepositoryService
             repo_service = ResticRepositoryService()
             
             # Build restore arguments
@@ -234,16 +239,28 @@ class OperationsHandler:
             
             restore_args.extend(['--verbose'])
             
-            # Execute restore command
-            env = ResticArgumentBuilder.build_environment(dest_config)
+            # Execute restore command using unified ResticExecutionService
+            from services.execution import ResticExecutionService
+            restic_executor = ResticExecutionService()
             
-            cmd = ['restic'] + restore_args
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=1800,  # 30 minute timeout
-                env=env
+            # Extract command args (remove 'restic' and repo args handled by service)
+            command_args = []
+            skip_next = False
+            for i, arg in enumerate(restore_args):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if arg == '-r':
+                    skip_next = True  # skip the repo URI
+                    continue
+                command_args.append(arg)
+            
+            result = restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                source_config=job_config.get('source_config'),
+                operation_type='restore',
+                timeout=1800  # 30 minute timeout
             )
             
             if result.returncode == 0:

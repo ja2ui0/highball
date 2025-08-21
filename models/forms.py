@@ -346,6 +346,12 @@ class DestinationParser:
                 return {'valid': False, 'error': 'rclone path is required'}
             
             return {'valid': True, 'uri': f'rclone:{remote}:{path}'}
+            
+        elif repo_type == 'same_as_origin':
+            path = safe_get_value(form_data, 'origin_repo_path')
+            if not path:
+                return {'valid': False, 'error': 'Origin repository path is required'}
+            return {'valid': True, 'uri': path.strip()}
         
         else:
             return {'valid': False, 'error': f'Unknown repository type: {repo_type}'}

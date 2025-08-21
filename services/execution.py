@@ -167,7 +167,13 @@ class CommandExecutionService:
         
         # Add target and command
         ssh_cmd.append(f'{username}@{hostname}')
-        ssh_cmd.append(shlex.join(command))
+        
+        # Convert command to shell string with proper quote handling
+        container_cmd_str = shlex.join(command)
+        # Allow shell evaluation of $(id -u):$(id -g) on remote host (like highball-main)
+        container_cmd_str = container_cmd_str.replace("'$(id -u):$(id -g)'", "$(id -u):$(id -g)")
+        
+        ssh_cmd.append(container_cmd_str)
         
         return self.execute_locally(ssh_cmd)
     
@@ -298,6 +304,147 @@ class ExecutionService:
     def obfuscate_environment_for_logging(self, env_vars: Dict[str, str]) -> Dict[str, str]:
         """Delegation: obfuscate environment variables for safe logging"""
         return self.obfuscator.obfuscate_environment_vars(env_vars)
+
+
+# =============================================================================
+# **RESTIC EXECUTION SERVICE** - Unified Restic execution with automatic context detection
+# =============================================================================
+
+class ResticExecutionService:
+    """Unified Restic execution with automatic credential and SSH handling"""
+    
+    def __init__(self):
+        self.executor = ExecutionService()
+    
+    def execute_restic_command(
+        self, 
+        dest_config: Dict[str, Any],
+        command_args: List[str],
+        source_config: Optional[Dict[str, Any]] = None,
+        operation_type: str = 'general',
+        timeout: int = 120
+    ) -> subprocess.CompletedProcess:
+        """Execute restic command with automatic execution context detection
+        
+        Args:
+            dest_config: Destination configuration with credentials
+            command_args: Restic command arguments (e.g., ['snapshots', '--json'])
+            source_config: Source configuration for SSH detection
+            operation_type: Type of operation ('ui', 'backup', 'restore', 'maintenance')
+            timeout: Command timeout in seconds
+            
+        Returns:
+            subprocess.CompletedProcess result
+        """
+        
+        if self._should_use_ssh(dest_config, source_config, operation_type):
+            return self._execute_via_ssh(dest_config, command_args, source_config, timeout)
+        else:
+            return self._execute_locally(dest_config, command_args, timeout)
+    
+    def _should_use_ssh(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]], operation_type: str) -> bool:
+        """Determine if SSH execution should be used based on context"""
+        if not source_config:
+            return False
+        
+        # For same_as_origin repositories, always use SSH (repository is on origin host filesystem)
+        if dest_config.get('repo_type') == 'same_as_origin':
+            return True
+        
+        # UI operations execute locally from Highball container (for networked repos)
+        if operation_type in ['ui', 'browse', 'inspect']:
+            return False
+            
+        # Source operations use SSH when source is SSH
+        has_ssh_config = bool(source_config.get('hostname') and source_config.get('username'))
+        
+        if operation_type in ['backup', 'restore', 'maintenance', 'init']:
+            return has_ssh_config
+            
+        # General operations use SSH when available
+        return has_ssh_config
+    
+    def _execute_locally(
+        self, 
+        dest_config: Dict[str, Any], 
+        command_args: List[str], 
+        timeout: int
+    ) -> subprocess.CompletedProcess:
+        """Execute restic command locally with proper credentials"""
+        from models.backup import ResticArgumentBuilder
+        
+        # Build environment with all credentials (S3, etc.)
+        env = ResticArgumentBuilder.build_environment(dest_config)
+        
+        # Build restic command
+        repo_uri = dest_config.get('repo_uri', '')
+        cmd = ['restic', '-r', repo_uri] + command_args
+        
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env
+        )
+    
+    def _execute_via_ssh(
+        self, 
+        dest_config: Dict[str, Any], 
+        command_args: List[str], 
+        source_config: Dict[str, Any], 
+        timeout: int
+    ) -> subprocess.CompletedProcess:
+        """Execute restic command via SSH using container"""
+        from models.backup import ResticArgumentBuilder
+        
+        # Extract SSH configuration
+        hostname = source_config['hostname']
+        username = source_config['username']
+        container_runtime = source_config.get('container_runtime', 'docker')
+        
+        # Build environment flags for container
+        env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
+        
+        # Build container command
+        repo_uri = dest_config.get('repo_uri', '')
+        container_cmd = [
+            container_runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)'
+        ] + env_flags
+        
+        # Add volume mount for same_as_origin repositories (directory should exist from validation)  
+        if dest_config.get('repo_type') == 'same_as_origin':
+            # Mount the repository directory into container
+            container_cmd.extend(['-v', f'{repo_uri}:{repo_uri}'])
+        
+        # For ALL SSH operations, mount source paths (not just same_as_origin)
+        if source_config:
+            # For backup operations, mount source paths as read-only
+            if 'backup' in command_args:
+                source_paths = source_config.get('source_paths', [])
+                for path_config in source_paths:
+                    source_path = path_config['path']
+                    container_cmd.extend(['-v', f'{source_path}:{source_path}:ro'])
+            
+            # For restore operations, mount source paths as read-write
+            if 'restore' in command_args:
+                source_paths = source_config.get('source_paths', [])
+                for path_config in source_paths:
+                    source_path = path_config['path']
+                    container_cmd.extend(['-v', f'{source_path}:{source_path}'])
+        
+        container_cmd.extend([
+            'restic/restic:0.18.0',
+            '-r', repo_uri
+        ] + command_args)
+        
+        # DEBUG: Log the container command for same_as_origin
+        if dest_config.get('repo_type') == 'same_as_origin':
+            import sys
+            print(f"DEBUG SAME_AS_ORIGIN COMMAND: {container_cmd}", file=sys.stderr)
+        
+        # Execute via SSH
+        return self.executor.execute_ssh_command(hostname, username, container_cmd)
 
 
 # Legacy compatibility functions

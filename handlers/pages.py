@@ -283,9 +283,12 @@ class PagesHandler:
     
     def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
         """Save backup job from form submission"""
+        import sys
+        print(f"DEBUG: save_backup_job called with form_data keys: {list(form_data.keys())}", file=sys.stderr)
         try:
             # Parse job form data using unified parser
             job_result = job_parser.parse_job_form(form_data)
+            print(f"DEBUG: job_result valid: {job_result.get('valid')}, error: {job_result.get('error')}", file=sys.stderr)
             
             if not job_result['valid']:
                 # Show form with errors

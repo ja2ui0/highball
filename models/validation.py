@@ -314,6 +314,55 @@ class SSHValidator:
     def _cache_result(self, cache_key: str, result: Dict[str, Any]) -> None:
         """Cache validation result"""
         self._validation_cache[cache_key] = (datetime.now(), result)
+    
+    def validate_ssh_repo_path_with_creation(self, hostname: str, username: str, repo_path: str) -> Dict[str, Any]:
+        """Validate SSH repository path with automatic creation and RWX verification"""
+        if not hostname or not username or not repo_path:
+            return {'valid': False, 'error': 'Hostname, username, and repository path are required'}
+        
+        try:
+            # Test basic SSH connectivity (reuse existing method)
+            ssh_test = self._test_ssh_connection(hostname, username)
+            if not ssh_test['success']:
+                return {'valid': False, 'error': ssh_test['error']}
+            
+            # Check if path exists (reuse existing method)
+            path_exists = self._test_path_exists(hostname, username, repo_path)
+            path_existed_initially = path_exists['success']
+            
+            if not path_existed_initially:
+                # Try to create the directory
+                cmd = ['ssh'] + self.config.to_ssh_args() + [
+                    f'{username}@{hostname}', f'mkdir -p "{repo_path}"'
+                ]
+                mkdir_result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+                
+                if mkdir_result.returncode != 0:
+                    return {
+                        'valid': False, 
+                        'error': f'Cannot create repository directory: {mkdir_result.stderr.decode().strip()}'
+                    }
+            
+            # Test RWX permissions (reuse existing method)
+            permissions = self._test_path_permissions(hostname, username, repo_path)
+            
+            if permissions != 'RWX':
+                return {
+                    'valid': False, 
+                    'error': f'Repository path requires write permissions (RWX), found: {permissions}'
+                }
+            
+            return {
+                'valid': True,
+                'ssh_status': 'OK',
+                'path_status': 'Created' if not path_existed_initially else 'Exists',
+                'path_permissions': permissions,
+                'repo_path': repo_path,
+                'tested_at': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Repository path validation failed: {str(e)}'}
 
 # =============================================================================
 # RESTIC VALIDATION - Repository access and status

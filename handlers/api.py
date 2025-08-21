@@ -430,9 +430,10 @@ class APIHandler:
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
             
-            # Initialize repository using backup service
-            result = backup_service.initialize_repository(dest_config)
+            # Initialize repository using backup service (pass source_config for SSH detection)
+            result = backup_service.initialize_repository(dest_config, source_config)
             self._send_json_response(request_handler, result)
             
         except Exception as e:

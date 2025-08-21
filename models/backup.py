@@ -323,6 +323,29 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             }
         ]
+    },
+    'same_as_origin': {
+        'display_name': 'Path on Origin Host',
+        'description': 'Store repository on the same host as the backup origin (useful for file rollbacks)',
+        'always_available': True,
+        'quick_check': {
+            'command': ['test', '-w', '{origin_repo_path_parent}'],
+            'expected_returncode': 0,
+            'timeout': 5,
+            'variables': {
+                'origin_repo_path_parent': 'dirname {origin_repo_path}'
+            }
+        },
+        'fields': [
+            {
+                'name': 'origin_repo_path',
+                'type': 'text',
+                'label': 'Repository Path on Origin Host',
+                'help': 'Path where the repository will be stored on the origin host (requires write permissions)',
+                'placeholder': '/tmp/restic-repo',
+                'required': True
+            }
+        ]
     }
 }
 
@@ -635,10 +658,7 @@ class ResticArgumentBuilder:
     @staticmethod
     def build_backup_args(config: BackupConfig, dry_run: bool = False) -> List[str]:
         """Build backup command arguments"""
-        args = []
-        
-        # Repository and authentication
-        args.extend(['-r', config.dest_config['repo_uri']])
+        args = ['backup']  # Add backup command
         
         # Source paths
         source_paths = config.source_config.get('source_paths', [])
@@ -782,11 +802,14 @@ class ResticRepositoryService:
     
     def __init__(self):
         self.command_builder = ResticArgumentBuilder()
+        from services.execution import ResticExecutionService
+        self.restic_executor = ResticExecutionService()
     
     def test_repository_access(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Test repository access and get status information"""
         try:
             dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
             repo_uri = dest_config.get('repo_uri')
             password = dest_config.get('password')
             
@@ -796,18 +819,13 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Test repository access with snapshots list
-            cmd = ['restic', '-r', repo_uri, 'snapshots', '--json']
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=env
+            # Execute using unified ResticExecutionService
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=['snapshots', '--json'],
+                source_config=source_config,
+                operation_type='ui',
+                timeout=30
             )
             
             if result.returncode == 0:
@@ -862,7 +880,7 @@ class ResticRepositoryService:
                 'error': f'Repository test failed: {str(e)}'
             }
     
-    def initialize_repository(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
+    def initialize_repository(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Initialize a new Restic repository"""
         try:
             repo_uri = dest_config.get('repo_uri')
@@ -874,18 +892,13 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Initialize repository
-            cmd = ['restic', '-r', repo_uri, 'init']
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                env=env
+            # Execute using unified ResticExecutionService
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=['init'],
+                source_config=source_config,
+                operation_type='init',
+                timeout=60
             )
             
             if result.returncode == 0:
@@ -910,8 +923,39 @@ class ResticRepositoryService:
                 'success': False,
                 'error': f'Initialization failed: {str(e)}'
             }
+
+    def run_backup_unified(self, dest_config: Dict[str, Any], source_config: Dict[str, Any], backup_args: List[str]) -> Dict[str, Any]:
+        """Run backup using unified ResticExecutionService (supports same_as_origin)"""
+        try:
+            # Execute using unified ResticExecutionService
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=backup_args,
+                source_config=source_config,
+                operation_type='backup'
+            )
+            
+            if result.returncode == 0:
+                return {
+                    'success': True,
+                    'message': 'Backup completed successfully',
+                    'output': result.stdout
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Backup failed: {result.stderr}',
+                    'output': result.stdout
+                }
+                
+        except Exception as e:
+            logger.error(f"Backup error: {e}")
+            return {
+                'success': False,
+                'error': f'Backup execution failed: {str(e)}'
+            }
     
-    def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
+    def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None, source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """List repository snapshots with optional filtering"""
         try:
             repo_uri = dest_config.get('repo_uri')
@@ -923,19 +967,27 @@ class ResticRepositoryService:
                     'error': 'Repository URI and password are required'
                 }
             
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Build command
+            # Build command args
             args = self.command_builder.build_list_args(repo_uri, filters)
-            cmd = ['restic'] + args
+            # Remove 'restic' and repo args since ResticExecutionService handles them
+            command_args = []
+            skip_next = False
+            for i, arg in enumerate(args):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if arg == '-r':
+                    skip_next = True  # skip the repo URI
+                    continue
+                command_args.append(arg)
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=env
+            # Execute using unified ResticExecutionService  
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                source_config=source_config,
+                operation_type='ui',
+                timeout=30
             )
             
             if result.returncode == 0:
@@ -999,7 +1051,9 @@ class ResticRepositoryService:
                 }
             
             # Check if we should use SSH execution
-            if source_config and source_config.get('hostname') and source_config.get('username'):
+            # For same_as_origin repositories, always use SSH (repository is on origin host)
+            if (dest_config.get('repo_type') == 'same_as_origin' or 
+                (source_config and source_config.get('hostname') and source_config.get('username'))):
                 return self._list_snapshots_via_ssh(repo_uri, password, source_config, dest_config)
             else:
                 # Fall back to local execution
@@ -1109,7 +1163,7 @@ class ResticRepositoryService:
             return False, f"Quick check failed: {str(e)}"
 
     def _list_snapshots_via_ssh(self, repo_uri: str, password: str, source_config: Dict[str, Any], dest_config: Dict[str, Any]) -> Dict[str, Any]:
-        """List snapshots via SSH execution (implementation from working code)"""
+        """List snapshots via SSH execution using unified ResticExecutionService"""
         import json
         
         # Quick pre-check using schema-driven approach
@@ -1120,22 +1174,15 @@ class ResticRepositoryService:
                 'error': f'Repository endpoint check failed: {check_message}'
             }
         
-        hostname = source_config.get('hostname')
-        username = source_config.get('username')
-        container_runtime = source_config.get('container_runtime', 'docker')
-        
-        # Build SSH + container command with proper credentials
-        env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
-        cmd = [
-            'ssh', f'{username}@{hostname}',
-            container_runtime, 'run', '--rm'
-        ] + env_flags + [
-            'restic/restic:0.18.0',
-            '-r', repo_uri, 'snapshots', '--json'
-        ]
-        
+        # Use ResticExecutionService for unified SSH execution (supports same_as_origin volume mounting)
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=['snapshots', '--json'],
+                source_config=source_config,
+                operation_type='ui',  # UI operation but uses SSH for same_as_origin
+                timeout=30
+            )
             
             if result.returncode == 0:
                 try:
@@ -1813,11 +1860,19 @@ class BackupService:
         self.maintenance_service = ResticMaintenanceService()
     
     def execute_backup(self, job_config: Dict[str, Any], dry_run: bool = False) -> Dict[str, Any]:
-        """Execute backup operation"""
+        """Execute backup operation using unified ResticExecutionService"""
         config = BackupConfig(job_config)
         
         if config.is_restic_backup:
-            return self.restic_runner.run_backup(config, dry_run)
+            # Use ResticRepositoryService which has ResticExecutionService integration
+            dest_config = job_config.get('dest_config', {})
+            source_config = job_config.get('source_config', {})
+            
+            # Build backup arguments using the existing argument builder
+            backup_args = self.restic_runner.argument_builder.build_backup_args(config, dry_run)
+            
+            # Use ResticRepositoryService for proper SSH execution
+            return self.repository_service.run_backup_unified(dest_config, source_config, backup_args)
         else:
             return {
                 'success': False,
@@ -1828,9 +1883,9 @@ class BackupService:
         """Test repository access"""
         return self.repository_service.test_repository_access(job_config)
     
-    def initialize_repository(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
+    def initialize_repository(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Initialize new repository"""
-        return self.repository_service.initialize_repository(dest_config)
+        return self.repository_service.initialize_repository(dest_config, source_config)
     
     def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """List repository snapshots with SSH support"""

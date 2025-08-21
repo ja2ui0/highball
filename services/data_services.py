@@ -234,6 +234,8 @@ class SnapshotIntrospectionService:
     
     def __init__(self):
         self.executor = ExecutionService()
+        from services.execution import ResticExecutionService
+        self.restic_executor = ResticExecutionService()
         self.timeout = 30  # seconds for introspection commands
     
     def get_snapshot_source_paths(
@@ -246,22 +248,28 @@ class SnapshotIntrospectionService:
     ) -> List[str]:
         """Introspection concern: get original source paths that were backed up in a snapshot"""
         try:
+            # Convert ssh_config to source_config format for ResticExecutionService
+            source_config = None
             if ssh_config:
-                # Execute via SSH using container (restic not installed on remote hosts)
-                result = self._execute_via_ssh(
-                    snapshot_id, repository_url, dest_config,
-                    ssh_config, container_runtime
-                )
-            else:
-                # Execute locally
-                result = self._execute_locally(
-                    snapshot_id, repository_url, dest_config
-                )
+                source_config = {
+                    'hostname': ssh_config['hostname'],
+                    'username': ssh_config['username'],
+                    'container_runtime': container_runtime
+                }
             
-            if result.get('success'):
-                return self._parse_snapshot_paths(result.get('stdout', ''))
+            # Execute using unified ResticExecutionService
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=['ls', snapshot_id, '--long'],
+                source_config=source_config,
+                operation_type='ui',
+                timeout=self.timeout
+            )
+            
+            if result.returncode == 0:
+                return self._parse_snapshot_paths(result.stdout)
             else:
-                print(f"WARNING: Failed to introspect snapshot {snapshot_id}: {result.get('error')}")
+                print(f"WARNING: Failed to introspect snapshot {snapshot_id}: {result.stderr}")
                 return []
                 
         except Exception as e:
@@ -278,38 +286,23 @@ class SnapshotIntrospectionService:
     ) -> Dict[str, Any]:
         """Introspection concern: get detailed metadata for a snapshot"""
         try:
-            from models.backup import ResticArgumentBuilder
-            
+            # Convert ssh_config to source_config format for ResticExecutionService
+            source_config = None
             if ssh_config:
-                # SSH operations - use centralized S3 credential system
-                env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
-                
-                show_command = [
-                    container_runtime, 'run', '--rm'
-                ] + env_flags + [
-                    'restic/restic:0.18.0',
-                    '-r', repository_url,
-                    'snapshots', '--json', snapshot_id
-                ]
-                
-                result = self.executor.execute_ssh_command(
-                    ssh_config['hostname'],
-                    ssh_config['username'],
-                    show_command
-                )
-            else:
-                # Local operations - use centralized environment builder
-                environment_vars = ResticArgumentBuilder.build_environment(dest_config)
-                
-                show_command = [
-                    'restic', '-r', repository_url,
-                    'snapshots', '--json', snapshot_id
-                ]
-                
-                result = self.executor.execute_local_command(
-                    show_command,
-                    environment_vars=environment_vars
-                )
+                source_config = {
+                    'hostname': ssh_config['hostname'],
+                    'username': ssh_config['username'],
+                    'container_runtime': container_runtime
+                }
+            
+            # Execute using unified ResticExecutionService
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=['snapshots', '--json', snapshot_id],
+                source_config=source_config,
+                operation_type='ui',
+                timeout=self.timeout
+            )
             
             if result.returncode == 0:
                 import json
@@ -323,75 +316,6 @@ class SnapshotIntrospectionService:
             print(f"ERROR: Snapshot metadata retrieval failed for {snapshot_id}: {str(e)}")
             return {}
     
-    def _execute_via_ssh(
-        self,
-        snapshot_id: str,
-        repository_url: str,
-        dest_config: Dict[str, Any],
-        ssh_config: Dict[str, str],
-        container_runtime: str
-    ) -> Dict[str, Any]:
-        """Introspection concern: execute snapshot command via SSH using container"""
-        try:
-            from models.backup import ResticArgumentBuilder
-            
-            # Use centralized S3 credential system for SSH operations
-            env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
-            
-            # Build container command for listing snapshot root paths
-            list_command = [
-                container_runtime, 'run', '--rm'
-            ] + env_flags + [
-                'restic/restic:0.18.0',
-                '-r', repository_url,
-                'ls', snapshot_id, '--long'
-            ]
-            
-            result = self.executor.execute_ssh_command(
-                ssh_config['hostname'],
-                ssh_config['username'],
-                list_command
-            )
-            
-            if result.returncode == 0:
-                return {'success': True, 'stdout': result.stdout}
-            else:
-                return {'success': False, 'error': result.stderr}
-                
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def _execute_locally(
-        self,
-        snapshot_id: str,
-        repository_url: str,
-        dest_config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Introspection concern: execute snapshot command locally"""
-        try:
-            from models.backup import ResticArgumentBuilder
-            
-            # Use centralized environment builder for local operations
-            environment_vars = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Use restic directly for local execution
-            list_command = [
-                'restic', '-r', repository_url,
-                'ls', snapshot_id, '--long'
-            ]
-            
-            result = self.executor.execute_local_command(
-                list_command,
-                environment_vars=environment_vars
-            )
-            
-            if result.returncode == 0:
-                return {'success': True, 'stdout': result.stdout}
-            else:
-                return {'success': False, 'error': result.stderr}
-                
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
     
     def _parse_snapshot_paths(self, ls_output: str) -> List[str]:
         """Introspection concern: parse restic ls output to extract original source paths"""

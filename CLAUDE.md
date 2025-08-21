@@ -28,9 +28,10 @@ source_config:
 ```
 
 **Execution Service Usage (CRITICAL)**:
-- Use existing `ContainerService.build_backup_container_command()` for command building
-- Use existing `ExecutionService.execute_ssh_command()` for SSH execution  
-- **NEVER** try to manually build container commands or SSH execution
+- **ALWAYS use** `ResticExecutionService.execute_restic_command()` from `services/execution.py` for ALL restic operations
+- **NEVER manually call** `ResticArgumentBuilder.build_environment()` or build SSH commands directly
+- Service provides automatic SSH/local context detection via `operation_type` parameter
+- Unified credential management eliminates S3 and cloud provider bugs
 - Services in `services/binaries.py` and `services/execution.py` contain proven patterns
 
 ## Primary Critical Testing Requirements (Next Session)
@@ -56,6 +57,8 @@ source_config:
 **Rule: Pure Orchestration Layer**: Highball orchestrates backup/restore operations by SSH-ing to hosts and running binaries there. Backup: SSH to source host → run restic/rsync → direct to destination. Restore: SSH to target host → run restic restore → files appear on target. Exception: Highball can restore to itself at `/restore` when source hosts no longer exist (designed for bind-mount persistence). This design enables ANY host to ANY destination with Highball providing coordination, not data intermediation.
 
 **Rule: Container Execution Strategy**: Use official `restic/restic:0.18.0` containers on remote hosts to solve version mismatch problems. Remote hosts may have outdated restic versions (e.g., 0.16.4 missing `--dry-run` for restore) while Highball has 0.18.0. Container execution ensures version consistency across all operations. SSH validation auto-detects docker/podman availability and populates `container_runtime` in job config. **CRITICAL**: `restic/restic:0.18.0` has `restic` as entrypoint - container commands use `-r repository command` NOT `restic -r repository command`.
+
+**Rule: Unified Restic Execution (CRITICAL ARCHITECTURE)**: All restic operations MUST use `ResticExecutionService` from `services/execution.py`. This service provides automatic SSH/local context detection, unified credential management, and consolidated execution patterns. **NEVER manually call** `ResticArgumentBuilder.build_environment()` or build SSH commands directly. **ALWAYS use** `restic_executor.execute_restic_command()` with appropriate `operation_type` ('ui', 'backup', 'restore', 'maintenance', 'init') for correct execution context.
 
 **Rule: SSH vs Local Execution Intelligence**: 
 - **UI Operations** (snapshot listing, browsing, validation): Always execute locally from Highball container using local restic binary and credentials
@@ -294,6 +297,7 @@ source_config:
 **Debug**: `docker logs -f highball`
 **Test Notifications**: `./test_notifications.py`
 **Test Units**: `python3 -m unittest tests.test_form_error_handler -v`
+**Web Interface**: `http://localhost:8087` (Highball web UI and API)
 
 ## Configuration Schema (User-facing Only)
 

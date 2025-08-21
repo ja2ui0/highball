@@ -38,6 +38,7 @@ class FormsHandler:
             'validate-ssh-source': self._validate_ssh_source,
             'validate-ssh-dest': self._validate_ssh_dest,
             'validate-source-path': self._validate_source_path,
+            'validate-origin-repo-path': self._validate_origin_repo_path,
             'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
             
@@ -343,6 +344,33 @@ class FormsHandler:
         
         # View concern: delegate to template service
         return self.template_service.render_validation_status('restic', result)
+    
+    def _validate_origin_repo_path(self, form_data):
+        """Validate same_as_origin repository path with RWX requirements"""
+        try:
+            # Extract repository path
+            repo_path = self._get_form_value(form_data, 'origin_repo_path')
+            if not repo_path or not repo_path.strip():
+                result = {'valid': False, 'error': 'Please enter a repository path'}
+                return self.template_service.render_validation_status('origin_repo_path', result)
+            
+            # Extract SSH configuration (required for same_as_origin)
+            hostname = self._get_form_value(form_data, 'hostname')
+            username = self._get_form_value(form_data, 'username')
+            
+            if not hostname or not username:
+                result = {'valid': False, 'error': 'SSH configuration required for same-as-origin repositories'}
+                return self.template_service.render_validation_status('origin_repo_path', result)
+            
+            # Use the validation service method we created
+            result = self.validation_service.ssh.validate_ssh_repo_path_with_creation(hostname, username, repo_path)
+            
+            # Return validation status with potential "create path" button
+            return self.template_service.render_validation_status('origin_repo_path', result)
+            
+        except Exception as e:
+            result = {'valid': False, 'error': f'Validation failed: {str(e)}'}
+            return self.template_service.render_validation_status('origin_repo_path', result)
     
     # =============================================================================
     # FIELD RENDERING ACTIONS - Inline HTML, no renderer services

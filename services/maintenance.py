@@ -187,6 +187,8 @@ class MaintenanceOperationFactory:
     def __init__(self, backup_config):
         self.backup_config = backup_config
         self.config_manager = MaintenanceConfigManager(backup_config)
+        from services.execution import ResticExecutionService
+        self.restic_executor = ResticExecutionService()
     
     def create_discard_operation(self, job_name: str) -> MaintenanceOperation:
         """Create discard operation for job (combines forget+prune)"""
@@ -213,9 +215,8 @@ class MaintenanceOperationFactory:
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
-        # Build repository URL and environment
+        # Build repository URL
         repository_url = dest_config.get('repo_uri', dest_config.get('dest_string', ''))
-        environment_vars = self._build_environment_vars(dest_config)
         
         # SSH config for remote operations
         ssh_config = None
@@ -239,28 +240,6 @@ class MaintenanceOperationFactory:
         jobs = self.backup_config.config.get('backup_jobs', {})
         return jobs.get(job_name, {})
     
-    def _build_environment_vars(self, dest_config: Dict[str, Any]) -> Dict[str, str]:
-        """Build environment variables for Restic execution"""
-        env_vars = {}
-        
-        # Repository password
-        password = dest_config.get('password', '')
-        if password:
-            env_vars['RESTIC_PASSWORD'] = password
-        
-        # Repository-specific environment variables
-        repo_type = dest_config.get('repo_type', 'local')
-        if repo_type == 'rest':
-            # REST server specific variables could go here
-            pass
-        elif repo_type == 's3':
-            # S3 specific variables
-            if dest_config.get('aws_access_key_id'):
-                env_vars['AWS_ACCESS_KEY_ID'] = dest_config['aws_access_key_id']
-            if dest_config.get('aws_secret_access_key'):
-                env_vars['AWS_SECRET_ACCESS_KEY'] = dest_config['aws_secret_access_key']
-        
-        return env_vars
 
 
 class MaintenanceExecutor:
