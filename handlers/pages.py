@@ -770,28 +770,10 @@ class ValidationHandlers:
             self.response_utils.send_json_response(request_handler, paths_result)
             return
         
-        # Validate each path
+        # Build SSH configuration and validate paths
         source_type = form_data.get('source_type', ['local'])[0]
-        validation_results = []
-        
-        from services.validation import ValidationService
-        validation_service = ValidationService()
-        
-        for path_config in paths_result['source_paths']:
-            if source_type == 'ssh':
-                hostname = form_data.get('hostname', [''])[0]
-                username = form_data.get('username', [''])[0]
-                ssh_config = {'hostname': hostname, 'username': username}
-                result = validation_service.validate_source_path(ssh_config, path_config['path'])
-            else:
-                result = validation_service.validate_source_path({}, path_config['path'])
-            
-            validation_results.append({
-                'path': path_config['path'],
-                'valid': result['valid'],
-                'error': result.get('error'),
-                'permissions': result.get('permissions')
-            })
+        ssh_config = self._build_ssh_config_from_form(form_data) if source_type == 'ssh' else {}
+        validation_results = self._validate_individual_paths(source_type, paths_result['source_paths'], ssh_config)
         
         self.response_utils.send_json_response(request_handler, {
             'valid': True,
@@ -901,6 +883,33 @@ class ValidationHandlers:
                 'error_type': 'connection_error',
                 'error_message': error_message or 'Unknown error'
             })
+
+    def _build_ssh_config_from_form(self, form_data: Dict[str, Any]) -> Dict[str, str]:
+        """Build SSH configuration from form data"""
+        hostname = form_data.get('hostname', [''])[0]
+        username = form_data.get('username', [''])[0]
+        return {'hostname': hostname, 'username': username}
+
+    def _validate_individual_paths(self, source_type: str, source_paths: List[Dict[str, Any]], ssh_config: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Validate each individual source path"""
+        from services.validation import ValidationService
+        validation_service = ValidationService()
+        
+        validation_results = []
+        for path_config in source_paths:
+            if source_type == 'ssh':
+                result = validation_service.validate_source_path(ssh_config, path_config['path'])
+            else:
+                result = validation_service.validate_source_path({}, path_config['path'])
+            
+            validation_results.append({
+                'path': path_config['path'],
+                'valid': result['valid'],
+                'error': result.get('error'),
+                'permissions': result.get('permissions')
+            })
+        
+        return validation_results
 
     @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, request_handler, job_name=None):

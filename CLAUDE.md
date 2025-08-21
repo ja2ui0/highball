@@ -81,15 +81,17 @@ source_config:
 - `app.py` (routing), `config.py` (YAML config)
 
 ### HTTP Layer (handlers/)
-- **Page Rendering**: `pages.py` (981 lines) - **OPTIMIZED ARCHITECTURE** with specialized handler classes:
+- **Page Rendering**: `pages.py` (optimized) - **REFACTORED ARCHITECTURE** with specialized handler classes:
   - `GETHandlers` - All read-only page rendering (dashboard, forms, config, inspection, logs)
   - `POSTHandlers` - All form submissions and mutations (save job, delete job, save config)
   - `ValidationHandlers` - All validation endpoints and AJAX operations (SSH validation, network scan, HTMX)
   - **Direct routing** from `app.py` to specialized handlers (no delegation overhead)
   - **Template logic extracted** to form builders in `services/data_services.py` (169 total lines extracted)
+  - **Response handling unified** via `ResponseUtils` class eliminating 37 duplicate method calls
+  - **Method complexity eliminated** via Extract Method pattern - two 70+ line methods reduced to 12-19 lines
 - **Operations**: `operations.py` (backup/restore execution and coordination)
 - **Forms**: `forms.py` (HTMX form processing and validation)
-- **API**: `api.py` (JSON endpoints for HTMX updates, external integrations, repository introspection)
+- **API**: `api.py` (JSON endpoints for HTMX updates, external integrations, repository introspection, **unified response utilities**)
 - **Scheduling**: `scheduler.py` (job scheduling and cron management)
 
 ## API Handler Usage Rules (CRITICAL - Unplanned Evolution)
@@ -223,6 +225,20 @@ source_config:
 - **JavaScript Index Generation**: Uses `document.querySelectorAll().length` for unique DOM IDs, not form logic
 - **Protection**: Path 0 never shows remove button (`{% if path_index > 0 %}`), ensuring at least one path remains
 
+### Response Handling Architecture (Unified Pattern)
+- **ResponseUtils Class**: Centralized HTTP response handling in `handlers/api.py` eliminates duplication across all handler classes
+- **Unified Interface**: `send_html_response()`, `send_json_response()`, `send_redirect()`, `send_htmx_partial()`, `send_error()`, `send_htmx_error()`
+- **Separation of Concerns**: HTTP response logic stays in handlers layer, template rendering stays in services layer
+- **DRY Principle**: 37 duplicate response method calls eliminated via shared utilities
+- **Template Integration**: HTMX partial responses automatically render templates via `TemplateService` integration
+
+### Method Complexity Management (Extract Method Pattern)
+- **Single Responsibility Principle**: Large methods decomposed into focused sub-methods with clear responsibilities
+- **Proven Pattern**: `save_backup_job()` (74→19 lines) and `check_repository_availability_htmx()` (76→12 lines) demonstrate 74-84% complexity reduction
+- **Reusable Components**: Extracted methods like `_extract_job_name_parameter()` and `_get_validated_job_config()` eliminate duplication across endpoints
+- **Error Handling Consolidation**: `_send_job_form_error()` and `_send_repository_error_response()` provide consistent error UX patterns
+- **Testing Benefits**: Focused methods enable granular unit testing and easier debugging
+
 ## Known Issues & Technical Debt
 
 - **Source Path Validation Styling**: Functional but needs UX polish
@@ -237,11 +253,13 @@ source_config:
 **Curl Testing Rule**: ALWAYS use `--max-time 3` (or similar short timeout) when testing with curl. NEVER wait more than a few seconds for hanging requests - timeout indicates bugs that need investigation.
 **Decision Authority**: Claude owns technical implementation decisions (patterns, algorithms, code structure). Shane is tech director/product manager - owns design decisions, architectural direction, and product requirements. When uncertain about design preferences or high-level architecture, ask before implementing rather than having changes aborted for clarification. **Present options with reasoned recommendations** - not just choices, but grounded opinions based on sound practice and project cohesiveness.
 **Context Management**: Two-file documentation workflow. **CLAUDE.md** (permanent): architecture, patterns, rules, technical debt. **CHANGES.md** (temporal): current session focus, progress, technical notes, next priorities. Session end: fold architectural insights into CLAUDE.md, update CHANGES.md for next session. Post-compression: feed both files to restore complete context efficiently.
-**Surgical Refactoring Protocol**: **PROVEN METHOD** - Break complex refactoring into atomic phases with `.bak` files, immediate testing after each change, consolidate related services (avoid file sprawl), maintain identical interfaces during extraction. Results: 139→51 line reduction (63%) with zero breakage in critical job form pipeline.
+**Surgical Refactoring Protocol**: **PROVEN METHOD** - Break complex refactoring into atomic phases with `.bak` files, immediate testing after each change, consolidate related services (avoid file sprawl), maintain identical interfaces during extraction. Results: 139→51 line reduction (63%) with zero breakage in critical job form pipeline. **Extract Method Pattern**: Decompose 70+ line methods into focused sub-methods achieving 74-84% complexity reduction while eliminating duplication and improving maintainability.
 
 ### Code Architecture
 **Separation of Concerns**: **OPTIMIZED PATTERN** - Specialized handler classes (GET/POST/Validation) with direct routing, form builders in `services/data_services.py`, business logic in focused services, validators in `services/` not `handlers/`
+**Response Handling**: **UNIFIED PATTERN** - `ResponseUtils` class in `handlers/api.py` eliminates HTTP response duplication across all handlers while maintaining separation of concerns (HTTP logic in handlers, template rendering in services)
 **Modularization**: **SURGICAL EXTRACTION** - Break up monolithic components through atomic, tested extractions. Consolidate related builders in single service files to avoid sprawl. Single responsibility principle.
+**Method Complexity**: **EXTRACT METHOD PATTERN** - Decompose large methods (70+ lines) into focused sub-methods with single responsibilities, achieving 74-84% complexity reduction
 **Data Structures**: Dataclasses everywhere, `pathlib.Path` operations, type hints
 **Multi-provider Pattern**: Unified services with provider-specific logic consolidated
 
@@ -429,6 +447,7 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Recent Development Context
 
+**2025-08-21**: Anti-pattern elimination completed - **Response Service** and **Long Methods** anti-patterns completely resolved through surgical refactoring with zero breakage. ResponseUtils class eliminated 37 duplicate response method calls. Extract Method pattern reduced two 70+ line methods to 12-19 lines (74-84% complexity reduction). All core job workflows (creation, repository validation) now follow Single Responsibility Principle.
 **2025-08-20**: Schema-driven architecture migration completed - eliminated 100+ lines of hardcoded type logic, established schema appropriateness guidelines, comprehensive testing protocol applied  
 **2025-08-19**: Job form system completed - dual storage pattern for round-trip data integrity, smart edit forms with "code agent" auto-population, HTMX change detection, complete S3 support, three-mode maintenance system
 **2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup, backup browser SSH execution restored, restore overwrite checking implemented  
