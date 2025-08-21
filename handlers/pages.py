@@ -41,39 +41,6 @@ class GETHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
-
-class POSTHandlers:
-    """Handler for all form submissions and mutations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = job_form_builder
-
-class ValidationHandlers:
-    """Handler for all validation endpoints and AJAX operations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = job_form_builder
-
-class PagesHandler:
-    """Unified handler for all page rendering operations"""
-    
-    def __init__(self, backup_config, template_service: TemplateService):
-        self.backup_config = backup_config
-        self.template_service = template_service
-        self.job_form_builder = JobFormDataBuilder()
-        
-        # Initialize specialized handlers
-        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
-        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
-        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
-    
-    # =============================================================================
-    # DASHBOARD PAGES
-    # =============================================================================
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self, request_handler):
@@ -168,6 +135,199 @@ class PagesHandler:
         
         html = self.template_service.render_template('pages/job_form.html', **form_data)
         self._send_html_response(request_handler, html)
+    
+    def _send_html_response(self, request_handler, html: str):
+        """Send HTML response"""
+        request_handler.send_response(200)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        request_handler.wfile.write(html.encode())
+        
+    def _build_source_display_with_type(self, job_config):
+        """Build source display string with type prefix"""
+        source_type = job_config.get('source_type', 'local')
+        source_config = job_config.get('source_config', {})
+        
+        if source_type == 'local':
+            # Local source - show paths
+            source_paths = source_config.get('source_paths', [])
+            if source_paths:
+                first_path = source_paths[0]
+                if isinstance(first_path, dict):
+                    path_display = first_path.get('path', 'Unknown')
+                else:
+                    path_display = str(first_path)
+                
+                if len(source_paths) > 1:
+                    path_display += f" (+{len(source_paths)-1})"
+            else:
+                path_display = "No paths configured"
+            return f"local: {path_display}"
+            
+        elif source_type == 'ssh':
+            # SSH source - show hostname and paths
+            hostname = source_config.get('hostname', 'unknown')
+            username = source_config.get('username', 'unknown')
+            source_paths = source_config.get('source_paths', [])
+            
+            if source_paths:
+                first_path = source_paths[0]
+                if isinstance(first_path, dict):
+                    path_display = first_path.get('path', 'Unknown')
+                else:
+                    path_display = str(first_path)
+                
+                if len(source_paths) > 1:
+                    path_display += f" (+{len(source_paths)-1})"
+            else:
+                path_display = "No paths configured"
+            
+            return f"ssh: {username}@{hostname}:{path_display}"
+        
+        return f"{source_type}: Unknown configuration"
+    
+    def _build_dest_display_with_type(self, job_config):
+        """Build destination display string with type prefix"""
+        dest_type = job_config.get('dest_type', 'local')
+        dest_config = job_config.get('dest_config', {})
+        
+        if dest_type == 'local':
+            path = dest_config.get('path', 'Unknown')
+            return f"local: {path}"
+            
+        elif dest_type == 'ssh':
+            hostname = dest_config.get('hostname', 'unknown')
+            path = dest_config.get('path', 'unknown')
+            return f"ssh: {hostname}:{path}"
+            
+        elif dest_type == 'rsyncd':
+            hostname = dest_config.get('hostname', 'unknown')
+            share = dest_config.get('share', 'unknown')
+            return f"rsyncd: {hostname}::{share}"
+            
+        elif dest_type == 'restic':
+            repo_type = dest_config.get('repo_type', 'local')
+            repo_uri = dest_config.get('repo_uri', 'Unknown')
+            
+            # Show just the repo type and a simplified URI
+            if repo_type == 'local':
+                return f"restic: local:{repo_uri}"
+            elif repo_type == 'rest':
+                return f"restic: rest-server"
+            elif repo_type == 's3':
+                return f"restic: s3-bucket"
+            elif repo_type == 'sftp':
+                return f"restic: sftp"
+            elif repo_type == 'rclone':
+                return f"restic: rclone"
+            elif repo_type == 'same_as_origin':
+                return f"restic: same-as-origin"
+            else:
+                return f"restic: {repo_type}"
+        
+        return f"{dest_type}: Unknown configuration"
+        
+    def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Build notification form data structure"""
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        # Get global notification settings from config
+        global_settings = self.backup_config.get_global_settings()
+        global_notification = global_settings.get('notification', {})
+        
+        # Build form data for each provider
+        notification_data = {}
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = global_notification.get(provider_name, {})
+            
+            # Process top-level fields
+            for field_info in schema.get('fields', []):
+                field_name = f"{provider_name}_{field_info['name']}"
+                field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
+                
+                if field_info['type'] == 'checkbox':
+                    notification_data[field_name] = bool(field_value)
+                else:
+                    notification_data[field_name] = field_value
+            
+            # Process section fields
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        field_name = f"{provider_name}_{field_info['name']}"
+                        field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
+                        
+                        if field_info['type'] == 'checkbox':
+                            notification_data[field_name] = bool(field_value)
+                        elif field_info['type'] == 'select' and 'options' in field_info:
+                            # Handle select fields with config_field mapping
+                            selected_option = None
+                            for option in field_info['options']:
+                                if 'config_field' in option and provider_config.get(option['config_field']):
+                                    selected_option = option['value']
+                                    break
+                            notification_data[field_name] = selected_option or field_info.get('default', '')
+                        else:
+                            notification_data[field_name] = field_value
+        
+        return notification_data
+        
+    def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build schedule form data structure"""
+        schedule = job_config.get('schedule', 'daily')
+        enabled = job_config.get('enabled', True)
+        respect_conflicts = job_config.get('respect_conflicts', True)
+        
+        # Note: submit_button_text handled at handler level
+        return {
+            'schedule': schedule,
+            'enabled': enabled,
+            'respect_conflicts': respect_conflicts
+            
+            # Note: submit_button_text handled at handler level
+        }
+
+class POSTHandlers:
+    """Handler for all form submissions and mutations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
+class ValidationHandlers:
+    """Handler for all validation endpoints and AJAX operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
+class PagesHandler:
+    """Unified handler for all page rendering operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = JobFormDataBuilder()
+        
+        # Initialize specialized handlers
+        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
+        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
+        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
+    
+    # =============================================================================
+    # DELEGATED METHODS - GET HANDLERS
+    # =============================================================================
+    
+    def show_dashboard(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_dashboard(request_handler)
+    
+    def show_add_job_form(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_add_job_form(request_handler)
     
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, request_handler, job_name: str):
