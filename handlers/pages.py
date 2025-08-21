@@ -30,6 +30,7 @@ def handle_page_errors(operation_name: str):
                 return func(self, request_handler, *args, **kwargs)
             except Exception as e:
                 logger.error(f"{operation_name} error: {e}")
+                # TODO: Update error handling to use ResponseUtils once all handlers are migrated
                 self._send_error(request_handler, f"{operation_name} error: {str(e)}")
         return wrapper
     return decorator
@@ -41,6 +42,8 @@ class GETHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+        from handlers.api import ResponseUtils
+        self.response_utils = ResponseUtils(template_service)
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self, request_handler):
@@ -113,7 +116,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/dashboard.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
     @handle_page_errors("Add job form")
     def show_add_job_form(self, request_handler):
@@ -134,15 +137,8 @@ class GETHandlers:
         form_data.update(self._build_schedule_form_data({}))
         
         html = self.template_service.render_template('pages/job_form.html', **form_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
-    def _send_html_response(self, request_handler, html: str):
-        """Send HTML response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
-        
     def _build_source_display_with_type(self, job_config):
         """Build source display string with type prefix"""
         source_type = job_config.get('source_type', 'local')
@@ -292,7 +288,7 @@ class GETHandlers:
         form_data.update(self._build_schedule_form_data(job_config))
         
         html = self.template_service.render_template('pages/job_form.html', **form_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
     @handle_page_errors("Config manager")
     def show_config_manager(self, request_handler):
@@ -330,7 +326,7 @@ class GETHandlers:
         }
             
         html = self.template_service.render_template('pages/config_manager.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
     @handle_page_errors("Raw editor")
     def show_raw_editor(self, request_handler):
@@ -349,7 +345,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/config_editor.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
     def _get_available_themes(self):
         """Get list of available themes by scanning theme directory"""
@@ -418,7 +414,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/job_inspect.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
 
     @handle_page_errors("Dev logs")
     def show_dev_logs(self, request_handler, log_type: str = 'app'):
@@ -433,7 +429,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/dev_logs.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
     
     def _get_system_logs(self, log_type: str) -> List[str]:
         """Get system logs by type"""
@@ -479,20 +475,9 @@ class POSTHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+        from handlers.api import ResponseUtils
+        self.response_utils = ResponseUtils(template_service)
     
-    def _send_html_response(self, request_handler, html: str):
-        """Send HTML response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
-    
-    def _send_redirect(self, request_handler, location: str):
-        """Send redirect response"""
-        request_handler.send_response(302)
-        request_handler.send_header('Location', location)
-        request_handler.end_headers()
-
     @handle_page_errors("Save job")
     def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
         """Save backup job from form submission"""
@@ -513,7 +498,7 @@ class POSTHandlers:
                 error_form_data['page_title'] = 'Add Job'
                 error_form_data['form_title'] = 'Add New Backup Job'
             html = self.template_service.render_template('pages/job_form.html', **error_form_data)
-            self._send_html_response(request_handler, html)
+            self.response_utils.send_html_response(request_handler, html)
             return
         
         # Save job configuration
@@ -538,7 +523,7 @@ class POSTHandlers:
         
         if success:
             # Redirect to dashboard
-            self._send_redirect(request_handler, '/dashboard')
+            self.response_utils.send_redirect(request_handler, '/dashboard')
         else:
             error_form_data = self.job_form_builder.build_form_data_with_error(
                 form_data, "Failed to save job configuration"
@@ -550,7 +535,7 @@ class POSTHandlers:
                 error_form_data['page_title'] = 'Add Job'
                 error_form_data['form_title'] = 'Add New Backup Job'
             html = self.template_service.render_template('pages/job_form.html', **error_form_data)
-            self._send_html_response(request_handler, html)
+            self.response_utils.send_html_response(request_handler, html)
 
     @handle_page_errors("Delete job")
     def delete_backup_job(self, request_handler, job_name: str):
@@ -561,7 +546,7 @@ class POSTHandlers:
         success = self.backup_config.delete_backup_job(job_name)
         
         if success:
-            self._send_redirect(request_handler, '/dashboard')
+            self.response_utils.send_redirect(request_handler, '/dashboard')
         else:
             raise Exception(f"Failed to delete job '{job_name}'")
 
@@ -639,7 +624,7 @@ class POSTHandlers:
         # Reload configuration
         self.backup_config.reload_config()
         
-        self._send_redirect(request_handler, '/config')
+        self.response_utils.send_redirect(request_handler, '/config')
 
     @handle_page_errors("Save config")
     def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
@@ -676,7 +661,7 @@ class POSTHandlers:
         self.backup_config.save_config()
         
         # Redirect back to config page
-        self._send_redirect(request_handler, '/config')
+        self.response_utils.send_redirect(request_handler, '/config')
 
     def _build_notification_preview(self, global_settings: dict, form_data: Dict[str, Any]):
         """Build notification settings for preview (without modifying actual config)"""
@@ -735,7 +720,7 @@ class POSTHandlers:
         html = self.template_service.render_template('partials/config_preview.html', 
                                                    preview_yaml=preview_yaml,
                                                    success=True)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
 
 
 class ValidationHandlers:
@@ -745,6 +730,8 @@ class ValidationHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+        from handlers.api import ResponseUtils
+        self.response_utils = ResponseUtils(template_service)
     
     def _send_json_response(self, request_handler, data: Dict[str, Any]):
         """Send JSON response"""
@@ -754,28 +741,12 @@ class ValidationHandlers:
         request_handler.end_headers()
         request_handler.wfile.write(json.dumps(data).encode())
     
-    def _send_htmx_partial(self, request_handler, template_path: str, data: Dict[str, Any]):
-        """Send HTMX partial template response"""
-        html = self.template_service.render_template(template_path, **data)
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
-    
-    def _send_htmx_error(self, request_handler, message: str):
-        """Send HTMX error response"""
-        html = self.template_service.render_template('partials/htmx_error.html', error_message=message)
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
-
     @handle_page_errors("SSH validation")
     def validate_ssh_source(self, request_handler, source: str):
         """Validate SSH source configuration"""
         # Parse source string (format: username@hostname)
         if '@' not in source:
-            self._send_json_response(request_handler, {
+            self.response_utils.send_json_response(request_handler, {
                 'valid': False,
                 'error': 'Invalid source format. Expected: username@hostname'
             })
@@ -788,7 +759,7 @@ class ValidationHandlers:
         from services.validation import ValidationService
         validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
-        self._send_json_response(request_handler, result)
+        self.response_utils.send_json_response(request_handler, result)
 
     @handle_page_errors("Path validation")
     def validate_source_paths(self, request_handler, form_data: Dict[str, Any]):
@@ -798,7 +769,7 @@ class ValidationHandlers:
         paths_result = source_paths_parser.parse_multi_path_options(form_data)
         
         if not paths_result['valid']:
-            self._send_json_response(request_handler, paths_result)
+            self.response_utils.send_json_response(request_handler, paths_result)
             return
         
         # Validate each path
@@ -824,17 +795,11 @@ class ValidationHandlers:
                 'permissions': result.get('permissions')
             })
         
-        self._send_json_response(request_handler, {
+        self.response_utils.send_json_response(request_handler, {
             'valid': True,
             'results': validation_results
         })
 
-    def _send_html_response(self, request_handler, html: str):
-        """Send HTML response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
 
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, request_handler, network_range: str):
@@ -869,7 +834,7 @@ class ValidationHandlers:
         }
         
         html = self.template_service.render_template('pages/network_scan.html', **template_data)
-        self._send_html_response(request_handler, html)
+        self.response_utils.send_html_response(request_handler, html)
 
     @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, request_handler, job_name=None):
@@ -882,13 +847,13 @@ class ValidationHandlers:
             job_name = params.get('job', [''])[0]
         
         if not job_name:
-            self._send_htmx_error(request_handler, 'Job name is required')
+            self.response_utils.send_htmx_error(request_handler, 'Job name is required')
             return
         
         # Implement actual repository availability check logic
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            self._send_htmx_error(request_handler, f"Job '{job_name}' not found")
+            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
             return
 
         job_config = jobs[job_name]
@@ -905,7 +870,7 @@ class ValidationHandlers:
                 
                 if check_success:
                     # Repository is available - load backup browser
-                    self._send_htmx_partial(request_handler, 'partials/repository_available.html', {
+                    self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
                         'job_name': job_name,
                         'job_type': dest_type
                     })
@@ -913,22 +878,22 @@ class ValidationHandlers:
                     # Repository error - determine type and render appropriate template
                     if check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower()):
                         # Repository locked - render unlock interface
-                        self._send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
+                        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
                             'job_name': job_name,
                             'error_message': check_message
                         })
                     else:
                         # Other error - render error template
-                        self._send_htmx_partial(request_handler, 'partials/repository_error.html', {
+                        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
                             'job_name': job_name,
                             'error_type': 'connection_error',
                             'error_message': check_message or 'Unknown error'
                         })
             else:
-                self._send_htmx_error(request_handler, 'Repository URI not configured')
+                self.response_utils.send_htmx_error(request_handler, 'Repository URI not configured')
         else:
             # Non-restic repositories - assume available for now
-            self._send_htmx_partial(request_handler, 'partials/repository_available.html', {
+            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
                 'job_name': job_name,
                 'job_type': dest_type
             })
@@ -944,20 +909,20 @@ class ValidationHandlers:
             job_name = params.get('job', [''])[0]
         
         if not job_name:
-            self._send_htmx_error(request_handler, 'Job name is required')
+            self.response_utils.send_htmx_error(request_handler, 'Job name is required')
             return
         
         # Directly implement the unlock logic
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            self._send_htmx_error(request_handler, f"Job '{job_name}' not found")
+            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
             return
 
         job_config = jobs[job_name]
         dest_type = job_config.get('dest_type')
         
         if dest_type != 'restic':
-            self._send_htmx_error(request_handler, 'Unlock is only supported for restic repositories')
+            self.response_utils.send_htmx_error(request_handler, 'Unlock is only supported for restic repositories')
             return
 
         # Execute restic unlock command
@@ -972,7 +937,7 @@ class ValidationHandlers:
             self.check_repository_availability_htmx(request_handler, job_name)
         else:
             # Unlock failed - show error
-            self._send_htmx_partial(request_handler, 'partials/repository_error.html', {
+            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'unlock_failed',
                 'error_message': result.get('error', 'Unlock operation failed')
