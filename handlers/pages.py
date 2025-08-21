@@ -516,6 +516,97 @@ class GETHandlers:
                                                    page_title='Error')
         request_handler.wfile.write(html.encode())
 
+    @handle_page_errors("Job inspection")
+    def show_job_inspect(self, request_handler):
+        """Show job inspection page"""
+        # Get job name from query parameters
+        from urllib.parse import urlparse, parse_qs
+        url_parts = urlparse(request_handler.path)
+        params = parse_qs(url_parts.query)
+        job_name = params.get('name', [''])[0]
+        
+        if not job_name:
+            raise ValueError("Job name is required")
+        
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            raise ValueError(f"Job '{job_name}' not found")
+        
+        job_config = jobs[job_name]
+        
+        # Get job status and logs
+        from services.management import JobManagementService
+        job_management = JobManagementService(self.backup_config)
+        status_info = job_management.get_status(job_name)
+        recent_logs = job_management.get_log_entries(job_name, max_lines=100)
+        
+        # Format log content as string
+        job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
+        
+        template_data = {
+            'job_name': job_name,
+            'job_type': job_config.get('dest_type', 'unknown'),
+            'last_run': status_info.get('last_updated', 'Never'), 
+            'status': status_info.get('status', 'No runs'),
+            'message': status_info.get('details', 'No message'),
+            'job_log_content': job_log_content
+        }
+        
+        html = self.template_service.render_template('pages/job_inspect.html', **template_data)
+        self._send_html_response(request_handler, html)
+
+    @handle_page_errors("Dev logs")
+    def show_dev_logs(self, request_handler, log_type: str = 'app'):
+        """Show development/debug logs page"""
+        logs_data = self._get_system_logs(log_type)
+        
+        template_data = {
+            'log_type': log_type,
+            'logs': logs_data,
+            'available_types': ['app', 'system', 'job_status', 'validation', 'running_jobs', 'deleted_jobs'],
+            'page_title': f'Debug Logs: {log_type}'
+        }
+        
+        html = self.template_service.render_template('pages/dev_logs.html', **template_data)
+        self._send_html_response(request_handler, html)
+    
+    def _get_system_logs(self, log_type: str) -> List[str]:
+        """Get system logs by type"""
+        try:
+            if log_type == 'app':
+                # Application logs from docker
+                import subprocess
+                result = subprocess.run(['docker', 'logs', '--tail', '100', 'highball'], 
+                                      capture_output=True, text=True, timeout=10)
+                return result.stdout.split('\n') if result.returncode == 0 else ['Log retrieval failed']
+            
+            elif log_type == 'system':
+                # System logs
+                log_files = ['/var/log/syslog', '/var/log/messages']
+                for log_file in log_files:
+                    if os.path.exists(log_file):
+                        with open(log_file, 'r') as f:
+                            lines = f.readlines()
+                        return lines[-100:]  # Last 100 lines
+                return ['No system logs found']
+            
+            elif log_type in ['job_status', 'validation', 'running_jobs', 'deleted_jobs']:
+                # Highball operational logs
+                log_file = f'/var/log/highball/{log_type}.yaml'
+                if os.path.exists(log_file):
+                    with open(log_file, 'r') as f:
+                        content = f.read()
+                    return [content] if content.strip() else ['Empty log file']
+                return ['Log file not found']
+            
+            else:
+                return ['Unknown log type']
+                
+        except Exception as e:
+            logger.error(f"Get logs error: {e}")
+            return [f'Error retrieving logs: {str(e)}']
+
+
 class POSTHandlers:
     """Handler for all form submissions and mutations"""
     
@@ -568,6 +659,14 @@ class PagesHandler:
     def show_raw_editor(self, request_handler):
         """Delegate to GETHandlers"""
         return self.get_handlers.show_raw_editor(request_handler)
+    
+    def show_job_inspect(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_job_inspect(request_handler)
+    
+    def show_dev_logs(self, request_handler, log_type: str = 'app'):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_dev_logs(request_handler, log_type)
     
     @handle_page_errors("Save job")
     def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
@@ -896,102 +995,6 @@ class PagesHandler:
     # =============================================================================
     # INSPECTION PAGES
     # =============================================================================
-    
-    @handle_page_errors("Job inspect")
-    def show_job_inspect(self, request_handler):
-        """Show job inspection page"""
-        # Get job name from query parameters
-        from urllib.parse import urlparse, parse_qs
-        url_parts = urlparse(request_handler.path)
-        params = parse_qs(url_parts.query)
-        job_name = params.get('name', [''])[0]
-        
-        if not job_name:
-            self._send_error(request_handler, "Job name is required")
-            return
-        
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            self._send_error(request_handler, f"Job '{job_name}' not found")
-            return
-        
-        job_config = jobs[job_name]
-        
-        # Get job status and logs
-        from services.management import JobManagementService
-        job_management = JobManagementService(self.backup_config)
-        status_info = job_management.get_status(job_name)
-        recent_logs = job_management.get_log_entries(job_name, max_lines=100)
-        
-        # Format log content as string
-        job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
-        
-        template_data = {
-            'job_name': job_name,
-            'job_type': job_config.get('dest_type', 'unknown'),
-            'last_run': status_info.get('last_updated', 'Never'), 
-            'status': status_info.get('status', 'No runs'),
-            'message': status_info.get('details', 'No message'),
-            'job_log_content': job_log_content
-        }
-        
-        html = self.template_service.render_template('pages/job_inspect.html', **template_data)
-        self._send_html_response(request_handler, html)
-    
-    # =============================================================================
-    # LOG PAGES
-    # =============================================================================
-    
-    @handle_page_errors("Dev logs")
-    def show_dev_logs(self, request_handler, log_type: str = 'app'):
-        """Show development/debug logs page"""
-        logs_data = self._get_system_logs(log_type)
-        
-        template_data = {
-            'log_type': log_type,
-            'logs': logs_data,
-            'available_types': ['app', 'system', 'job_status', 'validation', 'running_jobs', 'deleted_jobs'],
-            'page_title': f'Debug Logs: {log_type}'
-        }
-        
-        html = self.template_service.render_template('pages/dev_logs.html', **template_data)
-        self._send_html_response(request_handler, html)
-    
-    def _get_system_logs(self, log_type: str) -> List[str]:
-        """Get system logs by type"""
-        try:
-            if log_type == 'app':
-                # Application logs from docker
-                import subprocess
-                result = subprocess.run(['docker', 'logs', '--tail', '100', 'highball'], 
-                                      capture_output=True, text=True, timeout=10)
-                return result.stdout.split('\n') if result.returncode == 0 else ['Log retrieval failed']
-            
-            elif log_type == 'system':
-                # System logs
-                log_files = ['/var/log/syslog', '/var/log/messages']
-                for log_file in log_files:
-                    if os.path.exists(log_file):
-                        with open(log_file, 'r') as f:
-                            lines = f.readlines()
-                        return lines[-100:]  # Last 100 lines
-                return ['No system logs found']
-            
-            elif log_type in ['job_status', 'validation', 'running_jobs', 'deleted_jobs']:
-                # Highball operational logs
-                log_file = f'/var/log/highball/{log_type}.yaml'
-                if os.path.exists(log_file):
-                    with open(log_file, 'r') as f:
-                        content = f.read()
-                    return [content] if content.strip() else ['Empty log file']
-                return ['Log file not found']
-            
-            else:
-                return ['Unknown log type']
-                
-        except Exception as e:
-            logger.error(f"Get logs error: {e}")
-            return [f'Error retrieving logs: {str(e)}']
     
     # =============================================================================
     # NETWORK UTILITIES
