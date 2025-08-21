@@ -707,6 +707,53 @@ class POSTHandlers:
             return value[0] if value else default
         return str(value)
 
+    def _update_notification_settings(self, global_settings: dict, form_data: Dict[str, Any]):
+        """Update notification settings from form data"""
+        notification_config = global_settings.setdefault('notification', {})
+        
+        # Process each provider using the schema-driven approach
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = notification_config.setdefault(provider_name, {})
+            
+            # Process top-level fields (including enabled checkbox)
+            for field_info in schema.get('fields', []):
+                self._process_notification_field(provider_config, provider_name, field_info, form_data)
+            
+            # Handle all sections (smtp_config, queue_settings, etc.)
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
+
+    def _process_notification_field(self, provider_config: dict, provider_name: str, field_info: dict, form_data: Dict[str, Any]):
+        """Process a single notification field based on its type"""
+        field_name = f"{provider_name}_{field_info['name']}"
+        
+        if field_info['type'] == 'checkbox':
+            provider_config[field_info['name']] = field_name in form_data
+        elif field_info['type'] == 'select' and 'options' in field_info:
+            # Handle select with config_field mapping (e.g., encryption)
+            select_value = self._get_form_value(form_data, field_name, field_info.get('default', ''))
+            # Reset all boolean options first
+            for option in field_info['options']:
+                if 'config_field' in option:
+                    provider_config[option['config_field']] = False
+            # Set the selected option to True
+            for option in field_info['options']:
+                if option['value'] == select_value and 'config_field' in option:
+                    provider_config[option['config_field']] = True
+        elif field_info['type'] == 'number':
+            value = self._get_form_value(form_data, field_name, str(field_info.get('placeholder', '0')))
+            try:
+                provider_config[field_info['name']] = int(value)
+            except ValueError:
+                provider_config[field_info['name']] = field_info.get('placeholder', 0)
+        else:
+            # text, email, password fields
+            provider_config[field_info['name']] = self._get_form_value(form_data, field_name, '')
+
     @handle_page_errors("Save raw config")
     def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
         """Save raw YAML configuration"""
@@ -728,6 +775,102 @@ class POSTHandlers:
         self.backup_config.reload_config()
         
         self._send_redirect(request_handler, '/config')
+
+    @handle_page_errors("Save config")
+    def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
+        """Save structured configuration from form"""
+        # Update global settings
+        global_settings = self.backup_config.config.setdefault('global_settings', {})
+        
+        # Basic settings
+        global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
+        
+        # Theme setting (only save if not default 'dark')
+        theme = self._get_form_value(form_data, 'theme', 'dark')
+        if theme != 'dark':
+            global_settings['theme'] = theme
+        elif 'theme' in global_settings:
+            # Remove theme key if set back to default
+            del global_settings['theme']
+        
+        global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
+        global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
+        global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
+        
+        # Default schedule times
+        default_schedule_times = global_settings.setdefault('default_schedule_times', {})
+        default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
+        default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
+        default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
+        default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
+        
+        # Notification settings - delegate to notification form parser
+        self._update_notification_settings(global_settings, form_data)
+        
+        # Save configuration
+        self.backup_config.save_config()
+        
+        # Redirect back to config page
+        self._send_redirect(request_handler, '/config')
+
+    def _build_notification_preview(self, global_settings: dict, form_data: Dict[str, Any]):
+        """Build notification settings for preview (without modifying actual config)"""
+        notification_config = global_settings.setdefault('notification', {})
+        
+        # Process each provider using the schema-driven approach
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = notification_config.setdefault(provider_name, {})
+            
+            # Process top-level fields (including enabled checkbox)
+            for field_info in schema.get('fields', []):
+                self._process_notification_field(provider_config, provider_name, field_info, form_data)
+            
+            # Handle all sections (smtp_config, queue_settings, etc.)
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
+
+    @handle_page_errors("Preview config")
+    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
+        """Preview configuration changes without saving"""
+        # Build the configuration that would be saved (without actually saving)
+        preview_config = {}
+        global_settings = preview_config.setdefault('global_settings', {})
+        
+        # Basic settings
+        global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
+        
+        # Theme setting
+        theme = self._get_form_value(form_data, 'theme', 'dark')
+        if theme != 'dark':
+            global_settings['theme'] = theme
+        
+        global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
+        global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
+        global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
+        
+        # Default schedule times
+        default_schedule_times = global_settings.setdefault('default_schedule_times', {})
+        default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
+        default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
+        default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
+        default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
+        
+        # Notification settings
+        self._build_notification_preview(global_settings, form_data)
+        
+        # Convert to YAML for display
+        import yaml
+        preview_yaml = yaml.dump(preview_config, default_flow_style=False, indent=2)
+        
+        # Render preview partial
+        html = self.template_service.render_template('partials/config_preview.html', 
+                                                   preview_yaml=preview_yaml,
+                                                   success=True)
+        self._send_html_response(request_handler, html)
 
 
 class ValidationHandlers:
@@ -794,6 +937,14 @@ class PagesHandler:
     def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
         """Delegate to POSTHandlers"""
         return self.post_handlers.save_raw_config(request_handler, form_data)
+    
+    def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
+        """Delegate to POSTHandlers"""
+        return self.post_handlers.save_structured_config(request_handler, form_data)
+    
+    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
+        """Delegate to POSTHandlers"""
+        return self.post_handlers.preview_config_changes(request_handler, form_data)
     
     # =============================================================================
     # CONFIGURATION PAGES
@@ -873,156 +1024,6 @@ class PagesHandler:
         
         html = self.template_service.render_template('pages/config_editor.html', **template_data)
         self._send_html_response(request_handler, html)
-    
-    @handle_page_errors("Save config")
-    def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
-        """Save structured configuration from form"""
-        # Update global settings
-        global_settings = self.backup_config.config.setdefault('global_settings', {})
-        
-        # Basic settings
-        global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
-        
-        # Theme setting (only save if not default 'dark')
-        theme = self._get_form_value(form_data, 'theme', 'dark')
-        if theme != 'dark':
-            global_settings['theme'] = theme
-        elif 'theme' in global_settings:
-            # Remove theme key if set back to default
-            del global_settings['theme']
-        
-        global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
-        global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
-        global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
-        
-        # Default schedule times
-        default_schedule_times = global_settings.setdefault('default_schedule_times', {})
-        default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
-        default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
-        default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
-        default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
-        
-        # Notification settings - delegate to notification form parser
-        self._update_notification_settings(global_settings, form_data)
-        
-        # Save configuration
-        self.backup_config.save_config()
-        
-        # Redirect back to config page
-        self._send_redirect(request_handler, '/config')
-    
-    @handle_page_errors("Preview config")
-    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
-        """Preview configuration changes without saving"""
-        # Build the configuration that would be saved (without actually saving)
-        preview_config = {}
-        global_settings = preview_config.setdefault('global_settings', {})
-        
-        # Basic settings
-        global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
-        
-        # Theme setting
-        theme = self._get_form_value(form_data, 'theme', 'dark')
-        if theme != 'dark':
-            global_settings['theme'] = theme
-        
-        global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
-        global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
-        global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
-        
-        # Default schedule times
-        default_schedule_times = global_settings.setdefault('default_schedule_times', {})
-        default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
-        default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
-        default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
-        default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
-        
-        # Notification settings
-        self._build_notification_preview(global_settings, form_data)
-        
-        # Convert to YAML for display
-        import yaml
-        preview_yaml = yaml.dump(preview_config, default_flow_style=False, indent=2)
-        
-        # Render preview partial
-        html = self.template_service.render_template('partials/config_preview.html', 
-                                                   preview_yaml=preview_yaml,
-                                                   success=True)
-        self._send_html_response(request_handler, html)
-    
-    def _build_notification_preview(self, global_settings: dict, form_data: Dict[str, Any]):
-        """Build notification settings for preview (without modifying actual config)"""
-        notification_config = global_settings.setdefault('notification', {})
-        
-        # Process each provider using the schema-driven approach
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
-        
-        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
-            provider_config = notification_config.setdefault(provider_name, {})
-            
-            # Process top-level fields (including enabled checkbox)
-            for field_info in schema.get('fields', []):
-                self._process_notification_field(provider_config, provider_name, field_info, form_data)
-            
-            # Handle all sections (smtp_config, queue_settings, etc.)
-            if 'sections' in schema:
-                for section in schema['sections']:
-                    for field_info in section['fields']:
-                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
-    
-    def _update_notification_settings(self, global_settings: dict, form_data: Dict[str, Any]):
-        """Update notification settings from form data"""
-        notification_config = global_settings.setdefault('notification', {})
-        
-        # Process each provider using the schema-driven approach
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
-        
-        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
-            provider_config = notification_config.setdefault(provider_name, {})
-            
-            # Process top-level fields (including enabled checkbox)
-            for field_info in schema.get('fields', []):
-                self._process_notification_field(provider_config, provider_name, field_info, form_data)
-            
-            # Handle all sections (smtp_config, queue_settings, etc.)
-            if 'sections' in schema:
-                for section in schema['sections']:
-                    for field_info in section['fields']:
-                        self._process_notification_field(provider_config, provider_name, field_info, form_data)
-    
-    def _process_notification_field(self, provider_config: dict, provider_name: str, field_info: dict, form_data: Dict[str, Any]):
-        """Process a single notification field based on its type"""
-        field_name = f"{provider_name}_{field_info['name']}"
-        
-        if field_info['type'] == 'checkbox':
-            provider_config[field_info['name']] = field_name in form_data
-        elif field_info['type'] == 'select' and 'options' in field_info:
-            # Handle select with config_field mapping (e.g., encryption)
-            select_value = self._get_form_value(form_data, field_name, field_info.get('default', ''))
-            # Reset all boolean options first
-            for option in field_info['options']:
-                if 'config_field' in option:
-                    provider_config[option['config_field']] = False
-            # Set the selected option to True
-            for option in field_info['options']:
-                if option['value'] == select_value and 'config_field' in option:
-                    provider_config[option['config_field']] = True
-        elif field_info['type'] == 'number':
-            value = self._get_form_value(form_data, field_name, str(field_info.get('placeholder', '0')))
-            try:
-                provider_config[field_info['name']] = int(value)
-            except ValueError:
-                provider_config[field_info['name']] = int(field_info.get('placeholder', '0'))
-        else:
-            # text, email, password fields
-            provider_config[field_info['name']] = self._get_form_value(form_data, field_name, '')
-    
-    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
-        """Helper to safely get form values handling both list and string formats"""
-        value = form_data.get(field_name, [default])
-        if isinstance(value, list):
-            return value[0] if value else default
-        return str(value)
     
     # =============================================================================
     # INSPECTION PAGES
