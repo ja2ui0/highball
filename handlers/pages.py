@@ -228,54 +228,14 @@ class GETHandlers:
         return f"{dest_type}: Unknown configuration"
         
     def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Build notification form data structure"""
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
-        
-        # Get global notification settings from config
-        global_settings = self.backup_config.get_global_settings()
-        global_notification = global_settings.get('notification', {})
-        
-        # Build form data for each provider
-        notification_data = {}
-        
-        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
-            provider_config = global_notification.get(provider_name, {})
-            
-            # Process top-level fields
-            for field_info in schema.get('fields', []):
-                field_name = f"{provider_name}_{field_info['name']}"
-                field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
-                
-                if field_info['type'] == 'checkbox':
-                    notification_data[field_name] = bool(field_value)
-                else:
-                    notification_data[field_name] = field_value
-            
-            # Process section fields
-            if 'sections' in schema:
-                for section in schema['sections']:
-                    for field_info in section['fields']:
-                        field_name = f"{provider_name}_{field_info['name']}"
-                        field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
-                        
-                        if field_info['type'] == 'checkbox':
-                            notification_data[field_name] = bool(field_value)
-                        elif field_info['type'] == 'select' and 'options' in field_info:
-                            # Handle select fields with config_field mapping
-                            selected_option = None
-                            for option in field_info['options']:
-                                if 'config_field' in option and provider_config.get(option['config_field']):
-                                    selected_option = option['value']
-                                    break
-                            notification_data[field_name] = selected_option or field_info.get('default', '')
-                        else:
-                            notification_data[field_name] = field_value
-        
-        return notification_data
+        """Build notification form data structure (delegated to service)"""
+        from services.data_services import NotificationFormDataBuilder
+        builder = NotificationFormDataBuilder(self.backup_config)
+        return builder.build_notification_context(existing_notifications)
         
     def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Build schedule form data structure (delegated to service)"""
-        from services.schedule_form_builder import ScheduleFormDataBuilder
+        from services.data_services import ScheduleFormDataBuilder
         builder = ScheduleFormDataBuilder()
         return builder.build_schedule_context(job_config)
     

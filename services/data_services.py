@@ -225,6 +225,91 @@ class JobFormDataBuilder:
         return configs
 
 
+class ScheduleFormDataBuilder:
+    """Service for building schedule form data structures"""
+    
+    def build_schedule_context(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Build schedule form data structure for job forms
+        
+        Args:
+            job_config: Job configuration dictionary (can be empty for add-job form)
+            
+        Returns:
+            Dict containing schedule form fields: schedule, enabled, respect_conflicts
+        """
+        schedule = job_config.get('schedule', 'daily')
+        enabled = job_config.get('enabled', True)
+        respect_conflicts = job_config.get('respect_conflicts', True)
+        
+        return {
+            'schedule': schedule,
+            'enabled': enabled,
+            'respect_conflicts': respect_conflicts
+        }
+
+
+class NotificationFormDataBuilder:
+    """Service for building notification form data structures"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+    
+    def build_notification_context(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Build notification form data structure for job forms
+        
+        Args:
+            existing_notifications: List of existing notification configurations (unused in current implementation)
+            
+        Returns:
+            Dict containing notification form fields for all providers
+        """
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        # Get global notification settings from config
+        global_settings = self.backup_config.get_global_settings()
+        global_notification = global_settings.get('notification', {})
+        
+        # Build form data for each provider
+        notification_data = {}
+        
+        for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
+            provider_config = global_notification.get(provider_name, {})
+            
+            # Process top-level fields
+            for field_info in schema.get('fields', []):
+                field_name = f"{provider_name}_{field_info['name']}"
+                field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
+                
+                if field_info['type'] == 'checkbox':
+                    notification_data[field_name] = bool(field_value)
+                else:
+                    notification_data[field_name] = field_value
+            
+            # Process section fields
+            if 'sections' in schema:
+                for section in schema['sections']:
+                    for field_info in section['fields']:
+                        field_name = f"{provider_name}_{field_info['name']}"
+                        field_value = provider_config.get(field_info['name'], field_info.get('default', ''))
+                        
+                        if field_info['type'] == 'checkbox':
+                            notification_data[field_name] = bool(field_value)
+                        elif field_info['type'] == 'select' and 'options' in field_info:
+                            # Handle select fields with config_field mapping
+                            selected_option = None
+                            for option in field_info['options']:
+                                if 'config_field' in option and provider_config.get(option['config_field']):
+                                    selected_option = option['value']
+                                    break
+                            notification_data[field_name] = selected_option or field_info.get('default', '')
+                        else:
+                            notification_data[field_name] = field_value
+        
+        return notification_data
+
+
 # =============================================================================
 # **SNAPSHOT INTROSPECTION CONCERN** - Discovery of paths and metadata from snapshots
 # =============================================================================
