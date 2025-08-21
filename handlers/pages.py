@@ -34,6 +34,30 @@ def handle_page_errors(operation_name: str):
         return wrapper
     return decorator
 
+class GETHandlers:
+    """Handler for all read-only page rendering operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
+class POSTHandlers:
+    """Handler for all form submissions and mutations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
+class ValidationHandlers:
+    """Handler for all validation endpoints and AJAX operations"""
+    
+    def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
+        self.backup_config = backup_config
+        self.template_service = template_service
+        self.job_form_builder = job_form_builder
+
 class PagesHandler:
     """Unified handler for all page rendering operations"""
     
@@ -41,6 +65,11 @@ class PagesHandler:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = JobFormDataBuilder()
+        
+        # Initialize specialized handlers
+        self.get_handlers = GETHandlers(backup_config, template_service, self.job_form_builder)
+        self.post_handlers = POSTHandlers(backup_config, template_service, self.job_form_builder)
+        self.validation_handlers = ValidationHandlers(backup_config, template_service, self.job_form_builder)
     
     # =============================================================================
     # DASHBOARD PAGES
