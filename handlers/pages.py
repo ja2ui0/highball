@@ -274,101 +274,15 @@ class GETHandlers:
         form_data['source_ssh_selected'] = (source_type == 'ssh')
         form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
         
-        # Pre-populate source fields for edit mode using schema-driven approach
-        from models.backup import SOURCE_TYPE_SCHEMAS
+        # Build source fields HTML using template builder
+        from services.data_services import JobFormTemplateBuilder
+        template_builder = JobFormTemplateBuilder(self.template_service)
+        form_data['source_fields_html'] = template_builder.build_source_fields_html(source_type, source_config)
         
-        if source_type in SOURCE_TYPE_SCHEMAS:
-            schema = SOURCE_TYPE_SCHEMAS[source_type]
-            
-            # Check if this source type has additional fields requiring a template
-            if schema.get('fields'):
-                template_name = f'partials/source_{source_type}_fields.html'
-                try:
-                    form_data['source_fields_html'] = self.template_service.render_template(
-                        template_name,
-                        **source_config
-                    )
-                except Exception:
-                    # Template doesn't exist, no additional fields to render
-                    form_data['source_fields_html'] = ''
-            else:
-                # No additional fields needed (e.g., local)
-                form_data['source_fields_html'] = ''
-        else:
-            form_data['source_fields_html'] = ''
-        
-        # Pre-populate destination fields for edit mode using schema-driven approach
-        from models.backup import DESTINATION_TYPE_SCHEMAS
-        
+        # Build destination fields HTML using template builder
         dest_type = job_config.get('dest_type', 'local')
         dest_config = job_config.get('dest_config', {})
-        
-        # Special handling for restic (has sub-types)
-        if dest_type == 'restic':
-            from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
-            
-            # Get restic config 
-            restic_config = form_data.get('restic_config', {})
-            
-            # Build repository type options
-            available_repository_types = []
-            for repo_type, schema in RESTIC_REPOSITORY_TYPE_SCHEMAS.items():
-                available_repository_types.append({
-                    'value': repo_type,
-                    'display_name': schema['display_name']
-                })
-            
-            # Get selected repository type and password
-            selected_repo_type = dest_config.get('repo_type', '')
-            restic_password = dest_config.get('password', '')
-            
-            # Build repository-specific fields for the selected type
-            repo_fields_html = ''
-            if selected_repo_type:
-                repo_fields_html = self.template_service.render_template(
-                    'partials/restic_repo_fields_dynamic.html',
-                    repo_type=selected_repo_type,
-                    repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
-                    field_values=dest_config  # Pass the actual config values for pre-population
-                )
-            
-            # Build the destination fields HTML for the selected type
-            dest_fields_html = self.template_service.render_template(
-                'partials/job_form_dest_restic.html',
-                restic_config=restic_config,
-                available_repository_types=available_repository_types,
-                selected_repo_type=selected_repo_type,
-                restic_password=restic_password,
-                repo_fields_html=repo_fields_html,  # Pre-rendered fields
-                show_wrapper=False
-            )
-            form_data['dest_fields_html'] = dest_fields_html
-        
-        # Schema-driven handling for other destination types
-        elif dest_type in DESTINATION_TYPE_SCHEMAS:
-            # Build template name from destination type
-            template_name = f'partials/dest_{dest_type}_fields.html'
-            
-            try:
-                # Use schema mapping to translate config field names to template field names
-                schema = DESTINATION_TYPE_SCHEMAS[dest_type]
-                template_values = {}
-                
-                if 'fields' in schema:
-                    for field_name, field_config in schema['fields'].items():
-                        config_key = field_config.get('config_key', field_name)
-                        template_values[field_name] = dest_config.get(config_key, '')
-                
-                dest_fields_html = self.template_service.render_template(
-                    template_name,
-                    **template_values  # Pass mapped values for pre-population
-                )
-                form_data['dest_fields_html'] = dest_fields_html
-            except Exception:
-                # Template doesn't exist, no fields to render
-                form_data['dest_fields_html'] = ''
-        else:
-            form_data['dest_fields_html'] = ''
+        form_data['dest_fields_html'] = template_builder.build_destination_fields_html(dest_type, dest_config, form_data)
         
         # Add notification configuration
         existing_notifications = job_config.get('notifications', [])

@@ -81,7 +81,12 @@ source_config:
 - `app.py` (routing), `config.py` (YAML config)
 
 ### HTTP Layer (handlers/)
-- **Page Rendering**: `pages.py` (consolidated: dashboard, config, inspection, logs, network)
+- **Page Rendering**: `pages.py` (981 lines) - **OPTIMIZED ARCHITECTURE** with specialized handler classes:
+  - `GETHandlers` - All read-only page rendering (dashboard, forms, config, inspection, logs)
+  - `POSTHandlers` - All form submissions and mutations (save job, delete job, save config)
+  - `ValidationHandlers` - All validation endpoints and AJAX operations (SSH validation, network scan, HTMX)
+  - **Direct routing** from `app.py` to specialized handlers (no delegation overhead)
+  - **Template logic extracted** to form builders in `services/data_services.py` (169 total lines extracted)
 - **Operations**: `operations.py` (backup/restore execution and coordination)
 - **Forms**: `forms.py` (HTMX form processing and validation)
 - **API**: `api.py` (JSON endpoints for HTMX updates, external integrations, repository introspection)
@@ -120,7 +125,12 @@ source_config:
 - **Maintenance**: `maintenance.py` (repository maintenance and cleanup operations)
 - **Scheduling**: `scheduling.py` (scheduler management and schedule loading)
 - **Management**: `management.py` (job management and lifecycle operations)
-- **Data Services**: `data_services.py` (form data building and snapshot introspection)
+- **Data Services**: `data_services.py` - **CONSOLIDATED FORM BUILDERS**:
+  - `JobFormDataBuilder` - Core job form data construction
+  - `ScheduleFormDataBuilder` - Schedule form field logic  
+  - `NotificationFormDataBuilder` - Complex provider schema processing
+  - `JobFormTemplateBuilder` - Dynamic HTML generation for source/destination fields
+  - `SnapshotIntrospectionService` - Snapshot content discovery
 - **Template**: `template.py` (template rendering and variable substitution)
 - **Binaries**: `binaries.py` (binary availability checking and validation)
 
@@ -227,10 +237,11 @@ source_config:
 **Curl Testing Rule**: ALWAYS use `--max-time 3` (or similar short timeout) when testing with curl. NEVER wait more than a few seconds for hanging requests - timeout indicates bugs that need investigation.
 **Decision Authority**: Claude owns technical implementation decisions (patterns, algorithms, code structure). Shane is tech director/product manager - owns design decisions, architectural direction, and product requirements. When uncertain about design preferences or high-level architecture, ask before implementing rather than having changes aborted for clarification. **Present options with reasoned recommendations** - not just choices, but grounded opinions based on sound practice and project cohesiveness.
 **Context Management**: Two-file documentation workflow. **CLAUDE.md** (permanent): architecture, patterns, rules, technical debt. **CHANGES.md** (temporal): current session focus, progress, technical notes, next priorities. Session end: fold architectural insights into CLAUDE.md, update CHANGES.md for next session. Post-compression: feed both files to restore complete context efficiently.
+**Surgical Refactoring Protocol**: **PROVEN METHOD** - Break complex refactoring into atomic phases with `.bak` files, immediate testing after each change, consolidate related services (avoid file sprawl), maintain identical interfaces during extraction. Results: 139→51 line reduction (63%) with zero breakage in critical job form pipeline.
 
 ### Code Architecture
-**Separation of Concerns**: Thin handlers (HTTP coordination), fat services (business logic), validators in `services/` not `handlers/`
-**Modularization**: Proactively break up monolithic components. Single responsibility principle. Extract when files exceed ~500 lines.
+**Separation of Concerns**: **OPTIMIZED PATTERN** - Specialized handler classes (GET/POST/Validation) with direct routing, form builders in `services/data_services.py`, business logic in focused services, validators in `services/` not `handlers/`
+**Modularization**: **SURGICAL EXTRACTION** - Break up monolithic components through atomic, tested extractions. Consolidate related builders in single service files to avoid sprawl. Single responsibility principle.
 **Data Structures**: Dataclasses everywhere, `pathlib.Path` operations, type hints
 **Multi-provider Pattern**: Unified services with provider-specific logic consolidated
 
