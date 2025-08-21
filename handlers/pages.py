@@ -287,6 +287,234 @@ class GETHandlers:
             
             # Note: submit_button_text handled at handler level
         }
+    
+    @handle_page_errors("Edit job form")
+    def show_edit_job_form(self, request_handler, job_name: str):
+        """Show edit job form"""
+        if not job_name:
+            self._send_error(request_handler, "Job name is required")
+            return
+        
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            self._send_error(request_handler, f"Job '{job_name}' not found")
+            return
+        
+        job_config = jobs[job_name]
+        form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
+        form_data['page_title'] = f'Edit Job: {job_name}'
+        form_data['form_title'] = f'Edit Backup Job: {job_name}'
+        form_data['submit_button_text'] = 'Commit Changes'
+        form_data['form_has_changes'] = False  # Initially no changes
+        
+        # Store original config for change detection (as JSON string)
+        import json
+        form_data['original_job_config'] = json.dumps(job_config, sort_keys=True)
+        
+        # Add available destination types (could be context-aware based on source)
+        source_config = job_config.get('source_config', {})
+        destination_service = DestinationTypeService()
+        form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
+        
+        # Pre-select source and destination types for edit mode
+        source_type = job_config.get('source_type', 'local')
+        form_data['selected_source_type'] = source_type
+        form_data['source_local_selected'] = (source_type == 'local')
+        form_data['source_ssh_selected'] = (source_type == 'ssh')
+        form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
+        
+        # Pre-populate source fields for edit mode using schema-driven approach
+        from models.backup import SOURCE_TYPE_SCHEMAS
+        
+        if source_type in SOURCE_TYPE_SCHEMAS:
+            schema = SOURCE_TYPE_SCHEMAS[source_type]
+            
+            # Check if this source type has additional fields requiring a template
+            if schema.get('fields'):
+                template_name = f'partials/source_{source_type}_fields.html'
+                try:
+                    form_data['source_fields_html'] = self.template_service.render_template(
+                        template_name,
+                        **source_config
+                    )
+                except Exception:
+                    # Template doesn't exist, no additional fields to render
+                    form_data['source_fields_html'] = ''
+            else:
+                # No additional fields needed (e.g., local)
+                form_data['source_fields_html'] = ''
+        else:
+            form_data['source_fields_html'] = ''
+        
+        # Pre-populate destination fields for edit mode using schema-driven approach
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        
+        dest_type = job_config.get('dest_type', 'local')
+        dest_config = job_config.get('dest_config', {})
+        
+        # Special handling for restic (has sub-types)
+        if dest_type == 'restic':
+            from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+            
+            # Get restic config 
+            restic_config = form_data.get('restic_config', {})
+            
+            # Build repository type options
+            available_repository_types = []
+            for repo_type, schema in RESTIC_REPOSITORY_TYPE_SCHEMAS.items():
+                available_repository_types.append({
+                    'value': repo_type,
+                    'display_name': schema['display_name']
+                })
+            
+            # Get selected repository type and password
+            selected_repo_type = dest_config.get('repo_type', '')
+            restic_password = dest_config.get('password', '')
+            
+            # Build repository-specific fields for the selected type
+            repo_fields_html = ''
+            if selected_repo_type:
+                repo_fields_html = self.template_service.render_template(
+                    'partials/restic_repo_fields_dynamic.html',
+                    repo_type=selected_repo_type,
+                    repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
+                    field_values=dest_config  # Pass the actual config values for pre-population
+                )
+            
+            # Build the destination fields HTML for the selected type
+            dest_fields_html = self.template_service.render_template(
+                'partials/job_form_dest_restic.html',
+                restic_config=restic_config,
+                available_repository_types=available_repository_types,
+                selected_repo_type=selected_repo_type,
+                restic_password=restic_password,
+                repo_fields_html=repo_fields_html,  # Pre-rendered fields
+                show_wrapper=False
+            )
+            form_data['dest_fields_html'] = dest_fields_html
+        
+        # Schema-driven handling for other destination types
+        elif dest_type in DESTINATION_TYPE_SCHEMAS:
+            # Build template name from destination type
+            template_name = f'partials/dest_{dest_type}_fields.html'
+            
+            try:
+                # Use schema mapping to translate config field names to template field names
+                schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+                template_values = {}
+                
+                if 'fields' in schema:
+                    for field_name, field_config in schema['fields'].items():
+                        config_key = field_config.get('config_key', field_name)
+                        template_values[field_name] = dest_config.get(config_key, '')
+                
+                dest_fields_html = self.template_service.render_template(
+                    template_name,
+                    **template_values  # Pass mapped values for pre-population
+                )
+                form_data['dest_fields_html'] = dest_fields_html
+            except Exception:
+                # Template doesn't exist, no fields to render
+                form_data['dest_fields_html'] = ''
+        else:
+            form_data['dest_fields_html'] = ''
+        
+        # Add notification configuration
+        existing_notifications = job_config.get('notifications', [])
+        form_data.update(self._build_notification_form_data(existing_notifications))
+        
+        # Add schedule configuration
+        form_data.update(self._build_schedule_form_data(job_config))
+        
+        html = self.template_service.render_template('pages/job_form.html', **form_data)
+        self._send_html_response(request_handler, html)
+    
+    @handle_page_errors("Config manager")
+    def show_config_manager(self, request_handler):
+        """Show configuration management page"""
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        global_settings = self.backup_config.get_global_settings()
+        
+        # Extract individual field values for template population
+        default_schedule_times = global_settings.get('default_schedule_times', {})
+        
+        # Get available themes for template to handle
+        available_themes = self._get_available_themes()
+        current_theme = global_settings.get('theme', 'dark')
+        
+        template_data = {
+            # Keep global_settings for partials that use it
+            'global_settings': global_settings,
+            'provider_schemas': PROVIDER_FIELD_SCHEMAS,
+            'page_title': 'Configuration',
+            
+            # Individual field values for form population
+            'scheduler_timezone': global_settings.get('scheduler_timezone', 'UTC'),
+            'available_themes': available_themes,
+            'current_theme': current_theme,
+            'enable_conflict_avoidance': 'checked' if global_settings.get('enable_conflict_avoidance', True) else '',
+            'conflict_check_interval': str(global_settings.get('conflict_check_interval', 300)),
+            'delay_notification_threshold': str(global_settings.get('delay_notification_threshold', 300)),
+            
+            # Default schedule times
+            'hourly_default': default_schedule_times.get('hourly', '0 * * * *'),
+            'daily_default': default_schedule_times.get('daily', '0 3 * * *'),
+            'weekly_default': default_schedule_times.get('weekly', '0 3 * * 0'),
+            'monthly_default': default_schedule_times.get('monthly', '0 3 1 * *'),
+        }
+            
+        html = self.template_service.render_template('pages/config_manager.html', **template_data)
+        self._send_html_response(request_handler, html)
+    
+    @handle_page_errors("Raw editor")
+    def show_raw_editor(self, request_handler):
+        """Show raw YAML configuration editor"""
+        config_path = self.backup_config.config_file
+        raw_config = ""
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                raw_config = f.read()
+        
+        template_data = {
+            'raw_config': raw_config,
+            'config_path': config_path,
+            'page_title': 'Raw Configuration Editor'
+        }
+        
+        html = self.template_service.render_template('pages/config_editor.html', **template_data)
+        self._send_html_response(request_handler, html)
+    
+    def _get_available_themes(self):
+        """Get list of available themes by scanning theme directory"""
+        import os
+        themes = []
+        theme_dir = 'static/themes'
+        
+        if os.path.exists(theme_dir):
+            for file in os.listdir(theme_dir):
+                if file.endswith('.css'):
+                    theme_name = file[:-4]  # Remove .css extension
+                    themes.append(theme_name)
+        
+        # Always ensure 'dark' is available as fallback
+        if 'dark' not in themes:
+            themes.append('dark')
+        
+        return sorted(themes)
+    
+    def _send_error(self, request_handler, message: str, status_code: int = 500):
+        """Send error response using template partial"""
+        request_handler.send_response(status_code)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        
+        # Render error template
+        html = self.template_service.render_template('pages/error.html', 
+                                                   error_message=message,
+                                                   page_title='Error')
+        request_handler.wfile.write(html.encode())
 
 class POSTHandlers:
     """Handler for all form submissions and mutations"""
@@ -328,6 +556,18 @@ class PagesHandler:
     def show_add_job_form(self, request_handler):
         """Delegate to GETHandlers"""
         return self.get_handlers.show_add_job_form(request_handler)
+    
+    def show_edit_job_form(self, request_handler, job_name: str):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_edit_job_form(request_handler, job_name)
+    
+    def show_config_manager(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_config_manager(request_handler)
+    
+    def show_raw_editor(self, request_handler):
+        """Delegate to GETHandlers"""
+        return self.get_handlers.show_raw_editor(request_handler)
     
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, request_handler, job_name: str):
