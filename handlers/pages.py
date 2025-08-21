@@ -700,6 +700,35 @@ class POSTHandlers:
         else:
             raise Exception(f"Failed to delete job '{job_name}'")
 
+    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
+        """Helper to safely get form values handling both list and string formats"""
+        value = form_data.get(field_name, [default])
+        if isinstance(value, list):
+            return value[0] if value else default
+        return str(value)
+
+    @handle_page_errors("Save raw config")
+    def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
+        """Save raw YAML configuration"""
+        raw_config = form_data.get('raw_config', [''])[0]
+        
+        # Validate YAML syntax
+        try:
+            import yaml
+            yaml.safe_load(raw_config)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML: {str(e)}")
+        
+        # Save to file
+        config_path = self.backup_config.config_file
+        with open(config_path, 'w') as f:
+            f.write(raw_config)
+        
+        # Reload configuration
+        self.backup_config.reload_config()
+        
+        self._send_redirect(request_handler, '/config')
+
 
 class ValidationHandlers:
     """Handler for all validation endpoints and AJAX operations"""
@@ -761,6 +790,10 @@ class PagesHandler:
     def delete_backup_job(self, request_handler, job_name: str):
         """Delegate to POSTHandlers"""
         return self.post_handlers.delete_backup_job(request_handler, job_name)
+    
+    def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
+        """Delegate to POSTHandlers"""
+        return self.post_handlers.save_raw_config(request_handler, form_data)
     
     # =============================================================================
     # CONFIGURATION PAGES
@@ -990,28 +1023,6 @@ class PagesHandler:
         if isinstance(value, list):
             return value[0] if value else default
         return str(value)
-    
-    @handle_page_errors("Save raw config")
-    def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
-        """Save raw YAML configuration"""
-        raw_config = form_data.get('raw_config', [''])[0]
-        
-        # Validate YAML syntax
-        try:
-            yaml.safe_load(raw_config)
-        except yaml.YAMLError as e:
-            self._send_error(request_handler, f"Invalid YAML: {str(e)}")
-            return
-        
-        # Save to file
-        config_path = self.backup_config.config_file
-        with open(config_path, 'w') as f:
-            f.write(raw_config)
-        
-        # Reload configuration
-        self.backup_config.reload_config()
-        
-        self._send_redirect(request_handler, '/config')
     
     # =============================================================================
     # INSPECTION PAGES
