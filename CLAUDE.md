@@ -61,10 +61,11 @@ source_config:
 **Rule: Unified Restic Execution (CRITICAL ARCHITECTURE)**: All restic operations MUST use `ResticExecutionService` from `services/execution.py`. This service provides automatic SSH/local context detection, unified credential management, and consolidated execution patterns. **NEVER manually call** `ResticArgumentBuilder.build_environment()` or build SSH commands directly. **ALWAYS use** `restic_executor.execute_restic_command()` with appropriate `operation_type` ('ui', 'backup', 'restore', 'maintenance', 'init') for correct execution context.
 
 **Rule: SSH vs Local Execution Intelligence**: 
-- **UI Operations** (snapshot listing, browsing, validation): Always execute locally from Highball container using local restic binary and credentials
+- **UI Operations** (snapshot listing, browsing, validation): Execute locally from Highball container using local restic binary and credentials, EXCEPT same-as-origin repositories which always use SSH
 - **Source Operations** (backup, restore-to-source): Always execute via SSH+container on source host  
 - **Repository Operations** (init, maintenance): Execute via SSH when source is SSH for lock detection and pipeline validation
-- **Pattern**: `_should_use_ssh(source_config, operation_type)` determines execution context - 'ui' operations always local, 'init'/'maintenance' operations use SSH when source is SSH
+- **Same-as-Origin Exception**: same_as_origin repositories always use SSH execution regardless of operation type since repository is on origin host filesystem
+- **Pattern**: `_should_use_ssh(source_config, operation_type)` determines execution context with same-as-origin override
 
 **Rule: DRY Principle & Provider Separation**: Don't Repeat Yourself. Restore services orchestrate provider-agnostic operations (overwrite detection, validation, progress tracking). Provider-specific functionality is consolidated into unified services. SSH patterns, authentication, environment management shared across all operations. This separation enables cohesive multi-provider support without code duplication.
 
@@ -160,6 +161,12 @@ source_config:
 **Debug System**: System debugging interface (`/dev`) with network scanner, 8 unified log sources (system + operational) with organized 2-row layout, separated from per-job inspection
 
 ## Common Patterns
+
+### Error Handling Strategy
+- **Centralized error handling**: `@handle_page_errors()` decorator applied to all request handling methods
+- **DRY principle**: Eliminated repetitive try/catch blocks throughout handlers
+- **Consistent error responses**: Unified error handling via `self._send_error()` with proper HTTP status codes
+- **Method focus**: Handler methods focus on business logic, decorator handles exceptions
 
 ### Container Execution Strategy
 - Use official `restic/restic:0.18.0` containers on remote hosts for version consistency
@@ -358,6 +365,7 @@ backup_jobs:
           excludes: ["*.log"]
     dest_type: "ssh|local|rsyncd|restic"  # restic fully functional
     dest_config: {hostname, share} | {repo_type, repo_uri, password, discrete_fields...}  # dual storage: URIs + fields
+    # repo_type: local|rest|s3|sftp|rclone|same_as_origin  # same_as_origin: repository on origin host filesystem
     schedule: "daily|weekly|hourly|monthly|cron_pattern"
     enabled: true
     respect_conflicts: true     # wait for conflicting jobs (default: true)

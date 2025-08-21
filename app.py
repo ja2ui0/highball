@@ -169,7 +169,6 @@ class BackupWebHandler(BaseHTTPRequestHandler):
         # HTMX routes handle their own form parsing (thin orchestrator)
         if path.startswith('/htmx/'):
             action = path[6:]  # Remove '/htmx/' prefix
-            print(f"DEBUG: HTMX request received - action: {action}, method: {self.command}")
             html = self._handlers['forms'].handle_htmx_request(self, action)
             self._send_htmx_response(html)
             return

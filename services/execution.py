@@ -439,10 +439,6 @@ class ResticExecutionService:
         ] + command_args)
         
         # DEBUG: Log the container command for same_as_origin
-        if dest_config.get('repo_type') == 'same_as_origin':
-            import sys
-            print(f"DEBUG SAME_AS_ORIGIN COMMAND: {container_cmd}", file=sys.stderr)
-        
         # Execute via SSH
         return self.executor.execute_ssh_command(hostname, username, container_cmd)
 
