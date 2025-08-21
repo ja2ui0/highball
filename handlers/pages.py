@@ -478,31 +478,24 @@ class POSTHandlers:
         from handlers.api import ResponseUtils
         self.response_utils = ResponseUtils(template_service)
     
-    @handle_page_errors("Save job")
-    def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
-        """Save backup job from form submission"""
-        # Parse job form data using unified parser
-        job_result = job_parser.parse_job_form(form_data)
-        
-        if not job_result['valid']:
-            # Show form with errors
-            error_form_data = self.job_form_builder.build_form_data_with_error(
-                form_data, job_result['error']
-            )
-            # Determine if this is add or edit based on job_name
-            job_name_from_form = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name', []), list) else form_data.get('job_name', '')
-            if job_name_from_form:
-                error_form_data['page_title'] = f'Edit Job: {job_name_from_form}'
-                error_form_data['form_title'] = f'Edit Backup Job: {job_name_from_form}'
-            else:
-                error_form_data['page_title'] = 'Add Job'
-                error_form_data['form_title'] = 'Add New Backup Job'
-            html = self.template_service.render_template('pages/job_form.html', **error_form_data)
-            self.response_utils.send_html_response(request_handler, html)
-            return
-        
-        # Save job configuration
-        job_name = job_result['job_name']
+    def _send_job_form_error(self, request_handler, form_data: Dict[str, Any], error_message: str):
+        """Send job form with error message"""
+        error_form_data = self.job_form_builder.build_form_data_with_error(
+            form_data, error_message
+        )
+        # Determine if this is add or edit based on job_name
+        job_name_from_form = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name', []), list) else form_data.get('job_name', '')
+        if job_name_from_form:
+            error_form_data['page_title'] = f'Edit Job: {job_name_from_form}'
+            error_form_data['form_title'] = f'Edit Backup Job: {job_name_from_form}'
+        else:
+            error_form_data['page_title'] = 'Add Job'
+            error_form_data['form_title'] = 'Add New Backup Job'
+        html = self.template_service.render_template('pages/job_form.html', **error_form_data)
+        self.response_utils.send_html_response(request_handler, html)
+
+    def _build_job_config_from_result(self, job_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Build job configuration from parsed form result"""
         job_config = {
             'source_type': job_result['source_type'],
             'source_config': job_result['source_config'],
@@ -517,25 +510,30 @@ class POSTHandlers:
         # Add maintenance config if present
         if 'maintenance_config' in job_result:
             job_config['maintenance_config'] = job_result['maintenance_config']
+            
+        return job_config
+
+    @handle_page_errors("Save job")
+    def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
+        """Save backup job from form submission"""
+        # Parse job form data using unified parser
+        job_result = job_parser.parse_job_form(form_data)
+        
+        if not job_result['valid']:
+            self._send_job_form_error(request_handler, form_data, job_result['error'])
+            return
+        
+        # Build and save job configuration
+        job_name = job_result['job_name']
+        job_config = self._build_job_config_from_result(job_result)
         
         # Save to config
         success = self.backup_config.save_job(job_name, job_config)
         
         if success:
-            # Redirect to dashboard
             self.response_utils.send_redirect(request_handler, '/dashboard')
         else:
-            error_form_data = self.job_form_builder.build_form_data_with_error(
-                form_data, "Failed to save job configuration"
-            )
-            if job_name:
-                error_form_data['page_title'] = f'Edit Job: {job_name}'
-                error_form_data['form_title'] = f'Edit Backup Job: {job_name}'
-            else:
-                error_form_data['page_title'] = 'Add Job'
-                error_form_data['form_title'] = 'Add New Backup Job'
-            html = self.template_service.render_template('pages/job_form.html', **error_form_data)
-            self.response_utils.send_html_response(request_handler, html)
+            self._send_job_form_error(request_handler, form_data, "Failed to save job configuration")
 
     @handle_page_errors("Delete job")
     def delete_backup_job(self, request_handler, job_name: str):
@@ -836,89 +834,104 @@ class ValidationHandlers:
         html = self.template_service.render_template('pages/network_scan.html', **template_data)
         self.response_utils.send_html_response(request_handler, html)
 
+    def _extract_job_name_parameter(self, request_handler, job_name=None) -> str:
+        """Extract job name from parameter or query string"""
+        if job_name:
+            return job_name
+            
+        from urllib.parse import urlparse, parse_qs
+        url_parts = urlparse(request_handler.path)
+        params = parse_qs(url_parts.query)
+        return params.get('job', [''])[0]
+
+    def _get_validated_job_config(self, request_handler, job_name: str):
+        """Get job config and validate it exists, send error if not"""
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
+            return None
+        return jobs[job_name]
+
+    def _check_and_respond_repository_status(self, request_handler, job_name: str, job_config: Dict[str, Any]):
+        """Check repository availability and send appropriate HTMX response"""
+        dest_type = job_config.get('dest_type')
+        
+        if dest_type == 'restic':
+            self._check_restic_repository(request_handler, job_name, job_config)
+        else:
+            # Non-restic repositories - assume available for now
+            self._send_repository_available_response(request_handler, job_name, dest_type)
+
+    def _check_restic_repository(self, request_handler, job_name: str, job_config: Dict[str, Any]):
+        """Check restic repository availability and respond"""
+        dest_config = job_config.get('dest_config', {})
+        repo_uri = dest_config.get('repo_uri')
+        
+        if not repo_uri:
+            self.response_utils.send_htmx_error(request_handler, 'Repository URI not configured')
+            return
+            
+        from models.backup import backup_service
+        check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
+        
+        if check_success:
+            self._send_repository_available_response(request_handler, job_name, 'restic')
+        else:
+            self._send_repository_error_response(request_handler, job_name, check_message)
+
+    def _send_repository_available_response(self, request_handler, job_name: str, job_type: str):
+        """Send repository available HTMX partial"""
+        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
+            'job_name': job_name,
+            'job_type': job_type
+        })
+
+    def _send_repository_error_response(self, request_handler, job_name: str, error_message: str):
+        """Send appropriate repository error HTMX partial based on error type"""
+        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
+            # Repository locked - render unlock interface
+            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
+                'job_name': job_name,
+                'error_message': error_message
+            })
+        else:
+            # Other error - render error template
+            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'connection_error',
+                'error_message': error_message or 'Unknown error'
+            })
+
     @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, request_handler, job_name=None):
         """HTMX endpoint for repository availability check"""
-        # Get job name from parameter or query parameters
-        if not job_name:
-            from urllib.parse import urlparse, parse_qs
-            url_parts = urlparse(request_handler.path)
-            params = parse_qs(url_parts.query)
-            job_name = params.get('job', [''])[0]
+        job_name = self._extract_job_name_parameter(request_handler, job_name)
         
         if not job_name:
             self.response_utils.send_htmx_error(request_handler, 'Job name is required')
             return
         
-        # Implement actual repository availability check logic
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
+        # Get and validate job configuration
+        job_config = self._get_validated_job_config(request_handler, job_name)
+        if not job_config:
             return
-
-        job_config = jobs[job_name]
-        dest_type = job_config.get('dest_type')
-        
-        if dest_type == 'restic':
-            # Use the quick check for restic repositories
-            dest_config = job_config.get('dest_config', {})
-            repo_uri = dest_config.get('repo_uri')
-            
-            if repo_uri:
-                from models.backup import backup_service
-                check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
-                
-                if check_success:
-                    # Repository is available - load backup browser
-                    self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
-                        'job_name': job_name,
-                        'job_type': dest_type
-                    })
-                else:
-                    # Repository error - determine type and render appropriate template
-                    if check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower()):
-                        # Repository locked - render unlock interface
-                        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
-                            'job_name': job_name,
-                            'error_message': check_message
-                        })
-                    else:
-                        # Other error - render error template
-                        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
-                            'job_name': job_name,
-                            'error_type': 'connection_error',
-                            'error_message': check_message or 'Unknown error'
-                        })
-            else:
-                self.response_utils.send_htmx_error(request_handler, 'Repository URI not configured')
-        else:
-            # Non-restic repositories - assume available for now
-            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
-                'job_name': job_name,
-                'job_type': dest_type
-            })
+        # Perform repository availability check and send response
+        self._check_and_respond_repository_status(request_handler, job_name, job_config)
 
     @handle_page_errors("Repository unlock")
     def unlock_repository_htmx(self, request_handler, job_name=None):
         """HTMX endpoint for repository unlock"""
-        # Get job name from parameter or query parameters
-        if not job_name:
-            from urllib.parse import urlparse, parse_qs
-            url_parts = urlparse(request_handler.path)
-            params = parse_qs(url_parts.query)
-            job_name = params.get('job', [''])[0]
+        job_name = self._extract_job_name_parameter(request_handler, job_name)
         
         if not job_name:
             self.response_utils.send_htmx_error(request_handler, 'Job name is required')
             return
-        
-        # Directly implement the unlock logic
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
+            
+        # Get and validate job configuration
+        job_config = self._get_validated_job_config(request_handler, job_name)
+        if not job_config:
             return
-
-        job_config = jobs[job_name]
+            
         dest_type = job_config.get('dest_type')
         
         if dest_type != 'restic':
