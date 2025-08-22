@@ -406,19 +406,23 @@ class OperationsHandler:
     # JOB SCHEDULING
     # =============================================================================
     
-    def schedule_job(self, request_handler, form_data: Dict[str, Any]):
+    def schedule_job(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Schedule a job for execution"""
         try:
             job_name = form_data.get('job_name', [''])[0]
             
             if not job_name:
-                self._send_error(request_handler, "Job name is required")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Job name is required'
+                })
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_error(request_handler, f"Job '{job_name}' not found")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
             
             # Add job to scheduler
             from services.scheduling import SchedulingService
@@ -433,7 +437,7 @@ class OperationsHandler:
             else:
                 message = f"Job '{job_name}' is set to manual execution"
             
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': True,
                 'message': message,
                 'job_name': job_name,
@@ -442,7 +446,10 @@ class OperationsHandler:
             
         except Exception as e:
             logger.error(f"Schedule job error: {e}")
-            self._send_error(request_handler, f"Schedule error: {str(e)}")
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Schedule error: {str(e)}'
+            })
     
     # =============================================================================
     # UTILITY METHODS

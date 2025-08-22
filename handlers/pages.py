@@ -625,8 +625,10 @@ class POSTHandlers:
             provider_config[field_info['name']] = self._get_form_value(form_data, field_name, '')
 
     @handle_page_errors("Save raw config")
-    def save_raw_config(self, request_handler, form_data: Dict[str, Any]):
+    def save_raw_config(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save raw YAML configuration"""
+        from fastapi.responses import RedirectResponse
+        
         raw_config = form_data.get('raw_config', [''])[0]
         
         # Validate YAML syntax
@@ -634,7 +636,10 @@ class POSTHandlers:
             import yaml
             yaml.safe_load(raw_config)
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML: {str(e)}")
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Invalid YAML: {str(e)}'
+            }, status_code=400)
         
         # Save to file
         config_path = self.backup_config.config_file
@@ -644,44 +649,53 @@ class POSTHandlers:
         # Reload configuration
         self.backup_config.reload_config()
         
-        self.response_utils.send_redirect(request_handler, '/config')
+        return RedirectResponse(url='/config', status_code=302)
 
     @handle_page_errors("Save config")
-    def save_structured_config(self, request_handler, form_data: Dict[str, Any]):
+    def save_structured_config(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save structured configuration from form"""
-        # Update global settings
-        global_settings = self.backup_config.config.setdefault('global_settings', {})
+        from fastapi.responses import RedirectResponse
         
-        # Basic settings
-        global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
-        
-        # Theme setting (only save if not default 'dark')
-        theme = self._get_form_value(form_data, 'theme', 'dark')
-        if theme != 'dark':
-            global_settings['theme'] = theme
-        elif 'theme' in global_settings:
-            # Remove theme key if set back to default
-            del global_settings['theme']
-        
-        global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
-        global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
-        global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
-        
-        # Default schedule times
-        default_schedule_times = global_settings.setdefault('default_schedule_times', {})
-        default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
-        default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
-        default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
-        default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
-        
-        # Notification settings - delegate to notification form parser
-        self._update_notification_settings(global_settings, form_data)
-        
-        # Save configuration
-        self.backup_config.save_config()
-        
-        # Redirect back to config page
-        self.response_utils.send_redirect(request_handler, '/config')
+        try:
+            # Update global settings
+            global_settings = self.backup_config.config.setdefault('global_settings', {})
+            
+            # Basic settings
+            global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
+            
+            # Theme setting (only save if not default 'dark')
+            theme = self._get_form_value(form_data, 'theme', 'dark')
+            if theme != 'dark':
+                global_settings['theme'] = theme
+            elif 'theme' in global_settings:
+                # Remove theme key if set back to default
+                del global_settings['theme']
+            
+            global_settings['enable_conflict_avoidance'] = 'enable_conflict_avoidance' in form_data
+            global_settings['conflict_check_interval'] = int(self._get_form_value(form_data, 'conflict_check_interval', '300'))
+            global_settings['delay_notification_threshold'] = int(self._get_form_value(form_data, 'delay_notification_threshold', '300'))
+            
+            # Default schedule times
+            default_schedule_times = global_settings.setdefault('default_schedule_times', {})
+            default_schedule_times['hourly'] = self._get_form_value(form_data, 'hourly_default', '0 * * * *')
+            default_schedule_times['daily'] = self._get_form_value(form_data, 'daily_default', '0 3 * * *')
+            default_schedule_times['weekly'] = self._get_form_value(form_data, 'weekly_default', '0 3 * * 0')
+            default_schedule_times['monthly'] = self._get_form_value(form_data, 'monthly_default', '0 3 1 * *')
+            
+            # Notification settings - delegate to notification form parser
+            self._update_notification_settings(global_settings, form_data)
+            
+            # Save configuration
+            self.backup_config.save_config()
+            
+            # Redirect back to config page
+            return RedirectResponse(url='/config', status_code=302)
+            
+        except Exception as e:
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Configuration save failed: {str(e)}'
+            }, status_code=500)
 
     def _build_notification_preview(self, global_settings: dict, form_data: Dict[str, Any]):
         """Build notification settings for preview (without modifying actual config)"""
@@ -704,7 +718,7 @@ class POSTHandlers:
                         self._process_notification_field(provider_config, provider_name, field_info, form_data)
 
     @handle_page_errors("Preview config")
-    def preview_config_changes(self, request_handler, form_data: Dict[str, Any]):
+    def preview_config_changes(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Preview configuration changes without saving"""
         # Build the configuration that would be saved (without actually saving)
         preview_config = {}
@@ -740,7 +754,7 @@ class POSTHandlers:
         html = self.template_service.render_template('partials/config_preview.html', 
                                                    preview_yaml=preview_yaml,
                                                    success=True)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
 
 
 class ValidationHandlers:
@@ -849,73 +863,65 @@ class ValidationHandlers:
         html = self.template_service.render_template('pages/network_scan.html', **template_data)
         return HTMLResponse(content=html)
 
-    def _extract_job_name_parameter(self, request_handler, job_name=None) -> str:
-        """Extract job name from parameter or query string"""
-        if job_name:
-            return job_name
-            
-        from urllib.parse import urlparse, parse_qs
-        url_parts = urlparse(request_handler.path)
-        params = parse_qs(url_parts.query)
-        return params.get('job', [''])[0]
+    # Job name extraction now handled by FastAPI Query() parameters
 
-    def _get_validated_job_config(self, request_handler, job_name: str):
-        """Get job config and validate it exists, send error if not"""
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            self.response_utils.send_htmx_error(request_handler, f"Job '{job_name}' not found")
-            return None
-        return jobs[job_name]
+    # Job config validation now handled inline in HTMX methods
 
-    def _check_and_respond_repository_status(self, request_handler, job_name: str, job_config: Dict[str, Any]):
-        """Check repository availability and send appropriate HTMX response"""
+    def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check repository availability and return appropriate HTMX HTML response"""
         dest_type = job_config.get('dest_type')
         
         if dest_type == 'restic':
-            self._check_restic_repository(request_handler, job_name, job_config)
+            return self._check_restic_repository_html(job_name, job_config)
         else:
             # Non-restic repositories - assume available for now
-            self._send_repository_available_response(request_handler, job_name, dest_type)
+            html = self.template_service.render_template('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': dest_type
+            })
+            return HTMLResponse(content=html)
 
-    def _check_restic_repository(self, request_handler, job_name: str, job_config: Dict[str, Any]):
-        """Check restic repository availability and respond"""
+    def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check restic repository availability and return HTML response"""
         dest_config = job_config.get('dest_config', {})
         repo_uri = dest_config.get('repo_uri')
         
         if not repo_uri:
-            self.response_utils.send_htmx_error(request_handler, 'Repository URI not configured')
-            return
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message='Repository URI not configured')
+            return HTMLResponse(content=html)
             
         from models.backup import backup_service
         check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
         
         if check_success:
-            self._send_repository_available_response(request_handler, job_name, 'restic')
+            html = self.template_service.render_template('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': 'restic'
+            })
+            return HTMLResponse(content=html)
         else:
-            self._send_repository_error_response(request_handler, job_name, check_message)
+            return self._send_repository_error_html(job_name, check_message)
 
-    def _send_repository_available_response(self, request_handler, job_name: str, job_type: str):
-        """Send repository available HTMX partial"""
-        self.response_utils.send_htmx_partial(request_handler, 'partials/repository_available.html', {
-            'job_name': job_name,
-            'job_type': job_type
-        })
+    # Repository response methods now return HTMLResponse directly
 
-    def _send_repository_error_response(self, request_handler, job_name: str, error_message: str):
+    def _send_repository_error_html(self, job_name: str, error_message: str) -> HTMLResponse:
         """Send appropriate repository error HTMX partial based on error type"""
         if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
             # Repository locked - render unlock interface
-            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_locked_error.html', {
+            html = self.template_service.render_template('partials/repository_locked_error.html', {
                 'job_name': job_name,
                 'error_message': error_message
             })
+            return HTMLResponse(content=html)
         else:
             # Other error - render error template
-            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
+            html = self.template_service.render_template('partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'connection_error',
                 'error_message': error_message or 'Unknown error'
             })
+            return HTMLResponse(content=html)
 
     def _build_ssh_config_from_form(self, form_data: Dict[str, Any]) -> Dict[str, str]:
         """Build SSH configuration from form data"""
@@ -945,40 +951,48 @@ class ValidationHandlers:
         return validation_results
 
     @handle_page_errors("Repository check")
-    def check_repository_availability_htmx(self, request_handler, job_name=None):
+    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
         """HTMX endpoint for repository availability check"""
-        job_name = self._extract_job_name_parameter(request_handler, job_name)
         
         if not job_name:
-            self.response_utils.send_htmx_error(request_handler, 'Job name is required')
-            return
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message='Job name is required')
+            return HTMLResponse(content=html)
         
         # Get and validate job configuration
-        job_config = self._get_validated_job_config(request_handler, job_name)
-        if not job_config:
-            return
-        # Perform repository availability check and send response
-        self._check_and_respond_repository_status(request_handler, job_name, job_config)
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message=f"Job '{job_name}' not found")
+            return HTMLResponse(content=html)
+        
+        job_config = jobs[job_name]
+        # Perform repository availability check and return response
+        return self._check_and_respond_repository_status_html(job_name, job_config)
 
     @handle_page_errors("Repository unlock")
-    def unlock_repository_htmx(self, request_handler, job_name=None):
+    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
         """HTMX endpoint for repository unlock"""
-        job_name = self._extract_job_name_parameter(request_handler, job_name)
         
         if not job_name:
-            self.response_utils.send_htmx_error(request_handler, 'Job name is required')
-            return
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message='Job name is required')
+            return HTMLResponse(content=html)
             
         # Get and validate job configuration
-        job_config = self._get_validated_job_config(request_handler, job_name)
-        if not job_config:
-            return
-            
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message=f"Job '{job_name}' not found")
+            return HTMLResponse(content=html)
+        
+        job_config = jobs[job_name]
         dest_type = job_config.get('dest_type')
         
         if dest_type != 'restic':
-            self.response_utils.send_htmx_error(request_handler, 'Unlock is only supported for restic repositories')
-            return
+            html = self.template_service.render_template('partials/error_message.html', 
+                                                       error_message='Unlock is only supported for restic repositories')
+            return HTMLResponse(content=html)
 
         # Execute restic unlock command
         dest_config = job_config.get('dest_config', {})
@@ -989,13 +1003,14 @@ class ValidationHandlers:
         
         if result.get('success'):
             # Unlock successful - automatically retry availability check
-            self.check_repository_availability_htmx(request_handler, job_name)
+            return self.check_repository_availability_htmx(job_name)
         else:
             # Unlock failed - show error
-            self.response_utils.send_htmx_partial(request_handler, 'partials/repository_error.html', {
+            html = self.template_service.render_template('partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'unlock_failed',
-                'error_message': result.get('error', 'Unlock operation failed')
+                'error_message': result.get('error', 'Unlock failed')
             })
+            return HTMLResponse(content=html)
 
 

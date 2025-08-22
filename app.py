@@ -284,13 +284,13 @@ async def get_jobs(state: Optional[str] = Query(None), fields: Optional[str] = Q
 @app.get("/check-repository-availability")
 async def check_repository_availability(job: str = Query("")):
     """Check repository availability"""
-    return convert_handler_response(services.handlers['validation_pages'].check_repository_availability_htmx, job)
+    return services.handlers['validation_pages'].check_repository_availability_htmx(job)
 
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
     """Unlock repository (GET)"""
-    return convert_handler_response(services.handlers['validation_pages'].unlock_repository_htmx, job)
+    return services.handlers['validation_pages'].unlock_repository_htmx(job)
 
 
 # =============================================================================
@@ -378,7 +378,7 @@ async def preview_config_changes(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['post_pages'].preview_config_changes, form_data)
+    return services.handlers['post_pages'].preview_config_changes(form_data)
 
 
 @app.post("/save-config")
@@ -393,7 +393,7 @@ async def save_config(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['post_pages'].save_structured_config, form_data)
+    return services.handlers['post_pages'].save_structured_config(form_data)
 
 
 @app.post("/save-config/raw")
@@ -408,7 +408,7 @@ async def save_raw_config(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['post_pages'].save_raw_config, form_data)
+    return services.handlers['post_pages'].save_raw_config(form_data)
 
 
 @app.post("/schedule-job")
@@ -423,7 +423,7 @@ async def schedule_job(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['operations'].schedule_job, form_data)
+    return services.handlers['operations'].schedule_job(form_data)
 
 
 @app.post("/restore")
@@ -484,7 +484,7 @@ async def unlock_repository_post(request: Request):
         job_name = params.get('job', [''])[0]
     else:
         job_name = ''
-    return convert_handler_response(services.handlers['validation_pages'].unlock_repository_htmx, job_name)
+    return services.handlers['validation_pages'].unlock_repository_htmx(job_name)
 
 
 # =============================================================================
