@@ -521,14 +521,18 @@ class POSTHandlers:
         return job_config
 
     @handle_page_errors("Save job")
-    def save_backup_job(self, request_handler, form_data: Dict[str, Any]):
+    def save_backup_job(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save backup job from form submission"""
+        from fastapi.responses import RedirectResponse
+        
         # Parse job form data using unified parser
         job_result = job_parser.parse_job_form(form_data)
         
         if not job_result['valid']:
-            self._send_job_form_error(request_handler, form_data, job_result['error'])
-            return
+            return JSONResponse(content={
+                'success': False,
+                'error': job_result['error']
+            }, status_code=400)
         
         # Build and save job configuration
         job_name = job_result['job_name']
@@ -538,22 +542,33 @@ class POSTHandlers:
         success = self.backup_config.save_job(job_name, job_config)
         
         if success:
-            self.response_utils.send_redirect(request_handler, '/dashboard')
+            return RedirectResponse(url='/dashboard', status_code=302)
         else:
-            self._send_job_form_error(request_handler, form_data, "Failed to save job configuration")
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Failed to save job configuration'
+            }, status_code=500)
 
     @handle_page_errors("Delete job")
-    def delete_backup_job(self, request_handler, job_name: str):
+    def delete_backup_job(self, job_name: str) -> JSONResponse:
         """Delete backup job"""
+        from fastapi.responses import RedirectResponse
+        
         if not job_name:
-            raise ValueError("Job name is required")
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Job name is required'
+            }, status_code=400)
         
         success = self.backup_config.delete_backup_job(job_name)
         
         if success:
-            self.response_utils.send_redirect(request_handler, '/dashboard')
+            return RedirectResponse(url='/dashboard', status_code=302)
         else:
-            raise Exception(f"Failed to delete job '{job_name}'")
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to delete job '{job_name}'"
+            }, status_code=500)
 
     def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
         """Helper to safely get form values handling both list and string formats"""
@@ -779,22 +794,21 @@ class ValidationHandlers:
         return JSONResponse(content=result)
 
     @handle_page_errors("Path validation")
-    def validate_source_paths(self, request_handler, form_data: Dict[str, Any]):
+    def validate_source_paths(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Validate source paths from form"""
         # Parse source paths from form
         from models.forms import source_paths_parser
         paths_result = source_paths_parser.parse_multi_path_options(form_data)
         
         if not paths_result['valid']:
-            self.response_utils.send_json_response(request_handler, paths_result)
-            return
+            return JSONResponse(content=paths_result)
         
         # Build SSH configuration and validate paths
         source_type = form_data.get('source_type', ['local'])[0]
         ssh_config = self._build_ssh_config_from_form(form_data) if source_type == 'ssh' else {}
         validation_results = self._validate_individual_paths(source_type, paths_result['source_paths'], ssh_config)
         
-        self.response_utils.send_json_response(request_handler, {
+        return JSONResponse(content={
             'valid': True,
             'results': validation_results
         })

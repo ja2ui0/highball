@@ -5,14 +5,14 @@ Replaces: backup.py, backup_executor.py, backup_command_builder.py, backup_confl
          backup_notification_dispatcher.py, restore_handler.py
 """
 
-import json
 import logging
-import subprocess
 import threading
-import time
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pathlib import Path
+
+# FastAPI imports
+from fastapi.responses import JSONResponse
 
 # Import unified models
 from models.backup import backup_service, ResticArgumentBuilder
@@ -37,17 +37,21 @@ class OperationsHandler:
     # BACKUP OPERATIONS
     # =============================================================================
     
-    def run_backup_job(self, request_handler, job_name: str, dry_run: bool = False):
+    def run_backup_job(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration"""
         try:
             if not job_name:
-                self._send_error(request_handler, "Job name is required")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Job name is required'
+                })
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_error(request_handler, f"Job '{job_name}' not found")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
             
             job_config = jobs[job_name]
             # Add job name to config for proper tagging
@@ -55,16 +59,19 @@ class OperationsHandler:
             
             # Check if job is enabled
             if not job_config.get('enabled', True):
-                self._send_error(request_handler, f"Job '{job_name}' is disabled")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': f"Job '{job_name}' is disabled"
+                })
             
             # Check for conflicts if required
             if job_config.get('respect_conflicts', True):
                 conflicts = self.job_management.check_conflicts(job_name)
                 if conflicts:
-                    self._send_error(request_handler, 
-                                   f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}")
-                    return
+                    return JSONResponse(content={
+                        'success': False,
+                        'error': f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}"
+                    })
             
             # Start backup in background thread
             backup_thread = threading.Thread(
@@ -76,7 +83,7 @@ class OperationsHandler:
             
             # Send immediate response
             status_message = f"{'Dry run' if dry_run else 'Backup'} started for job '{job_name}'"
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': True,
                 'message': status_message,
                 'job_name': job_name,
@@ -85,7 +92,10 @@ class OperationsHandler:
             
         except Exception as e:
             logger.error(f"Backup job error: {e}")
-            self._send_error(request_handler, f"Backup error: {str(e)}")
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Backup error: {str(e)}'
+            })
     
     def _execute_backup_async(self, job_name: str, job_config: Dict[str, Any], dry_run: bool):
         """Execute backup operation asynchronously"""
@@ -141,7 +151,7 @@ class OperationsHandler:
     # RESTORE OPERATIONS
     # =============================================================================
     
-    def process_restore_request(self, request_handler, form_data: Dict[str, Any]):
+    def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Process restore request from form"""
         try:
             job_name = form_data.get('job_name', [''])[0]
@@ -150,24 +160,32 @@ class OperationsHandler:
             dry_run = 'dry_run' in form_data
             
             if not job_name:
-                self._send_error(request_handler, "Job name is required")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Job name is required'
+                })
             
             if not snapshot_id:
-                self._send_error(request_handler, "Snapshot ID is required")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Snapshot ID is required'
+                })
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_error(request_handler, f"Job '{job_name}' not found")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
             
             job_config = jobs[job_name]
             
             # Only support Restic restores for now
             if job_config.get('dest_type') != 'restic':
-                self._send_error(request_handler, "Restore only supported for Restic repositories")
-                return
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Restore only supported for Restic repositories'
+                })
             
             # Build restore request
             restore_request = {
@@ -185,15 +203,14 @@ class OperationsHandler:
             
             # Execute restore
             result = self._execute_restore(restore_request)
-            
-            if result['success']:
-                self._send_json_response(request_handler, result)
-            else:
-                self._send_error(request_handler, result['error'])
+            return JSONResponse(content=result)
                 
         except Exception as e:
             logger.error(f"Restore request error: {e}")
-            self._send_error(request_handler, f"Restore error: {str(e)}")
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Restore error: {str(e)}'
+            })
     
     def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
         """Execute restore operation"""
@@ -290,7 +307,7 @@ class OperationsHandler:
                 'error': f'Restore failed: {str(e)}'
             }
     
-    def check_restore_overwrites(self, request_handler, form_data: Dict[str, Any]):
+    def check_restore_overwrites(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Check for potential restore overwrites"""
         try:
             job_name = form_data.get('job_name', [''])[0]
@@ -298,26 +315,24 @@ class OperationsHandler:
             target_type = form_data.get('target_type', ['safe'])[0]
             
             if not job_name or not snapshot_id:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name and snapshot ID are required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             
             # Analyze potential overwrites
             overwrite_analysis = self._analyze_restore_overwrites(job_config, snapshot_id, target_type)
             
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': True,
                 'analysis': overwrite_analysis
             })
@@ -432,22 +447,4 @@ class OperationsHandler:
     # =============================================================================
     # UTILITY METHODS
     # =============================================================================
-    
-    def _send_json_response(self, request_handler, data: Dict[str, Any]):
-        """Send JSON response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'application/json')
-        request_handler.end_headers()
-        request_handler.wfile.write(json.dumps(data).encode())
-    
-    def _send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'application/json')
-        request_handler.end_headers()
-        
-        error_response = {
-            'success': False,
-            'error': message
-        }
-        request_handler.wfile.write(json.dumps(error_response).encode())
+    # All operations methods now return JSONResponse directly - no utility methods needed

@@ -309,7 +309,7 @@ async def save_job(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['post_pages'].save_backup_job, form_data)
+    return services.handlers['post_pages'].save_backup_job(form_data)
 
 
 @app.post("/delete-job")
@@ -317,7 +317,7 @@ async def delete_job(request: Request):
     """Delete backup job"""
     form = await request.form()
     job_name = form.get('job_name', '')
-    return convert_handler_response(services.handlers['post_pages'].delete_backup_job, job_name)
+    return services.handlers['post_pages'].delete_backup_job(job_name)
 
 
 @app.post("/run-backup")
@@ -325,7 +325,7 @@ async def run_backup(request: Request):
     """Run backup job"""
     form = await request.form()
     job_name = form.get('job_name', '')
-    return convert_handler_response(services.handlers['operations'].run_backup_job, job_name, False)
+    return services.handlers['operations'].run_backup_job(job_name, False)
 
 
 @app.post("/dry-run-backup")
@@ -333,7 +333,7 @@ async def dry_run_backup(request: Request):
     """Dry run backup job"""
     form = await request.form()
     job_name = form.get('job_name', '')
-    return convert_handler_response(services.handlers['operations'].run_backup_job, job_name, True)
+    return services.handlers['operations'].run_backup_job(job_name, True)
 
 
 @app.post("/validate-source-paths")
@@ -348,7 +348,7 @@ async def validate_source_paths(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['validation_pages'].validate_source_paths, form_data)
+    return services.handlers['validation_pages'].validate_source_paths(form_data)
 
 
 @app.post("/initialize-restic-repo")
@@ -363,7 +363,7 @@ async def initialize_restic_repo(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['api'].initialize_restic_repo, form_data)
+    return services.handlers['api'].initialize_restic_repo(form_data)
 
 
 @app.post("/preview-config-changes")
@@ -438,7 +438,7 @@ async def process_restore_request(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['operations'].process_restore_request, form_data)
+    return services.handlers['operations'].process_restore_request(form_data)
 
 
 @app.post("/check-restore-overwrites")
@@ -453,7 +453,7 @@ async def check_restore_overwrites(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['operations'].check_restore_overwrites, form_data)
+    return services.handlers['operations'].check_restore_overwrites(form_data)
 
 
 @app.post("/test-telegram-notification")
