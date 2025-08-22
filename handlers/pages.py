@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+# FastAPI imports
+from fastapi import Request
+from fastapi.responses import HTMLResponse, JSONResponse
+
 # Import models for unified validation and forms
 from models.validation import validation_service
 from models.forms import job_parser
@@ -25,13 +29,16 @@ logger = logging.getLogger(__name__)
 def handle_page_errors(operation_name: str):
     """Decorator to handle common page operation errors consistently"""
     def decorator(func):
-        def wrapper(self, request_handler, *args, **kwargs):
+        def wrapper(self, *args, **kwargs):
             try:
-                return func(self, request_handler, *args, **kwargs)
+                return func(self, *args, **kwargs)
             except Exception as e:
                 logger.error(f"{operation_name} error: {e}")
-                # TODO: Update error handling to use ResponseUtils once all handlers are migrated
-                self._send_error(request_handler, f"{operation_name} error: {str(e)}")
+                # Return FastAPI error response
+                return HTMLResponse(
+                    content=f"<html><body><h1>Error</h1><p>{operation_name} error: {str(e)}</p></body></html>",
+                    status_code=500
+                )
         return wrapper
     return decorator
 
@@ -46,7 +53,7 @@ class GETHandlers:
         self.response_utils = ResponseUtils(template_service)
     
     @handle_page_errors("Dashboard")
-    def show_dashboard(self, request_handler):
+    def show_dashboard(self) -> HTMLResponse:
         """Show main dashboard with job list"""
         jobs = self.backup_config.get_backup_jobs()
         global_settings = self.backup_config.get_global_settings()
@@ -116,10 +123,10 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/dashboard.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     @handle_page_errors("Add job form")
-    def show_add_job_form(self, request_handler):
+    def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
         form_data = self.job_form_builder.build_empty_form_data()
         form_data['page_title'] = 'Add Job'
@@ -137,7 +144,7 @@ class GETHandlers:
         form_data.update(self._build_schedule_form_data({}))
         
         html = self.template_service.render_template('pages/job_form.html', **form_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     def _build_source_display_with_type(self, job_config):
         """Build source display string with type prefix"""
@@ -236,16 +243,18 @@ class GETHandlers:
         return builder.build_schedule_context(job_config)
     
     @handle_page_errors("Edit job form")
-    def show_edit_job_form(self, request_handler, job_name: str):
+    def show_edit_job_form(self, job_name: str) -> HTMLResponse:
         """Show edit job form"""
         if not job_name:
-            self._send_error(request_handler, "Job name is required")
-            return
+            error_html = self.template_service.render_template('pages/error.html', 
+                error_message="Job name is required", page_title="Error")
+            return HTMLResponse(content=error_html, status_code=400)
         
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            self._send_error(request_handler, f"Job '{job_name}' not found")
-            return
+            error_html = self.template_service.render_template('pages/error.html', 
+                error_message=f"Job '{job_name}' not found", page_title="Error")
+            return HTMLResponse(content=error_html, status_code=404)
         
         job_config = jobs[job_name]
         form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
@@ -288,10 +297,10 @@ class GETHandlers:
         form_data.update(self._build_schedule_form_data(job_config))
         
         html = self.template_service.render_template('pages/job_form.html', **form_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     @handle_page_errors("Config manager")
-    def show_config_manager(self, request_handler):
+    def show_config_manager(self) -> HTMLResponse:
         """Show configuration management page"""
         from models.notifications import PROVIDER_FIELD_SCHEMAS
         
@@ -326,10 +335,10 @@ class GETHandlers:
         }
             
         html = self.template_service.render_template('pages/config_manager.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     @handle_page_errors("Raw editor")
-    def show_raw_editor(self, request_handler):
+    def show_raw_editor(self) -> HTMLResponse:
         """Show raw YAML configuration editor"""
         config_path = self.backup_config.config_file
         raw_config = ""
@@ -345,7 +354,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/config_editor.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     def _get_available_themes(self):
         """Get list of available themes by scanning theme directory"""
@@ -378,20 +387,18 @@ class GETHandlers:
         request_handler.wfile.write(html.encode())
 
     @handle_page_errors("Job inspection")
-    def show_job_inspect(self, request_handler):
+    def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
         """Show job inspection page"""
-        # Get job name from query parameters
-        from urllib.parse import urlparse, parse_qs
-        url_parts = urlparse(request_handler.path)
-        params = parse_qs(url_parts.query)
-        job_name = params.get('name', [''])[0]
-        
         if not job_name:
-            raise ValueError("Job name is required")
+            error_html = self.template_service.render_template('pages/error.html', 
+                error_message="Job name is required", page_title="Error")
+            return HTMLResponse(content=error_html, status_code=400)
         
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            raise ValueError(f"Job '{job_name}' not found")
+            error_html = self.template_service.render_template('pages/error.html', 
+                error_message=f"Job '{job_name}' not found", page_title="Error")
+            return HTMLResponse(content=error_html, status_code=404)
         
         job_config = jobs[job_name]
         
@@ -414,10 +421,10 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/job_inspect.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
 
     @handle_page_errors("Dev logs")
-    def show_dev_logs(self, request_handler, log_type: str = 'app'):
+    def show_dev_logs(self, log_type: str = 'app') -> HTMLResponse:
         """Show development/debug logs page"""
         logs_data = self._get_system_logs(log_type)
         
@@ -429,7 +436,7 @@ class GETHandlers:
         }
         
         html = self.template_service.render_template('pages/dev_logs.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
     
     def _get_system_logs(self, log_type: str) -> List[str]:
         """Get system logs by type"""
@@ -753,15 +760,14 @@ class ValidationHandlers:
         request_handler.wfile.write(error_html.encode())
     
     @handle_page_errors("SSH validation")
-    def validate_ssh_source(self, request_handler, source: str):
+    def validate_ssh_source(self, source: str) -> JSONResponse:
         """Validate SSH source configuration"""
         # Parse source string (format: username@hostname)
         if '@' not in source:
-            self.response_utils.send_json_response(request_handler, {
+            return JSONResponse(content={
                 'valid': False,
                 'error': 'Invalid source format. Expected: username@hostname'
             })
-            return
         
         username, hostname = source.split('@', 1)
         ssh_config = {'username': username, 'hostname': hostname}
@@ -770,7 +776,7 @@ class ValidationHandlers:
         from services.validation import ValidationService
         validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
-        self.response_utils.send_json_response(request_handler, result)
+        return JSONResponse(content=result)
 
     @handle_page_errors("Path validation")
     def validate_source_paths(self, request_handler, form_data: Dict[str, Any]):
@@ -795,7 +801,7 @@ class ValidationHandlers:
 
 
     @handle_page_errors("Network scan")
-    def scan_network_for_rsyncd(self, request_handler, network_range: str):
+    def scan_network_for_rsyncd(self, network_range: str) -> HTMLResponse:
         """Scan network for rsyncd services"""
         # Basic network scanning functionality
         import subprocess
@@ -827,7 +833,7 @@ class ValidationHandlers:
         }
         
         html = self.template_service.render_template('pages/network_scan.html', **template_data)
-        self.response_utils.send_html_response(request_handler, html)
+        return HTMLResponse(content=html)
 
     def _extract_job_name_parameter(self, request_handler, job_name=None) -> str:
         """Extract job name from parameter or query string"""

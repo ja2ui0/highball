@@ -153,43 +153,43 @@ def convert_handler_response(handler_method, *args, **kwargs):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard():
     """Main dashboard page"""
-    return convert_handler_response(services.handlers['get_pages'].show_dashboard)
+    return services.handlers['get_pages'].show_dashboard()
 
 
 @app.get("/add-job", response_class=HTMLResponse)
 async def show_add_job_form():
     """Add new backup job form"""
-    return convert_handler_response(services.handlers['get_pages'].show_add_job_form)
+    return services.handlers['get_pages'].show_add_job_form()
 
 
 @app.get("/edit-job", response_class=HTMLResponse)
 async def show_edit_job_form(name: str = Query("")):
     """Edit existing backup job form"""
-    return convert_handler_response(services.handlers['get_pages'].show_edit_job_form, name)
+    return services.handlers['get_pages'].show_edit_job_form(name)
 
 
 @app.get("/config", response_class=HTMLResponse)
 async def show_config_manager():
     """Configuration manager page"""
-    return convert_handler_response(services.handlers['get_pages'].show_config_manager)
+    return services.handlers['get_pages'].show_config_manager()
 
 
 @app.get("/config/raw", response_class=HTMLResponse)
 async def show_raw_editor():
     """Raw YAML configuration editor"""
-    return convert_handler_response(services.handlers['get_pages'].show_raw_editor)
+    return services.handlers['get_pages'].show_raw_editor()
 
 
 @app.get("/dev", response_class=HTMLResponse)
 async def show_dev_logs(type: str = Query("app")):
     """Development logs and debugging"""
-    return convert_handler_response(services.handlers['get_pages'].show_dev_logs, type)
+    return services.handlers['get_pages'].show_dev_logs(type)
 
 
 @app.get("/inspect", response_class=HTMLResponse)
-async def show_job_inspect():
+async def show_job_inspect(name: str = Query("")):
     """Job inspection page"""
-    return convert_handler_response(services.handlers['get_pages'].show_job_inspect)
+    return services.handlers['get_pages'].show_job_inspect(name)
 
 
 # =============================================================================
@@ -199,19 +199,19 @@ async def show_job_inspect():
 @app.get("/scan-network")
 async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
     """Scan network for rsyncd services"""
-    return convert_handler_response(services.handlers['validation_pages'].scan_network_for_rsyncd, range)
+    return services.handlers['validation_pages'].scan_network_for_rsyncd(range)
 
 
 @app.get("/validate-ssh")
 async def validate_ssh_source(source: str = Query("")):
     """Validate SSH source configuration"""
-    return convert_handler_response(services.handlers['validation_pages'].validate_ssh_source, source)
+    return services.handlers['validation_pages'].validate_ssh_source(source)
 
 
 @app.get("/validate-restic")
 async def validate_restic_job(job: str = Query("")):
     """Validate Restic repository configuration"""
-    return convert_handler_response(services.handlers['api'].validate_restic_job, job)
+    return services.handlers['api'].validate_restic_job(job)
 
 
 @app.post("/validate-restic-form")
@@ -226,7 +226,7 @@ async def validate_restic_form(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return convert_handler_response(services.handlers['api'].validate_restic_form, form_data)
+    return services.handlers['api'].validate_restic_form(form_data)
 
 
 # =============================================================================
@@ -236,37 +236,37 @@ async def validate_restic_form(request: Request):
 @app.get("/restic-repo-info")
 async def get_repository_info(job: str = Query("")):
     """Get Restic repository information"""
-    return convert_handler_response(services.handlers['api'].get_repository_info, job)
+    return services.handlers['api'].get_repository_info(job)
 
 
 @app.get("/restic-snapshots")
 async def list_snapshots(job: str = Query("")):
     """List Restic repository snapshots"""
-    return convert_handler_response(services.handlers['api'].list_snapshots, job)
+    return services.handlers['api'].list_snapshots(job)
 
 
 @app.get("/restic-snapshot-stats")
 async def get_snapshot_stats(job: str = Query(""), snapshot: str = Query("")):
     """Get statistics for specific snapshot"""
-    return convert_handler_response(services.handlers['api'].get_snapshot_stats, job, snapshot)
+    return services.handlers['api'].get_snapshot_stats(job, snapshot)
 
 
 @app.get("/restic-browse")
 async def browse_directory(job: str = Query(""), snapshot: str = Query(""), path: str = Query("/")):
     """Browse directory in snapshot"""
-    return convert_handler_response(services.handlers['api'].browse_directory, job, snapshot, path)
+    return services.handlers['api'].browse_directory(job, snapshot, path)
 
 
 @app.get("/restic-init")
 async def init_repository(job: str = Query("")):
     """Initialize Restic repository"""
-    return convert_handler_response(services.handlers['api'].init_repository, job)
+    return services.handlers['api'].init_repository(job)
 
 
 @app.get("/filesystem-browse")
-async def browse_filesystem():
+async def browse_filesystem(path: str = Query("/")):
     """Browse filesystem"""
-    return convert_handler_response(services.handlers['api'].browse_filesystem)
+    return services.handlers['api'].browse_filesystem(path)
 
 
 @app.get("/jobs")
@@ -276,9 +276,9 @@ async def list_jobs():
 
 
 @app.get("/api/highball/jobs")
-async def get_jobs():
+async def get_jobs(state: Optional[str] = Query(None), fields: Optional[str] = Query(None)):
     """API endpoint for jobs"""
-    return convert_handler_response(services.handlers['api'].get_jobs)
+    return services.handlers['api'].get_jobs(state, fields)
 
 
 @app.get("/check-repository-availability")
@@ -460,30 +460,16 @@ async def check_restore_overwrites(request: Request):
 async def test_telegram_notification(request: Request):
     """Test Telegram notification"""
     form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return convert_handler_response(services.handlers['api'].test_telegram_notification, form_data)
+    test_message = form.get('test_message', 'Test notification from Highball')
+    return services.handlers['api'].test_telegram_notification(test_message)
 
 
 @app.post("/test-email-notification")
 async def test_email_notification(request: Request):
     """Test email notification"""
     form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return convert_handler_response(services.handlers['api'].test_email_notification, form_data)
+    test_message = form.get('test_message', 'Test notification from Highball')
+    return services.handlers['api'].test_email_notification(test_message)
 
 
 @app.post("/unlock-repository")

@@ -4,14 +4,13 @@ Merges all API and data service handlers into single module
 Replaces: api_handler.py, restic_handler.py, filesystem_handler.py, notification_test_handler.py
 """
 
-import json
 import logging
-import os
-import subprocess
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+
+# FastAPI imports
+from fastapi.responses import JSONResponse
 
 # Import unified models
 from models.backup import backup_service
@@ -31,17 +30,9 @@ class APIHandler:
     # REST API ENDPOINTS
     # =============================================================================
     
-    def get_jobs(self, request_handler):
+    def get_jobs(self, state_filter: Optional[str] = None, fields_filter: Optional[str] = None) -> JSONResponse:
         """GET /api/highball/jobs - List jobs with optional filtering"""
         try:
-            # Parse query parameters
-            url_parts = urlparse(request_handler.path)
-            params = parse_qs(url_parts.query)
-            
-            # Get filter parameters
-            state_filter = params.get('state', [None])[0]
-            fields_filter = params.get('fields', [None])[0]
-            
             jobs = self.backup_config.get_backup_jobs()
             
             # Get job status information
@@ -87,55 +78,62 @@ class APIHandler:
                 'timestamp': datetime.now().isoformat()
             }
             
-            self._send_json_response(request_handler, response_data, cors=True)
+            return JSONResponse(
+                content=response_data,
+                headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+                }
+            )
             
         except Exception as e:
             logger.error(f"API jobs error: {e}")
-            self._send_api_error(request_handler, f"API error: {str(e)}")
+            return JSONResponse(
+                content={'error': f"API error: {str(e)}", 'timestamp': datetime.now().isoformat()},
+                status_code=500
+            )
     
     # =============================================================================
     # RESTIC REPOSITORY OPERATIONS
     # =============================================================================
     
-    def validate_restic_job(self, request_handler, job_name: str):
+    def validate_restic_job(self, job_name: str) -> JSONResponse:
         """Validate Restic repository for a job"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             
             if job_config.get('dest_type') != 'restic':
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job is not configured for Restic'
                 })
-                return
             
             # Test repository access using unified backup service
             result = backup_service.test_repository(job_config)
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Restic validation error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Validation failed: {str(e)}'
             })
     
-    def validate_restic_form(self, request_handler, form_data: Dict[str, Any]):
+    def validate_restic_form(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Validate Restic configuration from form data"""
         try:
             # Parse Restic destination from form
@@ -143,40 +141,37 @@ class APIHandler:
             restic_result = destination_parser.parse_restic_destination(form_data)
             
             if not restic_result['valid']:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': restic_result['error']
                 })
-                return
             
             # Test repository access
             result = backup_service.test_repository({'dest_config': restic_result['config']})
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Restic form validation error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Form validation failed: {str(e)}'
             })
     
-    def get_repository_info(self, request_handler, job_name: str):
+    def get_repository_info(self, job_name: str) -> JSONResponse:
         """Get Restic repository information"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             
@@ -184,32 +179,30 @@ class APIHandler:
             dest_config = job_config.get('dest_config', {})
             analysis_result = backup_service.analyze_content(dest_config, job_name)
             
-            self._send_json_response(request_handler, analysis_result)
+            return JSONResponse(content=analysis_result)
             
         except Exception as e:
             logger.error(f"Repository info error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Repository info failed: {str(e)}'
             })
     
-    def check_repository_availability(self, request_handler, job_name: str):
+    def check_repository_availability(self, job_name: str) -> JSONResponse:
         """Check if repository is available for browsing (pre-flight check for HTMX)"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
 
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
 
             job_config = jobs[job_name]
             dest_type = job_config.get('dest_type')
@@ -223,7 +216,7 @@ class APIHandler:
                     check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
                     
                     if check_success:
-                        self._send_json_response(request_handler, {
+                        return JSONResponse(content={
                             'success': True,
                             'available': True,
                             'job_type': dest_type
@@ -238,7 +231,7 @@ class APIHandler:
                         elif 'Command returned 10' in check_message:
                             error_type = 'repository_not_found'
                         
-                        self._send_json_response(request_handler, {
+                        return JSONResponse(content={
                             'success': True,
                             'available': False,
                             'error_type': error_type,
@@ -246,14 +239,14 @@ class APIHandler:
                             'job_type': dest_type
                         })
                 else:
-                    self._send_json_response(request_handler, {
+                    return JSONResponse(content={
                         'success': False,
                         'error': 'Repository URI not configured'
                     })
             else:
                 # For non-restic jobs (rsync, etc), assume available for now
                 # Could add filesystem checks here later
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': True,
                     'available': True,
                     'job_type': dest_type
@@ -261,38 +254,35 @@ class APIHandler:
 
         except Exception as e:
             logger.error(f"Repository availability check error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Availability check failed: {str(e)}'
             })
 
-    def unlock_repository(self, request_handler, job_name: str):
+    def unlock_repository(self, job_name: str) -> JSONResponse:
         """Unlock a locked restic repository (HTMX endpoint)"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
 
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
 
             job_config = jobs[job_name]
             dest_type = job_config.get('dest_type')
             
             if dest_type != 'restic':
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Unlock is only supported for restic repositories'
                 })
-                return
 
             # Execute restic unlock command using the same patterns as other operations
             dest_config = job_config.get('dest_config', {})
@@ -300,32 +290,30 @@ class APIHandler:
             
             result = backup_service.unlock_repository(dest_config, source_config)
             
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
 
         except Exception as e:
             logger.error(f"Repository unlock error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Repository unlock failed: {str(e)}'
             })
     
-    def list_snapshots(self, request_handler, job_name: str):
+    def list_snapshots(self, job_name: str) -> JSONResponse:
         """List snapshots for a job"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
@@ -335,32 +323,30 @@ class APIHandler:
             filters = {'job_name': job_name}
             result = backup_service.list_snapshots(dest_config, filters, source_config)
             
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"List snapshots error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Snapshot listing failed: {str(e)}'
             })
     
-    def get_snapshot_stats(self, request_handler, job_name: str, snapshot_id: str):
+    def get_snapshot_stats(self, job_name: str, snapshot_id: str) -> JSONResponse:
         """Get statistics for a specific snapshot"""
         try:
             if not job_name or not snapshot_id:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name and snapshot ID are required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
@@ -368,32 +354,30 @@ class APIHandler:
             
             # Use unified backup service for snapshot statistics
             result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Snapshot stats error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Stats retrieval failed: {str(e)}'
             })
     
-    def browse_directory(self, request_handler, job_name: str, snapshot_id: str, path: str = '/'):
+    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/') -> JSONResponse:
         """Browse directory contents in a snapshot"""
         try:
             if not job_name or not snapshot_id:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name and snapshot ID are required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
@@ -401,32 +385,30 @@ class APIHandler:
             
             # Use unified backup service for directory browsing
             result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Directory browse error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Browse failed: {str(e)}'
             })
     
-    def init_repository(self, request_handler, job_name: str):
+    def init_repository(self, job_name: str) -> JSONResponse:
         """Initialize Restic repository for a job"""
         try:
             if not job_name:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': 'Job name is required'
                 })
-                return
             
             jobs = self.backup_config.get_backup_jobs()
             if job_name not in jobs:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f"Job '{job_name}' not found"
                 })
-                return
             
             job_config = jobs[job_name]
             dest_config = job_config.get('dest_config', {})
@@ -434,16 +416,16 @@ class APIHandler:
             
             # Initialize repository using backup service (pass source_config for SSH detection)
             result = backup_service.initialize_repository(dest_config, source_config)
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Repository init error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Repository initialization failed: {str(e)}'
             })
     
-    def initialize_restic_repo(self, request_handler, form_data: Dict[str, Any]):
+    def initialize_restic_repo(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Initialize Restic repository from form data"""
         try:
             # Parse Restic destination from form
@@ -451,19 +433,18 @@ class APIHandler:
             restic_result = destination_parser.parse_restic_destination(form_data)
             
             if not restic_result['valid']:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': restic_result['error']
                 })
-                return
             
             # Initialize repository
             result = backup_service.initialize_repository(restic_result['config'])
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Form repository init error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Repository initialization failed: {str(e)}'
             })
@@ -472,29 +453,22 @@ class APIHandler:
     # FILESYSTEM OPERATIONS
     # =============================================================================
     
-    def browse_filesystem(self, request_handler):
+    def browse_filesystem(self, path: str = '/') -> JSONResponse:
         """Browse local filesystem for path selection"""
         try:
-            # Parse query parameters for path
-            url_parts = urlparse(request_handler.path)
-            params = parse_qs(url_parts.query)
-            path = params.get('path', ['/'])[0]
-            
             try:
                 path_obj = Path(path)
                 if not path_obj.exists():
-                    self._send_json_response(request_handler, {
+                    return JSONResponse(content={
                         'success': False,
                         'error': f'Path does not exist: {path}'
                     })
-                    return
                 
                 if not path_obj.is_dir():
-                    self._send_json_response(request_handler, {
+                    return JSONResponse(content={
                         'success': False,
                         'error': f'Path is not a directory: {path}'
                     })
-                    return
                 
                 # List directory contents
                 entries = []
@@ -518,13 +492,12 @@ class APIHandler:
                     entries.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
                     
                 except PermissionError:
-                    self._send_json_response(request_handler, {
+                    return JSONResponse(content={
                         'success': False,
                         'error': f'Permission denied: {path}'
                     })
-                    return
                 
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': True,
                     'path': str(path_obj),
                     'parent': str(path_obj.parent) if path_obj.parent != path_obj else None,
@@ -532,14 +505,14 @@ class APIHandler:
                 })
                 
             except Exception as e:
-                self._send_json_response(request_handler, {
+                return JSONResponse(content={
                     'success': False,
                     'error': f'Filesystem error: {str(e)}'
                 })
             
         except Exception as e:
             logger.error(f"Filesystem browse error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Browse failed: {str(e)}'
             })
@@ -548,32 +521,28 @@ class APIHandler:
     # NOTIFICATION TESTING
     # =============================================================================
     
-    def test_telegram_notification(self, request_handler, form_data: Dict[str, Any]):
+    def test_telegram_notification(self, test_message: str = 'Test notification from Highball') -> JSONResponse:
         """Test Telegram notification"""
         try:
-            test_message = form_data.get('test_message', ['Test notification from Highball'])[0]
             result = self.notification_service.test_provider('telegram')
-            
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Telegram test error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Telegram test failed: {str(e)}'
             })
     
-    def test_email_notification(self, request_handler, form_data: Dict[str, Any]):
+    def test_email_notification(self, test_message: str = 'Test notification from Highball') -> JSONResponse:
         """Test email notification"""
         try:
-            test_message = form_data.get('test_message', ['Test notification from Highball'])[0]
             result = self.notification_service.test_provider('email')
-            
-            self._send_json_response(request_handler, result)
+            return JSONResponse(content=result)
             
         except Exception as e:
             logger.error(f"Email test error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Email test failed: {str(e)}'
             })
@@ -581,31 +550,7 @@ class APIHandler:
     # =============================================================================
     # UTILITY METHODS
     # =============================================================================
-    
-    def _send_json_response(self, request_handler, data: Dict[str, Any], cors: bool = False):
-        """Send JSON response with optional CORS headers"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'application/json')
-        
-        if cors:
-            request_handler.send_header('Access-Control-Allow-Origin', '*')
-            request_handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            request_handler.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        
-        request_handler.end_headers()
-        request_handler.wfile.write(json.dumps(data).encode())
-    
-    def _send_api_error(self, request_handler, message: str, status_code: int = 500):
-        """Send API error response"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'application/json')
-        request_handler.end_headers()
-        
-        error_response = {
-            'error': message,
-            'timestamp': datetime.now().isoformat()
-        }
-        request_handler.wfile.write(json.dumps(error_response).encode())
+    # All API methods now return JSONResponse directly - no utility methods needed
 
 
 class ResponseUtils:
