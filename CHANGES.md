@@ -1,4 +1,60 @@
-# Changes 2025-08-21 - Same-as-Origin Repository Pattern & Critical Fixes
+# Changes 2025-08-22 - Config Hierarchy Migration COMPLETE
+
+## 2025-08-22: Configuration Hierarchy Migration Successfully Implemented
+
+### New Config Architecture (PRODUCTION READY)
+**COMPLETED**: Full migration from monolithic `config.yaml` to distributed hierarchy with job-scoped secrets.
+
+**New Structure**:
+- **Global settings**: `/config/local/local.yaml` 
+- **Individual jobs**: `/config/local/jobs/<job_name>.yaml` (flattened, no `backup_jobs` wrapper)
+- **Job-scoped secrets**: `/config/local/secrets/jobs/<job_name>.env` (only created when job has secrets)
+- **Deleted jobs**: `/config/local/jobs/deleted/` and `/config/local/secrets/jobs/deleted/`
+
+### Schema-Driven Secret Management (CRITICAL ARCHITECTURE)
+**Fully automated secret discovery**: NO hardcoded field mappings, completely schema-driven approach.
+
+**Secret Schema Integration**:
+- `DESTINATION_TYPE_SCHEMAS.restic`: Added `password` field with `secret: True, env_var: 'RESTIC_PASSWORD'`
+- `RESTIC_REPOSITORY_TYPE_SCHEMAS`: Updated `s3_access_key`, `s3_secret_key`, `rest_password` with `env_var` properties
+- **Auto-discovery**: `_get_secret_fields_from_schemas()` scans ALL schemas (source, destination, restic repo, notifications)
+
+**Job-Scoped Environment Isolation**:
+- Config loading: `${ENV_VAR}` placeholders replaced with job-specific values
+- Execution: Each job gets isolated environment preventing secret contamination
+- **Only creates `.env` files when jobs actually have secrets** (no empty file cruft)
+
+### File-Based Job Operations
+**Atomic operations with proper error handling**:
+- `save_job()`: Extract secrets → write config with placeholders → create `.env` if secrets exist
+- `delete_backup_job()`: Move both config and secrets to `deleted/` with `deleted_on` timestamp  
+- `restore_deleted_job()`: Move files back, remove timestamp, validate no conflicts
+
+### Config Loading Infrastructure
+**Complete replacement of legacy loading**:
+- **New method**: `_load_global_settings()`, `_load_backup_jobs()`, `_load_deleted_jobs()`
+- **Secret merging**: `_merge_secrets()` with recursive `${VAR}` replacement
+- **Environment variable substitution**: Supports global and job-scoped secrets
+- **Backward compatibility**: Same interface, handlers unchanged
+
+### Migration Testing Results
+**✅ SUCCESSFUL DEPLOYMENT**:
+- Container rebuilt and started without errors
+- Dashboard loads and displays jobs from new hierarchy
+- Job data correctly populated from distributed config files
+- Secret substitution working (passwords resolved from `.env` files)
+- Web interface fully functional
+
+### Implementation Quality
+**Zero-breakage migration**:
+- All existing handler interfaces preserved
+- Form parsers already used flattened structure (no changes needed)
+- Schema-driven approach future-proof for new providers/sources
+- **Atomic file operations** with temporary files and error rollback
+
+---
+
+# Previous Sessions (2025-08-21)
 
 ## 2025-08-21: Same-as-Origin Repository Implementation
 

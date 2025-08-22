@@ -60,6 +60,8 @@ source_config:
 
 **Rule: Unified Restic Execution (CRITICAL ARCHITECTURE)**: All restic operations MUST use `ResticExecutionService` from `services/execution.py`. This service provides automatic SSH/local context detection, unified credential management, and consolidated execution patterns. **NEVER manually call** `ResticArgumentBuilder.build_environment()` or build SSH commands directly. **ALWAYS use** `restic_executor.execute_restic_command()` with appropriate `operation_type` ('ui', 'backup', 'restore', 'maintenance', 'init') for correct execution context.
 
+**Rule: Schema-Driven Secret Management (CRITICAL ARCHITECTURE)**: ALL secret fields are discovered automatically from schema definitions with `secret: True` and `env_var` properties. Config loading replaces `${ENV_VAR}` placeholders with job-scoped values for complete environment isolation. **NEVER hardcode** secret field mappings - schemas define both secret status and environment variable names. Supports SOURCE, DESTINATION, RESTIC_REPOSITORY, and NOTIFICATION provider schemas seamlessly.
+
 **Rule: SSH vs Local Execution Intelligence**: 
 - **UI Operations** (snapshot listing, browsing, validation): Execute locally from Highball container using local restic binary and credentials, EXCEPT same-as-origin repositories which always use SSH
 - **Source Operations** (backup, restore-to-source): Always execute via SSH+container on source host  
@@ -78,7 +80,7 @@ source_config:
 ## Architecture Overview
 
 ### Core System
-- `app.py` (routing), `config.py` (YAML config)
+- `app.py` (routing), `config.py` (**NEW HIERARCHY**: distributed config with job-scoped secrets)
 
 ### HTTP Layer (handlers/)
 - **Page Rendering**: `pages.py` (optimized) - **REFACTORED ARCHITECTURE** with specialized handler classes:
@@ -151,7 +153,7 @@ source_config:
 
 ## Data Storage
 
-**Config** (user-facing): `/config/config.yaml` - jobs, global settings, deleted jobs
+**Config** (user-facing): **NEW HIERARCHY** - `/config/local/local.yaml` (global settings), `/config/local/jobs/*.yaml` (individual jobs), `/config/local/secrets/jobs/*.env` (job-scoped secrets)
 **Operational** (file-based logging):
 - `/var/log/highball/job_status.yaml` - last-run status per job  
 - `/var/log/highball/jobs/{job_name}.log` - detailed execution logs
@@ -335,10 +337,12 @@ source_config:
 **Test Units**: `python3 -m unittest tests.test_form_error_handler -v`
 **Web Interface**: `http://localhost:8087` (Highball web UI and API)
 
-## Configuration Schema (User-facing Only)
+## Configuration Schema (NEW HIERARCHY)
 
+**NEW ARCHITECTURE**: Distributed config with job-scoped secrets and environment variable isolation.
+
+**Global Settings** (`/config/local/local.yaml`):
 ```yaml
-global_settings:
   scheduler_timezone: "UTC"  # default UTC, configurable
   theme: "dark"  # UI theme (dark, light, gruvbox, etc.)
   default_schedule_times:
@@ -379,34 +383,42 @@ global_settings:
     check_config:
       read_data_subset: "5%"              # balance integrity vs performance
 
-backup_jobs:
-  job_name:
-    source_type: "ssh|local"
-    source_config: 
-      hostname: "hostname" 
-      username: "username"
-      source_paths:  # multi-path support
-        - path: "/path/one"
-          includes: ["*.txt"]
-          excludes: ["temp/"]
-        - path: "/path/two"
-          includes: []
-          excludes: ["*.log"]
-    dest_type: "ssh|local|rsyncd|restic"  # restic fully functional
-    dest_config: {hostname, share} | {repo_type, repo_uri, password, discrete_fields...}  # dual storage: URIs + fields
-    # repo_type: local|rest|s3|sftp|rclone|same_as_origin  # same_as_origin: repository on origin host filesystem
-    schedule: "daily|weekly|hourly|monthly|cron_pattern"
-    enabled: true
-    respect_conflicts: true     # wait for conflicting jobs (default: true)
-    container_runtime: "docker|podman"  # detected during SSH validation, used for restic container execution
-    restic_maintenance: auto            # automatic repository maintenance (auto|user|off, Restic only)
-    # Optional per-job maintenance overrides (user mode only):
-    # maintenance_discard_schedule: "0 4 * * *"     # custom discard schedule
-    # retention_policy: {keep_last: 10, ...}        # custom retention policy
-    # maintenance_check_schedule: "0 1 * * 0"       # custom check schedule
+**Individual Job Files** (`/config/local/jobs/<job_name>.yaml` - FLATTENED structure):
+```yaml
+source_type: "ssh|local"
+source_config: 
+  hostname: "hostname" 
+  username: "username"
+  source_paths:  # multi-path support
+    - path: "/path/one"
+      includes: ["*.txt"]
+      excludes: ["temp/"]
+    - path: "/path/two"
+      includes: []
+      excludes: ["*.log"]
+dest_type: "ssh|local|rsyncd|restic"  # restic fully functional
+dest_config: {hostname, share} | {repo_type, repo_uri, password: "${ENV_VAR}", discrete_fields...}
+# repo_type: local|rest|s3|sftp|rclone|same_as_origin  # same_as_origin: repository on origin host filesystem
+schedule: "daily|weekly|hourly|monthly|cron_pattern"
+enabled: true
+respect_conflicts: true     # wait for conflicting jobs (default: true)
+container_runtime: "docker|podman"  # detected during SSH validation, used for restic container execution
+restic_maintenance: auto            # automatic repository maintenance (auto|user|off, Restic only)
+# Optional per-job maintenance overrides (user mode only):
+# maintenance_discard_schedule: "0 4 * * *"     # custom discard schedule
+# retention_policy: {keep_last: 10, ...}        # custom retention policy
+# maintenance_check_schedule: "0 1 * * 0"       # custom check schedule
+```
 
-deleted_jobs:  # user can manually restore to backup_jobs
-  job_name: {...}
+**Job-Scoped Secrets** (`/config/local/secrets/jobs/<job_name>.env` - ONLY created if job has secrets):
+```bash
+RESTIC_PASSWORD="secret123"
+S3_ACCESS_KEY_ID="AKIA..."
+S3_SECRET_ACCESS_KEY="abc123..."
+HTPASSWD="restpass"
+```
+
+**Deleted Jobs**: Moved to `/config/local/jobs/deleted/<job_name>.yaml` with `deleted_on` timestamp
 ```
 
 ## Roadmap

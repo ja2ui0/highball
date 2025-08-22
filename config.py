@@ -5,52 +5,280 @@ Handles loading/saving YAML config files
 """
 import os
 import yaml
+import glob
+from dotenv import dotenv_values
 class BackupConfig:
     """Manages the backup configuration in YAML format"""
     
-    def __init__(self, config_file="/config/config.yaml"):
+    def __init__(self, config_file="/config/local/local.yaml"):
         self.config_file = config_file
         self.config = self.load_config()
     
     def load_config(self):
-        """Load config from YAML file with robust error handling"""
+        """Load config from new hierarchy: global settings + individual job files + secrets"""
+        try:
+            # Load global settings from /config/local/local.yaml
+            global_settings = self._load_global_settings()
+            
+            # Load active jobs from /config/local/jobs/*.yaml
+            backup_jobs = self._load_backup_jobs()
+            
+            # Load deleted jobs from /config/local/jobs/deleted/*.yaml  
+            deleted_jobs = self._load_deleted_jobs()
+            
+            return {
+                'global_settings': global_settings,
+                'backup_jobs': backup_jobs,
+                'deleted_jobs': deleted_jobs
+            }
+            
+        except Exception as e:
+            # Handle any errors by falling back to defaults
+            self._backup_malformed_config(f"Config hierarchy loading error: {str(e)}")
+            return self._get_default_config()
+    
+    def _load_global_settings(self):
+        """Load global settings from /config/local/local.yaml"""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r') as f:
                     content = f.read().strip()
                     
-                # Handle empty or whitespace-only files
                 if not content:
-                    return self._get_default_config()
+                    return self._get_default_config()['global_settings']
                     
-                config = yaml.safe_load(content)
+                settings = yaml.safe_load(content)
                 
-                # Handle None result from yaml.safe_load
-                if config is None:
-                    return self._get_default_config()
-                    
-                # Validate config structure
-                if not isinstance(config, dict):
-                    self._backup_malformed_config("Config is not a valid dictionary")
-                    return self._get_default_config()
+                if settings is None or not isinstance(settings, dict):
+                    return self._get_default_config()['global_settings']
                 
-                return config
+                # Load user-specific secrets from /config/local/secrets/local.env
+                secrets_file = "/config/local/secrets/local.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    settings = self._merge_secrets(settings, secrets)
                 
-            except yaml.YAMLError as e:
-                # Handle invalid YAML - backup and use defaults
-                self._backup_malformed_config(f"YAML syntax error: {str(e)}")
-                return self._get_default_config()
+                return settings
+                
             except Exception as e:
-                # Handle other file reading errors
-                self._backup_malformed_config(f"File reading error: {str(e)}")
-                return self._get_default_config()
+                print(f"Warning: Error loading global settings: {str(e)}")
+                return self._get_default_config()['global_settings']
         else:
-            # Config file doesn't exist - create directory if needed
-            config_dir = os.path.dirname(self.config_file)
-            if config_dir and not os.path.exists(config_dir):
-                os.makedirs(config_dir)
+            return self._get_default_config()['global_settings']
+    
+    def _load_backup_jobs(self):
+        """Load active jobs from /config/local/jobs/*.yaml with job-scoped secrets"""
+        jobs = {}
+        jobs_dir = "/config/local/jobs"
+        
+        if not os.path.exists(jobs_dir):
+            return jobs
             
-            return self._get_default_config()
+        # Find all .yaml files in jobs directory (not in deleted subdirectory)
+        job_files = glob.glob(os.path.join(jobs_dir, "*.yaml"))
+        
+        for job_file in job_files:
+            job_name = os.path.splitext(os.path.basename(job_file))[0]
+            
+            try:
+                # Load job config
+                with open(job_file, 'r') as f:
+                    job_config = yaml.safe_load(f.read())
+                
+                if job_config is None:
+                    print(f"Warning: Empty job config for {job_name}")
+                    continue
+                
+                # Load job-specific secrets if they exist (scoped per job)
+                secrets_file = f"/config/local/secrets/jobs/{job_name}.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    job_config = self._merge_secrets(job_config, secrets)
+                
+                jobs[job_name] = job_config
+                
+            except Exception as e:
+                print(f"Warning: Error loading job {job_name}: {str(e)}")
+                continue
+        
+        return jobs
+    
+    def _load_deleted_jobs(self):
+        """Load deleted jobs from /config/local/jobs/deleted/*.yaml with job-scoped secrets"""
+        deleted_jobs = {}
+        deleted_dir = "/config/local/jobs/deleted"
+        
+        if not os.path.exists(deleted_dir):
+            return deleted_jobs
+            
+        # Find all .yaml files in deleted directory
+        job_files = glob.glob(os.path.join(deleted_dir, "*.yaml"))
+        
+        for job_file in job_files:
+            job_name = os.path.splitext(os.path.basename(job_file))[0]
+            
+            try:
+                # Load deleted job config
+                with open(job_file, 'r') as f:
+                    job_config = yaml.safe_load(f.read())
+                
+                if job_config is None:
+                    print(f"Warning: Empty deleted job config for {job_name}")
+                    continue
+                
+                # Load deleted job secrets if they exist (scoped per deleted job)
+                secrets_file = f"/config/local/secrets/jobs/deleted/{job_name}.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    job_config = self._merge_secrets(job_config, secrets)
+                
+                deleted_jobs[job_name] = job_config
+                
+            except Exception as e:
+                print(f"Warning: Error loading deleted job {job_name}: {str(e)}")
+                continue
+        
+        return deleted_jobs
+    
+    def _merge_secrets(self, config, secrets):
+        """Merge secrets into config by replacing ${VAR} placeholders - maintains job isolation"""
+        def replace_vars(obj):
+            if isinstance(obj, str):
+                # Replace ${VAR} patterns with actual values from job-specific secrets
+                for key, value in secrets.items():
+                    obj = obj.replace(f"${{{key}}}", value)
+                return obj
+            elif isinstance(obj, dict):
+                return {k: replace_vars(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_vars(item) for item in obj]
+            else:
+                return obj
+        
+        return replace_vars(config)
+    
+    def _get_secret_fields_from_schemas(self, job_config):
+        """Discover ALL secret fields from ALL schemas based on job configuration"""
+        from models.backup import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, SOURCE_TYPE_SCHEMAS
+        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        
+        secret_fields = {}
+        
+        # Helper function to extract secrets from any schema structure
+        def extract_secrets_from_schema_fields(fields):
+            if isinstance(fields, dict):
+                # DESTINATION_TYPE_SCHEMAS format: {'field_name': {'config_key': 'key', 'secret': True, 'env_var': 'VAR'}}
+                for field_name, field_config in fields.items():
+                    if field_config.get('secret') and field_config.get('env_var'):
+                        secret_fields[field_name] = field_config['env_var']
+            elif isinstance(fields, list):
+                # RESTIC_REPOSITORY_TYPE_SCHEMAS format: [{'name': 'field', 'secret': True, 'env_var': 'VAR'}]
+                for field_def in fields:
+                    if field_def.get('secret') and field_def.get('env_var'):
+                        secret_fields[field_def['name']] = field_def['env_var']
+        
+        # Check source type schema
+        source_type = job_config.get('source_type')
+        if source_type and source_type in SOURCE_TYPE_SCHEMAS:
+            source_schema = SOURCE_TYPE_SCHEMAS[source_type]
+            if 'fields' in source_schema:
+                extract_secrets_from_schema_fields(source_schema['fields'])
+        
+        # Check destination type schema
+        dest_type = job_config.get('dest_type')
+        if dest_type and dest_type in DESTINATION_TYPE_SCHEMAS:
+            dest_schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+            if 'fields' in dest_schema:
+                extract_secrets_from_schema_fields(dest_schema['fields'])
+        
+        # Check restic repository type schema
+        dest_config = job_config.get('dest_config', {})
+        repo_type = dest_config.get('repo_type')
+        if repo_type and repo_type in RESTIC_REPOSITORY_TYPE_SCHEMAS:
+            repo_schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
+            if 'fields' in repo_schema:
+                extract_secrets_from_schema_fields(repo_schema['fields'])
+        
+        # Check notification provider schemas
+        notifications = job_config.get('notifications', [])
+        for notification in notifications:
+            if isinstance(notification, dict):
+                provider = notification.get('provider')
+                if provider and provider in PROVIDER_FIELD_SCHEMAS:
+                    provider_schema = PROVIDER_FIELD_SCHEMAS[provider]
+                    if 'fields' in provider_schema:
+                        extract_secrets_from_schema_fields(provider_schema['fields'])
+        
+        return secret_fields
+    
+    def _extract_secrets_from_job_config(self, job_config):
+        """Extract secrets from job config based on schemas, replace with placeholders"""
+        # Get schema-driven secret field mappings
+        secret_fields = self._get_secret_fields_from_schemas(job_config)
+        
+        clean_config = {}
+        secrets = {}
+        
+        def extract_from_dict(source_dict, target_dict):
+            for key, value in source_dict.items():
+                if key in secret_fields and value:
+                    # Replace secret with placeholder in config
+                    env_var = secret_fields[key]
+                    target_dict[key] = f"${{{env_var}}}"
+                    # Store actual value in secrets
+                    secrets[env_var] = value
+                elif isinstance(value, dict):
+                    # Recursively process nested dictionaries
+                    target_dict[key] = {}
+                    extract_from_dict(value, target_dict[key])
+                else:
+                    # Copy non-secret values as-is
+                    target_dict[key] = value
+        
+        extract_from_dict(job_config, clean_config)
+        return clean_config, secrets
+    
+    def _write_job_files_atomically(self, job_name, clean_config, secrets):
+        """Write job config and secrets files atomically"""
+        import tempfile
+        import shutil
+        
+        jobs_dir = "/config/local/jobs"
+        secrets_dir = "/config/local/secrets/jobs"
+        
+        # Prepare file paths
+        config_file = os.path.join(jobs_dir, f"{job_name}.yaml")
+        secrets_file = os.path.join(secrets_dir, f"{job_name}.env")
+        
+        # Write config file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_config:
+            yaml.dump(clean_config, temp_config, default_flow_style=False, indent=2)
+            temp_config_path = temp_config.name
+        
+        try:
+            # Atomic move for config
+            shutil.move(temp_config_path, config_file)
+            
+            # Only create .env file if secrets exist
+            if secrets:
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as temp_secrets:
+                    for key, value in secrets.items():
+                        temp_secrets.write(f'{key}="{value}"\n')
+                    temp_secrets_path = temp_secrets.name
+                
+                # Atomic move for secrets
+                shutil.move(temp_secrets_path, secrets_file)
+            else:
+                # Remove secrets file if no secrets (job changed from having secrets to not)
+                if os.path.exists(secrets_file):
+                    os.remove(secrets_file)
+                    
+        except Exception as e:
+            # Cleanup on failure
+            for temp_path in [temp_config_path, temp_secrets_path if secrets else None]:
+                if temp_path and os.path.exists(temp_path):
+                    os.remove(temp_path)
+            raise e
     
     def _backup_malformed_config(self, error_reason):
         """Backup malformed config file and log the issue"""
@@ -137,7 +365,7 @@ class BackupConfig:
                     }
                 }
             },
-            "backup_jobs": {}
+            "backup_jobs": {}  # Jobs now loaded from file hierarchy
         }
     
     def save_config(self, config=None):
@@ -162,40 +390,128 @@ class BackupConfig:
         return self.config.get('backup_jobs', {}).get(job_name)
     
     def add_backup_job(self, job_name, job_config):
-        """Add or update a backup job"""
-        if 'backup_jobs' not in self.config:
-            self.config['backup_jobs'] = {}
-        self.config['backup_jobs'][job_name] = job_config
-        self.save_config()
+        """Add or update a backup job using new file hierarchy"""
+        return self.save_job(job_name, job_config)
     
     def save_job(self, job_name, job_config):
-        """Save a backup job (alias for add_backup_job)"""
-        self.add_backup_job(job_name, job_config)
-        return True  # Return True for success indication
+        """Save a backup job: config with ${placeholders}, .env with secrets (only if secrets exist)"""
+        try:
+            # Ensure directories exist
+            jobs_dir = "/config/local/jobs"
+            secrets_dir = "/config/local/secrets/jobs"
+            os.makedirs(jobs_dir, exist_ok=True)
+            os.makedirs(secrets_dir, exist_ok=True)
+            
+            # Extract secrets from job config based on schema
+            clean_config, secrets = self._extract_secrets_from_job_config(job_config)
+            
+            # Write files atomically (only creates .env if secrets dict has content)
+            self._write_job_files_atomically(job_name, clean_config, secrets)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving job {job_name}: {str(e)}")
+            return False
     
     def delete_backup_job(self, job_name):
-        """Delete a backup job (move to deleted_jobs section)"""
-        if 'backup_jobs' in self.config and job_name in self.config['backup_jobs']:
-            # Move entire job config from backup_jobs to deleted_jobs
-            job_config = self.config['backup_jobs'][job_name].copy()
+        """Delete a backup job (move files to deleted/ subdirectories)"""
+        try:
+            # Check if job exists
+            if job_name not in self.config.get('backup_jobs', {}):
+                return False
             
-            # Initialize deleted_jobs section if it doesn't exist
-            if 'deleted_jobs' not in self.config:
-                self.config['deleted_jobs'] = {}
+            # Ensure deleted directories exist
+            deleted_jobs_dir = "/config/local/jobs/deleted"
+            deleted_secrets_dir = "/config/local/secrets/jobs/deleted"
+            os.makedirs(deleted_jobs_dir, exist_ok=True)
+            os.makedirs(deleted_secrets_dir, exist_ok=True)
             
-            # Add deleted_at timestamp
-            from datetime import datetime
-            job_config['deleted_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # File paths
+            config_file = f"/config/local/jobs/{job_name}.yaml"
+            secrets_file = f"/config/local/secrets/jobs/{job_name}.env"
+            deleted_config_file = f"/config/local/jobs/deleted/{job_name}.yaml"
+            deleted_secrets_file = f"/config/local/secrets/jobs/deleted/{job_name}.env"
             
-            # Move job to deleted_jobs (entire config branch with timestamp)
-            self.config['deleted_jobs'][job_name] = job_config
+            # Add deleted_on timestamp to job config
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    job_config = yaml.safe_load(f.read())
+                
+                from datetime import datetime
+                job_config['deleted_on'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+                
+                # Write updated config to deleted location
+                with open(deleted_config_file, 'w') as f:
+                    yaml.dump(job_config, f, default_flow_style=False, indent=2)
+                
+                # Remove original config file
+                os.remove(config_file)
             
-            # Remove from active backup_jobs
-            del self.config['backup_jobs'][job_name]
+            # Move secrets file if it exists
+            if os.path.exists(secrets_file):
+                import shutil
+                shutil.move(secrets_file, deleted_secrets_file)
             
-            self.save_config()
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
             return True
-        return False
+            
+        except Exception as e:
+            print(f"Error deleting job {job_name}: {str(e)}")
+            return False
+    
+    def restore_deleted_job(self, job_name):
+        """Restore a deleted job (move files back from deleted/ subdirectories)"""
+        try:
+            # Check if deleted job exists
+            if job_name not in self.config.get('deleted_jobs', {}):
+                return False
+            
+            # Check if job name conflicts with existing active job
+            if job_name in self.config.get('backup_jobs', {}):
+                print(f"Error: Job name '{job_name}' already exists in active jobs")
+                return False
+            
+            # File paths
+            deleted_config_file = f"/config/local/jobs/deleted/{job_name}.yaml"
+            deleted_secrets_file = f"/config/local/secrets/jobs/deleted/{job_name}.env"
+            config_file = f"/config/local/jobs/{job_name}.yaml"
+            secrets_file = f"/config/local/secrets/jobs/{job_name}.env"
+            
+            # Restore config file
+            if os.path.exists(deleted_config_file):
+                with open(deleted_config_file, 'r') as f:
+                    job_config = yaml.safe_load(f.read())
+                
+                # Remove deleted_on timestamp
+                if 'deleted_on' in job_config:
+                    del job_config['deleted_on']
+                
+                # Write restored config to active location
+                with open(config_file, 'w') as f:
+                    yaml.dump(job_config, f, default_flow_style=False, indent=2)
+                
+                # Remove from deleted location
+                os.remove(deleted_config_file)
+            
+            # Restore secrets file if it exists
+            if os.path.exists(deleted_secrets_file):
+                import shutil
+                shutil.move(deleted_secrets_file, secrets_file)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error restoring job {job_name}: {str(e)}")
+            return False
     
     def get_global_settings(self):
         """Get global settings"""

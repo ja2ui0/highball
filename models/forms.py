@@ -221,10 +221,21 @@ class DestinationParser:
         repo_type = safe_get_value(form_data, 'restic_repo_type')
         password = safe_get_value(form_data, 'restic_password')
         
-        if not repo_type:
-            return {'valid': False, 'error': 'Repository type is required'}
-        if not password:
-            return {'valid': False, 'error': 'Repository password is required'}
+        # Schema-driven validation for required fields
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
+        required_fields = schema.get('required_fields', [])
+        
+        # Map form fields to config keys
+        field_values = {
+            'repo_type': repo_type,
+            'password': password
+        }
+        
+        for field in required_fields:
+            if field in field_values and not field_values[field]:
+                display_name = schema.get('display_name', 'Restic')
+                return {'valid': False, 'error': f'{display_name} destination missing {field}'}
         
         # Generate repository URI based on type
         uri_result = DestinationParser._build_restic_uri(repo_type, form_data)

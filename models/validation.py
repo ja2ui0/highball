@@ -412,7 +412,19 @@ class ResticValidator:
         """Validate complete Restic destination configuration"""
         dest_config = parsed_job.get('dest_config', {})
         
-        # Check required fields
+        # Schema-driven required field validation
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
+        required_fields = schema.get('required_fields', [])
+        
+        for field in required_fields:
+            if not dest_config.get(field):
+                return {
+                    'success': False,
+                    'message': f'{schema.get("display_name", "Restic")} destination missing {field}'
+                }
+        
+        # Additional restic-specific required fields (not in schema)
         repo_type = dest_config.get('repo_type')
         if not repo_type:
             return {
@@ -425,13 +437,6 @@ class ResticValidator:
             return {
                 'success': False,
                 'message': 'Repository URI is required for Restic destinations'
-            }
-        
-        password = dest_config.get('password')
-        if not password:
-            return {
-                'success': False,
-                'message': 'Repository password is required for Restic destinations'
             }
         
         # Test repository access

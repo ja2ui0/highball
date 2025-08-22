@@ -88,7 +88,13 @@ DESTINATION_TYPE_SCHEMAS = {
         'always_available': False,  # depends on binary availability
         'requires': ['restic'],
         'requires_container_runtime': True,
-        'availability_check': 'check_restic_availability'
+        'availability_check': 'check_restic_availability',
+        'fields': {
+            'repo_type': {'config_key': 'repo_type', 'required': True},
+            'repo_uri': {'config_key': 'repo_uri', 'required': True},
+            'password': {'config_key': 'password', 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
+        },
+        'required_fields': ['repo_type', 'repo_uri', 'password']
     }
 }
 
@@ -184,7 +190,9 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'type': 'password',
                 'label': 'Password (Optional)',
                 'help': 'HTTP Basic Auth password if server requires authentication',
-                'placeholder': 'password'
+                'placeholder': 'password',
+                'secret': True,
+                'env_var': 'HTPASSWD'
             }
         ]
     },
@@ -237,7 +245,9 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'label': 'Access Key ID',
                 'help': 'AWS Access Key ID for authentication',
                 'placeholder': 'AKIAIOSFODNN7EXAMPLE',
-                'required': True
+                'required': True,
+                'secret': True,
+                'env_var': 'S3_ACCESS_KEY_ID'
             },
             {
                 'name': 's3_secret_key',
@@ -245,7 +255,9 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'label': 'Secret Access Key',
                 'help': 'AWS Secret Access Key for authentication',
                 'placeholder': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-                'required': True
+                'required': True,
+                'secret': True,
+                'env_var': 'S3_SECRET_ACCESS_KEY'
             },
             {
                 'name': 's3_endpoint',
