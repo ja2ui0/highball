@@ -7,7 +7,7 @@ import os
 import yaml
 import subprocess
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from pydantic import BaseModel
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Set
 
@@ -16,20 +16,37 @@ from typing import Dict, Any, Optional, List, Set
 # **DATA STRUCTURES** - Shared configuration and path management
 # =============================================================================
 
-@dataclass
-class LogPaths:
+class LogPaths(BaseModel):
     """Centralized log path management using pathlib"""
     base_dir: Path = Path("/var/log/highball")
     
-    def __post_init__(self):
-        """Initialize derived paths and ensure directories exist"""
-        self.jobs_dir = self.base_dir / "jobs"
-        self.status_file = self.base_dir / "job_status.yaml"
-        self.validation_file = self.base_dir / "job_validation.yaml"
-        self.deleted_jobs_file = self.base_dir / "deleted_jobs.yaml"
-        self.running_jobs_file = self.base_dir / "running_jobs.txt"
+    @property
+    def jobs_dir(self) -> Path:
+        """Get jobs directory path"""
+        return self.base_dir / "jobs"
+    
+    @property  
+    def status_file(self) -> Path:
+        """Get status file path"""
+        return self.base_dir / "job_status.yaml"
         
-        # Ensure directories exist
+    @property
+    def validation_file(self) -> Path:
+        """Get validation file path"""
+        return self.base_dir / "job_validation.yaml"
+        
+    @property
+    def deleted_jobs_file(self) -> Path:
+        """Get deleted jobs file path"""
+        return self.base_dir / "deleted_jobs.yaml"
+        
+    @property
+    def running_jobs_file(self) -> Path:
+        """Get running jobs file path"""
+        return self.base_dir / "running_jobs.txt"
+    
+    def model_post_init(self, __context) -> None:
+        """Ensure directories exist"""
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
     
     def get_job_log_file(self, job_name: str) -> Path:

@@ -7,15 +7,14 @@ import subprocess
 import shlex
 import re
 from typing import List, Dict, Optional, Any
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 
 # =============================================================================
 # **DATA STRUCTURES** - Execution configuration and results
 # =============================================================================
 
-@dataclass
-class ExecutionConfig:
+class ExecutionConfig(BaseModel):
     """Execution configuration parameters"""
     timeout: int = 120
     capture_output: bool = True
@@ -23,8 +22,7 @@ class ExecutionConfig:
     shell: bool = False
 
 
-@dataclass
-class ExecutionResult:
+class ExecutionResult(BaseModel):
     """Execution result data structure"""
     returncode: int
     stdout: str = ""
