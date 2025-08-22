@@ -1,0 +1,27 @@
+#!/bin/bash
+# Runtime user management and privilege dropping
+
+# Set default PUID/PGID if not provided
+PUID=${PUID:-1000}
+PGID=${PGID:-1000}
+
+echo "Setting up container with PUID=$PUID, PGID=$PGID"
+
+# Modify existing www-data group and user to match desired PUID/PGID
+groupmod -g $PGID www-data
+usermod -u $PUID -g $PGID www-data
+
+# Create necessary directories with correct ownership
+mkdir -p /var/log/supervisor /tmp/supervisor
+chown -R www-data:www-data /app /config /var/log /tmp/supervisor
+# Fix /run permissions for nginx
+chown www-data:www-data /run
+
+# Fix nginx directories (nginx already expects www-data)
+mkdir -p /var/cache/nginx /var/lib/nginx /var/log/nginx
+chown -R www-data:www-data /var/cache/nginx /var/lib/nginx /var/log/nginx
+
+echo "Container initialization complete"
+
+# Switch to user and exec supervisord
+exec gosu www-data supervisord -c /etc/supervisor/conf.d/supervisord.conf

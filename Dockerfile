@@ -14,7 +14,8 @@ RUN apt-get update && \
         supervisor \
         tzdata \
         jq \
-        netcat-openbsd && \
+        netcat-openbsd \
+        gosu && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/requirements.txt /root/.cache
@@ -33,9 +34,14 @@ COPY config/ /config/
 COPY favicon.ico /app/
 COPY *.py /app/
 COPY handlers/ /app/handlers/
+COPY models/ /app/models/
 COPY services/ /app/services/
 COPY templates/ /app/templates/
 COPY static/ /app/static/
+
+# Copy init script and make executable
+COPY init /app/init
+RUN chmod +x /app/init
 
 # Fix ownership
 RUN chown -R root:root /app /config
@@ -45,5 +51,6 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost/ || exit 1
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Use init script as entrypoint for user management
+ENTRYPOINT ["/app/init"]
 
