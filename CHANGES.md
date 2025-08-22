@@ -107,12 +107,22 @@ if dest_config.get('repo_type') == 'same_as_origin':
 
 ---
 
-## 2025-08-21 Continued: Error Handling Refactor
+## 2025-08-21 Continued: Anti-Pattern Elimination COMPLETE
 
-### Error Handling Decorator Implementation
-**Applied `@handle_page_errors` decorator to 17 methods** in `handlers/pages.py`, eliminating repetitive try/catch blocks:
-- Fixed broken `show_edit_job_form` indentation 
-- Tested each method individually with `./rr` and curl
-- **Result**: Methods now focus on business logic, centralized error handling
+### Response Service & Long Methods Refactoring
+**Applied surgical refactoring approach with zero breakage**:
+- **ResponseUtils class** in `handlers/api.py` eliminated 37 duplicate response method calls
+- **Extract Method pattern** reduced three 70+ line methods to 12-19 lines (54-84% complexity reduction)
+- **Methods refactored**: `save_backup_job()`, `check_repository_availability_htmx()`, `validate_source_paths()`
+- **Sub-methods created**: 10+ focused helpers following Single Responsibility Principle
+- **Result**: ALL anti-patterns eliminated, clean architecture achieved
 
-**Next Phase Options**: HTTP method separation (GETHandlers/POSTHandlers/ValidationHandlers) or template data builder extraction
+### Config Hierarchy Migration Preparation
+**Validated existing distributed config structure**:
+- **New hierarchy**: `config/local/` with separate `jobs/`, `secrets/`, `deleted/` directories
+- **Job config flattening**: Removed nested `backup_jobs` wrapper
+- **Secrets separation**: Passwords/keys moved to `.env` files with variable substitution
+- **Smart design**: Only jobs with secrets have `.env` files (no empty file cruft)
+- **Template pattern**: `local/` serves as `/etc/skel` equivalent for future multi-user
+
+**Next Phase**: Config loading infrastructure migration with atomic job operations

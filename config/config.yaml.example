@@ -1,0 +1,28 @@
+conflict_check_interval: 300
+default_schedule_times:
+  daily: 0 3 * * *
+  hourly: 0 * * * *
+  monthly: 0 3 1 * *
+  weekly: 0 3 * * 0
+delay_notification_threshold: 300
+enable_conflict_avoidance: true
+notification:
+  email:
+    enabled: true
+    from_email: from.email@gmail.com
+    password: "${SMTP_PASSWORD}"
+    queue_enabled: true
+    queue_interval_minutes: 15
+    smtp_port: 587
+    smtp_server: smtp.gmail.com
+    to_email: to.email@gmail.com
+    use_ssl: false
+    use_tls: true
+    username: "${SMTP_USERNAME}"
+  telegram:
+    chat_id: "${TELEGRAM_CHAT_ID}"
+    enabled: true
+    queue_enabled: true
+    queue_interval_minutes: 5
+    token: "${TELEGRAM_TOKEN}"
+scheduler_timezone: UTC

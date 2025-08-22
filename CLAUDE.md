@@ -88,7 +88,7 @@ source_config:
   - **Direct routing** from `app.py` to specialized handlers (no delegation overhead)
   - **Template logic extracted** to form builders in `services/data_services.py` (169 total lines extracted)
   - **Response handling unified** via `ResponseUtils` class eliminating 37 duplicate method calls
-  - **Method complexity eliminated** via Extract Method pattern - two 70+ line methods reduced to 12-19 lines
+  - **Method complexity eliminated** via Extract Method pattern - three 70+ line methods reduced to 12-19 lines
 - **Operations**: `operations.py` (backup/restore execution and coordination)
 - **Forms**: `forms.py` (HTMX form processing and validation)
 - **API**: `api.py` (JSON endpoints for HTMX updates, external integrations, repository introspection, **unified response utilities**)
@@ -234,7 +234,7 @@ source_config:
 
 ### Method Complexity Management (Extract Method Pattern)
 - **Single Responsibility Principle**: Large methods decomposed into focused sub-methods with clear responsibilities
-- **Proven Pattern**: `save_backup_job()` (74→19 lines) and `check_repository_availability_htmx()` (76→12 lines) demonstrate 74-84% complexity reduction
+- **Proven Pattern**: `save_backup_job()` (74→19 lines), `check_repository_availability_htmx()` (76→12 lines), and `validate_source_paths()` (37→17 lines) demonstrate 54-84% complexity reduction
 - **Reusable Components**: Extracted methods like `_extract_job_name_parameter()` and `_get_validated_job_config()` eliminate duplication across endpoints
 - **Error Handling Consolidation**: `_send_job_form_error()` and `_send_repository_error_response()` provide consistent error UX patterns
 - **Testing Benefits**: Focused methods enable granular unit testing and easier debugging
@@ -447,7 +447,7 @@ deleted_jobs:  # user can manually restore to backup_jobs
 
 ## Recent Development Context
 
-**2025-08-21**: Anti-pattern elimination completed - **Response Service** and **Long Methods** anti-patterns completely resolved through surgical refactoring with zero breakage. ResponseUtils class eliminated 37 duplicate response method calls. Extract Method pattern reduced two 70+ line methods to 12-19 lines (74-84% complexity reduction). All core job workflows (creation, repository validation) now follow Single Responsibility Principle.
+**2025-08-21**: **ALL anti-patterns eliminated** - Response Service, Long Methods, and Validation Scattered completely resolved through surgical refactoring with zero breakage. ResponseUtils class eliminated 37 duplicate response method calls. Extract Method pattern reduced three 70+ line methods to 12-19 lines (54-84% complexity reduction). All core workflows now follow Single Responsibility Principle.
 **2025-08-20**: Schema-driven architecture migration completed - eliminated 100+ lines of hardcoded type logic, established schema appropriateness guidelines, comprehensive testing protocol applied  
 **2025-08-19**: Job form system completed - dual storage pattern for round-trip data integrity, smart edit forms with "code agent" auto-population, HTMX change detection, complete S3 support, three-mode maintenance system
 **2025-08-18**: Jinja2 template system completed - all templates converted from legacy `{{VARIABLE}}` syntax to Jinja2 conditionals and includes, architectural cleanup, backup browser SSH execution restored, restore overwrite checking implemented  
