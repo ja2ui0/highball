@@ -5,3 +5,6 @@ croniter
 notifiers
 Jinja2
 python-dotenv
+fastapi
+uvicorn
+python-multipart

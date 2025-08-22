@@ -2,7 +2,7 @@
 
 Web-based backup orchestration with scheduling and monitoring. Supports rsync and Restic providers with full connectivity validation.
 
-See also: @LOCAL/PYTHON.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md, @LOCAL/CONFIG-SCHEMA.md
+See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md, @LOCAL/CONFIG-SCHEMA.md
 
 ## 🚨 CRITICAL EXECUTION PATTERNS (READ FIRST)
 

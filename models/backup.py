@@ -15,7 +15,7 @@ from pathlib import Path
 import tempfile
 from functools import wraps
 import shlex
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -623,8 +623,7 @@ JOB_SCHEDULE_SCHEMA = {
 # COMMAND EXECUTION DATA STRUCTURES
 # =============================================================================
 
-@dataclass
-class CommandInfo:
+class CommandInfo(BaseModel):
     """Information about built backup command"""
     exec_argv: List[str]
     log_cmd_str: str

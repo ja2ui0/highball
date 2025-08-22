@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import threading
 import time
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 # Import notifiers for actual sending
 try:
@@ -31,15 +31,14 @@ logger = logging.getLogger(__name__)
 # NOTIFICATION DATA CLASSES
 # =============================================================================
 
-@dataclass
-class NotificationMessage:
+class NotificationMessage(BaseModel):
     """Represents a notification message"""
     provider: str
     recipient: str
     title: str
     message: str
     job_name: str = ""
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -64,8 +63,7 @@ class NotificationMessage:
             timestamp=datetime.fromisoformat(data.get('timestamp', datetime.now().isoformat()))
         )
 
-@dataclass
-class NotificationConfig:
+class NotificationConfig(BaseModel):
     """Notification configuration for a job"""
     provider: str
     notify_on_success: bool = False

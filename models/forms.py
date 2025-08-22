@@ -7,7 +7,7 @@ Also includes form data structures moved from services/form_data_service.py
 """
 
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field, validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 # **FORM DATA STRUCTURES** - Configuration dataclasses for form handling
 # =============================================================================
 
-@dataclass
-class SourceConfig:
+class SourceConfig(BaseModel):
     """Form concern: source configuration data structure"""
     source_type: str = ""
     local_path: str = ""
@@ -27,11 +26,10 @@ class SourceConfig:
     ssh_path: str = ""
     
     # Multi-path support
-    source_paths: list = field(default_factory=list)
+    source_paths: List[Dict[str, Any]] = Field(default_factory=list)
 
 
-@dataclass  
-class DestConfig:
+class DestConfig(BaseModel):
     """Form concern: standard destination configuration data structure"""
     dest_type: str = ""
     local_path: str = ""
@@ -43,8 +41,7 @@ class DestConfig:
     rsync_options: str = ""
 
 
-@dataclass
-class ResticConfig:
+class ResticConfig(BaseModel):
     """Form concern: Restic repository configuration data structure"""
     repo_type: str = ""
     password: str = ""
@@ -77,8 +74,7 @@ class ResticConfig:
     rclone_config: str = ""
 
 
-@dataclass
-class NotificationConfig:
+class NotificationConfig(BaseModel):
     """Form concern: notification provider configuration data structure"""
     provider_type: str = ""
     notify_on_success: bool = False
@@ -87,18 +83,17 @@ class NotificationConfig:
     failure_message: str = ""
 
 
-@dataclass
-class JobFormData:
+class JobFormData(BaseModel):
     """Form concern: complete job form data structure"""
     job_name: str = ""
-    source_config: SourceConfig = field(default_factory=SourceConfig)
-    dest_config: DestConfig = field(default_factory=DestConfig)
-    restic_config: ResticConfig = field(default_factory=ResticConfig)
+    source_config: SourceConfig = Field(default_factory=SourceConfig)
+    dest_config: DestConfig = Field(default_factory=DestConfig)
+    restic_config: ResticConfig = Field(default_factory=ResticConfig)
     schedule: str = ""
     enabled: bool = True
     respect_conflicts: bool = True
     restic_maintenance: str = "auto"
-    notifications: List[NotificationConfig] = field(default_factory=list)
+    notifications: List[NotificationConfig] = Field(default_factory=list)
 
 # =============================================================================
 # UTILITY FUNCTIONS - Common form parsing helpers

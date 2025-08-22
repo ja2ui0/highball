@@ -9,7 +9,7 @@ import re
 import os
 import validators
 from datetime import datetime
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import logging
@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 # DATA CLASSES - Shared validation structures
 # =============================================================================
 
-@dataclass
-class SSHConfig:
+class SSHConfig(BaseModel):
     """SSH connection configuration with sensible defaults"""
     connect_timeout: int = 5
     batch_mode: bool = True
@@ -38,8 +37,7 @@ class SSHConfig:
             '-o', f'UserKnownHostsFile={self.known_hosts_file}'
         ]
 
-@dataclass
-class SSHConnectionDetails:
+class SSHConnectionDetails(BaseModel):
     """Parsed SSH connection information"""
     username: str
     hostname: str
@@ -58,12 +56,11 @@ class SSHConnectionDetails:
         """Validate connection details including path"""
         return bool(self.username and self.hostname and self.path)
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Standard validation result structure"""
     valid: bool
     error: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: Dict[str, Any] = Field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format"""
