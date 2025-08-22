@@ -62,6 +62,8 @@ source_config:
 
 **Rule: Schema-Driven Secret Management (CRITICAL ARCHITECTURE)**: ALL secret fields are discovered automatically from schema definitions with `secret: True` and `env_var` properties. Config loading replaces `${ENV_VAR}` placeholders with job-scoped values for complete environment isolation. **NEVER hardcode** secret field mappings - schemas define both secret status and environment variable names. Supports SOURCE, DESTINATION, RESTIC_REPOSITORY, and NOTIFICATION provider schemas seamlessly.
 
+**Rule: Schema-Driven Validation (CRITICAL ARCHITECTURE)**: ALL field validation uses schema `required_fields` lookups. **NEVER hardcode** field requirements in validation logic. Validation methods throw specific exceptions caught by error handling decorators. Single validation methods eliminate duplication. Use `@handle_restic_service_errors` for service operations, `@handle_page_errors` for page operations.
+
 **Rule: SSH vs Local Execution Intelligence**: 
 - **UI Operations** (snapshot listing, browsing, validation): Execute locally from Highball container using local restic binary and credentials, EXCEPT same-as-origin repositories which always use SSH
 - **Source Operations** (backup, restore-to-source): Always execute via SSH+container on source host  
@@ -75,7 +77,9 @@ source_config:
 
 **Rule: Naming is Immutable**: Method, function, variable, class and filenames NEVER change when refactoring. If, during regular development you want to change a name to make it more specific or more broad for context, you MUST stop everything else and update ALL references to that name everywhere it occurs in the code immediately!
 
-**Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Jinja2, Docker, rsync/SSH. HTMX. Javascript requires permission.
+**Rule: Rootless Container Architecture**: LinuxServer.io-style user management with runtime PUID/PGID support. Container accepts `PUID` and `PGID` environment variables to modify the `www-data` user at startup, ensuring proper file ownership in mounted volumes. Init script (`/app/init`) handles user modification and privilege dropping via `gosu`. Supports arbitrary UID/GID for rootless operation while maintaining compatibility with rootful Docker and Podman. No docker.sock dependency for core functionality.
+
+**Stack**: Python 3.11 (dataclasses, pathlib, validators, notifiers), APScheduler, PyYAML, Jinja2, Docker/Podman (rootless compatible), rsync/SSH. HTMX. Javascript requires permission.
 
 ## Architecture Overview
 
@@ -176,11 +180,13 @@ source_config:
 
 ## Common Patterns
 
-### Error Handling Strategy
-- **Centralized error handling**: `@handle_page_errors()` decorator applied to all request handling methods
-- **DRY principle**: Eliminated repetitive try/catch blocks throughout handlers
-- **Consistent error responses**: Unified error handling via `self._send_error()` with proper HTTP status codes
-- **Method focus**: Handler methods focus on business logic, decorator handles exceptions
+### Error Handling Strategy (CRITICAL ANTI-PATTERN PREVENTION)
+- **Decorator Pattern**: Use `@handle_page_errors()` for handlers, `@handle_restic_service_errors()` for services
+- **Exception-Based Flow**: Methods throw specific exceptions, decorators catch and format responses
+- **ANTI-PATTERN**: Never wrap service methods in try/catch blocks - use decorators instead
+- **DRY Principle**: Single validation methods that throw exceptions, not multiple try/catch blocks
+- **Method Focus**: Business logic throws exceptions, decorators handle HTTP responses
+- **Future Claude Alert**: If you see repetitive try/catch blocks or manual error formatting in service methods, this is an anti-pattern. Use decorators + exceptions instead.
 
 ### Container Execution Strategy
 - Use official `restic/restic:0.18.0` containers on remote hosts for version consistency
@@ -199,10 +205,14 @@ source_config:
 - **Error Data Preservation Pattern**: Use parsed config from payload over raw form data when available
 - **Template Variables Pattern**: Server data via HTML data attributes to JavaScript
 
-### Validation Patterns
-- Real-time validation with dedicated endpoints (`/validate-*`)
-- 30-minute SSH validation caching
-- Permission checking: RX (backup capable), RWX (restore-to-source capable)
+### Validation Patterns (SCHEMA-DRIVEN ARCHITECTURE)
+- **Schema-Driven Field Validation**: All validation uses `schema.get('required_fields')` lookups
+- **Exception-Based Validation**: Validation methods throw `ValueError` with specific messages
+- **Decorator Error Handling**: `@handle_restic_service_errors` catches exceptions and formats responses
+- **Single Source of Truth**: Field requirements defined in schemas only, never hardcoded
+- **Real-time validation**: Dedicated endpoints (`/validate-*`) with 30-minute SSH caching
+- **Permission checking**: RX (backup capable), RWX (restore-to-source capable)
+- **Anti-Pattern Prevention**: Never use `if not field:` checks - always use schema validation
 
 ### Frontend Architecture
 - **Schema-Driven HTMX**: All form operations use server-side HTMX with dynamic field rendering
@@ -247,6 +257,32 @@ source_config:
 - **Dashboard Restore Status**: No polling/progress display in main job table yet
 
 ## Development Rules (Critical - Reference First)
+
+### Anti-Pattern Prevention (CRITICAL - Read First)
+
+**🚨 TRY/CATCH ANTI-PATTERN ALERT**: Never wrap service methods in repetitive try/catch blocks. This violates DRY principle and creates maintenance nightmares.
+
+**CORRECT Pattern**: 
+```python
+@handle_restic_service_errors("operation name")
+def service_method(self, config):
+    self._validate_required_fields(config)  # throws ValueError on missing fields
+    # business logic here
+    return result
+```
+
+**ANTI-PATTERN** (Never Do This):
+```python
+def service_method(self, config):
+    try:
+        if not config.get('field'):
+            return {'success': False, 'error': 'Missing field'}
+        # business logic
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+```
+
+**Future Claude Detection**: If you see multiple methods with identical try/catch/return error blocks, immediately flag this as an anti-pattern and refactor to decorator + exception pattern.
 
 ### Environment & Workflow
 
@@ -336,6 +372,12 @@ source_config:
 **Test Notifications**: `./test_notifications.py`
 **Test Units**: `python3 -m unittest tests.test_form_error_handler -v`
 **Web Interface**: `http://localhost:8087` (Highball web UI and API)
+
+**Rootless Container Usage**:
+- Default user: `docker-compose up -d`
+- Custom user: `PUID=$(id -u) PGID=$(id -g) docker-compose up -d`
+- Root access: `PUID=0 PGID=0 docker-compose up -d`
+- Podman: `podman-compose up -d` (rootless by default)
 
 ## Configuration Schema (NEW HIERARCHY)
 
@@ -475,7 +517,7 @@ See CHANGES.md for current session focus and detailed implementation status.
 
 ## Next Session Priority
 
-**CRITICAL**: These core systems must be tested before any FastAPI/Pydantic migration:
+**CRITICAL**: These core systems must be tested before any framework migration:
 
 1. **Real Backup Execution** - Test actual backup execution (not dry-run) with data transfer verification
 2. **Restore Operations** - Test complete restore workflow with overwrite protection 
@@ -483,7 +525,7 @@ See CHANGES.md for current session focus and detailed implementation status.
 4. **Restic Maintenance Operations** - Test discard/prune/check operations, scheduling, retention policies  
 5. **Rsync Patterns** - Test multi-provider support and rsync execution patterns
 
-**Framework Migration**: Only after core functionality verified → FastAPI/Pydantic migration with confidence
+**Architecture Status**: Rootless containers + distributed config + schema-driven validation = **PRODUCTION READY FOUNDATION**. All major architectural migrations complete. Framework changes (FastAPI/Pydantic) are now **optional optimizations**, not requirements.
 
 **Future Priorities**: Kopia provider support, enhanced Restic features (progress parsing, retention policies), notification template preview 
 

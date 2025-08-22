@@ -656,9 +656,9 @@ class ResponseUtils:
     
     def send_htmx_error(self, request_handler, message: str):
         """Send HTMX error response"""
-        error_html = self.template_service.render_template('partials/error_message.html', {
-            'error_message': message
-        })
+        error_html = self.template_service.render_template('partials/error_message.html', 
+            error_message=message
+        )
         request_handler.send_response(400)
         request_handler.send_header('Content-type', 'text/html')
         request_handler.end_headers()

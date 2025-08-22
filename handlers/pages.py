@@ -739,6 +739,19 @@ class ValidationHandlers:
         request_handler.end_headers()
         request_handler.wfile.write(json.dumps(data).encode())
     
+    def _send_error(self, request_handler, message: str, status_code: int = 500):
+        """Send error response using template partial"""
+        request_handler.send_response(status_code)
+        request_handler.send_header('Content-type', 'text/html')
+        request_handler.end_headers()
+        
+        # Render error template
+        error_html = self.template_service.render_template('error.html', 
+            error_message=message,
+            status_code=status_code
+        )
+        request_handler.wfile.write(error_html.encode())
+    
     @handle_page_errors("SSH validation")
     def validate_ssh_source(self, request_handler, source: str):
         """Validate SSH source configuration"""

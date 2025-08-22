@@ -408,51 +408,25 @@ class ResticValidator:
             logger.error(f"Restic validation error: {e}")
             return {'valid': False, 'error': f'Repository validation failed: {str(e)}'}
     
-    def validate_restic_destination(self, parsed_job: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate complete Restic destination configuration"""
-        dest_config = parsed_job.get('dest_config', {})
-        
-        # Schema-driven required field validation
-        from models.backup import DESTINATION_TYPE_SCHEMAS
-        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
-        required_fields = schema.get('required_fields', [])
-        
-        for field in required_fields:
-            if not dest_config.get(field):
-                return {
-                    'success': False,
-                    'message': f'{schema.get("display_name", "Restic")} destination missing {field}'
-                }
-        
-        # Additional restic-specific required fields (not in schema)
-        repo_type = dest_config.get('repo_type')
-        if not repo_type:
+    def check_repository_availability(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Check if restic repository is accessible and get status (availability check only)"""
+        try:
+            # Test repository access
+            access_result = self.validate_restic_repository_access(dest_config)
+            
             return {
-                'success': False,
-                'message': 'Repository type is required for Restic destinations'
+                'accessible': access_result['valid'],
+                'error': access_result.get('error') if not access_result['valid'] else None,
+                'status': access_result.get('status'),
+                'snapshot_count': access_result.get('snapshot_count', 0),
+                'latest_backup': access_result.get('latest_backup')
             }
-        
-        repo_uri = dest_config.get('repo_uri')
-        if not repo_uri:
+        except Exception as e:
+            logger.error(f"Repository availability check failed: {e}")
             return {
-                'success': False,
-                'message': 'Repository URI is required for Restic destinations'
+                'accessible': False,
+                'error': f'Repository availability check failed: {str(e)}'
             }
-        
-        # Test repository access
-        access_result = self.validate_restic_repository_access(dest_config)
-        if not access_result['valid']:
-            return {
-                'success': False,
-                'message': access_result['error']
-            }
-        
-        return {
-            'success': True,
-            'message': 'Restic repository configuration is valid',
-            'repository_status': access_result.get('status'),
-            'snapshot_count': access_result.get('snapshot_count', 0)
-        }
 
 # =============================================================================
 # SOURCE PATH VALIDATION - Path existence and permissions
@@ -530,6 +504,31 @@ class JobValidator:
         self.restic_validator = ResticValidator()
         self.source_path_validator = SourcePathValidator()
     
+    def _validate_schema_fields(self, config: Dict[str, Any], schema_type: str, config_type: str) -> ValidationResult:
+        """Unified schema-driven field validation for any config type"""
+        from models.backup import DESTINATION_TYPE_SCHEMAS, SOURCE_TYPE_SCHEMAS
+        
+        schema_map = {
+            'destination': DESTINATION_TYPE_SCHEMAS,
+            'source': SOURCE_TYPE_SCHEMAS
+        }
+        
+        if schema_type not in schema_map:
+            return ValidationResult(valid=False, error=f'Unknown schema type: {schema_type}')
+        
+        schemas = schema_map[schema_type]
+        if config_type not in schemas:
+            return ValidationResult(valid=False, error=f'Unknown {schema_type} type: {config_type}')
+        
+        schema = schemas[config_type]
+        
+        # Validate required fields based on schema
+        for field in schema.get('required_fields', []):
+            if not config.get(field):
+                return ValidationResult(valid=False, error=f'{schema["display_name"]} {schema_type} missing {field}')
+        
+        return ValidationResult(valid=True)
+    
     def validate_backup_job(self, job_config: Dict[str, Any]) -> ValidationResult:
         """Validate complete backup job configuration"""
         try:
@@ -602,27 +601,24 @@ class JobValidator:
         return ValidationResult(valid=True)
     
     def _validate_dest_config(self, job_config: Dict[str, Any]) -> ValidationResult:
-        """Validate destination configuration"""
+        """Validate destination configuration using unified schema-driven approach"""
         dest_type = job_config['dest_type']
         dest_config = job_config['dest_config']
         
+        # Schema-driven field validation (unified for all destination types)
+        field_validation = self._validate_schema_fields(
+            config=dest_config,
+            schema_type='destination',
+            config_type=dest_type
+        )
+        if not field_validation.valid:
+            return field_validation
+        
+        # Type-specific availability checks (when needed)
         if dest_type == 'restic':
-            restic_result = self.restic_validator.validate_restic_destination(job_config)
-            if not restic_result['success']:
-                return ValidationResult(valid=False, error=restic_result['message'])
-        else:
-            # Schema-driven destination validation  
-            from models.backup import DESTINATION_TYPE_SCHEMAS
-            
-            if dest_type not in DESTINATION_TYPE_SCHEMAS:
-                return ValidationResult(valid=False, error=f'Unknown destination type: {dest_type}')
-            
-            schema = DESTINATION_TYPE_SCHEMAS[dest_type]
-            
-            # Validate required fields based on schema
-            for field in schema.get('required_fields', []):
-                if not dest_config.get(field):
-                    return ValidationResult(valid=False, error=f'{schema["display_name"]} destination missing {field}')
+            availability_result = self.restic_validator.check_repository_availability(dest_config)
+            if not availability_result['accessible']:
+                return ValidationResult(valid=False, error=availability_result['error'])
         
         return ValidationResult(valid=True)
     

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import tempfile
+from functools import wraps
 import shlex
 from dataclasses import dataclass
 
@@ -806,6 +807,26 @@ class ResticArgumentBuilder:
         return flags
 
 # =============================================================================
+# RESTIC SERVICE ERROR HANDLING
+# =============================================================================
+
+def handle_restic_service_errors(operation_name: str):
+    """Decorator to handle common restic service operation errors consistently"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            try:
+                return func(self, *args, **kwargs)
+            except Exception as e:
+                logger.error(f"Restic {operation_name} error: {e}")
+                return {
+                    'success': False,
+                    'error': f'{operation_name} operation failed: {str(e)}'
+                }
+        return wrapper
+    return decorator
+
+# =============================================================================
 # RESTIC REPOSITORY SERVICE - Repository operations
 # =============================================================================
 
@@ -817,55 +838,64 @@ class ResticRepositoryService:
         from services.execution import ResticExecutionService
         self.restic_executor = ResticExecutionService()
     
+    def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
+        """Validate required fields exist or raise exception with actionable message"""
+        from models.backup import DESTINATION_TYPE_SCHEMAS
+        
+        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
+        required_fields = schema.get('required_fields', [])
+        
+        for field in required_fields:
+            if not dest_config.get(field):
+                raise ValueError(f'{schema.get("display_name", "Restic")} repository missing {field}')
+        
+        # If we reach here, all validation passed
+    
+    @handle_restic_service_errors("repository access test")
     def test_repository_access(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Test repository access and get status information"""
-        try:
-            dest_config = job_config.get('dest_config', {})
-            source_config = job_config.get('source_config', {})
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Execute using unified ResticExecutionService
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=['snapshots', '--json'],
+            source_config=source_config,
+            operation_type='ui',
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            # Repository exists and is accessible
+            try:
+                snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+                snapshot_count = len(snapshots)
+                
+                latest_backup = None
+                if snapshots:
+                    # Get most recent snapshot
+                    latest_snapshot = max(snapshots, key=lambda s: s['time'])
+                    latest_backup = latest_snapshot['time']
+                
                 return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
+                    'success': True,
+                    'repository_status': 'existing' if snapshot_count > 0 else 'empty',
+                    'snapshot_count': snapshot_count,
+                    'latest_backup': latest_backup,
+                    'repository_uri': repo_uri
                 }
-            
-            # Execute using unified ResticExecutionService
-            result = self.restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=['snapshots', '--json'],
-                source_config=source_config,
-                operation_type='ui',
-                timeout=30
-            )
-            
-            if result.returncode == 0:
-                # Repository exists and is accessible
-                try:
-                    snapshots = json.loads(result.stdout) if result.stdout.strip() else []
-                    snapshot_count = len(snapshots)
-                    
-                    latest_backup = None
-                    if snapshots:
-                        # Get most recent snapshot
-                        latest_snapshot = max(snapshots, key=lambda s: s['time'])
-                        latest_backup = latest_snapshot['time']
-                    
-                    return {
-                        'success': True,
-                        'repository_status': 'existing' if snapshot_count > 0 else 'empty',
-                        'snapshot_count': snapshot_count,
-                        'latest_backup': latest_backup,
-                        'repository_uri': repo_uri
-                    }
-                except json.JSONDecodeError:
-                    return {
-                        'success': True,
-                        'repository_status': 'empty',
-                        'snapshot_count': 0,
-                        'repository_uri': repo_uri
-                    }
+            except json.JSONDecodeError:
+                return {
+                    'success': True,
+                    'repository_status': 'empty',
+                    'snapshot_count': 0,
+                    'repository_uri': repo_uri
+                }
             else:
                 # Check if repository doesn't exist vs other error
                 if 'unable to open config file' in result.stderr or 'repository does not exist' in result.stderr:
@@ -879,61 +909,32 @@ class ResticRepositoryService:
                         'success': False,
                         'error': f'Repository access failed: {result.stderr}'
                     }
-                    
-        except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'error': 'Repository access timeout - check connection'
-            }
-        except Exception as e:
-            logger.error(f"Repository test error: {e}")
-            return {
-                'success': False,
-                'error': f'Repository test failed: {str(e)}'
-            }
     
+    @handle_restic_service_errors("repository initialization")
     def initialize_repository(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Initialize a new Restic repository"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Execute using unified ResticExecutionService
-            result = self.restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=['init'],
-                source_config=source_config,
-                operation_type='init',
-                timeout=60
-            )
-            
-            if result.returncode == 0:
-                return {
-                    'success': True,
-                    'message': 'Repository initialized successfully'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Repository initialization failed: {result.stderr}'
-                }
-                
-        except subprocess.TimeoutExpired:
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Execute using unified ResticExecutionService
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=['init'],
+            source_config=source_config,
+            operation_type='init',
+            timeout=60
+        )
+        
+        if result.returncode == 0:
             return {
-                'success': False,
-                'error': 'Repository initialization timeout'
+                'success': True,
+                'message': 'Repository initialized successfully'
             }
-        except Exception as e:
-            logger.error(f"Repository initialization error: {e}")
+        else:
             return {
                 'success': False,
-                'error': f'Initialization failed: {str(e)}'
+                'error': f'Repository initialization failed: {result.stderr}'
             }
 
     def run_backup_unified(self, dest_config: Dict[str, Any], source_config: Dict[str, Any], backup_args: List[str]) -> Dict[str, Any]:
@@ -967,42 +968,37 @@ class ResticRepositoryService:
                 'error': f'Backup execution failed: {str(e)}'
             }
     
+    @handle_restic_service_errors("snapshot listing")
     def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None, source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """List repository snapshots with optional filtering"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Build command args
-            args = self.command_builder.build_list_args(repo_uri, filters)
-            # Remove 'restic' and repo args since ResticExecutionService handles them
-            command_args = []
-            skip_next = False
-            for i, arg in enumerate(args):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if arg == '-r':
-                    skip_next = True  # skip the repo URI
-                    continue
-                command_args.append(arg)
-            
-            # Execute using unified ResticExecutionService  
-            result = self.restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=command_args,
-                source_config=source_config,
-                operation_type='ui',
-                timeout=30
-            )
-            
-            if result.returncode == 0:
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Build command args
+        args = self.command_builder.build_list_args(repo_uri, filters)
+        # Remove 'restic' and repo args since ResticExecutionService handles them
+        command_args = []
+        skip_next = False
+        for i, arg in enumerate(args):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == '-r':
+                skip_next = True  # skip the repo URI
+                continue
+            command_args.append(arg)
+        
+        # Execute using unified ResticExecutionService  
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=command_args,
+            source_config=source_config,
+            operation_type='ui',
+            timeout=30
+        )
+        
+        if result.returncode == 0:
                 try:
                     raw_snapshots = json.loads(result.stdout) if result.stdout.strip() else []
                     # Format snapshots for backup browser expectations
@@ -1032,51 +1028,27 @@ class ResticRepositoryService:
                         'snapshots': [],
                         'count': 0
                     }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to list snapshots: {result.stderr}'
-                }
-                
-        except subprocess.TimeoutExpired:
+        else:
             return {
                 'success': False,
-                'error': 'Snapshot listing timeout'
-            }
-        except Exception as e:
-            logger.error(f"Snapshot listing error: {e}")
-            return {
-                'success': False,
-                'error': f'Snapshot listing failed: {str(e)}'
+                'error': f'Failed to list snapshots: {result.stderr}'
             }
     
+    @handle_restic_service_errors("SSH snapshot listing")
     def list_snapshots_with_ssh(self, dest_config: Dict[str, Any], source_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """List snapshots with SSH execution support (like working code)"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Check if we should use SSH execution
-            # For same_as_origin repositories, always use SSH (repository is on origin host)
-            if (dest_config.get('repo_type') == 'same_as_origin' or 
-                (source_config and source_config.get('hostname') and source_config.get('username'))):
-                return self._list_snapshots_via_ssh(repo_uri, password, source_config, dest_config)
-            else:
-                # Fall back to local execution
-                return self.list_snapshots(dest_config, filters)
-                
-        except Exception as e:
-            logger.error(f"SSH snapshot listing error: {e}")
-            return {
-                'success': False,
-                'error': f'SSH snapshot listing failed: {str(e)}'
-            }
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Check if we should use SSH execution
+        # For same_as_origin repositories, always use SSH (repository is on origin host)
+        if (dest_config.get('repo_type') == 'same_as_origin' or 
+            (source_config and source_config.get('hostname') and source_config.get('username'))):
+            return self._list_snapshots_via_ssh(repo_uri, password, source_config, dest_config)
+        else:
+            # Fall back to local execution
+            return self.list_snapshots(dest_config, filters)
     
     def _execute_template_variables(self, variables: Dict[str, str], context: Dict[str, Any]) -> Dict[str, str]:
         """Execute template variable transformations"""
@@ -1243,88 +1215,59 @@ class ResticRepositoryService:
                 'error': f'SSH execution failed: {str(e)}'
             }
     
+    @handle_restic_service_errors("snapshot statistics")
     def get_snapshot_statistics(self, dest_config: Dict[str, Any], snapshot_id: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get detailed statistics for a specific snapshot"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Always execute locally for UI operations per working pattern
+        env = ResticArgumentBuilder.build_environment(dest_config)
+        
+        # Get snapshot statistics using local restic
+        cmd = ['restic', '-r', repo_uri, 'stats', snapshot_id, '--json']
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env
+        )
+        
+        if result.returncode == 0:
+            try:
+                stats = json.loads(result.stdout) if result.stdout.strip() else {}
+                return {
+                    'success': True,
+                    'stats': stats,  # backup browser expects 'stats' not 'statistics'
+                    'snapshot_id': snapshot_id
+                }
+            except json.JSONDecodeError:
                 return {
                     'success': False,
-                    'error': 'Repository URI and password are required'
+                    'error': 'Invalid JSON response from restic stats'
                 }
-            
-            # Always execute locally for UI operations per working pattern
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Get snapshot statistics using local restic
-            cmd = ['restic', '-r', repo_uri, 'stats', snapshot_id, '--json']
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=env
-            )
-            
-            if result.returncode == 0:
-                try:
-                    stats = json.loads(result.stdout) if result.stdout.strip() else {}
-                    return {
-                        'success': True,
-                        'stats': stats,  # backup browser expects 'stats' not 'statistics'
-                        'snapshot_id': snapshot_id
-                    }
-                except json.JSONDecodeError:
-                    return {
-                        'success': False,
-                        'error': 'Invalid JSON response from restic stats'
-                    }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Stats command failed: {result.stderr}'
-                }
-                
-        except subprocess.TimeoutExpired:
+        else:
             return {
                 'success': False,
-                'error': 'Statistics request timed out'
-            }
-        except Exception as e:
-            logger.error(f"Snapshot statistics error: {e}")
-            return {
-                'success': False,
-                'error': f'Statistics failed: {str(e)}'
+                'error': f'Stats command failed: {result.stderr}'
             }
     
+    @handle_restic_service_errors("repository unlock")
     def unlock_repository(self, dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Unlock a restic repository"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Check if we should use SSH execution (same pattern as other operations)
-            if source_config and source_config.get('hostname') and source_config.get('username'):
-                return self._unlock_repository_via_ssh(dest_config, source_config)
-            else:
-                # Fall back to local execution
-                return self._unlock_repository_local(dest_config)
-                
-        except Exception as e:
-            logger.error(f"Repository unlock error: {e}")
-            return {
-                'success': False,
-                'error': f'Repository unlock failed: {str(e)}'
-            }
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Check if we should use SSH execution (same pattern as other operations)
+        if source_config and source_config.get('hostname') and source_config.get('username'):
+            return self._unlock_repository_via_ssh(dest_config, source_config)
+        else:
+            # Fall back to local execution
+            return self._unlock_repository_local(dest_config)
     
     def _unlock_repository_local(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
         """Unlock repository using local restic execution"""
@@ -1405,54 +1348,37 @@ class ResticRepositoryService:
                 'error': f'SSH unlock failed: {str(e)}'
             }
     
+    @handle_restic_service_errors("snapshot directory browsing")
     def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Browse directory contents in a specific snapshot"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Always execute locally for UI operations per working pattern
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Clean path for restic ls command
-            clean_path = path.strip('/') if path and path != '/' else ''
-            
-            # List directory contents using local restic (EXACT working command)
-            cmd = ['restic', '-r', repo_uri, 'ls', snapshot_id, '--json', path]
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                env=env
-            )
-            
-            if result.returncode == 0:
-                # Parse using EXACT working method
-                return self._parse_directory_listing(result.stdout, path)
-            else:
-                return {
-                    'success': False,
-                    'error': f'Directory listing failed: {result.stderr}'
-                }
-                
-        except subprocess.TimeoutExpired:
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Always execute locally for UI operations per working pattern
+        env = ResticArgumentBuilder.build_environment(dest_config)
+        
+        # Clean path for restic ls command
+        clean_path = path.strip('/') if path and path != '/' else ''
+        
+        # List directory contents using local restic (EXACT working command)
+        cmd = ['restic', '-r', repo_uri, 'ls', snapshot_id, '--json', path]
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env
+        )
+        
+        if result.returncode == 0:
+            # Parse using EXACT working method
+            return self._parse_directory_listing(result.stdout, path)
+        else:
             return {
                 'success': False,
-                'error': 'Directory browsing timed out'
-            }
-        except Exception as e:
-            logger.error(f"Directory browsing error: {e}")
-            return {
-                'success': False,
-                'error': f'Directory browsing failed: {str(e)}'
+                'error': f'Directory listing failed: {result.stderr}'
             }
     
     def _parse_directory_listing(self, json_output: str, current_path: str) -> Dict[str, Any]:
@@ -1800,62 +1726,43 @@ class ResticMaintenanceService:
     def __init__(self):
         self.argument_builder = ResticArgumentBuilder()
     
+    @handle_restic_service_errors("maintenance operation")
     def run_maintenance_operation(self, dest_config: Dict[str, Any], operation: str, 
                                 config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Run maintenance operation on repository"""
-        try:
-            repo_uri = dest_config.get('repo_uri')
-            password = dest_config.get('password')
-            
-            if not repo_uri or not password:
-                return {
-                    'success': False,
-                    'error': 'Repository URI and password are required'
-                }
-            
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Build command
-            args = self.argument_builder.build_maintenance_args(repo_uri, operation, config)
-            cmd = ['restic'] + args
-            
-            # Execute maintenance operation
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=1800,  # 30 minute timeout
-                env=env
-            )
-            
-            if result.returncode == 0:
-                return {
-                    'success': True,
-                    'operation': operation,
-                    'message': f'{operation.capitalize()} operation completed successfully',
-                    'output': result.stdout
-                }
-            else:
-                return {
-                    'success': False,
-                    'operation': operation,
-                    'error': f'{operation.capitalize()} operation failed: {result.stderr}',
-                    'output': result.stdout
-                }
-                
-        except subprocess.TimeoutExpired:
+        self._validate_required_fields(dest_config)
+        repo_uri = dest_config['repo_uri']
+        password = dest_config['password']
+        
+        # Set environment using centralized builder
+        env = ResticArgumentBuilder.build_environment(dest_config)
+        
+        # Build command
+        args = self.argument_builder.build_maintenance_args(repo_uri, operation, config)
+        cmd = ['restic'] + args
+        
+        # Execute maintenance operation
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,  # 30 minute timeout
+            env=env
+        )
+        
+        if result.returncode == 0:
             return {
-                'success': False,
+                'success': True,
                 'operation': operation,
-                'error': f'{operation.capitalize()} operation timeout (30 minute limit)'
+                'message': f'{operation.capitalize()} operation completed successfully',
+                'output': result.stdout
             }
-        except Exception as e:
-            logger.error(f"Maintenance operation {operation} error: {e}")
+        else:
             return {
                 'success': False,
                 'operation': operation,
-                'error': f'{operation.capitalize()} operation failed: {str(e)}'
+                'error': f'{operation.capitalize()} operation failed: {result.stderr}',
+                'output': result.stdout
             }
 
 # =============================================================================
