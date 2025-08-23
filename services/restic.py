@@ -15,7 +15,7 @@ import tempfile
 from functools import wraps
 
 # Import dependencies
-from services.execution import OperationType
+from services.execution import OperationType, ResticExecutionService
 from models.builders import ResticArgumentBuilder
 from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
 
@@ -435,18 +435,14 @@ class ResticRepositoryService:
         repo_uri = dest_config['repo_uri']
         password = dest_config['password']
         
-        # Always execute locally for UI operations per working pattern
-        env = ResticArgumentBuilder.build_environment(dest_config)
-        
-        # Get snapshot statistics using local restic
-        cmd = ['restic', '-r', repo_uri, 'stats', snapshot_id, '--json']
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env
+        # Get snapshot statistics using unified execution service
+        command_args = ['stats', snapshot_id, '--json']
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=command_args,
+            source_config=source_config,
+            operation_type=OperationType.UI,
+            timeout=30
         )
         
         if result.returncode == 0:
@@ -487,13 +483,14 @@ class ResticRepositoryService:
         try:
             repo_uri = dest_config.get('repo_uri')
             
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(dest_config)
-            
-            # Build unlock command
-            cmd = ['restic', '-r', repo_uri, 'unlock']
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+            # Use unified execution service for unlock command
+            command_args = ['unlock']
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                operation_type=OperationType.MAINTENANCE,
+                timeout=30
+            )
             
             if result.returncode == 0:
                 return {
@@ -526,17 +523,15 @@ class ResticRepositoryService:
             username = source_config.get('username')
             container_runtime = source_config.get('container_runtime', 'docker')
             
-            # Build SSH + container command with proper credentials
-            env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
-            cmd = [
-                'ssh', f'{username}@{hostname}',
-                container_runtime, 'run', '--rm'
-            ] + env_flags + [
-                'restic/restic:0.18.0',
-                '-r', repo_uri, 'unlock'
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            # Use unified execution service for unlock command via SSH
+            command_args = ['unlock']
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                source_config=source_config,
+                operation_type=OperationType.MAINTENANCE,
+                timeout=30
+            )
             
             if result.returncode == 0:
                 return {
@@ -568,21 +563,17 @@ class ResticRepositoryService:
         repo_uri = dest_config['repo_uri']
         password = dest_config['password']
         
-        # Always execute locally for UI operations per working pattern
-        env = ResticArgumentBuilder.build_environment(dest_config)
-        
         # Clean path for restic ls command
         clean_path = path.strip('/') if path and path != '/' else ''
         
-        # List directory contents using local restic (EXACT working command)
-        cmd = ['restic', '-r', repo_uri, 'ls', snapshot_id, '--json', path]
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env
+        # List directory contents using unified execution service
+        command_args = ['ls', snapshot_id, '--json', path]
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=command_args,
+            source_config=source_config,
+            operation_type=OperationType.BROWSE,
+            timeout=30
         )
         
         if result.returncode == 0:
@@ -776,6 +767,7 @@ class ResticRunner:
     def __init__(self):
         self.argument_builder = ResticArgumentBuilder()
         self.repository_service = ResticRepositoryService()
+        self.restic_executor = ResticExecutionService()
     
     def run_backup(self, config, dry_run: bool = False) -> Dict[str, Any]:
         """Execute Restic backup with comprehensive error handling"""
@@ -806,18 +798,14 @@ class ResticRunner:
     def _run_local_backup(self, config, backup_args: List[str], dry_run: bool) -> Dict[str, Any]:
         """Run backup locally"""
         try:
-            # Set environment using centralized builder
-            env = ResticArgumentBuilder.build_environment(config.dest_config)
-            
-            # Execute backup
-            cmd = ['restic', 'backup'] + backup_args
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=3600,  # 1 hour timeout
-                env=env
+            # Execute backup using unified execution service
+            command_args = ['backup'] + backup_args
+            result = self.restic_executor.execute_restic_command(
+                dest_config=config.dest_config,
+                command_args=command_args,
+                source_config=getattr(config, 'source_config', None),
+                operation_type=OperationType.BACKUP,
+                timeout=3600
             )
             
             return self._process_backup_result(result, dry_run)
@@ -941,6 +929,7 @@ class ResticMaintenanceService:
     
     def __init__(self):
         self.argument_builder = ResticArgumentBuilder()
+        self.restic_executor = ResticExecutionService()
     
     def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
         """Validate required fields exist or raise exception with actionable message"""
@@ -961,20 +950,15 @@ class ResticMaintenanceService:
         repo_uri = dest_config['repo_uri']
         password = dest_config['password']
         
-        # Set environment using centralized builder
-        env = ResticArgumentBuilder.build_environment(dest_config)
-        
-        # Build command
+        # Build command arguments
         args = self.argument_builder.build_maintenance_args(repo_uri, operation, config)
-        cmd = ['restic'] + args
         
-        # Execute maintenance operation
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=1800,  # 30 minute timeout
-            env=env
+        # Execute maintenance operation using unified execution service
+        result = self.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=args,
+            operation_type=OperationType.MAINTENANCE,
+            timeout=1800  # 30 minute timeout
         )
         
         if result.returncode == 0:

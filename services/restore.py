@@ -11,6 +11,7 @@ import os
 import json
 from typing import Dict, Any, Optional, List
 from services.management import JobManagementService
+from services.execution import ResticExecutionService, OperationType
 
 
 class RestoreErrorParser:
@@ -372,6 +373,7 @@ class RestoreExecutionService:
         self.job_management = JobManagementService()
         self.active_restores = {}  # Track active restore operations
         self.error_parser = RestoreErrorParser()
+        self.restic_executor = ResticExecutionService()
     
     def execute_dry_run(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute dry run restore and return results"""

@@ -6,7 +6,22 @@ import subprocess
 from time import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from services.execution import OperationType
+from services.execution import OperationType, ResticExecutionService
+
+
+# Maintenance defaults
+DISCARD_SCHEDULE = "0 3 * * *"
+CHECK_SCHEDULE = "0 2 * * 0"
+KEEP_LAST = 7
+KEEP_HOURLY = 6
+KEEP_DAILY = 7
+KEEP_WEEKLY = 4
+KEEP_MONTHLY = 6
+KEEP_YEARLY = 0
+CHECK_READ_DATA_SUBSET = "5%"
+NICE_LEVEL = 10
+IONICE_CLASS = 3
+IONICE_LEVEL = 7
 
 
 class MaintenanceOperation(BaseModel):
@@ -91,7 +106,7 @@ class MaintenanceConfigManager:
         # Global default
         global_settings = self.backup_config.config.get('global_settings', {})
         maintenance_settings = global_settings.get('maintenance', {})
-        return maintenance_settings.get('discard_schedule', MaintenanceDefaults.DISCARD_SCHEDULE)
+        return maintenance_settings.get('discard_schedule', DISCARD_SCHEDULE)
     
     def get_check_schedule(self, job_name: str) -> str:
         """Get check schedule for job"""
@@ -105,7 +120,7 @@ class MaintenanceConfigManager:
         # Global default
         global_settings = self.backup_config.config.get('global_settings', {})
         maintenance_settings = global_settings.get('maintenance', {})
-        return maintenance_settings.get('check_schedule', MaintenanceDefaults.CHECK_SCHEDULE)
+        return maintenance_settings.get('check_schedule', CHECK_SCHEDULE)
     
     def get_retention_policy(self, job_name: str) -> Dict[str, Any]:
         """Get retention policy for job"""
@@ -123,12 +138,12 @@ class MaintenanceConfigManager:
         
         # Merge with defaults
         default_retention = {
-            'keep_last': MaintenanceDefaults.KEEP_LAST,
-            'keep_hourly': MaintenanceDefaults.KEEP_HOURLY,
-            'keep_daily': MaintenanceDefaults.KEEP_DAILY,
-            'keep_weekly': MaintenanceDefaults.KEEP_WEEKLY,
-            'keep_monthly': MaintenanceDefaults.KEEP_MONTHLY,
-            'keep_yearly': MaintenanceDefaults.KEEP_YEARLY
+            'keep_last': KEEP_LAST,
+            'keep_hourly': KEEP_HOURLY,
+            'keep_daily': KEEP_DAILY,
+            'keep_weekly': KEEP_WEEKLY,
+            'keep_monthly': KEEP_MONTHLY,
+            'keep_yearly': KEEP_YEARLY
         }
         
         # Override defaults with global settings
@@ -152,7 +167,7 @@ class MaintenanceConfigManager:
         
         # Merge with defaults
         default_check = {
-            'read_data_subset': MaintenanceDefaults.CHECK_READ_DATA_SUBSET
+            'read_data_subset': CHECK_READ_DATA_SUBSET
         }
         
         default_check.update(global_check)
@@ -246,6 +261,7 @@ class MaintenanceExecutor:
     def __init__(self):
         from services.management import JobManagementService
         self.job_management = JobManagementService()
+        self.restic_executor = ResticExecutionService()
     
     def execute_discard(self, operation: MaintenanceOperation) -> MaintenanceResult:
         """Execute discard operation (combines forget+prune)"""
@@ -257,11 +273,23 @@ class MaintenanceExecutor:
             # Build retention args
             retention_args = self._build_retention_args(operation.retention_config)
             
-            # Create forget command (includes --prune)
-            command = self._create_restic_command(operation, 'forget', retention_args)
+            # Execute forget command with unified execution service
+            command_args = ['forget'] + retention_args + ['--prune']
+            dest_config = self._convert_operation_to_dest_config(operation)
+            source_config = operation.ssh_config
             
-            # Execute with maintenance priority
-            output = self._execute_command(command, operation.job_name, 'discard')
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                source_config=source_config,
+                operation_type=OperationType.DISCARD,
+                timeout=1800  # 30 minute timeout
+            )
+            
+            if result.returncode != 0:
+                raise Exception(f"Discard operation failed: {result.stderr}")
+            
+            output = result.stdout
             
             duration = time() - start_time
             return MaintenanceResult(
@@ -292,11 +320,23 @@ class MaintenanceExecutor:
             # Build check args
             check_args = self._build_check_args(operation.check_config)
             
-            # Create check command
-            command = self._create_restic_command(operation, 'check', check_args)
+            # Execute check command with unified execution service
+            command_args = ['check'] + check_args
+            dest_config = self._convert_operation_to_dest_config(operation)
+            source_config = operation.ssh_config
             
-            # Execute with maintenance priority
-            output = self._execute_command(command, operation.job_name, 'check')
+            result = self.restic_executor.execute_restic_command(
+                dest_config=dest_config,
+                command_args=command_args,
+                source_config=source_config,
+                operation_type=OperationType.CHECK,
+                timeout=1800  # 30 minute timeout
+            )
+            
+            if result.returncode != 0:
+                raise Exception(f"Check operation failed: {result.stderr}")
+            
+            output = result.stdout
             
             duration = time() - start_time
             return MaintenanceResult(
@@ -317,56 +357,6 @@ class MaintenanceExecutor:
                 error_message=str(e)
             )
     
-    def _create_restic_command(self, operation: MaintenanceOperation, command_type: str, args: List[str]) -> List[str]:
-        """Create command array for maintenance operation"""
-        from models.backup import ResticCommand, CommandType, TransportType
-        
-        transport = TransportType.SSH if operation.ssh_config else TransportType.LOCAL
-        command_type_enum = CommandType.FORGET if command_type == 'forget' else CommandType.CHECK
-        
-        restic_command = ResticCommand(
-            command_type=command_type_enum,
-            transport=transport,
-            ssh_config=operation.ssh_config,
-            repository_url=operation.repository_url,
-            args=args,
-            environment_vars=operation.environment_vars,
-            job_config={'container_runtime': operation.container_runtime}
-        )
-        
-        # Convert to execution format
-        if transport == TransportType.SSH:
-            return restic_command.to_ssh_command()
-        else:
-            return restic_command.to_local_command()
-    
-    def _execute_command(self, command: List[str], job_name: str, operation_type: OperationType) -> str:
-        """Execute maintenance command with proper logging and priority"""
-        # Add maintenance-specific nice/ionice priority
-        cmd_array = self._add_maintenance_priority(command)
-        
-        # Log the command (with password obfuscation)
-        from services.command_obfuscation import CommandObfuscationService
-        obfuscated_command = CommandObfuscationService.obfuscate_command_array(cmd_array)
-        self.job_management.log_execution(job_name, f"Executing {operation_type}: {' '.join(obfuscated_command)}", 'INFO')
-        
-        # Execute via subprocess
-        try:
-            result = subprocess.run(cmd_array, capture_output=True, text=True, timeout=3600)
-            
-            if result.returncode == 0:
-                self.job_management.log_execution(job_name, f"Maintenance {operation_type} completed successfully", 'INFO')
-                if result.stdout.strip():
-                    self.job_management.log_execution(job_name, f"Output: {result.stdout.strip()}", 'INFO')
-                return result.stdout.strip()
-            else:
-                error_msg = f"Maintenance {operation_type} failed with exit code {result.returncode}"
-                if result.stderr.strip():
-                    error_msg += f": {result.stderr.strip()}"
-                raise Exception(error_msg)
-                
-        except subprocess.TimeoutExpired:
-            raise Exception(f"Maintenance {operation_type} timed out after 1 hour")
         except Exception as e:
             self.job_management.log_execution(job_name, f"Maintenance {operation_type} error: {str(e)}", 'ERROR')
             raise
@@ -374,9 +364,34 @@ class MaintenanceExecutor:
     def _add_maintenance_priority(self, command: List[str]) -> List[str]:
         """Add nice/ionice priority for maintenance operations (lower than backups)"""
         return [
-            'nice', f'-n', str(MaintenanceDefaults.NICE_LEVEL),
-            'ionice', '-c', str(MaintenanceDefaults.IONICE_CLASS), '-n', str(MaintenanceDefaults.IONICE_LEVEL)
+            'nice', f'-n', str(NICE_LEVEL),
+            'ionice', '-c', str(IONICE_CLASS), '-n', str(IONICE_LEVEL)
         ] + command
+    
+    def _convert_operation_to_dest_config(self, operation: MaintenanceOperation) -> Dict[str, Any]:
+        """Convert maintenance operation to dest_config format for ResticExecutionService"""
+        # Extract repository info from repository_url
+        repo_uri = operation.repository_url
+        
+        # Create dest_config with environment variables
+        dest_config = {
+            'repo_uri': repo_uri,
+            'repo_type': 'local',  # Will be determined by ResticExecutionService
+        }
+        
+        # Add environment variables as individual fields
+        for env_key, env_value in operation.environment_vars.items():
+            if env_key == 'RESTIC_PASSWORD':
+                dest_config['password'] = env_value
+            elif env_key.startswith('AWS_'):
+                # S3 credentials
+                if env_key == 'AWS_ACCESS_KEY_ID':
+                    dest_config['s3_access_key_id'] = env_value
+                elif env_key == 'AWS_SECRET_ACCESS_KEY':
+                    dest_config['s3_secret_access_key'] = env_value
+            # Add other credential types as needed
+        
+        return dest_config
     
     def _build_retention_args(self, retention_config: dict) -> List[str]:
         """Build retention arguments for forget command"""
@@ -386,12 +401,12 @@ class MaintenanceExecutor:
         args = ['--prune']  # Always prune after forget
         
         # Use configured values or defaults
-        keep_last = retention_config.get('keep_last', MaintenanceDefaults.KEEP_LAST)
-        keep_hourly = retention_config.get('keep_hourly', MaintenanceDefaults.KEEP_HOURLY)
-        keep_daily = retention_config.get('keep_daily', MaintenanceDefaults.KEEP_DAILY)
-        keep_weekly = retention_config.get('keep_weekly', MaintenanceDefaults.KEEP_WEEKLY)
-        keep_monthly = retention_config.get('keep_monthly', MaintenanceDefaults.KEEP_MONTHLY)
-        keep_yearly = retention_config.get('keep_yearly', MaintenanceDefaults.KEEP_YEARLY)
+        keep_last = retention_config.get('keep_last', KEEP_LAST)
+        keep_hourly = retention_config.get('keep_hourly', KEEP_HOURLY)
+        keep_daily = retention_config.get('keep_daily', KEEP_DAILY)
+        keep_weekly = retention_config.get('keep_weekly', KEEP_WEEKLY)
+        keep_monthly = retention_config.get('keep_monthly', KEEP_MONTHLY)
+        keep_yearly = retention_config.get('keep_yearly', KEEP_YEARLY)
         
         args.extend(['--keep-last', str(keep_last)])
         args.extend(['--keep-hourly', str(keep_hourly)])
@@ -412,7 +427,7 @@ class MaintenanceExecutor:
         args = []
         
         # Read data subset for performance balance
-        read_data_subset = check_config.get('read_data_subset', MaintenanceDefaults.CHECK_READ_DATA_SUBSET)
+        read_data_subset = check_config.get('read_data_subset', '5%')
         if read_data_subset:
             args.extend(['--read-data-subset', read_data_subset])
         
