@@ -339,7 +339,7 @@ class OperationsHandler:
             
         except Exception as e:
             logger.error(f"Overwrite check error: {e}")
-            self._send_json_response(request_handler, {
+            return JSONResponse(content={
                 'success': False,
                 'error': f'Overwrite check failed: {str(e)}'
             })

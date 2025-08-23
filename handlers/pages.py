@@ -373,17 +373,7 @@ class GETHandlers:
         
         return sorted(themes)
     
-    def _send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response using template partial"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        
-        # Render error template
-        html = self.template_service.render_template('pages/error.html', 
-                                                   error_message=message,
-                                                   page_title='Error')
-        request_handler.wfile.write(html.encode())
+    # CGI error method removed - all page handlers now return FastAPI responses directly
 
     @handle_page_errors("Job inspection")
     def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
@@ -764,26 +754,7 @@ class ValidationHandlers:
         self.job_form_builder = job_form_builder
         # ResponseUtils removed - all methods now return FastAPI responses directly
     
-    def _send_json_response(self, request_handler, data: Dict[str, Any]):
-        """Send JSON response"""
-        import json
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'application/json')
-        request_handler.end_headers()
-        request_handler.wfile.write(json.dumps(data).encode())
-    
-    def _send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response using template partial"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        
-        # Render error template
-        error_html = self.template_service.render_template('error.html', 
-            error_message=message,
-            status_code=status_code
-        )
-        request_handler.wfile.write(error_html.encode())
+    # CGI utility methods removed - all handlers now return FastAPI responses directly
     
     @handle_page_errors("SSH validation")
     def validate_ssh_source(self, source: str) -> JSONResponse:

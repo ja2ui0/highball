@@ -3,7 +3,6 @@ Forms Handler - Pure HTTP coordination for HTMX operations
 Delegates all business logic to appropriate services
 """
 
-import cgi
 import html
 import logging
 import time
@@ -26,11 +25,9 @@ class FormsHandler:
         self.template_service = template_service
         self.configured_providers = []  # Track configured notification providers
     
-    def handle_htmx_request(self, request, action, form_data=None):
+    def handle_htmx_request(self, request, action, form_data):
         """Single HTMX entry point with action dispatch"""
-        # HTTP concern: use pre-parsed form data or parse if needed
-        if form_data is None:
-            form_data = self._parse_form_data(request)
+        # Form data is now always pre-parsed by FastAPI route
         
         # Action dispatch table
         actions = {
@@ -733,42 +730,7 @@ class FormsHandler:
         return self.template_service.render_template('partials/provider_selection_dropdown.html',
                                                    available_options=available_options)
     
-    def _parse_form_data(self, request):
-        """HTTP concern: parse form data from request handler object"""
-        try:
-            content_length = int(request.headers.get('Content-Length', 0))
-            if content_length == 0:
-                return {}
-            
-            content_type = request.headers.get('Content-Type', '')
-            
-            if content_type.startswith('multipart/form-data'):
-                # Parse multipart form data
-                form = cgi.FieldStorage(
-                    fp=request.rfile,
-                    headers=request.headers,
-                    environ={'REQUEST_METHOD': 'POST'}
-                )
-                
-                # Convert to dict format expected by handlers
-                form_data = {}
-                for field in form.list:
-                    if field.name in form_data:
-                        # Handle multiple values for same field name
-                        if not isinstance(form_data[field.name], list):
-                            form_data[field.name] = [form_data[field.name]]
-                        form_data[field.name].append(field.value)
-                    else:
-                        form_data[field.name] = [field.value]
-                return form_data
-            else:
-                # Parse URL-encoded form data
-                post_data = request.rfile.read(content_length).decode('utf-8')
-                return parse_qs(post_data)
-                
-        except Exception as e:
-            logger.error(f"Form data parsing error: {e}")
-            return {}
+    # _parse_form_data method removed - FastAPI now handles form parsing
     
     def _get_form_value(self, form_data, key, default=''):
         """HTTP concern: extract single value from form data"""
