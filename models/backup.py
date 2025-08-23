@@ -16,6 +16,7 @@ import tempfile
 from functools import wraps
 import shlex
 from pydantic import BaseModel
+from services.execution import OperationType
 
 logger = logging.getLogger(__name__)
 
@@ -865,7 +866,7 @@ class ResticRepositoryService:
             dest_config=dest_config,
             command_args=['snapshots', '--json'],
             source_config=source_config,
-            operation_type='ui',
+            operation_type=OperationType.UI,
             timeout=30
         )
         
@@ -921,7 +922,7 @@ class ResticRepositoryService:
             dest_config=dest_config,
             command_args=['init'],
             source_config=source_config,
-            operation_type='init',
+            operation_type=OperationType.INIT,
             timeout=60
         )
         
@@ -944,7 +945,7 @@ class ResticRepositoryService:
                 dest_config=dest_config,
                 command_args=backup_args,
                 source_config=source_config,
-                operation_type='backup'
+                operation_type=OperationType.BACKUP
             )
             
             if result.returncode == 0:
@@ -993,7 +994,7 @@ class ResticRepositoryService:
             dest_config=dest_config,
             command_args=command_args,
             source_config=source_config,
-            operation_type='ui',
+            operation_type=OperationType.UI,
             timeout=30
         )
         
@@ -1163,7 +1164,7 @@ class ResticRepositoryService:
                 dest_config=dest_config,
                 command_args=['snapshots', '--json'],
                 source_config=source_config,
-                operation_type='ui',  # UI operation but uses SSH for same_as_origin
+                operation_type=OperationType.UI,  # UI operation but uses SSH for same_as_origin
                 timeout=30
             )
             

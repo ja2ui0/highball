@@ -6,7 +6,7 @@ Replaces: job_form_data_builder.py, snapshot_introspection_service.py
 from typing import Dict, List, Optional, Any
 from models.forms import JobFormData, SourceConfig, DestConfig, ResticConfig, NotificationConfig
 from models.backup import SOURCE_PATH_SCHEMA
-from services.execution import ExecutionService
+from services.execution import ExecutionService, OperationType
 
 
 # =============================================================================
@@ -453,7 +453,7 @@ class SnapshotIntrospectionService:
                 dest_config=dest_config,
                 command_args=['ls', snapshot_id, '--long'],
                 source_config=source_config,
-                operation_type='ui',
+                operation_type=OperationType.UI,
                 timeout=self.timeout
             )
             
@@ -491,7 +491,7 @@ class SnapshotIntrospectionService:
                 dest_config=dest_config,
                 command_args=['snapshots', '--json', snapshot_id],
                 source_config=source_config,
-                operation_type='ui',
+                operation_type=OperationType.UI,
                 timeout=self.timeout
             )
             

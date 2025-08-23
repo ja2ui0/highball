@@ -6,8 +6,30 @@ Replaces: command_execution_service.py, command_obfuscation.py
 import subprocess
 import shlex
 import re
+from enum import Enum
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
+
+
+class OperationType(Enum):
+    """Operation type enumeration for execution context determination"""
+    # UI operations (execute locally from Highball container)
+    UI = "ui"
+    BROWSE = "browse"
+    INSPECT = "inspect"
+    
+    # Source operations (execute via SSH when source is SSH)
+    BACKUP = "backup"
+    RESTORE = "restore"
+    MAINTENANCE = "maintenance"
+    INIT = "init"
+    
+    # Maintenance subtypes
+    DISCARD = "discard"  # forget+prune combined
+    CHECK = "check"      # repository check
+    
+    # Default
+    GENERAL = "general"
 
 
 # =============================================================================
@@ -319,7 +341,7 @@ class ResticExecutionService:
         dest_config: Dict[str, Any],
         command_args: List[str],
         source_config: Optional[Dict[str, Any]] = None,
-        operation_type: str = 'general',
+        operation_type: OperationType = OperationType.GENERAL,
         timeout: int = 120
     ) -> subprocess.CompletedProcess:
         """Execute restic command with automatic execution context detection
@@ -328,7 +350,7 @@ class ResticExecutionService:
             dest_config: Destination configuration with credentials
             command_args: Restic command arguments (e.g., ['snapshots', '--json'])
             source_config: Source configuration for SSH detection
-            operation_type: Type of operation ('ui', 'backup', 'restore', 'maintenance')
+            operation_type: Type of operation for execution context determination
             timeout: Command timeout in seconds
             
         Returns:
@@ -340,7 +362,7 @@ class ResticExecutionService:
         else:
             return self._execute_locally(dest_config, command_args, timeout)
     
-    def _should_use_ssh(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]], operation_type: str) -> bool:
+    def _should_use_ssh(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]], operation_type: OperationType) -> bool:
         """Determine if SSH execution should be used based on context"""
         if not source_config:
             return False
@@ -350,13 +372,13 @@ class ResticExecutionService:
             return True
         
         # UI operations execute locally from Highball container (for networked repos)
-        if operation_type in ['ui', 'browse', 'inspect']:
+        if operation_type in [OperationType.UI, OperationType.BROWSE, OperationType.INSPECT]:
             return False
             
         # Source operations use SSH when source is SSH
         has_ssh_config = bool(source_config.get('hostname') and source_config.get('username'))
         
-        if operation_type in ['backup', 'restore', 'maintenance', 'init']:
+        if operation_type in [OperationType.BACKUP, OperationType.RESTORE, OperationType.MAINTENANCE, OperationType.INIT]:
             return has_ssh_config
             
         # General operations use SSH when available

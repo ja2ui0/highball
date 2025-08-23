@@ -21,6 +21,7 @@ from models.notifications import create_notification_service
 
 # Import services
 from services.management import JobManagementService
+from services.execution import OperationType
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,7 @@ class OperationsHandler:
                 dest_config=dest_config,
                 command_args=command_args,
                 source_config=job_config.get('source_config'),
-                operation_type='restore',
+                operation_type=OperationType.RESTORE,
                 timeout=1800  # 30 minute timeout
             )
             

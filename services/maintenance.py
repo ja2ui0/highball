@@ -6,11 +6,12 @@ import subprocess
 from time import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
+from services.execution import OperationType
 
 
 class MaintenanceOperation(BaseModel):
     """Represents a maintenance operation to be executed"""
-    operation_type: str  # 'discard' (forget+prune combined) or 'check'
+    operation_type: OperationType  # OperationType.DISCARD (forget+prune combined) or OperationType.CHECK
     job_name: str
     repository_url: str
     environment_vars: Dict[str, str]
@@ -22,7 +23,7 @@ class MaintenanceOperation(BaseModel):
 
 class MaintenanceResult(BaseModel):
     """Result of a maintenance operation"""
-    operation_type: str
+    operation_type: OperationType
     job_name: str
     success: bool
     duration_seconds: float = 0.0
@@ -207,7 +208,7 @@ class MaintenanceOperationFactory:
         
         return base_operation
     
-    def _create_base_operation(self, job_name: str, job_config: Dict[str, Any], operation_type: str) -> MaintenanceOperation:
+    def _create_base_operation(self, job_name: str, job_config: Dict[str, Any], operation_type: OperationType) -> MaintenanceOperation:
         """Create base maintenance operation from job config"""
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
@@ -264,7 +265,7 @@ class MaintenanceExecutor:
             
             duration = time() - start_time
             return MaintenanceResult(
-                operation_type='discard',
+                operation_type=OperationType.DISCARD,
                 job_name=operation.job_name,
                 success=True,
                 duration_seconds=duration,
@@ -274,7 +275,7 @@ class MaintenanceExecutor:
         except Exception as e:
             duration = time() - start_time
             return MaintenanceResult(
-                operation_type='discard',
+                operation_type=OperationType.DISCARD,
                 job_name=operation.job_name,
                 success=False,
                 duration_seconds=duration,
@@ -299,7 +300,7 @@ class MaintenanceExecutor:
             
             duration = time() - start_time
             return MaintenanceResult(
-                operation_type='check',
+                operation_type=OperationType.CHECK,
                 job_name=operation.job_name,
                 success=True,
                 duration_seconds=duration,
@@ -309,7 +310,7 @@ class MaintenanceExecutor:
         except Exception as e:
             duration = time() - start_time
             return MaintenanceResult(
-                operation_type='check',
+                operation_type=OperationType.CHECK,
                 job_name=operation.job_name,
                 success=False,
                 duration_seconds=duration,
@@ -339,7 +340,7 @@ class MaintenanceExecutor:
         else:
             return restic_command.to_local_command()
     
-    def _execute_command(self, command: List[str], job_name: str, operation_type: str) -> str:
+    def _execute_command(self, command: List[str], job_name: str, operation_type: OperationType) -> str:
         """Execute maintenance command with proper logging and priority"""
         # Add maintenance-specific nice/ionice priority
         cmd_array = self._add_maintenance_priority(command)
@@ -530,9 +531,9 @@ class ResticMaintenanceService:
     
     def execute_maintenance_operation(self, operation: MaintenanceOperation) -> MaintenanceResult:
         """Execute a maintenance operation"""
-        if operation.operation_type == 'discard':
+        if operation.operation_type == OperationType.DISCARD:
             return self.executor.execute_discard(operation)
-        elif operation.operation_type == 'check':
+        elif operation.operation_type == OperationType.CHECK:
             return self.executor.execute_check(operation)
         else:
             raise ValueError(f"Unknown maintenance operation type: {operation.operation_type}")
