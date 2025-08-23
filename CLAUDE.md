@@ -56,6 +56,7 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 **Restore System**: Complete functionality with intelligent overwrite protection, dual restore targets, dry run capability
 **REST API**: GET `/api/highball/jobs` endpoint for external dashboard widgets with query filtering
 **Debug System**: System debugging interface (`/dev`) with network scanner and unified log sources
+**Scheduler Debug**: GET `/jobs` endpoint shows APScheduler internal jobs (debug/admin only - distinct from `/api/highball/jobs` which shows backup job configs)
 
 ## Known Issues & Technical Debt
 

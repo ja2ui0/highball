@@ -49,8 +49,7 @@ class GETHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
-        from handlers.api import ResponseUtils
-        self.response_utils = ResponseUtils(template_service)
+        # ResponseUtils removed - all methods now return FastAPI responses directly
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
@@ -482,8 +481,7 @@ class POSTHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
-        from handlers.api import ResponseUtils
-        self.response_utils = ResponseUtils(template_service)
+        # ResponseUtils removed - all methods now return FastAPI responses directly
     
     def _send_job_form_error(self, request_handler, form_data: Dict[str, Any], error_message: str):
         """Send job form with error message"""
@@ -764,8 +762,7 @@ class ValidationHandlers:
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
-        from handlers.api import ResponseUtils
-        self.response_utils = ResponseUtils(template_service)
+        # ResponseUtils removed - all methods now return FastAPI responses directly
     
     def _send_json_response(self, request_handler, data: Dict[str, Any]):
         """Send JSON response"""

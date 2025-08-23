@@ -90,59 +90,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # =============================================================================
-# UTILITY FUNCTION FOR HANDLER RESPONSE CONVERSION
+# BRIDGE FUNCTION ELIMINATED - 100% FASTAPI MODERNIZATION COMPLETE  
 # =============================================================================
-
-def convert_handler_response(handler_method, *args, **kwargs):
-    """Convert old handler methods to FastAPI responses"""
-    # Create a mock request handler that captures responses
-    class MockRequestHandler:
-        def __init__(self):
-            self.response_status = 200
-            self.response_headers = {}
-            self.response_content = ""
-        
-        def send_response(self, code):
-            self.response_status = code
-            
-        def send_header(self, key, value):
-            self.response_headers[key] = value
-            
-        def end_headers(self):
-            pass
-            
-        def wfile_write(self, content):
-            if isinstance(content, bytes):
-                content = content.decode('utf-8')
-            self.response_content += content
-
-        @property
-        def wfile(self):
-            class WFile:
-                def __init__(self, handler):
-                    self.handler = handler
-                def write(self, content):
-                    self.handler.wfile_write(content)
-            return WFile(self)
-
-    # Call the handler method with mock request
-    mock_request = MockRequestHandler()
-    handler_method(mock_request, *args, **kwargs)
-    
-    # Convert to FastAPI response
-    if 'application/json' in mock_request.response_headers.get('Content-type', ''):
-        try:
-            import json
-            json_data = json.loads(mock_request.response_content)
-            return JSONResponse(content=json_data, status_code=mock_request.response_status)
-        except:
-            pass
-    
-    return HTMLResponse(
-        content=mock_request.response_content,
-        status_code=mock_request.response_status,
-        headers=mock_request.response_headers
-    )
+# All handlers now return FastAPI responses directly - zero legacy remnants
 
 
 # =============================================================================
@@ -272,7 +222,7 @@ async def browse_filesystem(path: str = Query("/")):
 @app.get("/jobs")
 async def list_jobs():
     """List scheduled jobs"""
-    return convert_handler_response(services.handlers['job_scheduler'].list_jobs)
+    return services.handlers['job_scheduler'].list_jobs()
 
 
 @app.get("/api/highball/jobs")
@@ -505,7 +455,7 @@ async def handle_htmx_request(action: str, request: Request):
 @app.options("/api/{path:path}")
 async def handle_options(path: str):
     """Handle CORS preflight requests for API endpoints"""
-    return convert_handler_response(services.handlers['api'].handle_options)
+    return services.handlers['api'].handle_options()
 
 
 # =============================================================================

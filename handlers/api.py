@@ -548,63 +548,19 @@ class APIHandler:
             })
     
     # =============================================================================
-    # UTILITY METHODS
+    # CORS HANDLING
     # =============================================================================
-    # All API methods now return JSONResponse directly - no utility methods needed
-
-
-class ResponseUtils:
-    """Shared HTTP response utilities for all handlers"""
     
-    def __init__(self, template_service):
-        self.template_service = template_service
-    
-    def send_html_response(self, request_handler, html: str):
-        """Send HTML response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(html.encode())
-    
-    def send_json_response(self, request_handler, data: Dict[str, Any], cors: bool = False):
-        """Send JSON response"""
-        request_handler.send_response(200)
-        request_handler.send_header('Content-type', 'application/json')
-        if cors:
-            request_handler.send_header('Access-Control-Allow-Origin', '*')
-            request_handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            request_handler.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        request_handler.end_headers()
-        request_handler.wfile.write(json.dumps(data).encode())
-    
-    def send_redirect(self, request_handler, location: str):
-        """Send redirect response"""
-        request_handler.send_response(302)
-        request_handler.send_header('Location', location)
-        request_handler.end_headers()
-    
-    def send_htmx_partial(self, request_handler, template_path: str, data: Dict[str, Any]):
-        """Send HTMX partial template response"""
-        html = self.template_service.render_template(template_path, **data)
-        self.send_html_response(request_handler, html)
-    
-    def send_error(self, request_handler, message: str, status_code: int = 500):
-        """Send error response using template partial"""
-        request_handler.send_response(status_code)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        
-        error_html = self.template_service.render_template('partials/error_message.html', {
-            'error_message': message
-        })
-        request_handler.wfile.write(error_html.encode())
-    
-    def send_htmx_error(self, request_handler, message: str):
-        """Send HTMX error response"""
-        error_html = self.template_service.render_template('partials/error_message.html', 
-            error_message=message
+    def handle_options(self) -> JSONResponse:
+        """Handle CORS preflight requests for API endpoints"""
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            }
         )
-        request_handler.send_response(400)
-        request_handler.send_header('Content-type', 'text/html')
-        request_handler.end_headers()
-        request_handler.wfile.write(error_html.encode())
+
+
+# ResponseUtils class removed - all CGI patterns eliminated for Python 3.13 compatibility
