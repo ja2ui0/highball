@@ -74,9 +74,9 @@ class OperationsHandler:
                         'error': f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}"
                     })
             
-            # Start backup in background thread
+            # Start backup via JobManagementService in background thread
             backup_thread = threading.Thread(
-                target=self._execute_backup_async,
+                target=self.job_management.run_backup_job_async,
                 args=(job_name, job_config, dry_run)
             )
             backup_thread.daemon = True
@@ -97,56 +97,6 @@ class OperationsHandler:
                 'success': False,
                 'error': f'Backup error: {str(e)}'
             })
-    
-    def _execute_backup_async(self, job_name: str, job_config: Dict[str, Any], dry_run: bool):
-        """Execute backup operation asynchronously"""
-        start_time = datetime.now()
-        
-        try:
-            # Register running job
-            self.job_management.register_running_job(job_name)
-            
-            # Log job start
-            self.job_management.log_execution(job_name, f"Starting backup job (dry_run={dry_run})")
-            
-            # Execute backup based on destination type
-            dest_type = job_config.get('dest_type')
-            
-            if dest_type == 'restic':
-                result = backup_service.execute_backup(job_config, dry_run)
-            elif dest_type in ['ssh', 'local', 'rsyncd']:
-                result = rsync_service.execute_backup(job_config, dry_run)
-            else:
-                result = {
-                    'success': False,
-                    'error': f'Unsupported destination type: {dest_type}'
-                }
-            
-            # Calculate duration
-            end_time = datetime.now()
-            duration_seconds = (end_time - start_time).total_seconds()
-            
-            # Log result
-            if result['success']:
-                self.job_management.log_status(job_name, 'completed', f"Backup completed in {duration_seconds:.2f}s")
-                
-                # Send success notifications if not dry run
-                if not dry_run:
-                    self.notification_service.notify_job_success(job_name, duration_seconds, job_config)
-            else:
-                self.job_management.log_status(job_name, 'failed', result['error'])
-                
-                # Send failure notifications
-                self.notification_service.notify_job_failure(job_name, result['error'], job_config)
-            
-        except Exception as e:
-            logger.error(f"Async backup error for {job_name}: {e}")
-            self.job_management.log_status(job_name, 'failed', str(e))
-            self.notification_service.notify_job_failure(job_name, str(e), job_config)
-        
-        finally:
-            # Unregister running job
-            self.job_management.unregister_running_job(job_name)
     
     # =============================================================================
     # RESTORE OPERATIONS

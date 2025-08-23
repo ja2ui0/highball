@@ -116,14 +116,14 @@ class ScheduleLoader:
 
     def bootstrap_schedules(self, backup_config) -> int:
         """Loading concern: register all enabled jobs that have non-manual schedule"""
-        from handlers.operations import OperationsHandler
+        from services.management import JobManagementService
         
         jobs = backup_config.config.get("backup_jobs", {}) or {}
         global_settings = backup_config.config.get("global_settings", {}) or {}
         timezone = global_settings.get("scheduler_timezone", "UTC")
         default_dry = bool(global_settings.get("default_dry_run_on_schedule", True))
 
-        operations_handler = OperationsHandler(backup_config, None)
+        job_management = JobManagementService(backup_config)
 
         scheduled = 0
         for name, conf in jobs.items():
@@ -137,13 +137,13 @@ class ScheduleLoader:
             # Per-job override; default to global default
             dry = bool(conf.get("dry_run_on_schedule", default_dry))
 
-            # Register: run via the same path as UI, but headless (no HTTP handler)
+            # Register: run via service layer (no HTTP dependencies)
             # Use a stable job id so we could update/replace later if needed
             job_id = f"backup:{name}"
 
             def _run(job_name=name, dry_run=dry):
-                # Source label tells your logs this was a scheduler trigger
-                operations_handler.run_backup_job_async(None, job_name, dry_run)
+                # Execute backup via service layer - breaks circular dependency
+                job_management.run_backup_job_async(job_name, None, dry_run)
 
             # Use crontab string directly
             self.scheduler_manager.add_crontab_job(
