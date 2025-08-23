@@ -770,7 +770,7 @@ class ValidationHandlers:
         ssh_config = {'username': username, 'hostname': hostname}
         
         # Use unified validation service
-        from services.validation import ValidationService
+        from models.validation import ValidationService
         validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
         return JSONResponse(content=result)
@@ -899,7 +899,7 @@ class ValidationHandlers:
 
     def _validate_individual_paths(self, source_type: str, source_paths: List[Dict[str, Any]], ssh_config: Dict[str, str]) -> List[Dict[str, Any]]:
         """Validate each individual source path"""
-        from services.validation import ValidationService
+        from models.validation import ValidationService
         validation_service = ValidationService()
         
         validation_results = []

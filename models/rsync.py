@@ -9,6 +9,38 @@ import logging
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import shlex
+from pydantic import BaseModel, Field
+
+# =============================================================================
+# RESPONSE MODELS
+# =============================================================================
+
+class RsyncResult(BaseModel):
+    """Rsync operation result structure"""
+    success: bool
+    message: str = ""
+    error: str = ""
+    stats: Dict[str, Any] = Field(default_factory=dict)
+    output: str = ""
+    dry_run: bool = False
+    return_code: Optional[int] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format for backward compatibility"""
+        result = {'success': self.success}
+        if self.message:
+            result['message'] = self.message
+        if self.error:
+            result['error'] = self.error
+        if self.stats:
+            result['stats'] = self.stats
+        if self.output:
+            result['output'] = self.output
+        if self.dry_run:
+            result['dry_run'] = self.dry_run
+        if self.return_code is not None:
+            result['return_code'] = self.return_code
+        return result
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +48,24 @@ logger = logging.getLogger(__name__)
 # RSYNC CONFIGURATION
 # =============================================================================
 
-class RsyncConfig:
+class RsyncConfig(BaseModel):
     """Configuration for rsync backup operations"""
+    job_name: str = Field(default="unknown")
+    source_config: Dict[str, Any] = Field(default_factory=dict)
+    dest_config: Dict[str, Any] = Field(default_factory=dict)
+    source_type: str = Field(default="local")
+    dest_type: str = Field(default="local")
     
-    def __init__(self, job_config: Dict[str, Any]):
-        self.job_config = job_config
-        self.job_name = job_config.get('job_name', 'unknown')
-        self.source_config = job_config.get('source_config', {})
-        self.dest_config = job_config.get('dest_config', {})
-        self.source_type = job_config.get('source_type', 'local')
-        self.dest_type = job_config.get('dest_type', 'local')
+    @classmethod
+    def from_job_config(cls, job_config: Dict[str, Any]) -> 'RsyncConfig':
+        """Create RsyncConfig from job configuration dict"""
+        return cls(
+            job_name=job_config.get('job_name', 'unknown'),
+            source_config=job_config.get('source_config', {}),
+            dest_config=job_config.get('dest_config', {}),
+            source_type=job_config.get('source_type', 'local'),
+            dest_type=job_config.get('dest_type', 'local')
+        )
     
     @property
     def is_ssh_source(self) -> bool:
@@ -125,32 +165,32 @@ class RsyncRunner:
             
             if result.returncode == 0:
                 stats = self._parse_rsync_stats(result.stdout)
-                return {
-                    'success': True,
-                    'message': 'Rsync backup completed successfully' if not dry_run else 'Rsync dry run completed successfully',
-                    'stats': stats,
-                    'output': result.stdout,
-                    'dry_run': dry_run
-                }
+                return RsyncResult(
+                    success=True,
+                    message='Rsync backup completed successfully' if not dry_run else 'Rsync dry run completed successfully',
+                    stats=stats,
+                    output=result.stdout,
+                    dry_run=dry_run
+                ).to_dict()
             else:
-                return {
-                    'success': False,
-                    'error': f'Rsync backup failed: {result.stderr}',
-                    'output': result.stdout,
-                    'return_code': result.returncode
-                }
+                return RsyncResult(
+                    success=False,
+                    error=f'Rsync backup failed: {result.stderr}',
+                    output=result.stdout,
+                    return_code=result.returncode
+                ).to_dict()
                 
         except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'error': 'Rsync backup timeout (1 hour limit)'
-            }
+            return RsyncResult(
+                success=False,
+                error='Rsync backup timeout (1 hour limit)'
+            ).to_dict()
         except Exception as e:
             logger.error(f"Rsync backup error: {e}")
-            return {
-                'success': False,
-                'error': f'Rsync backup failed: {str(e)}'
-            }
+            return RsyncResult(
+                success=False,
+                error=f'Rsync backup failed: {str(e)}'
+            ).to_dict()
     
     def _parse_rsync_stats(self, output: str) -> Dict[str, Any]:
         """Parse rsync statistics from output"""
@@ -205,13 +245,13 @@ class RsyncService:
     
     def execute_backup(self, job_config: Dict[str, Any], dry_run: bool = False) -> Dict[str, Any]:
         """Execute rsync backup operation"""
-        config = RsyncConfig(job_config)
+        config = RsyncConfig.from_job_config(job_config)
         return self.runner.run_backup(config, dry_run)
     
     def test_destination(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Test rsync destination connectivity"""
         try:
-            config = RsyncConfig(job_config)
+            config = RsyncConfig.from_job_config(job_config)
             
             # Build a simple test command
             if config.is_ssh_dest:
@@ -243,27 +283,27 @@ class RsyncService:
             )
             
             if result.returncode == 0:
-                return {
-                    'success': True,
-                    'message': 'Destination is accessible and writable'
-                }
+                return RsyncResult(
+                    success=True,
+                    message='Destination is accessible and writable'
+                ).to_dict()
             else:
-                return {
-                    'success': False,
-                    'error': f'Destination test failed: {result.stderr}'
-                }
+                return RsyncResult(
+                    success=False,
+                    error=f'Destination test failed: {result.stderr}'
+                ).to_dict()
                 
         except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'error': 'Destination test timeout'
-            }
+            return RsyncResult(
+                success=False,
+                error='Destination test timeout'
+            ).to_dict()
         except Exception as e:
             logger.error(f"Destination test error: {e}")
-            return {
-                'success': False,
-                'error': f'Destination test failed: {str(e)}'
-            }
+            return RsyncResult(
+                success=False,
+                error=f'Destination test failed: {str(e)}'
+            ).to_dict()
 
 # Export the service
 rsync_service = RsyncService()

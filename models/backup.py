@@ -16,7 +16,7 @@ from pathlib import Path
 import tempfile
 from functools import wraps
 import shlex
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.execution import OperationType
 
 # Import extracted modules
@@ -41,16 +41,24 @@ class CommandInfo(BaseModel):
 # BACKUP CONFIGURATION CLASSES
 # =============================================================================
 
-class BackupConfig:
+class BackupConfig(BaseModel):
     """Base configuration for backup operations"""
+    job_name: str = Field(default="unknown")
+    source_config: Dict[str, Any] = Field(default_factory=dict)
+    dest_config: Dict[str, Any] = Field(default_factory=dict)
+    source_type: str = Field(default="local")
+    dest_type: str = Field(default="local")
     
-    def __init__(self, job_config: Dict[str, Any]):
-        self.job_config = job_config
-        self.job_name = job_config.get('job_name', 'unknown')
-        self.source_config = job_config.get('source_config', {})
-        self.dest_config = job_config.get('dest_config', {})
-        self.source_type = job_config.get('source_type', 'local')
-        self.dest_type = job_config.get('dest_type', 'local')
+    @classmethod
+    def from_job_config(cls, job_config: Dict[str, Any]) -> 'BackupConfig':
+        """Create BackupConfig from job configuration dict"""
+        return cls(
+            job_name=job_config.get('job_name', 'unknown'),
+            source_config=job_config.get('source_config', {}),
+            dest_config=job_config.get('dest_config', {}),
+            source_type=job_config.get('source_type', 'local'),
+            dest_type=job_config.get('dest_type', 'local')
+        )
     
     @property
     def is_restic_backup(self) -> bool:
@@ -82,7 +90,7 @@ class BackupService:
     
     def execute_backup(self, job_config: Dict[str, Any], dry_run: bool = False) -> Dict[str, Any]:
         """Execute backup operation using unified ResticExecutionService"""
-        config = BackupConfig(job_config)
+        config = BackupConfig.from_job_config(job_config)
         
         if config.is_restic_backup:
             # Use ResticRepositoryService which has ResticExecutionService integration
@@ -102,7 +110,7 @@ class BackupService:
     
     def test_repository_connection(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Test repository connection using appropriate service"""
-        config = BackupConfig(job_config)
+        config = BackupConfig.from_job_config(job_config)
         
         if config.is_restic_backup:
             return self.repository_service.test_repository_access(job_config)
@@ -114,7 +122,7 @@ class BackupService:
     
     def list_snapshots(self, job_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """List snapshots using appropriate service"""
-        config = BackupConfig(job_config)
+        config = BackupConfig.from_job_config(job_config)
         
         if config.is_restic_backup:
             dest_config = job_config.get('dest_config', {})

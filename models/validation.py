@@ -71,6 +71,42 @@ class ValidationResult(BaseModel):
             result.update(self.details)
         return result
 
+class OperationResult(BaseModel):
+    """Standard operation result structure"""
+    success: bool
+    error: str = ""
+    message: str = ""
+    details: Dict[str, Any] = Field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format for backward compatibility"""
+        result = {'success': self.success}
+        if self.error:
+            result['error'] = self.error
+        if self.message:
+            result['message'] = self.message
+        if self.details:
+            result.update(self.details)
+        return result
+
+class TestResult(BaseModel):
+    """Test result structure with version information"""
+    success: bool
+    error: str = ""
+    version: str = ""
+    details: Dict[str, Any] = Field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format for backward compatibility"""
+        result = {'success': self.success}
+        if self.error:
+            result['error'] = self.error
+        if self.version:
+            result['version'] = self.version
+        if self.details:
+            result.update(self.details)
+        return result
+
 # =============================================================================
 # SSH VALIDATION - Complete SSH connectivity and permissions
 # =============================================================================
@@ -194,13 +230,13 @@ class SSHValidator:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
             
             if result.returncode == 0 and 'SSH_OK' in result.stdout:
-                return {'success': True}
+                return TestResult(success=True).to_dict()
             else:
-                return {'success': False, 'error': f'SSH connection failed: {result.stderr}'}
+                return TestResult(success=False, error=f'SSH connection failed: {result.stderr}').to_dict()
         except subprocess.TimeoutExpired:
-            return {'success': False, 'error': 'SSH connection timeout'}
+            return TestResult(success=False, error='SSH connection timeout').to_dict()
         except Exception as e:
-            return {'success': False, 'error': f'SSH test failed: {str(e)}'}
+            return TestResult(success=False, error=f'SSH test failed: {str(e)}').to_dict()
     
     def _test_rsync_availability(self, hostname: str, username: str) -> Dict[str, Any]:
         """Test rsync availability and get version on remote host"""
@@ -216,15 +252,15 @@ class SSHValidator:
                 if 'rsync' in output.lower() and 'version' in output.lower():
                     # Extract just the version info for cleaner display
                     version_line = output.split('\n')[0].strip()
-                    return {'success': True, 'version': version_line}
+                    return TestResult(success=True, version=version_line).to_dict()
                 elif 'RSYNC_MISSING' in output:
-                    return {'success': False, 'error': 'Not found'}
+                    return TestResult(success=False, error='Not found').to_dict()
                 else:
-                    return {'success': False, 'error': 'Unexpected output'}
+                    return TestResult(success=False, error='Unexpected output').to_dict()
             else:
-                return {'success': False, 'error': 'Command failed'}
+                return TestResult(success=False, error='Command failed').to_dict()
         except Exception as e:
-            return {'success': False, 'error': f'Test error: {str(e)}'}
+            return TestResult(success=False, error=f'Test error: {str(e)}').to_dict()
     
     def _test_container_runtime(self, hostname: str, username: str, runtime: str) -> Dict[str, Any]:
         """Test container runtime (podman/docker) availability and get version"""
@@ -245,15 +281,15 @@ class SSHValidator:
                         version_str = f'{parts[0]} {parts[2].rstrip(",")}'
                     else:
                         version_str = parts[0] if parts else runtime
-                    return {'success': True, 'version': version_str}
+                    return TestResult(success=True, version=version_str).to_dict()
                 elif f'{runtime.upper()}_MISSING' in output:
-                    return {'success': False, 'error': 'Not found'}
+                    return TestResult(success=False, error='Not found').to_dict()
                 else:
-                    return {'success': False, 'error': 'Unexpected output'}
+                    return TestResult(success=False, error='Unexpected output').to_dict()
             else:
-                return {'success': False, 'error': 'Command failed'}
+                return TestResult(success=False, error='Command failed').to_dict()
         except Exception as e:
-            return {'success': False, 'error': f'Test error: {str(e)}'}
+            return TestResult(success=False, error=f'Test error: {str(e)}').to_dict()
     
     def _detect_container_runtime(self, hostname: str, username: str) -> Optional[str]:
         """Detect available container runtime (docker/podman) - returns preferred runtime only"""
@@ -274,12 +310,12 @@ class SSHValidator:
             result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
             
             if result.returncode == 0:
-                return {'success': True}
+                return TestResult(success=True).to_dict()
             else:
-                return {'success': False, 'error': 'Path does not exist or cannot be read'}
+                return TestResult(success=False, error='Path does not exist or cannot be read').to_dict()
                 
         except Exception as e:
-            return {'success': False, 'error': f'Path test error: {str(e)}'}
+            return TestResult(success=False, error=f'Path test error: {str(e)}').to_dict()
     
     def _test_path_permissions(self, hostname: str, username: str, path: str) -> str:
         """Test path permissions (RO vs RWX)"""
@@ -686,6 +722,10 @@ class ValidationService:
     def validate_restic_repository(self, restic_config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate Restic repository access"""
         return self.restic.validate_restic_repository_access(restic_config)
+    
+    def validate_ssh_source(self, source_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate SSH source configuration"""
+        return self.ssh.validate_ssh_source(source_config)
     
     def validate_source_path_with_ssh(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
         """Validation concern: validate source path with optional SSH details"""

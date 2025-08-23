@@ -10,8 +10,31 @@ import sys
 import os
 import json
 from typing import Dict, Any, Optional, List
+from pydantic import BaseModel, Field
 from services.management import JobManagementService
 from services.execution import ResticExecutionService, OperationType
+
+# =============================================================================
+# RESPONSE MODELS
+# =============================================================================
+
+class RestoreResult(BaseModel):
+    """Restore operation result structure"""
+    success: bool
+    error: str = ""
+    message: str = ""
+    details: Dict[str, Any] = Field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format for backward compatibility"""
+        result = {'success': self.success}
+        if self.error:
+            result['error'] = self.error
+        if self.message:
+            result['message'] = self.message
+        if self.details:
+            result.update(self.details)
+        return result
 
 
 class RestoreErrorParser:
@@ -390,7 +413,7 @@ class RestoreExecutionService:
             restic_runner = ResticRunner()
             plan = restic_runner.plan_restore_job(job_config, dry_run_config)
             if not plan.commands:
-                return {'success': False, 'error': 'No restore commands generated'}
+                return RestoreResult(success=False, error='No restore commands generated').to_dict()
             
             # Get first command (restore operations have only one command)
             restore_command = plan.commands[0]
@@ -444,9 +467,9 @@ class RestoreExecutionService:
                 }
                 
         except subprocess.TimeoutExpired:
-            return {'success': False, 'error': 'Dry run timed out'}
+            return RestoreResult(success=False, error='Dry run timed out').to_dict()
         except Exception as e:
-            return {'success': False, 'error': f'Dry run error: {str(e)}'}
+            return RestoreResult(success=False, error=f'Dry run error: {str(e)}').to_dict()
     
     def start_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]) -> None:
         """Start restore operation in background thread"""
