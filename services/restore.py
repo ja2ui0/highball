@@ -448,7 +448,7 @@ class RestoreExecutionService:
         except Exception as e:
             return {'success': False, 'error': f'Dry run error: {str(e)}'}
     
-    def start_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]):
+    def start_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]) -> None:
         """Start restore operation in background thread"""
         job_name = restore_config['job_name']
         
@@ -679,7 +679,7 @@ class RestoreService:
         """Execute dry run restore and return results"""
         return self.execution_service.execute_dry_run(job_config, restore_config)
     
-    def start_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]):
+    def start_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]) -> None:
         """Start restore operation in background thread"""
         self.execution_service.start_background_restore(job_config, restore_config)
     

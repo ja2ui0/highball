@@ -6,7 +6,7 @@ Delegates all business logic to appropriate services
 import html
 import logging
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from urllib.parse import parse_qs
 from models.validation import ValidationService
 from models.forms import JobFormParser, DestinationParser
@@ -25,7 +25,7 @@ class FormsHandler:
         self.template_service = template_service
         self.configured_providers = []  # Track configured notification providers
     
-    def handle_htmx_request(self, request, action, form_data):
+    def handle_htmx_request(self, request: Any, action: str, form_data: Dict[str, Any]) -> str:
         """Single HTMX entry point with action dispatch"""
         # Form data is now always pre-parsed by FastAPI route
         

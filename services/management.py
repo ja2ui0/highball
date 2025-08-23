@@ -64,7 +64,7 @@ class JobLogger:
     def __init__(self):
         self.log_paths = LogPaths()
     
-    def log_job_execution(self, job_name: str, message: str, level: str = "INFO"):
+    def log_job_execution(self, job_name: str, message: str, level: str = "INFO") -> None:
         """Logging concern: write execution message to job log file"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_entry = f"[{timestamp}] {level}: {message}"
@@ -76,7 +76,7 @@ class JobLogger:
         except Exception as e:
             print(f"ERROR: Failed to write to job log for {job_name}: {e}")
     
-    def log_job_status(self, job_name: str, status: str, details: str = ""):
+    def log_job_status(self, job_name: str, status: str, details: str = "") -> None:
         """Logging concern: update job status in YAML status file"""
         try:
             status_data = {}
@@ -139,7 +139,7 @@ class JobProcessTracker:
         self.log_paths = LogPaths()
         self.max_job_age_hours = 24
     
-    def register_job(self, job_name: str):
+    def register_job(self, job_name: str) -> None:
         """Process concern: register a job as currently running with timestamp"""
         try:
             with self.log_paths.running_jobs_file.open('a') as f:
@@ -147,7 +147,7 @@ class JobProcessTracker:
         except Exception as e:
             print(f"WARNING: Could not register running job {job_name}: {e}")
     
-    def unregister_job(self, job_name: str):
+    def unregister_job(self, job_name: str) -> None:
         """Process concern: remove a job from the running jobs tracking"""
         try:
             if not self.log_paths.running_jobs_file.exists():
@@ -195,7 +195,7 @@ class JobProcessTracker:
             print(f"WARNING: Could not read running jobs: {e}")
             return []
     
-    def cleanup_stale_entries(self):
+    def cleanup_stale_entries(self) -> None:
         """Process concern: remove entries for jobs that are too old"""
         try:
             if not self.log_paths.running_jobs_file.exists():
@@ -330,11 +330,11 @@ class JobManagementService:
         self.conflict_manager = JobConflictManager(backup_config) if backup_config else None
     
     # **LOGGING DELEGATION** - Pure delegation to logging concern
-    def log_execution(self, job_name: str, message: str, level: str = "INFO"):
+    def log_execution(self, job_name: str, message: str, level: str = "INFO") -> None:
         """Delegation: log execution message"""
         self.logger.log_job_execution(job_name, message, level)
     
-    def log_status(self, job_name: str, status: str, details: str = ""):
+    def log_status(self, job_name: str, status: str, details: str = "") -> None:
         """Delegation: update job status"""
         self.logger.log_job_status(job_name, status, details)
     
@@ -347,11 +347,11 @@ class JobManagementService:
         return self.logger.get_job_log_entries(job_name, max_lines)
     
     # **PROCESS TRACKING DELEGATION** - Pure delegation to tracking concern
-    def register_running_job(self, job_name: str):
+    def register_running_job(self, job_name: str) -> None:
         """Delegation: register running job"""
         self.process_tracker.register_job(job_name)
     
-    def unregister_running_job(self, job_name: str):
+    def unregister_running_job(self, job_name: str) -> None:
         """Delegation: unregister running job"""
         self.process_tracker.unregister_job(job_name)
     
@@ -359,7 +359,7 @@ class JobManagementService:
         """Delegation: get running jobs list"""
         return self.process_tracker.get_running_jobs()
     
-    def cleanup_stale_jobs(self):
+    def cleanup_stale_jobs(self) -> None:
         """Delegation: cleanup stale entries"""
         self.process_tracker.cleanup_stale_entries()
     

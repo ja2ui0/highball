@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import logging
 import atexit
+from typing import Optional, Any, Callable, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class SchedulerManager:
         logger.info("SchedulerManager started")
         atexit.register(lambda: self.shutdown())
 
-    def add_cron_job(self, func, job_id, cron_expr, args=None, kwargs=None):
+    def add_cron_job(self, func: Callable, job_id: str, cron_expr: Dict[str, Any], args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Scheduler concern: add or replace job with explicit CronTrigger kwargs"""
         self.remove_job(job_id)
         self.scheduler.add_job(
@@ -37,7 +38,7 @@ class SchedulerManager:
         )
         logger.info(f"Added cron job {job_id} with schedule {cron_expr}")
 
-    def add_crontab_job(self, func, job_id, crontab: str, timezone: str | None = None, args=None, kwargs=None):
+    def add_crontab_job(self, func: Callable, job_id: str, crontab: str, timezone: Optional[str] = None, args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Scheduler concern: add or replace job using crontab string like '30 3 * * 1,3,5'"""
         self.remove_job(job_id)
         trigger = CronTrigger.from_crontab(crontab, timezone=timezone)
@@ -51,7 +52,7 @@ class SchedulerManager:
         )
         logger.info(f"Added crontab job {job_id}: '{crontab}' tz={timezone or 'scheduler default'}")
 
-    def add_interval_job(self, func, job_id, seconds, args=None, kwargs=None):
+    def add_interval_job(self, func: Callable, job_id: str, seconds: int, args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Scheduler concern: add or replace job on fixed interval in seconds"""
         self.remove_job(job_id)
         self.scheduler.add_job(
@@ -65,7 +66,7 @@ class SchedulerManager:
         )
         logger.info(f"Added interval job {job_id} every {seconds} seconds")
 
-    def remove_job(self, job_id):
+    def remove_job(self, job_id: str) -> None:
         """Scheduler concern: remove job if it exists"""
         try:
             self.scheduler.remove_job(job_id)
@@ -73,7 +74,7 @@ class SchedulerManager:
         except Exception:
             pass  # No job to remove
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Scheduler concern: stop the scheduler"""
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
@@ -168,23 +169,23 @@ class SchedulingService:
         self.schedule_loader = ScheduleLoader(self.scheduler_manager)
     
     # **SCHEDULER DELEGATION** - Pure delegation to scheduler concern
-    def add_cron_job(self, func, job_id, cron_expr, args=None, kwargs=None):
+    def add_cron_job(self, func: Callable, job_id: str, cron_expr: Dict[str, Any], args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Delegation: add cron job"""
         return self.scheduler_manager.add_cron_job(func, job_id, cron_expr, args, kwargs)
     
-    def add_crontab_job(self, func, job_id, crontab: str, timezone: str | None = None, args=None, kwargs=None):
+    def add_crontab_job(self, func: Callable, job_id: str, crontab: str, timezone: Optional[str] = None, args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Delegation: add crontab job"""
         return self.scheduler_manager.add_crontab_job(func, job_id, crontab, timezone, args, kwargs)
     
-    def add_interval_job(self, func, job_id, seconds, args=None, kwargs=None):
+    def add_interval_job(self, func: Callable, job_id: str, seconds: int, args: Optional[List[Any]] = None, kwargs: Optional[Dict[str, Any]] = None) -> None:
         """Delegation: add interval job"""
         return self.scheduler_manager.add_interval_job(func, job_id, seconds, args, kwargs)
     
-    def remove_job(self, job_id):
+    def remove_job(self, job_id: str) -> None:
         """Delegation: remove job"""
         return self.scheduler_manager.remove_job(job_id)
     
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Delegation: shutdown scheduler"""
         return self.scheduler_manager.shutdown()
     

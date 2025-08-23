@@ -4,7 +4,7 @@ Handles loading and rendering HTML templates with Jinja2 support
 """
 import os
 import html
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from jinja2 import Environment, FileSystemLoader
 class TemplateService:
     """Service for loading and rendering HTML templates"""
@@ -17,7 +17,7 @@ class TemplateService:
             autoescape=True  # Auto-escape HTML for security
         )
     
-    def get_theme_css_path(self):
+    def get_theme_css_path(self) -> str:
         """Get the CSS path for the current theme"""
         if not self.backup_config:
             return "/static/themes/dark.css"  # default fallback
@@ -31,7 +31,7 @@ class TemplateService:
         
         return theme_path
     
-    def load_template(self, template_name):
+    def load_template(self, template_name: str) -> str:
         """Load HTML template from templates directory (enforces pages vs partials separation)"""
         template_path = f"templates/{template_name}"
         if os.path.exists(template_path):
@@ -40,15 +40,15 @@ class TemplateService:
         else:
             return self._error_template(template_name, template_path)
     
-    def load_page_template(self, page_name):
+    def load_page_template(self, page_name: str) -> str:
         """Template concern: load full page template (complete HTML documents)"""
         return self.load_template(f"pages/{page_name}")
     
-    def load_partial_template(self, partial_name):
+    def load_partial_template(self, partial_name: str) -> str:
         """Template concern: load HTMX partial template (HTML fragments)"""
         return self.load_template(f"partials/{partial_name}")
     
-    def render_template(self, template_name, **kwargs):
+    def render_template(self, template_name: str, **kwargs: Any) -> str:
         """Render template using Jinja2 with context variables"""
         try:
             # Use Jinja2 to render the template

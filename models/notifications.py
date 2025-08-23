@@ -237,7 +237,7 @@ class NotificationProviderFactory:
         self.global_config = global_config
         self._providers = {}
     
-    def get_provider(self, provider_name: str):
+    def get_provider(self, provider_name: str) -> Any:
         """Get configured provider instance"""
         if not NOTIFIERS_AVAILABLE:
             raise Exception("notifiers library not available")
@@ -428,7 +428,7 @@ class NotificationQueue:
         self.queue_dir.mkdir(parents=True, exist_ok=True)
         self._locks = {}
     
-    def enqueue_notification(self, provider: str, notification: NotificationMessage, interval_seconds: int = 300):
+    def enqueue_notification(self, provider: str, notification: NotificationMessage, interval_seconds: int = 300) -> None:
         """Add notification to provider queue"""
         queue_file = self.queue_dir / f"{provider}_state.yaml"
         

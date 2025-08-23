@@ -9,7 +9,7 @@ import yaml
 import os
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 
 # FastAPI imports
@@ -26,10 +26,10 @@ from services.data_services import JobFormDataBuilder, DestinationTypeService
 
 logger = logging.getLogger(__name__)
 
-def handle_page_errors(operation_name: str):
+def handle_page_errors(operation_name: str) -> Callable:
     """Decorator to handle common page operation errors consistently"""
-    def decorator(func):
-        def wrapper(self, *args, **kwargs):
+    def decorator(func: Callable) -> Callable:
+        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
             try:
                 return func(self, *args, **kwargs)
             except Exception as e:

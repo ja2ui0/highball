@@ -347,7 +347,7 @@ class RepositoryManager:
         return self.filesystem_browser.browse_directory(job_config, path)
     
     # **UTILITY METHODS** - Common repository patterns
-    def get_response_formatter(self):
+    def get_response_formatter(self) -> type:
         """Get standard response formatter"""
         return RepositoryResponse
 

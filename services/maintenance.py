@@ -443,7 +443,7 @@ class MaintenanceScheduler:
         self.config_manager = MaintenanceConfigManager(backup_config)
         self.operation_factory = MaintenanceOperationFactory(backup_config)
     
-    def schedule_job_maintenance(self, job_name: str):
+    def schedule_job_maintenance(self, job_name: str) -> None:
         """Schedule maintenance operations for a job"""
         # Check if maintenance is enabled
         if not self.config_manager.is_maintenance_enabled(job_name):
@@ -458,7 +458,7 @@ class MaintenanceScheduler:
         
         print(f"INFO: Scheduled maintenance operations for job '{job_name}'")
     
-    def unschedule_job_maintenance(self, job_name: str):
+    def unschedule_job_maintenance(self, job_name: str) -> None:
         """Remove scheduled maintenance operations for a job"""
         discard_job_id = f"maintenance_discard_{job_name}"
         check_job_id = f"maintenance_check_{job_name}"
@@ -468,7 +468,7 @@ class MaintenanceScheduler:
         
         print(f"INFO: Unscheduled maintenance operations for job '{job_name}'")
     
-    def reschedule_job_maintenance(self, job_name: str):
+    def reschedule_job_maintenance(self, job_name: str) -> None:
         """Reschedule maintenance operations for a job (remove + add)"""
         self.unschedule_job_maintenance(job_name)
         self.schedule_job_maintenance(job_name)
@@ -481,7 +481,7 @@ class MaintenanceScheduler:
         job_id = f"maintenance_discard_{job_name}"
         
         # Create operation factory function for scheduler
-        def execute_discard():
+        def execute_discard() -> None:
             maintenance_service = ResticMaintenanceService(
                 backup_config=self.backup_config,
                 scheduler_service=self.scheduler_service
@@ -504,7 +504,7 @@ class MaintenanceScheduler:
         job_id = f"maintenance_check_{job_name}"
         
         # Create operation factory function for scheduler
-        def execute_check():
+        def execute_check() -> None:
             maintenance_service = ResticMaintenanceService(
                 backup_config=self.backup_config,
                 scheduler_service=self.scheduler_service
@@ -532,15 +532,15 @@ class ResticMaintenanceService:
         self.executor = MaintenanceExecutor()
         self.scheduler = MaintenanceScheduler(backup_config, scheduler_service)
     
-    def schedule_job_maintenance(self, job_name: str):
+    def schedule_job_maintenance(self, job_name: str) -> None:
         """Schedule maintenance operations for a job"""
         self.scheduler.schedule_job_maintenance(job_name)
     
-    def unschedule_job_maintenance(self, job_name: str):
+    def unschedule_job_maintenance(self, job_name: str) -> None:
         """Remove scheduled maintenance operations for a job"""
         self.scheduler.unschedule_job_maintenance(job_name)
     
-    def reschedule_job_maintenance(self, job_name: str):
+    def reschedule_job_maintenance(self, job_name: str) -> None:
         """Reschedule maintenance operations for a job"""
         self.scheduler.reschedule_job_maintenance(job_name)
     
@@ -584,7 +584,7 @@ def bootstrap_maintenance_schedules(backup_config, scheduler_service, notificati
     return scheduled_count
 
 
-def update_job_maintenance_schedule(job_name: str, job_config: dict, backup_config, scheduler_service, notification_service=None):
+def update_job_maintenance_schedule(job_name: str, job_config: Dict[str, Any], backup_config: Any, scheduler_service: Any, notification_service: Optional[Any] = None) -> None:
     """Update maintenance schedule for a single job (called when job is added/modified)"""
     maintenance_service = ResticMaintenanceService(
         backup_config=backup_config,
@@ -603,7 +603,7 @@ def update_job_maintenance_schedule(job_name: str, job_config: dict, backup_conf
         print(f"INFO: Unscheduled maintenance for job '{job_name}' (mode: {maintenance_mode})")
 
 
-def remove_job_maintenance_schedule(job_name: str, backup_config, scheduler_service):
+def remove_job_maintenance_schedule(job_name: str, backup_config: Any, scheduler_service: Any) -> None:
     """Remove maintenance schedule for a job (called when job is deleted)"""
     maintenance_service = ResticMaintenanceService(
         backup_config=backup_config,

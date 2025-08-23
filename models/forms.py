@@ -99,7 +99,7 @@ class JobFormData(BaseModel):
 # UTILITY FUNCTIONS - Common form parsing helpers
 # =============================================================================
 
-def safe_get_list(data, key):
+def safe_get_list(data: Dict[str, Any], key: str) -> List[str]:
     """Safely get list from form data regardless of format"""
     if hasattr(data, 'getlist'):
         return data.getlist(key)
@@ -107,12 +107,12 @@ def safe_get_list(data, key):
         value = data.get(key, [])
         return value if isinstance(value, list) else [value]
 
-def safe_get_value(data, key, default=''):
+def safe_get_value(data: Dict[str, Any], key: str, default: str = '') -> str:
     """Safely get single value from form data"""
     values = safe_get_list(data, key)
     return values[0] if values and values[0] else default
 
-def parse_lines(text):
+def parse_lines(text: str) -> List[str]:
     """Parse textarea input into list of non-empty lines"""
     return [line.strip() for line in text.split('\n') if line.strip()]
 
@@ -124,7 +124,7 @@ class SourceParser:
     """Parse source configurations (SSH, local)"""
     
     @staticmethod
-    def parse_ssh_source(form_data):
+    def parse_ssh_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse SSH source configuration"""
         hostname = safe_get_value(form_data, 'hostname')
         username = safe_get_value(form_data, 'username')
@@ -147,7 +147,7 @@ class SourceParser:
         return {'valid': True, 'config': config}
     
     @staticmethod
-    def parse_local_source(form_data):
+    def parse_local_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse local source configuration"""
         # Local sources need minimal configuration
         return {'valid': True, 'config': {}}
@@ -160,7 +160,7 @@ class DestinationParser:
     """Parse destination configurations (SSH, local, rsyncd, restic)"""
     
     @staticmethod
-    def parse_ssh_destination(form_data):
+    def parse_ssh_destination(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse SSH destination configuration"""
         hostname = safe_get_value(form_data, 'dest_hostname')
         username = safe_get_value(form_data, 'dest_username')
@@ -182,7 +182,7 @@ class DestinationParser:
         return {'valid': True, 'config': config}
     
     @staticmethod
-    def parse_local_destination(form_data):
+    def parse_local_destination(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse local destination configuration"""
         path = safe_get_value(form_data, 'dest_path')
         
@@ -193,7 +193,7 @@ class DestinationParser:
         return {'valid': True, 'config': config}
     
     @staticmethod
-    def parse_rsyncd_destination(form_data):
+    def parse_rsyncd_destination(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse rsyncd destination configuration"""
         hostname = safe_get_value(form_data, 'rsyncd_hostname')
         share = safe_get_value(form_data, 'rsyncd_share')
@@ -211,7 +211,7 @@ class DestinationParser:
         return {'valid': True, 'config': config}
     
     @staticmethod
-    def parse_restic_destination(form_data):
+    def parse_restic_destination(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Restic destination configuration with all repository types"""
         repo_type = safe_get_value(form_data, 'restic_repo_type')
         password = safe_get_value(form_data, 'restic_password')
@@ -391,7 +391,7 @@ class SourcePathsParser:
     """Parse multi-path source configurations"""
     
     @staticmethod
-    def parse_multi_path_options(form_data):
+    def parse_multi_path_options(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse multi-path source options from form data"""
         source_paths = safe_get_list(form_data, 'source_path[]')
         source_includes = safe_get_list(form_data, 'source_includes[]') 
@@ -432,7 +432,7 @@ class NotificationParser:
     """Parse notification provider configurations"""
     
     @staticmethod
-    def parse_notification_config(form_data):
+    def parse_notification_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse notification configuration from form data"""
         # Get notification form arrays
         providers = safe_get_list(form_data, 'notification_providers[]')
@@ -489,7 +489,7 @@ class MaintenanceParser:
     """Parse maintenance configuration for Restic repositories"""
     
     @staticmethod
-    def parse_maintenance_config(form_data):
+    def parse_maintenance_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse maintenance configuration from form data"""
         maintenance_mode = safe_get_value(form_data, 'restic_maintenance', 'auto')
         
@@ -530,7 +530,7 @@ class JobFormParser:
     """Unified job form parser - single entry point for all form parsing"""
     
     @staticmethod
-    def parse_job_form(form_data):
+    def parse_job_form(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse complete job form data"""
         # Basic job info
         job_name = safe_get_value(form_data, 'job_name').strip()
@@ -595,7 +595,7 @@ class JobFormParser:
         return job_data
     
     @staticmethod
-    def parse_source_configuration(form_data):
+    def parse_source_configuration(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse complete source configuration including paths"""
         source_type = safe_get_value(form_data, 'source_type')
         if not source_type:
@@ -631,7 +631,7 @@ class JobFormParser:
         return {'valid': True, 'config': source_config}
     
     @staticmethod
-    def parse_destination_configuration(form_data):
+    def parse_destination_configuration(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse destination configuration"""
         dest_type = safe_get_value(form_data, 'dest_type')
         if not dest_type:

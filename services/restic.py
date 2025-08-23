@@ -9,7 +9,7 @@ import json
 import os
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Callable
 from pathlib import Path
 import tempfile
 from functools import wraps
@@ -22,11 +22,11 @@ from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
 logger = logging.getLogger(__name__)
 
 # Import the error handling decorator
-def handle_restic_service_errors(operation_name: str):
+def handle_restic_service_errors(operation_name: str) -> Callable:
     """Decorator to handle common restic service operation errors consistently"""
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
             try:
                 return func(self, *args, **kwargs)
             except Exception as e:
