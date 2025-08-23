@@ -37,7 +37,7 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 ## Core Architecture
 
 **Flow**: `app.py` → `handlers/` → `services/` → `templates/` → `static/`
-**Stack**: Python 3.11+, FastAPI, Pydantic, APScheduler, PyYAML, Jinja2, Docker/Podman (rootless), HTMX
+**Stack**: Python 3.13, FastAPI, Pydantic, APScheduler, PyYAML, Jinja2, Docker/Podman (rootless), HTMX
 
 ### Key Principles
 - **Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings)
@@ -75,7 +75,7 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 **PRODUCTION READY**: Rootless containers + distributed config + schema-driven validation + FastAPI/Pydantic = **MODERN ARCHITECTURE COMPLETE**
 
 **Migration Status**: ✅ **FastAPI/Pydantic modernization 100% complete** - Application now looks like it was built with FastAPI from day one
-**Python Support**: Ready for Python 3.11+ (including 3.13) - zero deprecated CGI dependencies  
+**Python Version**: Now running Python 3.13 - zero deprecated CGI dependencies  
 **Legacy Code Reference**: `/home/ja2ui0/src/ja2ui0/highball-main/` contains pre-migration version for reference
 
 **Current Implementation Status**: See @LOCAL/MODERNIZATION.md for complete migration details

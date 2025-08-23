@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Install system dependencies and Python packages
 COPY requirements.txt /tmp/requirements.txt
