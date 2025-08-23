@@ -379,7 +379,7 @@ class ResticValidator:
                 return {'valid': False, 'error': 'Repository password is required'}
             
             # Test repository access via service
-            from models.backup import ResticRepositoryService
+            from services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
             repo_test = repo_service.test_repository_access({'dest_config': restic_config})
             
@@ -503,7 +503,7 @@ class JobValidator:
     
     def _validate_schema_fields(self, config: Dict[str, Any], schema_type: str, config_type: str) -> ValidationResult:
         """Unified schema-driven field validation for any config type"""
-        from models.backup import DESTINATION_TYPE_SCHEMAS, SOURCE_TYPE_SCHEMAS
+        from models.schemas import DESTINATION_TYPE_SCHEMAS, SOURCE_TYPE_SCHEMAS
         
         schema_map = {
             'destination': DESTINATION_TYPE_SCHEMAS,
@@ -576,7 +576,7 @@ class JobValidator:
         source_config = job_config['source_config']
         
         # Schema-driven source validation
-        from models.backup import SOURCE_TYPE_SCHEMAS
+        from models.schemas import SOURCE_TYPE_SCHEMAS
         
         if source_type not in SOURCE_TYPE_SCHEMAS:
             return ValidationResult(valid=False, error=f'Unknown source type: {source_type}')

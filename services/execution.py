@@ -391,7 +391,7 @@ class ResticExecutionService:
         timeout: int
     ) -> subprocess.CompletedProcess:
         """Execute restic command locally with proper credentials"""
-        from models.backup import ResticArgumentBuilder
+        from models.builders import ResticArgumentBuilder
         
         # Build environment with all credentials (S3, etc.)
         env = ResticArgumentBuilder.build_environment(dest_config)
@@ -416,7 +416,7 @@ class ResticExecutionService:
         timeout: int
     ) -> subprocess.CompletedProcess:
         """Execute restic command via SSH using container"""
-        from models.backup import ResticArgumentBuilder
+        from models.builders import ResticArgumentBuilder
         
         # Extract SSH configuration
         hostname = source_config['hostname']

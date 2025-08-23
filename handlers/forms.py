@@ -316,7 +316,7 @@ class FormsHandler:
         password = self._get_form_value(form_data, 'restic_password')
         
         # Schema-driven validation for required fields
-        from models.backup import DESTINATION_TYPE_SCHEMAS
+        from models.schemas import DESTINATION_TYPE_SCHEMAS
         schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
         required_fields = schema.get('required_fields', [])
         
@@ -386,7 +386,7 @@ class FormsHandler:
         source_type = form_data.get('source_type', [''])[0]
         
         # Schema-driven source field rendering
-        from models.backup import SOURCE_TYPE_SCHEMAS
+        from models.schemas import SOURCE_TYPE_SCHEMAS
         
         if source_type not in SOURCE_TYPE_SCHEMAS:
             return self.template_service.render_template('partials/info_message.html',
@@ -419,7 +419,7 @@ class FormsHandler:
         dest_type = form_data.get('dest_type', [''])[0]
         
         # Schema-driven destination field rendering
-        from models.backup import DESTINATION_TYPE_SCHEMAS
+        from models.schemas import DESTINATION_TYPE_SCHEMAS
         
         if dest_type not in DESTINATION_TYPE_SCHEMAS:
             return self.template_service.render_template('partials/info_message.html',
@@ -471,7 +471,7 @@ class FormsHandler:
     
     def _add_source_path(self, form_data):
         """Add a new source path entry"""
-        from models.backup import SOURCE_PATH_SCHEMA
+        from models.schemas import SOURCE_PATH_SCHEMA
         
         # Get path count from JavaScript via hx-vals
         path_count = int(self._get_form_value(form_data, 'path_count', '0'))
@@ -627,7 +627,7 @@ class FormsHandler:
         """Render maintenance configuration fields based on selected mode"""
         maintenance_mode = self._get_form_value(form_data, 'restic_maintenance', 'auto')
         
-        from models.backup import MAINTENANCE_MODE_SCHEMAS
+        from models.schemas import MAINTENANCE_MODE_SCHEMAS
         
         # Extract current field values from form data or use defaults
         field_values = {}
@@ -786,7 +786,7 @@ class FormsHandler:
         if not repo_type:
             return ''  # No fields for unselected type
             
-        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
         
         return self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
                                                    repo_type=repo_type,

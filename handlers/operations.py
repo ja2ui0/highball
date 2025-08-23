@@ -237,7 +237,7 @@ class OperationsHandler:
                     target_path = source_paths[0]['path']  # Use first source path
             
             # Use backup service for restore
-            from models.backup import ResticRepositoryService
+            from services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
             
             # Build restore arguments

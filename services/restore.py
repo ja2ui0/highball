@@ -376,7 +376,7 @@ class RestoreExecutionService:
     def execute_dry_run(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute dry run restore and return results"""
         try:
-            from models.backup import ResticRunner
+            from services.restic import ResticRunner
             from services.execution import ExecutionService, ExecutionConfig, obfuscate_password_in_command
             
             job_name = restore_config['job_name']
@@ -470,7 +470,7 @@ class RestoreExecutionService:
     
     def _execute_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]):
         """Execute restore operation in background with progress tracking"""
-        from models.backup import ResticRunner
+        from services.restic import ResticRunner
         from services.command_obfuscation import obfuscate_password_in_command
         
         job_name = restore_config['job_name']

@@ -5,7 +5,7 @@ Replaces: job_form_data_builder.py, snapshot_introspection_service.py
 """
 from typing import Dict, List, Optional, Any
 from models.forms import JobFormData, SourceConfig, DestConfig, ResticConfig, NotificationConfig
-from models.backup import SOURCE_PATH_SCHEMA
+from models.schemas import SOURCE_PATH_SCHEMA
 from services.execution import ExecutionService, OperationType
 
 
@@ -318,7 +318,7 @@ class JobFormTemplateBuilder:
     
     def build_source_fields_html(self, source_type: str, source_config: Dict[str, Any]) -> str:
         """Build source-specific fields HTML"""
-        from models.backup import SOURCE_TYPE_SCHEMAS
+        from models.schemas import SOURCE_TYPE_SCHEMAS
         
         if source_type not in SOURCE_TYPE_SCHEMAS:
             return ''
@@ -349,7 +349,7 @@ class JobFormTemplateBuilder:
     
     def _build_restic_destination_html(self, dest_config: Dict[str, Any], form_data: Dict[str, Any]) -> str:
         """Build complex restic destination fields HTML"""
-        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
         
         # Get restic config 
         restic_config = form_data.get('restic_config', {})
@@ -389,7 +389,7 @@ class JobFormTemplateBuilder:
     
     def _build_standard_destination_html(self, dest_type: str, dest_config: Dict[str, Any]) -> str:
         """Build standard destination fields HTML using schemas"""
-        from models.backup import DESTINATION_TYPE_SCHEMAS
+        from models.schemas import DESTINATION_TYPE_SCHEMAS
         
         if dest_type not in DESTINATION_TYPE_SCHEMAS:
             return ''
@@ -596,7 +596,7 @@ class DestinationTypeService:
     
     def get_available_destination_types(self, source_config: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Get list of available destination types with their metadata"""
-        from models.backup import DESTINATION_TYPE_SCHEMAS
+        from models.schemas import DESTINATION_TYPE_SCHEMAS
         
         available_types = []
         
@@ -648,7 +648,7 @@ class ResticRepositoryTypeService:
     
     def get_available_repository_types(self) -> List[Dict[str, Any]]:
         """Get list of available restic repository types with their metadata"""
-        from models.backup import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
         
         available_types = []
         
