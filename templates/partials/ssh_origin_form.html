@@ -1,0 +1,74 @@
+<div class="section-container">
+    <h2 class="section-header">Add SSH Origin</h2>
+    
+    <form method="post" action="/ssh/add" enctype="multipart/form-data" id="ssh-origin-form">
+        <div class="form-group">
+            <label for="origin_name">Origin Name:</label>
+            <input type="text" id="origin_name" name="origin_name" required 
+                   pattern="[a-zA-Z0-9_-]+" 
+                   placeholder="e.g., yeti, main-nas, prod-server">
+            <div class="help-text">Filename slug (a-z, 0-9, _, - only) - used for filesystem and code references</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="friendly_name">Display Name:</label>
+            <input type="text" id="friendly_name" name="friendly_name" required 
+                   placeholder="e.g., Main NAS, Production Server">
+            <div class="help-text">Human-readable name shown in the interface</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="ssh_hostname">SSH Hostname:</label>
+            <input type="text" id="ssh_hostname" name="ssh_hostname" required 
+                   placeholder="e.g., server.example.com, 192.168.1.100">
+            <div class="help-text">SSH server hostname or IP address</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="ssh_username">SSH Username:</label>
+            <input type="text" id="ssh_username" name="ssh_username" required 
+                   placeholder="e.g., root, backup-user">
+            <div class="help-text">Username for SSH authentication</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="ssh_port">SSH Port:</label>
+            <input type="number" id="ssh_port" name="ssh_port" value="22" 
+                   min="1" max="65535" placeholder="22">
+            <div class="help-text">SSH port number (default: 22)</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="ssh_timeout">Connection Timeout:</label>
+            <input type="number" id="ssh_timeout" name="ssh_timeout" value="5" 
+                   min="1" max="60" placeholder="5">
+            <div class="help-text">SSH connection timeout in seconds (default: 5)</div>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="ssh_highball" id="ssh_highball" checked 
+                       hx-post="/htmx/toggle-auth-method"
+                       hx-target="#auth-method-container"
+                       hx-include="closest form"> 
+                Use Highball SSH key (recommended)
+            </label>
+            <div class="help-text">Use Highball's managed SSH keypair. Requires password during setup to install public key.</div>
+        </div>
+        
+        <div id="auth-method-container">
+            {% include 'partials/ssh_auth_highball.html' %}
+        </div>
+        
+        <div class="form-group">
+            <button type="button" 
+                    hx-post="/ssh/validate" 
+                    hx-target="#validation-result"
+                    hx-include="closest form"
+                    class="button">Test Connection</button>
+            <button type="submit" class="button button-success">Save Origin</button>
+        </div>
+        
+        <div id="validation-result" style="margin-top: 15px;"></div>
+    </form>
+</div>

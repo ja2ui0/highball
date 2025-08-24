@@ -95,6 +95,53 @@ class JobFormData(BaseModel):
     restic_maintenance: str = "auto"
     notifications: List[NotificationConfig] = Field(default_factory=list)
 
+
+class OriginConfig(BaseModel):
+    """SSH origin configuration data structure matching origins/{name}.yaml schema"""
+    friendly_name: str
+    ssh_hostname: str
+    ssh_port: int = 22
+    ssh_timeout: int = 5
+    ssh_username: str
+    ssh_highball: bool = True
+    ssh_pubkey: str = "${SSH_PUBKEY}"
+    ssh_passphrase: str = "${SSH_PASSPHRASE}"
+    rsync_available: bool = False
+    container_runtime: Optional[str] = None
+    
+    # Origin name is derived from filename, not stored in YAML
+
+
+class OriginSecrets(BaseModel):
+    """SSH origin secrets data structure matching secrets/origins/{name}.env schema"""
+    ssh_pubkey: Optional[str] = None
+    ssh_passphrase: Optional[str] = None
+
+
+class OriginFormData(BaseModel):
+    """Form concern: SSH origin form data structure"""
+    origin_name: str = ""
+    friendly_name: str = ""
+    ssh_hostname: str = ""
+    ssh_port: int = 22
+    ssh_timeout: int = 5
+    ssh_username: str = ""
+    ssh_highball: bool = True
+    ssh_password: str = ""  # Transient - not stored
+    ssh_pubkey: str = ""
+    requires_passphrase: bool = False
+    ssh_passphrase: str = ""
+
+
+class OriginValidationResult(BaseModel):
+    """SSH origin validation result data structure"""
+    success: bool
+    connection_success: bool = False
+    rsync_available: bool = False
+    container_runtime: Optional[str] = None
+    validation_message: str = ""
+    error_message: Optional[str] = None
+
 # =============================================================================
 # UTILITY FUNCTIONS - Common form parsing helpers
 # =============================================================================
@@ -660,6 +707,106 @@ class JobFormParser:
         return {'valid': True, 'config': dest_config}
 
 # =============================================================================
+# SSH ORIGIN CONFIGURATION PARSER
+# =============================================================================
+
+class OriginParser:
+    """Parse SSH origin configurations"""
+    
+    @staticmethod
+    def parse_origin_form(form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse SSH origin form data"""
+        origin_name = safe_get_value(form_data, 'origin_name').strip()
+        if not origin_name:
+            return {'valid': False, 'error': 'Origin name is required'}
+        
+        # Validate origin name is a valid slug (matches filename requirements)
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', origin_name):
+            return {'valid': False, 'error': 'Origin name must contain only letters, numbers, underscores, and hyphens'}
+        
+        friendly_name = safe_get_value(form_data, 'friendly_name').strip()
+        if not friendly_name:
+            return {'valid': False, 'error': 'Friendly name is required'}
+        
+        ssh_hostname = safe_get_value(form_data, 'ssh_hostname').strip()
+        if not ssh_hostname:
+            return {'valid': False, 'error': 'SSH hostname is required'}
+        
+        ssh_username = safe_get_value(form_data, 'ssh_username').strip()
+        if not ssh_username:
+            return {'valid': False, 'error': 'SSH username is required'}
+        
+        # Parse authentication method
+        ssh_highball = safe_get_value(form_data, 'ssh_highball') == 'on'
+        
+        # Parse optional fields with defaults
+        ssh_port = safe_get_value(form_data, 'ssh_port', '22')
+        ssh_timeout = safe_get_value(form_data, 'ssh_timeout', '5')
+        
+        try:
+            ssh_port = int(ssh_port)
+            ssh_timeout = int(ssh_timeout)
+        except ValueError:
+            return {'valid': False, 'error': 'SSH port and timeout must be numbers'}
+        
+        # Validate authentication configuration
+        auth_validation = OriginParser._validate_auth_config(form_data, ssh_highball)
+        if not auth_validation['valid']:
+            return auth_validation
+        
+        # Build origin configuration
+        origin_config = {
+            'origin_name': origin_name,
+            'friendly_name': friendly_name,
+            'ssh_hostname': ssh_hostname,
+            'ssh_port': ssh_port,
+            'ssh_timeout': ssh_timeout,
+            'ssh_username': ssh_username,
+            'ssh_highball': ssh_highball
+        }
+        
+        # Add authentication-specific fields
+        if ssh_highball:
+            # Highball key mode - need transient password for setup
+            ssh_password = safe_get_value(form_data, 'ssh_password')
+            if not ssh_password:
+                return {'valid': False, 'error': 'SSH password is required for Highball key installation'}
+            origin_config['ssh_password'] = ssh_password  # Transient
+        else:
+            # User key mode - need public key and optional passphrase
+            ssh_pubkey = safe_get_value(form_data, 'ssh_pubkey').strip()
+            if not ssh_pubkey:
+                return {'valid': False, 'error': 'SSH public key is required when not using Highball keys'}
+            
+            origin_config['ssh_pubkey'] = ssh_pubkey
+            
+            requires_passphrase = safe_get_value(form_data, 'requires_passphrase') == 'on'
+            if requires_passphrase:
+                ssh_passphrase = safe_get_value(form_data, 'ssh_passphrase')
+                if not ssh_passphrase:
+                    return {'valid': False, 'error': 'SSH key passphrase is required when "Requires passphrase" is checked'}
+                origin_config['ssh_passphrase'] = ssh_passphrase
+        
+        return {'valid': True, 'origin_config': origin_config}
+    
+    @staticmethod
+    def _validate_auth_config(form_data: Dict[str, Any], ssh_highball: bool) -> Dict[str, Any]:
+        """Validate authentication configuration consistency"""
+        if ssh_highball:
+            # Highball mode: should not have user key fields filled
+            ssh_pubkey = safe_get_value(form_data, 'ssh_pubkey').strip()
+            if ssh_pubkey:
+                return {'valid': False, 'error': 'Cannot specify SSH public key when using Highball keys'}
+        else:
+            # User key mode: should not have password filled
+            ssh_password = safe_get_value(form_data, 'ssh_password')
+            if ssh_password:
+                return {'valid': False, 'error': 'Cannot specify SSH password when using user-managed keys'}
+        
+        return {'valid': True}
+
+# =============================================================================
 # EXPORTS - Clean interface
 # =============================================================================
 
@@ -670,3 +817,4 @@ destination_parser = DestinationParser()
 notification_parser = NotificationParser()
 maintenance_parser = MaintenanceParser()
 source_paths_parser = SourcePathsParser()
+origin_parser = OriginParser()

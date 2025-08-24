@@ -7,7 +7,11 @@
     <td colspan="2">
         <div class="action-buttons">
             <a href="/restore-job?name={{ job_name }}" class="button button-success">Restore</a>
-            <a href="/purge-job?name={{ job_name }}" class="button button-danger">Purge</a>
+            <button hx-get="/purge-job" 
+                    hx-vals='{"name": "{{ job_name }}"}'
+                    hx-confirm="PERMANENTLY DELETE JOB '{{ job_name }}'? This will irreversibly remove all configuration and secrets for this job. This action CANNOT be undone. Are you absolutely certain you want to proceed?"
+                    hx-on::after-request="window.location.reload()"
+                    class="button button-danger">Purge</button>
         </div>
     </td>
 </tr>

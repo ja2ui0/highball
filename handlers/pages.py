@@ -124,6 +124,52 @@ class GETHandlers:
         html = self.template_service.render_template('pages/dashboard.html', **template_data)
         return HTMLResponse(content=html)
     
+    @handle_page_errors("SSH origins")
+    def show_ssh_origins(self) -> HTMLResponse:
+        """Show SSH origins management page"""
+        origins = self.backup_config.get_ssh_origins()
+        global_settings = self.backup_config.get_global_settings()
+        
+        # Build origin display list
+        origin_list = []
+        for origin_name, origin_config in origins.items():
+            # Determine authentication method display
+            auth_method = "Highball SSH Key" if origin_config.get('ssh_highball', True) else "User SSH Key"
+            
+            # Connection info display
+            connection_info = f"{origin_config.get('ssh_username')}@{origin_config.get('ssh_hostname')}:{origin_config.get('ssh_port', 22)}"
+            
+            # Capabilities display
+            capabilities = []
+            if origin_config.get('rsync_available'):
+                capabilities.append("rsync")
+            if origin_config.get('container_runtime'):
+                capabilities.append(origin_config['container_runtime'])
+            capabilities_display = ", ".join(capabilities) if capabilities else "Not detected"
+            
+            origin_display = {
+                'name': origin_name,
+                'friendly_name': origin_config.get('friendly_name', origin_name),
+                'connection_info': connection_info,
+                'auth_method': auth_method,
+                'capabilities': capabilities_display,
+                'config': origin_config
+            }
+            origin_list.append(origin_display)
+        
+        # Sort by friendly name for consistent display
+        origin_list.sort(key=lambda x: x['friendly_name'].lower())
+        
+        template_data = {
+            'origins': origin_list,
+            'global_settings': global_settings,
+            'theme_css_path': '',
+            'page_title': 'SSH Origins'
+        }
+        
+        html = self.template_service.render_template('pages/ssh_config.html', **template_data)
+        return HTMLResponse(content=html)
+    
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
@@ -558,6 +604,48 @@ class POSTHandlers:
                 'error': f"Failed to delete job '{job_name}'"
             }, status_code=500)
 
+    @handle_page_errors("Purge job")
+    def purge_backup_job(self, job_name: str) -> JSONResponse:
+        """Permanently purge backup job from deleted jobs"""
+        from fastapi.responses import RedirectResponse
+        
+        if not job_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Job name is required'
+            }, status_code=400)
+        
+        success = self.backup_config.purge_job(job_name)
+        
+        if success:
+            return RedirectResponse(url='/dashboard', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to purge job '{job_name}'"
+            }, status_code=500)
+
+    @handle_page_errors("Restore job")
+    def restore_backup_job(self, job_name: str) -> JSONResponse:
+        """Restore backup job from deleted jobs"""
+        from fastapi.responses import RedirectResponse
+        
+        if not job_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Job name is required'
+            }, status_code=400)
+        
+        success = self.backup_config.restore_deleted_job(job_name)
+        
+        if success:
+            return RedirectResponse(url='/dashboard', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to restore job '{job_name}'"
+            }, status_code=500)
+
     def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
         """Helper to safely get form values handling both list and string formats"""
         value = form_data.get(field_name, [default])
@@ -743,6 +831,123 @@ class POSTHandlers:
                                                    preview_yaml=preview_yaml,
                                                    success=True)
         return HTMLResponse(content=html)
+    
+    # =============================================================================
+    # SSH ORIGIN MANAGEMENT HANDLERS
+    # =============================================================================
+    
+    def _validate_and_update_origin_capabilities(self, origin_config):
+        """Run SSH validation and update origin config with detected capabilities"""
+        ssh_config = {
+            'hostname': origin_config['ssh_hostname'],
+            'username': origin_config['ssh_username']
+        }
+        
+        from models.validation import ValidationService
+        validation_service = ValidationService()
+        validation_result = validation_service.validate_ssh_source(ssh_config)
+        
+        # Add detected capabilities to origin config
+        if validation_result['valid']:
+            origin_config['rsync_available'] = 'rsync' in validation_result.get('rsync_status', '').lower() or validation_result.get('rsync_status') == 'Available'
+            origin_config['container_runtime'] = validation_result.get('container_runtime')
+        else:
+            # If validation fails, still save but with unknown capabilities
+            origin_config['rsync_available'] = False
+            origin_config['container_runtime'] = None
+        
+        return origin_config
+    
+    @handle_page_errors("Add SSH origin")
+    def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Add new SSH origin"""
+        from fastapi.responses import RedirectResponse
+        from models.forms import origin_parser
+        
+        # Parse origin form data
+        origin_result = origin_parser.parse_origin_form(form_data)
+        if not origin_result['valid']:
+            return JSONResponse(content={
+                'success': False,
+                'error': origin_result['error']
+            }, status_code=400)
+        
+        origin_config = origin_result['origin_config']
+        origin_name = origin_config['origin_name']
+        
+        # Check if origin already exists
+        existing_origins = self.backup_config.get_ssh_origins()
+        if origin_name in existing_origins:
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Origin "{origin_name}" already exists'
+            }, status_code=400)
+        
+        # Run validation to detect capabilities before saving
+        origin_config = self._validate_and_update_origin_capabilities(origin_config)
+        
+        # Save origin with detected capabilities
+        success = self.backup_config.save_origin(origin_name, origin_config)
+        
+        if success:
+            return RedirectResponse(url='/ssh', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to save origin '{origin_name}'"
+            }, status_code=500)
+    
+    @handle_page_errors("Save SSH origin")
+    def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Save SSH origin changes"""
+        from fastapi.responses import RedirectResponse
+        from models.forms import origin_parser
+        
+        # Parse origin form data
+        origin_result = origin_parser.parse_origin_form(form_data)
+        if not origin_result['valid']:
+            return JSONResponse(content={
+                'success': False,
+                'error': origin_result['error']
+            }, status_code=400)
+        
+        origin_config = origin_result['origin_config']
+        origin_name = origin_config['origin_name']
+        
+        # Run validation to detect capabilities before saving
+        origin_config = self._validate_and_update_origin_capabilities(origin_config)
+        
+        # Save origin with detected capabilities (overwrites existing)
+        success = self.backup_config.save_origin(origin_name, origin_config)
+        
+        if success:
+            return RedirectResponse(url='/ssh', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to save origin '{origin_name}'"
+            }, status_code=500)
+    
+    @handle_page_errors("Delete SSH origin")
+    def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
+        """Delete SSH origin"""
+        from fastapi.responses import RedirectResponse
+        
+        if not origin_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Origin name is required'
+            }, status_code=400)
+        
+        success = self.backup_config.delete_origin(origin_name)
+        
+        if success:
+            return RedirectResponse(url='/ssh', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to delete origin '{origin_name}'"
+            }, status_code=500)
 
 
 class ValidationHandlers:
@@ -794,6 +999,72 @@ class ValidationHandlers:
             'valid': True,
             'results': validation_results
         })
+    
+    @handle_page_errors("SSH origin validation")
+    def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Validate SSH origin configuration with capability detection"""
+        from models.forms import origin_parser
+        
+        # Parse origin form data
+        origin_result = origin_parser.parse_origin_form(form_data)
+        if not origin_result['valid']:
+            return JSONResponse(content=origin_result)
+        
+        origin_config = origin_result['origin_config']
+        
+        # Build SSH config for validation
+        ssh_config = {
+            'hostname': origin_config['ssh_hostname'],
+            'username': origin_config['ssh_username']
+        }
+        
+        # Use unified validation service
+        from models.validation import ValidationService
+        validation_service = ValidationService()
+        result = validation_service.validate_ssh_source(ssh_config)
+        
+        # Convert validation result to template context
+        if result['valid']:
+            template_context = {
+                'success': True,
+                'validation_message': f"SSH connection successful. {result.get('rsync_status', 'Rsync status unknown')}. Container runtime: {result.get('container_runtime', 'None detected')}.",
+                'rsync_available': 'rsync' in result.get('rsync_status', '').lower() or result.get('rsync_status') == 'Available',
+                'container_runtime': result.get('container_runtime')
+            }
+        else:
+            template_context = {
+                'success': False,
+                'validation_message': result.get('error', 'SSH validation failed')
+            }
+        
+        html = self.template_service.render_template('partials/ssh_validation_result.html', **template_context)
+        return HTMLResponse(content=html)
+    
+    @handle_page_errors("Toggle SSH auth method")
+    def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Toggle between Highball and user SSH authentication methods"""
+        ssh_highball = 'ssh_highball' in form_data
+        
+        if ssh_highball:
+            template = 'partials/ssh_auth_highball.html'
+        else:
+            template = 'partials/ssh_auth_user.html'
+        
+        html = self.template_service.render_template(template)
+        return HTMLResponse(content=html)
+    
+    @handle_page_errors("Toggle SSH passphrase field")
+    def toggle_ssh_passphrase(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Toggle SSH passphrase field visibility"""
+        requires_passphrase = 'requires_passphrase' in form_data
+        
+        if requires_passphrase:
+            template = 'partials/ssh_passphrase_field.html'
+            html = self.template_service.render_template(template)
+        else:
+            html = ''
+        
+        return HTMLResponse(content=html)
 
 
     @handle_page_errors("Network scan")

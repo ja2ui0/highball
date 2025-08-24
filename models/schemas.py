@@ -618,3 +618,144 @@ JOB_SCHEDULE_SCHEMA = {
         }
     ]
 }
+
+# =============================================================================
+# SSH ORIGIN MANAGEMENT SCHEMAS
+# =============================================================================
+
+# SSH origin form schema for add/edit origin forms
+SSH_ORIGIN_SCHEMA = {
+    'display_name': 'SSH Origin Configuration',
+    'description': 'Configure SSH host connection details and authentication method',
+    'fields': [
+        {
+            'name': 'friendly_name',
+            'type': 'text',
+            'label': 'Friendly Name',
+            'help': 'Display name for this SSH origin (e.g. "Vegas PC", "Production Server")',
+            'placeholder': 'My Server',
+            'required': True,
+            'max_length': 100
+        },
+        {
+            'name': 'ssh_hostname',
+            'type': 'text',
+            'label': 'SSH Hostname',
+            'help': 'SSH server hostname or IP address',
+            'placeholder': 'server.home.arpa',
+            'required': True
+        },
+        {
+            'name': 'ssh_port',
+            'type': 'number',
+            'label': 'SSH Port',
+            'help': 'SSH port number (default: 22)',
+            'placeholder': '22',
+            'default': '22',
+            'min': 1,
+            'max': 65535
+        },
+        {
+            'name': 'ssh_timeout',
+            'type': 'number',
+            'label': 'Connection Timeout',
+            'help': 'SSH connection timeout in seconds',
+            'placeholder': '5',
+            'default': '5',
+            'min': 1,
+            'max': 60
+        },
+        {
+            'name': 'ssh_username',
+            'type': 'text',
+            'label': 'SSH Username',
+            'help': 'Username for SSH authentication',
+            'placeholder': 'username',
+            'required': True
+        },
+        {
+            'name': 'ssh_highball',
+            'type': 'checkbox',
+            'label': 'Use Highball SSH key (recommended)',
+            'help': 'Use Highball\'s managed SSH keypair. Requires password during setup to install public key.',
+            'default': True
+        },
+        {
+            'name': 'ssh_password',
+            'type': 'password',
+            'label': 'SSH Password (for key installation)',
+            'help': 'Temporary password for ssh-copy-id key installation. Not stored after setup.',
+            'placeholder': 'password',
+            'conditional': {
+                'show_when': 'ssh_highball',
+                'value': True
+            }
+        },
+        {
+            'name': 'ssh_pubkey',
+            'type': 'textarea',
+            'label': 'SSH Public Key',
+            'help': 'Your SSH public key (ssh-rsa, ssh-ed25519, etc.)',
+            'placeholder': 'ssh-rsa AAAAB3NzaC1yc2EAAAA...',
+            'rows': 3,
+            'conditional': {
+                'show_when': 'ssh_highball',
+                'value': False
+            }
+        },
+        {
+            'name': 'requires_passphrase',
+            'type': 'checkbox',
+            'label': 'Requires passphrase',
+            'help': 'Check if your private key requires a passphrase',
+            'default': False,
+            'conditional': {
+                'show_when': 'ssh_highball',
+                'value': False
+            }
+        },
+        {
+            'name': 'ssh_passphrase',
+            'type': 'password',
+            'label': 'SSH Key Passphrase',
+            'help': 'Passphrase for your private SSH key',
+            'placeholder': 'passphrase',
+            'conditional': {
+                'show_when': 'requires_passphrase',
+                'value': True
+            }
+        }
+    ]
+}
+
+# SSH origin validation result schema
+SSH_ORIGIN_VALIDATION_SCHEMA = {
+    'display_name': 'SSH Origin Validation',
+    'description': 'SSH connection validation and capability detection results',
+    'fields': [
+        {
+            'name': 'connection_success',
+            'type': 'status',
+            'label': 'SSH Connection',
+            'help': 'Whether SSH connection was successful'
+        },
+        {
+            'name': 'rsync_available',
+            'type': 'status',
+            'label': 'rsync Available',
+            'help': 'Whether rsync is installed and available on the target host'
+        },
+        {
+            'name': 'container_runtime',
+            'type': 'text',
+            'label': 'Container Runtime',
+            'help': 'Detected container runtime (docker, podman, or null if none available)'
+        },
+        {
+            'name': 'validation_message',
+            'type': 'text',
+            'label': 'Validation Details',
+            'help': 'Additional details about the validation process'
+        }
+    ]
+}

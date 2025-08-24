@@ -1,0 +1,17 @@
+{% if success %}
+<div style="color: green; padding: 10px; border: 1px solid green; border-radius: 4px; background-color: #f0fff0;">
+    <strong>✓ Connection successful!</strong><br>
+    {{ validation_message }}
+    {% if rsync_available %}
+    <br>• rsync is available
+    {% endif %}
+    {% if container_runtime %}
+    <br>• Container runtime: {{ container_runtime }}
+    {% endif %}
+</div>
+{% else %}
+<div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px; background-color: #fff0f0;">
+    <strong>✗ Connection failed</strong><br>
+    {{ validation_message or error_message or 'Unknown error' }}
+</div>
+{% endif %}

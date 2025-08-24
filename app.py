@@ -47,6 +47,13 @@ class HighballServices:
         self.scheduler_service = SchedulingService()
         self.job_form_builder = JobFormDataBuilder()
 
+        # Initialize SSH keypair for Highball-managed origins (do not bring down UI if this fails)
+        try:
+            self._ensure_highball_ssh_keypair()
+            print("Highball SSH keypair verified/created")
+        except Exception as e:
+            print(f"[SSH_KEYS] Warning: SSH key generation failed: {e}")
+
         # Register schedules (do not bring down UI if this fails)
         try:
             count = self.scheduler_service.bootstrap_schedules(self.backup_config)
@@ -64,6 +71,57 @@ class HighballServices:
             'forms': FormsHandler(self.backup_config, self.template_service),
             'job_scheduler': JobSchedulerHandler(self.scheduler_service),
         }
+    
+    def _ensure_highball_ssh_keypair(self):
+        """Ensure Highball SSH keypair exists, generate if needed"""
+        import subprocess
+        import os
+        import stat
+        
+        ssh_dir = "/config/local/secrets/.ssh"
+        private_key_path = os.path.join(ssh_dir, "id_rsa")
+        public_key_path = os.path.join(ssh_dir, "id_rsa.pub")
+        
+        # Check if keypair already exists
+        if os.path.exists(private_key_path) and os.path.exists(public_key_path):
+            # Verify permissions on existing key
+            try:
+                os.chmod(private_key_path, 0o600)
+                os.chmod(public_key_path, 0o644)
+            except Exception as e:
+                print(f"Warning: Could not set SSH key permissions: {e}")
+            return
+        
+        # Create SSH directory if it doesn't exist
+        os.makedirs(ssh_dir, exist_ok=True)
+        
+        # Generate keypair without passphrase for non-interactive use
+        print("Generating Highball SSH keypair...")
+        cmd = [
+            'ssh-keygen', 
+            '-t', 'rsa',
+            '-b', '2048',
+            '-f', private_key_path,
+            '-N', '',  # No passphrase
+            '-C', 'highball@container',
+            '-q'  # Quiet mode
+        ]
+        
+        # Run ssh-keygen
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            raise Exception(f"ssh-keygen failed: {result.stderr}")
+        
+        # Set proper permissions
+        os.chmod(private_key_path, 0o600)
+        os.chmod(public_key_path, 0o644)
+        
+        # Create known_hosts file for host key acceptance
+        known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+        if not os.path.exists(known_hosts_path):
+            with open(known_hosts_path, 'w') as f:
+                f.write("# SSH known hosts for Highball\n")
+            os.chmod(known_hosts_path, 0o644)
 
 
 # Global services instance
@@ -140,6 +198,58 @@ async def show_dev_logs(type: str = Query("app")):
 async def show_job_inspect(name: str = Query("")):
     """Job inspection page"""
     return services.handlers['get_pages'].show_job_inspect(name)
+
+
+# =============================================================================
+# SSH ORIGIN MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@app.get("/ssh", response_class=HTMLResponse)
+async def show_ssh_origins():
+    """SSH origins management page"""
+    return services.handlers['get_pages'].show_ssh_origins()
+
+
+@app.post("/ssh/add")
+async def add_ssh_origin(request: Request):
+    """Add new SSH origin"""
+    form_data = dict(await request.form())
+    return services.handlers['post_pages'].add_ssh_origin(form_data)
+
+
+@app.post("/ssh/save")
+async def save_ssh_origin(request: Request):
+    """Save SSH origin changes"""
+    form_data = dict(await request.form())
+    return services.handlers['post_pages'].save_ssh_origin(form_data)
+
+
+@app.post("/ssh/delete")
+async def delete_ssh_origin(name: str = Query("")):
+    """Delete SSH origin"""
+    return services.handlers['post_pages'].delete_ssh_origin(name)
+
+
+@app.post("/ssh/validate")
+async def validate_ssh_origin(request: Request):
+    """Validate SSH origin configuration"""
+    form_data = dict(await request.form())
+    return services.handlers['validation_pages'].validate_ssh_origin(form_data)
+
+
+# SSH Origin HTMX Partials
+@app.post("/htmx/toggle-auth-method")
+async def toggle_ssh_auth_method(request: Request):
+    """Toggle SSH authentication method (HTMX partial)"""
+    form_data = dict(await request.form())
+    return services.handlers['validation_pages'].toggle_ssh_auth_method(form_data)
+
+
+@app.post("/htmx/toggle-passphrase")
+async def toggle_ssh_passphrase(request: Request):
+    """Toggle SSH passphrase field (HTMX partial)"""
+    form_data = dict(await request.form())
+    return services.handlers['validation_pages'].toggle_ssh_passphrase(form_data)
 
 
 # =============================================================================
@@ -262,12 +372,22 @@ async def save_job(request: Request):
     return services.handlers['post_pages'].save_backup_job(form_data)
 
 
-@app.post("/delete-job")
-async def delete_job(request: Request):
+@app.get("/delete-job")
+async def delete_job(name: str = Query("")):
     """Delete backup job"""
-    form = await request.form()
-    job_name = form.get('job_name', '')
-    return services.handlers['post_pages'].delete_backup_job(job_name)
+    return services.handlers['post_pages'].delete_backup_job(name)
+
+
+@app.get("/purge-job")
+async def purge_job(name: str = Query("")):
+    """Permanently purge backup job from deleted jobs"""
+    return services.handlers['post_pages'].purge_backup_job(name)
+
+
+@app.get("/restore-job")
+async def restore_job(name: str = Query("")):
+    """Restore backup job from deleted jobs"""
+    return services.handlers['post_pages'].restore_backup_job(name)
 
 
 @app.post("/run-backup")

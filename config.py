@@ -26,10 +26,14 @@ class BackupConfig:
             # Load deleted jobs from /config/local/jobs/deleted/*.yaml  
             deleted_jobs = self._load_deleted_jobs()
             
+            # Load SSH origins from /config/local/origins/*.yaml
+            ssh_origins = self._load_ssh_origins()
+            
             return {
                 'global_settings': global_settings,
                 'backup_jobs': backup_jobs,
-                'deleted_jobs': deleted_jobs
+                'deleted_jobs': deleted_jobs,
+                'ssh_origins': ssh_origins
             }
             
         except Exception as e:
@@ -139,6 +143,43 @@ class BackupConfig:
                 continue
         
         return deleted_jobs
+    
+    def _load_ssh_origins(self):
+        """Load SSH origins from /config/local/origins/*.yaml with origin-scoped secrets"""
+        origins = {}
+        origins_dir = "/config/local/origins"
+        
+        if not os.path.exists(origins_dir):
+            return origins
+            
+        # Find all .yaml files in origins directory
+        origin_files = glob.glob(os.path.join(origins_dir, "*.yaml"))
+        
+        for origin_file in origin_files:
+            origin_name = os.path.splitext(os.path.basename(origin_file))[0]
+            
+            try:
+                # Load origin config
+                with open(origin_file, 'r') as f:
+                    origin_config = yaml.safe_load(f.read())
+                
+                if origin_config is None:
+                    print(f"Warning: Empty origin config for {origin_name}")
+                    continue
+                
+                # Load origin-specific secrets if they exist (scoped per origin)
+                secrets_file = f"/config/local/secrets/origins/{origin_name}.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    origin_config = self._merge_secrets(origin_config, secrets)
+                
+                origins[origin_name] = origin_config
+                
+            except Exception as e:
+                print(f"Warning: Error loading origin {origin_name}: {str(e)}")
+                continue
+        
+        return origins
     
     def _merge_secrets(self, config, secrets):
         """Merge secrets into config by replacing ${VAR} placeholders - maintains job isolation"""
@@ -524,3 +565,150 @@ class BackupConfig:
         self.config['global_settings'].update(settings)
         self.save_config()
     
+    def purge_job(self, job_name):
+        """Permanently delete a job from deleted/ directories (irreversible)"""
+        try:
+            # Check if deleted job exists
+            if job_name not in self.config.get('deleted_jobs', {}):
+                return False
+            
+            # File paths for deleted job
+            deleted_config_file = f"/config/local/jobs/deleted/{job_name}.yaml"
+            deleted_secrets_file = f"/config/local/secrets/jobs/deleted/{job_name}.env"
+            
+            # Remove config file
+            if os.path.exists(deleted_config_file):
+                os.remove(deleted_config_file)
+            
+            # Remove secrets file
+            if os.path.exists(deleted_secrets_file):
+                os.remove(deleted_secrets_file)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error purging job {job_name}: {str(e)}")
+            return False
+    
+    # =============================================================================
+    # SSH ORIGIN MANAGEMENT METHODS
+    # =============================================================================
+    
+    def get_ssh_origins(self):
+        """Get all SSH origins"""
+        return self.config.get('ssh_origins', {})
+    
+    def get_ssh_origin(self, origin_name):
+        """Get specific SSH origin"""
+        return self.config.get('ssh_origins', {}).get(origin_name)
+    
+    def save_origin(self, origin_name, origin_config):
+        """Save an SSH origin: config with ${placeholders}, .env with secrets (only if secrets exist)"""
+        try:
+            # Ensure directories exist
+            origins_dir = "/config/local/origins"
+            secrets_dir = "/config/local/secrets/origins"
+            os.makedirs(origins_dir, exist_ok=True)
+            os.makedirs(secrets_dir, exist_ok=True)
+            
+            # Extract secrets from origin config for user-managed keys
+            clean_config, secrets = self._extract_secrets_from_origin_config(origin_config)
+            
+            # Write files atomically (only creates .env if secrets dict has content)
+            self._write_origin_files_atomically(origin_name, clean_config, secrets)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving origin {origin_name}: {str(e)}")
+            return False
+    
+    def delete_origin(self, origin_name):
+        """Delete an SSH origin permanently"""
+        try:
+            # Check if origin exists
+            if origin_name not in self.config.get('ssh_origins', {}):
+                return False
+            
+            # File paths
+            config_file = f"/config/local/origins/{origin_name}.yaml"
+            secrets_file = f"/config/local/secrets/origins/{origin_name}.env"
+            
+            # Remove config file
+            if os.path.exists(config_file):
+                os.remove(config_file)
+            
+            # Remove secrets file if it exists
+            if os.path.exists(secrets_file):
+                os.remove(secrets_file)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting origin {origin_name}: {str(e)}")
+            return False
+    
+    def _extract_secrets_from_origin_config(self, origin_config):
+        """Extract secrets from origin config for user-managed keys only"""
+        clean_config = origin_config.copy()
+        secrets = {}
+        
+        # Only extract secrets if using user-managed keys (ssh_highball = false)
+        if not origin_config.get('ssh_highball', True):
+            # Extract SSH_PUBKEY if provided
+            ssh_pubkey = origin_config.get('ssh_pubkey', '')
+            if ssh_pubkey and ssh_pubkey != '${SSH_PUBKEY}':
+                secrets['SSH_PUBKEY'] = ssh_pubkey
+                clean_config['ssh_pubkey'] = '${SSH_PUBKEY}'
+            
+            # Extract SSH_PASSPHRASE if provided
+            ssh_passphrase = origin_config.get('ssh_passphrase', '')
+            if ssh_passphrase and ssh_passphrase != '${SSH_PASSPHRASE}':
+                secrets['SSH_PASSPHRASE'] = ssh_passphrase
+                clean_config['ssh_passphrase'] = '${SSH_PASSPHRASE}'
+        
+        # Remove fields that shouldn't be stored in YAML
+        if 'origin_name' in clean_config:
+            del clean_config['origin_name']  # Derived from filename, not stored
+        if 'ssh_password' in clean_config:
+            del clean_config['ssh_password']  # Transient field, not stored
+        
+        return clean_config, secrets
+    
+    def _write_origin_files_atomically(self, origin_name, clean_config, secrets):
+        """Write origin config and secrets files atomically"""
+        import tempfile
+        import shutil
+        
+        # Write config file
+        config_file = f"/config/local/origins/{origin_name}.yaml"
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as temp_config:
+            yaml.dump(clean_config, temp_config, default_flow_style=False, indent=2)
+            temp_config_path = temp_config.name
+        
+        # Atomically move config file into place
+        shutil.move(temp_config_path, config_file)
+        
+        # Write secrets file only if there are secrets to write
+        secrets_file = f"/config/local/secrets/origins/{origin_name}.env"
+        if secrets:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.env') as temp_secrets:
+                for key, value in secrets.items():
+                    temp_secrets.write(f'{key}="{value}"\n')
+                temp_secrets_path = temp_secrets.name
+            
+            # Atomically move secrets file into place
+            shutil.move(temp_secrets_path, secrets_file)
+        else:
+            # Remove secrets file if no secrets (e.g., switching from user keys to Highball keys)
+            if os.path.exists(secrets_file):
+                os.remove(secrets_file)

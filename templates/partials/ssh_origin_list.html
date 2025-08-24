@@ -1,0 +1,21 @@
+<h2>SSH Origins</h2>
+<table class="job-table origin-table">
+    <tr>
+        <th>Name</th>
+        <th>Connection</th>
+        <th>Authentication</th>
+        <th>Capabilities</th>
+        <th>Actions</th>
+    </tr>
+    {% if origins %}
+        {% for origin in origins %}
+            {% include 'partials/ssh_origin_row.html' %}
+        {% endfor %}
+    {% else %}
+        <tr>
+            <td colspan="5" style="text-align: center; padding: 20px; color: #666;">
+                No SSH origins defined yet. Add your first origin below.
+            </td>
+        </tr>
+    {% endif %}
+</table>

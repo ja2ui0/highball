@@ -314,6 +314,13 @@ tr:hover {
 .deleted-table th:nth-child(5), .deleted-table td:nth-child(5) { width: 8%; min-width: 60px; }
 .deleted-table th:nth-child(6), .deleted-table td:nth-child(6) { width: 28%; min-width: 260px; } /* Combined Inspect+Actions width */
 
+/* SSH Origin table layout - 5 columns (Name, Connection, Auth, Capabilities, Actions) */
+.origin-table th:nth-child(1), .origin-table td:nth-child(1) { width: 15%; min-width: 120px; }
+.origin-table th:nth-child(2), .origin-table td:nth-child(2) { width: 25%; min-width: 180px; word-break: break-all; }
+.origin-table th:nth-child(3), .origin-table td:nth-child(3) { width: 15%; min-width: 100px; }
+.origin-table th:nth-child(4), .origin-table td:nth-child(4) { width: 15%; min-width: 100px; }
+.origin-table th:nth-child(5), .origin-table td:nth-child(5) { width: 30%; min-width: 250px; }
+
 /* Monospace text - reusable */
 .monospace, .source-path {
     font-family: 'Courier New', monospace;

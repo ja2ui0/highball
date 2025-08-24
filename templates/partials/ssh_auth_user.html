@@ -1,0 +1,21 @@
+<div class="form-group">
+    <label for="ssh_pubkey">SSH Public Key:</label>
+    <textarea id="ssh_pubkey" name="ssh_pubkey" rows="3" 
+              placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAA..."></textarea>
+    <div class="help-text">Your SSH public key (ssh-rsa, ssh-ed25519, etc.). You must install this key on the target host manually.</div>
+</div>
+
+<div class="form-group">
+    <label>
+        <input type="checkbox" name="requires_passphrase" id="requires_passphrase" 
+               hx-post="/htmx/toggle-passphrase"
+               hx-target="#passphrase-container"
+               hx-include="closest form"> 
+        Requires passphrase
+    </label>
+    <div class="help-text">Check if your private key requires a passphrase</div>
+</div>
+
+<div id="passphrase-container">
+    <!-- Empty by default, populated if passphrase required -->
+</div>
