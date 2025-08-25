@@ -2148,9 +2148,9 @@ class ValidationHandlers(BaseHandler):
         repo_uri = dest_config.get('repo_uri')
         
         if not repo_uri:
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message='Repository URI not configured')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Repository URI not configured'
+            })
             
         from models.backup import backup_service
         check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
