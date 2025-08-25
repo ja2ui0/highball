@@ -465,8 +465,7 @@ class GETHandlers(BaseHandler):
             'monthly_default': default_schedule_times.get('monthly', '0 3 1 * *'),
         }
             
-        html = self.template_service.render_template('pages/config_manager.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/config_manager.html', template_data)
     
     @handle_page_errors("Raw editor")
     def show_raw_editor(self) -> HTMLResponse:
@@ -540,8 +539,7 @@ class GETHandlers(BaseHandler):
             'job_log_content': job_log_content
         }
         
-        html = self.template_service.render_template('pages/job_inspect.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/job_inspect.html', template_data)
 
     @handle_page_errors("Dev logs")
     def show_dev_logs(self, log_type: str = 'app') -> HTMLResponse:
@@ -555,8 +553,7 @@ class GETHandlers(BaseHandler):
             'page_title': f'Debug Logs: {log_type}'
         }
         
-        html = self.template_service.render_template('pages/dev_logs.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/dev_logs.html', template_data)
     
     def _get_system_logs(self, log_type: str) -> List[str]:
         """Get system logs by type"""
@@ -906,10 +903,10 @@ class POSTHandlers(BaseHandler):
         preview_yaml = yaml.dump(preview_config, default_flow_style=False, indent=2)
         
         # Render preview partial
-        html = self.template_service.render_template('partials/config_preview.html', 
-                                                   preview_yaml=preview_yaml,
-                                                   success=True)
-        return HTMLResponse(content=html)
+        return self._render_html('partials/config_preview.html', {
+            'preview_yaml': preview_yaml,
+            'success': True
+        })
     
     # =============================================================================
     # SSH ORIGIN MANAGEMENT HANDLERS
@@ -1350,11 +1347,11 @@ class ValidationHandlers(BaseHandler):
         
         # Require password when Highball checkbox is checked
         if ssh_highball and not password:
-            html = self.template_service.render_template('partials/ssh_validation_result.html',
-                                                        success=False,
-                                                        edit_mode=edit_mode,
-                                                        validation_message='Password is required when "Auto-populate keys using Highball" is checked.')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/ssh_validation_result.html', {
+                'success': False,
+                'edit_mode': edit_mode,
+                'validation_message': 'Password is required when "Auto-populate keys using Highball" is checked.'
+            })
         
         use_password = ssh_highball and password
         
@@ -1386,19 +1383,19 @@ class ValidationHandlers(BaseHandler):
         threading.Thread(target=run_workflow, daemon=True).start()
         
         # Return initial progress template
-        html = self.template_service.render_template('partials/ssh_validation_progress.html', 
-                                                    session_id=session_id,
-                                                    initial_message="Starting SSH validation workflow...")
-        return HTMLResponse(content=html)
+        return self._render_html('partials/ssh_validation_progress.html', {
+            'session_id': session_id,
+            'initial_message': "Starting SSH validation workflow..."
+        })
     
     @handle_page_errors("SSH progress polling")
     def get_ssh_progress(self, session_id: str) -> HTMLResponse:
         """Get current SSH validation progress for a session"""
         if not hasattr(self, '_ssh_sessions') or session_id not in self._ssh_sessions:
-            html = self.template_service.render_template('partials/ssh_validation_result.html',
-                                                        success=False,
-                                                        validation_message="Session not found or expired")
-            return HTMLResponse(content=html)
+            return self._render_html('partials/ssh_validation_result.html', {
+                'success': False,
+                'validation_message': "Session not found or expired"
+            })
         
         session = self._ssh_sessions[session_id]
         progress_text = '\n'.join(session['progress'])
