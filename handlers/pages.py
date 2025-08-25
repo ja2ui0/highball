@@ -31,12 +31,12 @@ class BaseHandler:
     
     def _render_html(self, template: str, context: dict) -> HTMLResponse:
         """Helper to render template and return HTMLResponse"""
-        html = self.template_service.render_template(template, context)
+        html = self.template_service.render_template(template, **context)
         return HTMLResponse(content=html)
     
     def _render_error(self, template: str, context: dict, status: int = 400) -> HTMLResponse:
         """Helper to render error template and return HTMLResponse with status"""
-        html = self.template_service.render_template(template, context)
+        html = self.template_service.render_template(template, **context)
         return HTMLResponse(content=html, status_code=status)
 
 
@@ -136,8 +136,7 @@ class GETHandlers(BaseHandler):
             'page_title': 'Dashboard'
         }
         
-        html = self.template_service.render_template('pages/dashboard.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/dashboard.html', template_data)
     
     @handle_page_errors("SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
@@ -182,8 +181,7 @@ class GETHandlers(BaseHandler):
             'page_title': 'SSH Origins'
         }
         
-        html = self.template_service.render_template('pages/ssh_config.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/ssh_config.html', template_data)
     
     @handle_page_errors("Edit SSH origin")
     def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
@@ -192,8 +190,7 @@ class GETHandlers(BaseHandler):
         
         if not origin_config:
             # Return empty form if origin not found
-            html = self.template_service.render_template('partials/ssh_origin_form.html')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/ssh_origin_form.html', {})
         
         # Create edit form with populated values including existing capabilities
         form_data = {
@@ -209,8 +206,7 @@ class GETHandlers(BaseHandler):
             'edit_mode': True  # Flag to indicate this is edit mode
         }
         
-        html = self.template_service.render_template('partials/ssh_origin_form.html', **form_data)
-        return HTMLResponse(content=html)
+        return self._render_html('partials/ssh_origin_form.html', form_data)
     
     @handle_page_errors("Destinations")
     def show_destinations(self) -> HTMLResponse:
