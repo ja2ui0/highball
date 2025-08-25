@@ -2169,19 +2169,17 @@ class ValidationHandlers(BaseHandler):
         """Send appropriate repository error HTMX partial based on error type"""
         if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
             # Repository locked - render unlock interface
-            html = self.template_service.render_template('partials/repository_locked_error.html', {
+            return self._render_html('partials/repository_locked_error.html', {
                 'job_name': job_name,
                 'error_message': error_message
             })
-            return HTMLResponse(content=html)
         else:
             # Other error - render error template
-            html = self.template_service.render_template('partials/repository_error.html', {
+            return self._render_html('partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'connection_error',
                 'error_message': error_message or 'Unknown error'
             })
-            return HTMLResponse(content=html)
 
     def _build_ssh_config_from_form(self, form_data: Dict[str, Any]) -> Dict[str, str]:
         """Build SSH configuration from form data"""
