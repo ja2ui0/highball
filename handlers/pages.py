@@ -26,6 +26,20 @@ from services.data_services import JobFormDataBuilder, DestinationTypeService
 
 logger = logging.getLogger(__name__)
 
+class BaseHandler:
+    """Base class for all handlers with shared rendering helpers"""
+    
+    def _render_html(self, template: str, context: dict) -> HTMLResponse:
+        """Helper to render template and return HTMLResponse"""
+        html = self.template_service.render_template(template, context)
+        return HTMLResponse(content=html)
+    
+    def _render_error(self, template: str, context: dict, status: int = 400) -> HTMLResponse:
+        """Helper to render error template and return HTMLResponse with status"""
+        html = self.template_service.render_template(template, context)
+        return HTMLResponse(content=html, status_code=status)
+
+
 def handle_page_errors(operation_name: str) -> Callable:
     """Decorator to handle common page operation errors consistently"""
     def decorator(func: Callable) -> Callable:
@@ -42,7 +56,7 @@ def handle_page_errors(operation_name: str) -> Callable:
         return wrapper
     return decorator
 
-class GETHandlers:
+class GETHandlers(BaseHandler):
     """Handler for all read-only page rendering operations"""
     
     def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
@@ -50,6 +64,7 @@ class GETHandlers:
         self.template_service = template_service
         self.job_form_builder = job_form_builder
         # ResponseUtils removed - all methods now return FastAPI responses directly
+    
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
@@ -586,7 +601,7 @@ class GETHandlers:
             return [f'Error retrieving logs: {str(e)}']
 
 
-class POSTHandlers:
+class POSTHandlers(BaseHandler):
     """Handler for all form submissions and mutations"""
     
     def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
@@ -1270,7 +1285,7 @@ class POSTHandlers:
             }, status_code=500)
 
 
-class ValidationHandlers:
+class ValidationHandlers(BaseHandler):
     """Handler for all validation endpoints and AJAX operations"""
     
     def __init__(self, backup_config, template_service: TemplateService, job_form_builder):
