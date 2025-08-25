@@ -1,0 +1,15 @@
+<div class="section-container">
+    <h2 class="section-header">Add Destination</h2>
+    
+    <form method="post" action="/dests/add" enctype="multipart/form-data" id="destination-form">
+        {% include 'partials/destination_basic_fields.html' %}
+        
+        <div id="type-specific-fields">
+            <!-- Type-specific fields will be loaded here via HTMX -->
+        </div>
+        
+        {% include 'partials/destination_form_actions.html' %}
+        
+        <div id="validation-result" style="margin-top: 15px;"></div>
+    </form>
+</div>

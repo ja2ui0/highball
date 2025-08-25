@@ -1,0 +1,27 @@
+<div class="form-group">
+    <label for="repo_type">Repository Type:</label>
+    <select id="repo_type" name="repo_type" required
+            hx-post="/htmx/restic-repo-type-fields"
+            hx-target="#restic-repo-fields"
+            hx-include="closest form"
+            hx-trigger="change">
+        <option value="">Select repository type...</option>
+        <option value="rest">REST Server</option>
+        <option value="s3">Amazon S3</option>
+        <option value="sftp">SFTP</option>
+        <option value="rclone">rclone Remote</option>
+        <option value="same_as_origin">Path on Origin Host</option>
+    </select>
+    <div class="help-text">Type of Restic repository storage</div>
+</div>
+
+<div class="form-group">
+    <label for="password">Repository Password:</label>
+    <input type="password" id="password" name="password" required 
+           placeholder="repository encryption password">
+    <div class="help-text">Password for encrypting/decrypting the Restic repository</div>
+</div>
+
+<div id="restic-repo-fields">
+    <!-- Repository type-specific fields will be loaded here via HTMX -->
+</div>

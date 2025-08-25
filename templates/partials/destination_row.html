@@ -1,0 +1,36 @@
+<div class="list-row">
+    <div class="list-row-content">
+        <div class="list-row-header">
+            <h3>{{ destination.friendly_name }}</h3>
+            <div class="list-row-actions">
+                <a href="/dests/edit/{{ destination.name }}" class="button button-small button-secondary">Edit</a>
+                <form style="display: inline;" method="post" action="/dests/delete"
+                      hx-confirm="Are you sure you want to delete destination '{{ destination.friendly_name }}'?"
+                      hx-post="/dests/delete"
+                      hx-target="closest .list-row"
+                      hx-swap="outerHTML">
+                    <input type="hidden" name="name" value="{{ destination.name }}">
+                    <button type="submit" class="button button-small button-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+        <div class="list-row-details">
+            <div class="detail-row">
+                <span class="detail-label">Name:</span>
+                <span class="detail-value">{{ destination.name }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Type:</span>
+                <span class="detail-value">{{ destination.type_display }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Connection:</span>
+                <span class="detail-value">{{ destination.connection_info }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">URI:</span>
+                <span class="detail-value mono">{{ destination.uri_display }}</span>
+            </div>
+        </div>
+    </div>
+</div>

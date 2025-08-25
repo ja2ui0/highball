@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Destinations - Highball</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ theme_css_path }}">
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/nav.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="navigation"></div>
+        
+        <h1>Destinations</h1>
+        <p>Manage backup destinations. Define storage locations once, then select them when creating jobs.</p>
+        
+        {% include 'partials/destination_list.html' %}
+        
+        <div id="destination-form-container" style="margin-top: 30px;">
+            {% include 'partials/destination_form.html' %}
+        </div>
+    </div>
+</body>
+</html>

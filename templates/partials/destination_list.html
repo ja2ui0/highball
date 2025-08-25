@@ -1,0 +1,16 @@
+<div class="section-container">
+    <h2 class="section-header">
+        Existing Destinations
+        {% if destinations|length == 0 %}
+        <span class="empty-state">(none configured)</span>
+        {% endif %}
+    </h2>
+    
+    {% if destinations|length > 0 %}
+    <div class="list-container">
+        {% for destination in destinations %}
+        {% include 'partials/destination_row.html' %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

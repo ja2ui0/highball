@@ -819,50 +819,47 @@ class BackupConfig:
             return False
     
     def _extract_secrets_from_dest_config(self, dest_config):
-        """Extract secrets from destination config based on schema"""
-        from models.schemas import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS
-        
-        clean_config = dest_config.copy()
+        """Extract secrets from nested destination config"""
+        import copy
+        clean_config = copy.deepcopy(dest_config)
         secrets = {}
         
         dest_type = dest_config.get('type')
         
-        # Handle restic-specific secrets
-        if dest_type == 'restic':
-            repo_type = dest_config.get('repo_type') or dest_config.get('type')
+        # Handle restic-specific secrets from nested structure
+        if dest_type == 'restic' and 'restic' in dest_config:
+            restic_section = dest_config['restic']
             
             # Extract RESTIC_PASSWORD
-            password = dest_config.get('password', '')
+            password = restic_section.get('password', '')
             if password and password != '${RESTIC_PASSWORD}':
                 secrets['RESTIC_PASSWORD'] = password
-                clean_config['password'] = '${RESTIC_PASSWORD}'
+                clean_config['restic']['password'] = '${RESTIC_PASSWORD}'
             
-            # Extract restic repository type-specific secrets
-            if repo_type and repo_type in RESTIC_REPOSITORY_TYPE_SCHEMAS:
-                repo_schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
-                if 'fields' in repo_schema:
-                    for field_def in repo_schema['fields']:
-                        if field_def.get('secret') and field_def.get('env_var'):
-                            field_name = field_def['name']
-                            env_var = field_def['env_var']
-                            field_value = dest_config.get(field_name, '')
-                            
-                            if field_value and field_value != f"${{{env_var}}}":
-                                secrets[env_var] = field_value
-                                clean_config[field_name] = f"${{{env_var}}}"
+            # Handle restic type-specific secrets (REST username/password, S3 keys, etc.)
+            repo_type = restic_section.get('type')
+            if repo_type == 'rest' and 'rest' in restic_section:
+                rest_section = restic_section['rest']
+                
+                # Extract REST username
+                rest_username = rest_section.get('username', '')
+                if rest_username and rest_username != '${REST_USER}':
+                    secrets['REST_USER'] = rest_username
+                    clean_config['restic']['rest']['username'] = '${REST_USER}'
+                    
+                # Extract REST password  
+                rest_password = rest_section.get('password', '')
+                if rest_password and rest_password != '${REST_PASS}':
+                    secrets['REST_PASS'] = rest_password
+                    clean_config['restic']['rest']['password'] = '${REST_PASS}'
         
-        # Handle other destination type secrets (rsyncd password, etc.)
-        elif dest_type and dest_type in DESTINATION_TYPE_SCHEMAS:
-            dest_schema = DESTINATION_TYPE_SCHEMAS[dest_type]
-            if 'fields' in dest_schema:
-                for field_name, field_config in dest_schema['fields'].items():
-                    if field_config.get('secret') and field_config.get('env_var'):
-                        env_var = field_config['env_var']
-                        field_value = dest_config.get(field_name, '')
-                        
-                        if field_value and field_value != f"${{{env_var}}}":
-                            secrets[env_var] = field_value
-                            clean_config[field_name] = f"${{{env_var}}}"
+        # Handle rsyncd password from nested structure
+        elif dest_type == 'rsyncd' and 'rsyncd' in dest_config:
+            rsyncd_section = dest_config['rsyncd']
+            password = rsyncd_section.get('password', '')
+            if password and password != '${RSYNCD_PASSWORD}':
+                secrets['RSYNCD_PASSWORD'] = password
+                clean_config['rsyncd']['password'] = '${RSYNCD_PASSWORD}'
         
         # Remove fields that shouldn't be stored in YAML
         if 'dest_name' in clean_config:

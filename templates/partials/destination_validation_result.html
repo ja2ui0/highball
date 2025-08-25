@@ -1,0 +1,16 @@
+{% if success %}
+<div class="validation-result success">
+    <div class="validation-status">✓ Validation Successful</div>
+    <div class="validation-message">{{ validation_message }}</div>
+    {% if uri_generated %}
+    <div class="validation-detail">
+        <strong>Generated URI:</strong> <code>{{ uri_generated }}</code>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="validation-result error">
+    <div class="validation-status">✗ Validation Failed</div>
+    <div class="validation-message">{{ validation_message }}</div>
+</div>
+{% endif %}
