@@ -66,8 +66,15 @@
                     hx-target="#validation-result"
                     hx-include="closest form"
                     class="button">Push Keys and Validate</button>
-            <button type="submit" class="button button-success">Save Origin</button>
+            <button type="button" class="button" 
+                    hx-post="/htmx/preview-ssh-config"
+                    hx-include="closest form"
+                    hx-target="#ssh-config-preview"
+                    hx-swap="innerHTML">Preview Config</button>
+            <button type="submit" class="button button-success" id="save-origin-btn" disabled>Save Origin</button>
         </div>
+        
+        <div id="ssh-config-preview" style="margin-top: 15px;"></div>
         
         <div id="validation-result" style="margin-top: 15px;"></div>
     </form>

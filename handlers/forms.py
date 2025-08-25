@@ -89,6 +89,7 @@ class FormsHandler:
             
             # Config preview
             'preview-config': self._preview_config,
+            'preview-ssh-config': self._preview_ssh_config,
             'check-form-changes': self._check_form_changes,
         }
         
@@ -923,6 +924,55 @@ class FormsHandler:
             traceback.print_exc()
             return self.template_service.render_template('partials/job_config_preview.html',
                                                        preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.")
+    
+    def _preview_ssh_config(self, form_data):
+        """Generate and display SSH origin config preview"""
+        try:
+            import yaml
+            
+            if not form_data:
+                return self.template_service.render_template('partials/ssh_config_preview.html',
+                                                           preview_content="Error: No form data received",
+                                                           origin_name="unknown")
+            
+            # Extract form values
+            origin_name = self._get_form_value(form_data, 'origin_name', '').strip()
+            friendly_name = self._get_form_value(form_data, 'friendly_name', '').strip()
+            ssh_hostname = self._get_form_value(form_data, 'ssh_hostname', '').strip()
+            ssh_username = self._get_form_value(form_data, 'ssh_username', '').strip()
+            ssh_port = self._get_form_value(form_data, 'ssh_port', 22)
+            ssh_timeout = self._get_form_value(form_data, 'ssh_timeout', 5)
+            
+            if not all([origin_name, friendly_name, ssh_hostname, ssh_username]):
+                return self.template_service.render_template('partials/ssh_config_preview.html',
+                                                           preview_content="Error: Required fields missing (origin name, friendly name, hostname, username)",
+                                                           origin_name=origin_name or "unknown")
+            
+            # Build the config structure that would be written to YAML
+            config = {
+                'friendly_name': friendly_name if ' ' in friendly_name else friendly_name,  # Quote if contains spaces
+                'ssh_hostname': ssh_hostname,
+                'ssh_port': int(ssh_port),
+                'ssh_timeout': int(ssh_timeout),
+                'ssh_username': ssh_username,
+                'ssh_highball': True,  # Always true for Highball-only system
+                'rsync_available': False,  # Will be detected during validation
+                'container_runtime': None  # Will be detected during validation
+            }
+            
+            # Generate YAML with proper formatting
+            yaml_content = yaml.dump(config, default_flow_style=False, indent=2, sort_keys=False)
+            
+            return self.template_service.render_template('partials/ssh_config_preview.html',
+                                                       preview_content=yaml_content,
+                                                       origin_name=origin_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return self.template_service.render_template('partials/ssh_config_preview.html',
+                                                       preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.",
+                                                       origin_name=self._get_form_value(form_data, 'origin_name', 'unknown'))
     
     def _check_form_changes(self, form_data):
         """Check if form has changes compared to original config"""

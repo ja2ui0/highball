@@ -1330,34 +1330,262 @@ class ValidationHandlers:
                 'validation_message': f'Key push workflow failed: {str(e)}'
             }
     
+    @handle_page_errors("Initial SSH connection test")
     def _test_initial_ssh_connection(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Test initial SSH connection using password or existing key"""
-        # TODO: Implement initial connection test
-        return {'success': True}
+        import subprocess
+        
+        if use_password:
+            # Test connection with password using sshpass
+            cmd = [
+                'sshpass', '-p', password,
+                'ssh', '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                'echo "INITIAL_SSH_OK"'
+            ]
+        else:
+            # Test connection with existing key
+            cmd = [
+                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                'echo "INITIAL_SSH_OK"'
+            ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0 and 'INITIAL_SSH_OK' in result.stdout:
+            return {'success': True}
+        else:
+            return {
+                'success': False,
+                'validation_message': f'Initial SSH connection failed: {result.stderr.strip()}'
+            }
     
+    @handle_page_errors("Highball key existence check")
     def _check_highball_key_in_authorized_keys(self, hostname: str, username: str) -> dict:
         """Check if Highball public key exists in remote authorized_keys"""
-        # TODO: Implement key existence check
-        return {'key_exists': False}
+        import subprocess
+        
+        # Read our public key
+        with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+            our_pubkey = f.read().strip()
+        
+        # Extract the key part (without comment)
+        key_parts = our_pubkey.split()
+        if len(key_parts) >= 2:
+            key_signature = key_parts[1]  # The actual key data
+        else:
+            return {
+                'key_exists': False,
+                'error': 'Invalid public key format'
+            }
+        
+        # Check if this key exists in remote authorized_keys
+        cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            f'grep -q "{key_signature}" ~/.ssh/authorized_keys 2>/dev/null && echo "KEY_EXISTS" || echo "KEY_MISSING"'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            if 'KEY_EXISTS' in result.stdout:
+                return {'key_exists': True}
+            else:
+                return {'key_exists': False}
+        else:
+            # If command failed, assume key doesn't exist
+            return {'key_exists': False}
     
+    @handle_page_errors("SSH key push")
     def _push_highball_key(self, hostname: str, username: str, password: str) -> dict:
         """Push Highball public key using ssh-copy-id with sshpass"""
-        # TODO: Implement ssh-copy-id with sshpass
-        return {'success': True}
+        import subprocess
+        
+        cmd = [
+            'sshpass', '-p', password,
+            'ssh-copy-id',
+            '-i', '/config/local/secrets/.ssh/id_highball.pub',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            return {'success': True}
+        else:
+            return {
+                'success': False,
+                'validation_message': f'Key installation failed: {result.stderr.strip()}'
+            }
     
+    @handle_page_errors("Keypair copy to remote")
     def _copy_keypair_to_remote(self, hostname: str, username: str) -> dict:
         """Copy id_highball and id_highball.pub to remote .ssh directory"""
-        # TODO: Implement rsync of keypair files
+        import subprocess
+        
+        # Ensure remote .ssh directory exists with correct permissions
+        setup_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'mkdir -p ~/.ssh && chmod 700 ~/.ssh'
+        ]
+        
+        setup_result = subprocess.run(setup_cmd, capture_output=True, text=True, timeout=15)
+        if setup_result.returncode != 0:
+            return {
+                'success': False,
+                'validation_message': f'Failed to setup remote .ssh directory: {setup_result.stderr.strip()}'
+            }
+        
+        # Copy private key
+        scp_private_cmd = [
+            'scp', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '/config/local/secrets/.ssh/id_highball',
+            f'{username}@{hostname}:~/.ssh/id_highball'
+        ]
+        
+        private_result = subprocess.run(scp_private_cmd, capture_output=True, text=True, timeout=30)
+        if private_result.returncode != 0:
+            return {
+                'success': False,
+                'validation_message': f'Failed to copy private key: {private_result.stderr.strip()}'
+            }
+        
+        # Copy public key
+        scp_public_cmd = [
+            'scp', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '/config/local/secrets/.ssh/id_highball.pub',
+            f'{username}@{hostname}:~/.ssh/id_highball.pub'
+        ]
+        
+        public_result = subprocess.run(scp_public_cmd, capture_output=True, text=True, timeout=30)
+        if public_result.returncode != 0:
+            return {
+                'success': False,
+                'validation_message': f'Failed to copy public key: {public_result.stderr.strip()}'
+            }
+        
+        # Set correct permissions on private key
+        chmod_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'chmod 600 ~/.ssh/id_highball'
+        ]
+        
+        chmod_result = subprocess.run(chmod_cmd, capture_output=True, text=True, timeout=15)
+        if chmod_result.returncode != 0:
+            return {
+                'success': False,
+                'validation_message': f'Failed to set key permissions: {chmod_result.stderr.strip()}'
+            }
+        
         return {'success': True}
     
+    @handle_page_errors("Connection and capability detection")
     def _test_connection_and_capabilities(self, hostname: str, username: str) -> dict:
         """Test final connection and detect rsync/container capabilities"""
-        # TODO: Implement capability detection (reuse existing validation logic)
+        import subprocess
+        
+        # Test basic SSH connectivity with key
+        ssh_test_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'echo "SSH_FINAL_OK"'
+        ]
+        
+        ssh_result = subprocess.run(ssh_test_cmd, capture_output=True, text=True, timeout=15)
+        if ssh_result.returncode != 0 or 'SSH_FINAL_OK' not in ssh_result.stdout:
+            return {
+                'success': False,
+                'validation_message': f'Final SSH test failed: {ssh_result.stderr.strip()}'
+            }
+        
+        # Test rsync availability
+        rsync_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'rsync --version 2>/dev/null | head -1 || echo "RSYNC_MISSING"'
+        ]
+        
+        rsync_result = subprocess.run(rsync_cmd, capture_output=True, text=True, timeout=15)
+        rsync_available = (rsync_result.returncode == 0 and 
+                         'rsync' in rsync_result.stdout.lower() and 
+                         'RSYNC_MISSING' not in rsync_result.stdout)
+        
+        # Test container runtime (try docker first, then podman)
+        container_runtime = None
+        for runtime in ['docker', 'podman']:
+            runtime_cmd = [
+                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                f'{username}@{hostname}',
+                f'{runtime} --version 2>/dev/null || echo "{runtime.upper()}_MISSING"'
+            ]
+            
+            runtime_result = subprocess.run(runtime_cmd, capture_output=True, text=True, timeout=15)
+            if (runtime_result.returncode == 0 and 
+                runtime in runtime_result.stdout.lower() and 
+                f'{runtime.upper()}_MISSING' not in runtime_result.stdout):
+                container_runtime = runtime
+                break
+        
+        # Build validation message
+        capabilities = []
+        if rsync_available:
+            capabilities.append('rsync')
+        if container_runtime:
+            capabilities.append(f'{container_runtime} runtime')
+        
+        if capabilities:
+            message = f'Connection successful - detected: {", ".join(capabilities)}'
+        else:
+            message = 'Connection successful - no rsync or container runtime detected'
+        
         return {
             'success': True,
-            'validation_message': 'Connection successful with capabilities detected',
-            'rsync_available': True,
-            'container_runtime': 'docker'
+            'validation_message': message,
+            'rsync_available': rsync_available,
+            'container_runtime': container_runtime
         }
     
     @handle_page_errors("Toggle SSH auth method")

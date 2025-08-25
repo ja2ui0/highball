@@ -9,9 +9,15 @@
     <br>• Container runtime: {{ container_runtime }}
     {% endif %}
 </div>
+<div hx-swap-oob="true" id="save-origin-btn">
+    <button type="submit" class="button button-success" id="save-origin-btn">Save Origin</button>
+</div>
 {% else %}
 <div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px; background-color: #fff0f0;">
     <strong>✗ Connection failed</strong><br>
     {{ validation_message or error_message or 'Unknown error' }}
+</div>
+<div hx-swap-oob="true" id="save-origin-btn">
+    <button type="submit" class="button button-success" id="save-origin-btn" disabled style="opacity: 0.5;">Save Origin</button>
 </div>
 {% endif %}
