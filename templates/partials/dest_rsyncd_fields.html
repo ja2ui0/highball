@@ -1,8 +1,20 @@
 <div class="form-group">
-    <label for="rsyncd_hostname">Hostname:</label>
-    <input type="text" id="rsyncd_hostname" name="rsyncd_hostname" value="{{ rsyncd_hostname }}" required>
+    <label for="share">Share Name:</label>
+    <input type="text" id="share" name="share" required 
+           placeholder="e.g., backup, data">
+    <div class="help-text">Rsync daemon share name</div>
 </div>
+
 <div class="form-group">
-    <label for="rsyncd_share">Share:</label>
-    <input type="text" id="rsyncd_share" name="rsyncd_share" value="{{ rsyncd_share }}" required>
+    <label for="username">Username (Optional):</label>
+    <input type="text" id="username" name="username" 
+           placeholder="e.g., backup-user">
+    <div class="help-text">Username for rsync daemon authentication (if required)</div>
+</div>
+
+<div class="form-group">
+    <label for="password">Password (Optional):</label>
+    <input type="password" id="password" name="password" 
+           placeholder="password">
+    <div class="help-text">Password for rsync daemon authentication (if required)</div>
 </div>

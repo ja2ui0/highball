@@ -297,6 +297,47 @@ class DestinationParser:
         return {'valid': True, 'config': config}
     
     @staticmethod
+    def build_destination_uri(dest_type, form_data):
+        """Higher-order URI builder for all destination types"""
+        if dest_type == 'rsync':
+            hostname = safe_get_value(form_data, 'hostname')
+            username = safe_get_value(form_data, 'username')
+            path = safe_get_value(form_data, 'path')
+            port = safe_get_value(form_data, 'port', '22')
+            
+            if not all([hostname, username, path]):
+                return {'valid': False, 'error': 'Rsync destination requires hostname, username, and path'}
+            
+            if port != '22':
+                uri = f"{username}@{hostname}:{path} (port {port})"
+            else:
+                uri = f"{username}@{hostname}:{path}"
+            
+            return {'valid': True, 'uri': uri}
+            
+        elif dest_type == 'rsyncd':
+            hostname = safe_get_value(form_data, 'hostname')
+            share = safe_get_value(form_data, 'share')
+            port = safe_get_value(form_data, 'port', '873')
+            
+            if not all([hostname, share]):
+                return {'valid': False, 'error': 'Rsyncd destination requires hostname and share'}
+            
+            if port != '873':
+                uri = f"rsync://{hostname}:{port}/{share}"
+            else:
+                uri = f"rsync://{hostname}/{share}"
+            
+            return {'valid': True, 'uri': uri}
+            
+        elif dest_type == 'restic':
+            repo_type = safe_get_value(form_data, 'repo_type', '')
+            return DestinationParser._build_restic_uri(repo_type, form_data)
+            
+        else:
+            return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
+
+    @staticmethod
     def _build_restic_uri(repo_type, form_data):
         """Build Restic repository URI based on type"""
         if repo_type == 'local':
@@ -306,13 +347,13 @@ class DestinationParser:
             return {'valid': True, 'uri': path.strip()}
             
         elif repo_type == 'rest':
-            hostname = safe_get_value(form_data, 'rest_hostname')
-            port = safe_get_value(form_data, 'rest_port', '8000')
-            path = safe_get_value(form_data, 'rest_path', '')
-            use_root = safe_get_value(form_data, 'rest_use_root') == 'on'
-            use_https = safe_get_value(form_data, 'rest_use_https') == 'on'
-            username = safe_get_value(form_data, 'rest_username', '')
-            password = safe_get_value(form_data, 'rest_password', '')
+            hostname = safe_get_value(form_data, 'hostname')
+            port = safe_get_value(form_data, 'port', '8000')
+            path = safe_get_value(form_data, 'path', '')
+            use_root = safe_get_value(form_data, 'use_root') == 'on'
+            use_https = safe_get_value(form_data, 'use_https') == 'on'
+            username = safe_get_value(form_data, 'username', '')
+            password = safe_get_value(form_data, 'password', '')
             
             if not hostname:
                 return {'valid': False, 'error': 'REST server hostname is required'}
@@ -347,12 +388,12 @@ class DestinationParser:
             return {'valid': True, 'uri': f'rest:{scheme}://{authority}{uri_path}'}
             
         elif repo_type == 's3':
-            bucket = safe_get_value(form_data, 's3_bucket')
-            prefix = safe_get_value(form_data, 's3_prefix', '')
-            endpoint = safe_get_value(form_data, 's3_endpoint', '')
-            region = safe_get_value(form_data, 's3_region', 'us-east-1')  # Default for compatibility
-            access_key = safe_get_value(form_data, 's3_access_key')
-            secret_key = safe_get_value(form_data, 's3_secret_key')
+            bucket = safe_get_value(form_data, 'bucket')
+            prefix = safe_get_value(form_data, 'prefix', '')
+            endpoint = safe_get_value(form_data, 'endpoint', '')
+            region = safe_get_value(form_data, 'region', 'us-east-1')  # Default for compatibility
+            access_key = safe_get_value(form_data, 'access_key')
+            secret_key = safe_get_value(form_data, 'secret_key')
             
             if not bucket:
                 return {'valid': False, 'error': 'S3 bucket name is required'}
@@ -376,9 +417,9 @@ class DestinationParser:
             return {'valid': True, 'uri': uri}
             
         elif repo_type == 'sftp':
-            hostname = safe_get_value(form_data, 'sftp_hostname')
-            username = safe_get_value(form_data, 'sftp_username')
-            path = safe_get_value(form_data, 'sftp_path')
+            hostname = safe_get_value(form_data, 'hostname')
+            username = safe_get_value(form_data, 'username')
+            path = safe_get_value(form_data, 'path')
             
             if not hostname:
                 return {'valid': False, 'error': 'SFTP hostname is required'}
@@ -390,8 +431,8 @@ class DestinationParser:
             return {'valid': True, 'uri': f'sftp:{username}@{hostname}:{path}'}
             
         elif repo_type == 'rclone':
-            remote = safe_get_value(form_data, 'rclone_remote')
-            path = safe_get_value(form_data, 'rclone_path')
+            remote = safe_get_value(form_data, 'remote')
+            path = safe_get_value(form_data, 'path')
             
             if not remote:
                 return {'valid': False, 'error': 'rclone remote name is required'}
@@ -401,7 +442,7 @@ class DestinationParser:
             return {'valid': True, 'uri': f'rclone:{remote}:{path}'}
             
         elif repo_type == 'same_as_origin':
-            path = safe_get_value(form_data, 'origin_repo_path')
+            path = safe_get_value(form_data, 'path')
             if not path:
                 return {'valid': False, 'error': 'Origin repository path is required'}
             return {'valid': True, 'uri': path.strip()}

@@ -251,6 +251,49 @@ async def toggle_ssh_passphrase(request: Request):
     form_data = dict(await request.form())
     return services.handlers['validation_pages'].toggle_ssh_passphrase(form_data)
 
+# =============================================================================
+# DESTINATIONS MANAGEMENT ROUTES
+# =============================================================================
+
+@app.get("/dests", response_class=HTMLResponse)
+async def show_destinations():
+    """Destinations management page"""
+    return services.handlers['get_pages'].show_destinations()
+
+
+@app.post("/dests/add")
+async def add_destination(request: Request):
+    """Add new destination"""
+    form_data = dict(await request.form())
+    return services.handlers['post_pages'].add_destination(form_data)
+
+
+@app.post("/dests/save")
+async def save_destination(request: Request):
+    """Save destination changes"""
+    form_data = dict(await request.form())
+    return services.handlers['post_pages'].save_destination(form_data)
+
+
+@app.post("/dests/delete")
+async def delete_destination(name: str = Query("")):
+    """Delete destination"""
+    return services.handlers['post_pages'].delete_destination(name)
+
+
+@app.post("/dests/validate")
+async def validate_destination(request: Request):
+    """Validate destination configuration"""
+    form_data = dict(await request.form())
+    return services.handlers['validation_pages'].validate_destination(form_data)
+
+# Destination HTMX Partials
+@app.post("/htmx/destination-type-fields")
+async def destination_type_fields(request: Request):
+    """Load destination type-specific fields (HTMX partial)"""
+    form_data = dict(await request.form())
+    return services.handlers['validation_pages'].destination_type_fields(form_data)
+
 
 # =============================================================================
 # VALIDATION ENDPOINTS

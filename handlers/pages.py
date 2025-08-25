@@ -170,6 +170,55 @@ class GETHandlers:
         html = self.template_service.render_template('pages/ssh_config.html', **template_data)
         return HTMLResponse(content=html)
     
+    @handle_page_errors("Destinations")
+    def show_destinations(self) -> HTMLResponse:
+        """Show destinations management page"""
+        destinations = self.backup_config.get_destinations()
+        global_settings = self.backup_config.get_global_settings()
+        
+        # Build destination display list
+        dest_list = []
+        for dest_name, dest_config in destinations.items():
+            # Determine destination type display
+            dest_type = dest_config.get('type', 'Unknown')
+            type_display = {
+                'rsync': 'Rsync (SSH)',
+                'rsyncd': 'Rsync Daemon', 
+                'restic': 'Restic Repository'
+            }.get(dest_type, dest_type)
+            
+            # Connection info display
+            hostname = dest_config.get('hostname', 'unknown')
+            port = dest_config.get('port', 'unknown')
+            connection_info = f"{hostname}:{port}"
+            
+            # URI display (truncated for display)
+            uri = dest_config.get('uri', 'Not generated')
+            uri_display = uri if len(uri) <= 50 else uri[:47] + "..."
+            
+            dest_display = {
+                'name': dest_name,
+                'friendly_name': dest_config.get('friendly_name', dest_name),
+                'type_display': type_display,
+                'connection_info': connection_info,
+                'uri_display': uri_display,
+                'config': dest_config
+            }
+            dest_list.append(dest_display)
+        
+        # Sort by friendly name for consistent display
+        dest_list.sort(key=lambda x: x['friendly_name'].lower())
+        
+        template_data = {
+            'destinations': dest_list,
+            'global_settings': global_settings,
+            'theme_css_path': '',
+            'page_title': 'Destinations'
+        }
+        
+        html = self.template_service.render_template('pages/destinations.html', **template_data)
+        return HTMLResponse(content=html)
+    
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
@@ -1066,6 +1115,330 @@ class ValidationHandlers:
         
         return HTMLResponse(content=html)
 
+    # =============================================================================
+    # DESTINATION MANAGEMENT HANDLERS
+    # =============================================================================
+    
+    def _build_destination_uri(self, dest_config):
+        """Build destination URI based on type and configuration"""
+        from models.forms import DestinationParser
+        
+        dest_type = dest_config.get('type')
+        uri_result = DestinationParser.build_destination_uri(dest_type, dest_config)
+        
+        if uri_result['valid']:
+            return uri_result['uri']
+        else:
+            return f"Error: {uri_result.get('error', 'URI generation failed')}"
+    
+    @handle_page_errors("Add destination")
+    def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Add new destination"""
+        from fastapi.responses import RedirectResponse
+        
+        # Extract basic destination info
+        dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
+        friendly_name = self._get_form_value(form_data, 'friendly_name', '').strip()
+        dest_type = self._get_form_value(form_data, 'dest_type', '')
+        hostname = self._get_form_value(form_data, 'hostname', '').strip()
+        port = self._get_form_value(form_data, 'port', '')
+        
+        # Validation
+        if not dest_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Destination name is required'
+            }, status_code=400)
+            
+        if not dest_type:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Destination type is required'
+            }, status_code=400)
+        
+        # Check if destination already exists
+        existing_destinations = self.backup_config.get_destinations()
+        if dest_name in existing_destinations:
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Destination "{dest_name}" already exists'
+            }, status_code=400)
+        
+        # Build destination config
+        dest_config = {
+            'type': dest_type,
+            'hostname': hostname,
+            'port': int(port) if port else self._get_default_port(dest_type)
+        }
+        
+        # Set friendly_name, defaulting to dest_name if not provided
+        dest_config['friendly_name'] = friendly_name or dest_name
+        
+        # Add type-specific fields
+        if dest_type == 'rsync':
+            dest_config['username'] = self._get_form_value(form_data, 'username', '').strip()
+            dest_config['path'] = self._get_form_value(form_data, 'path', '').strip()
+        elif dest_type == 'rsyncd':
+            dest_config['share'] = self._get_form_value(form_data, 'share', '').strip()
+            username = self._get_form_value(form_data, 'username', '').strip()
+            password = self._get_form_value(form_data, 'password', '').strip()
+            if username:
+                dest_config['username'] = username
+            if password:
+                dest_config['password'] = password
+        elif dest_type == 'restic':
+            dest_config['repo_type'] = self._get_form_value(form_data, 'repo_type', '')
+            dest_config['password'] = self._get_form_value(form_data, 'password', '')
+            # Additional restic fields will be added by type-specific logic
+        
+        # Generate URI
+        dest_config['uri'] = self._build_destination_uri(dest_config)
+        
+        # Save destination
+        success = self.backup_config.save_destination(dest_name, dest_config)
+        
+        if success:
+            return RedirectResponse(url='/dests', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to save destination '{dest_name}'"
+            }, status_code=500)
+    
+    @handle_page_errors("Save destination")
+    def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Save destination changes"""
+        from fastapi.responses import RedirectResponse
+        
+        # Extract destination name from form
+        dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
+        
+        if not dest_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Destination name is required'
+            }, status_code=400)
+        
+        # Get existing destination config to preserve type-specific settings
+        existing_dest = self.backup_config.get_destination(dest_name)
+        if not existing_dest:
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Destination "{dest_name}" not found'
+            }, status_code=404)
+        
+        # Update config with form data (similar to add_destination logic)
+        updated_config = existing_dest.copy()
+        updated_config['friendly_name'] = self._get_form_value(form_data, 'friendly_name', dest_name).strip()
+        updated_config['hostname'] = self._get_form_value(form_data, 'hostname', '').strip()
+        port = self._get_form_value(form_data, 'port', '')
+        if port:
+            updated_config['port'] = int(port)
+        
+        # Regenerate URI with updated config
+        updated_config['uri'] = self._build_destination_uri(updated_config)
+        
+        # Save updated destination
+        success = self.backup_config.save_destination(dest_name, updated_config)
+        
+        if success:
+            return RedirectResponse(url='/dests', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to update destination '{dest_name}'"
+            }, status_code=500)
+    
+    @handle_page_errors("Delete destination")
+    def delete_destination(self, dest_name: str) -> JSONResponse:
+        """Delete destination"""
+        from fastapi.responses import RedirectResponse
+        
+        if not dest_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Destination name is required'
+            }, status_code=400)
+        
+        # Delete destination
+        success = self.backup_config.delete_destination(dest_name)
+        
+        if success:
+            return RedirectResponse(url='/dests', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to delete destination '{dest_name}'"
+            }, status_code=500)
+    
+    def _get_default_port(self, dest_type: str) -> int:
+        """Get default port for destination type"""
+        defaults = {
+            'rsync': 22,
+            'rsyncd': 873,
+            'restic': 8000  # Default for REST, will vary by repo type
+        }
+        return defaults.get(dest_type, 22)
+
+    @handle_page_errors("Destination validation")
+    def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Validate destination configuration"""
+        dest_type = self._get_form_value(form_data, 'dest_type', '')
+        hostname = self._get_form_value(form_data, 'hostname', '')
+        
+        if not dest_type or not hostname:
+            template_context = {
+                'success': False,
+                'validation_message': 'Destination type and hostname are required for validation'
+            }
+        else:
+            # Test basic connectivity based on destination type
+            if dest_type == 'rsync':
+                template_context = self._validate_rsync_destination(form_data)
+            elif dest_type == 'rsyncd':
+                template_context = self._validate_rsyncd_destination(form_data)
+            elif dest_type == 'restic':
+                template_context = self._validate_restic_destination(form_data)
+            else:
+                template_context = {
+                    'success': False,
+                    'validation_message': f'Validation not implemented for destination type: {dest_type}'
+                }
+        
+        # Generate URI preview
+        if template_context.get('success'):
+            from models.forms import DestinationParser
+            uri_result = DestinationParser.build_destination_uri(dest_type, form_data)
+            if uri_result['valid']:
+                template_context['uri_generated'] = uri_result['uri']
+        
+        html = self.template_service.render_template('partials/destination_validation_result.html', **template_context)
+        return HTMLResponse(content=html)
+    
+    def _validate_rsync_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate rsync (SSH) destination"""
+        hostname = self._get_form_value(form_data, 'hostname', '')
+        username = self._get_form_value(form_data, 'username', '')
+        path = self._get_form_value(form_data, 'path', '')
+        port = self._get_form_value(form_data, 'port', '22')
+        
+        if not all([hostname, username, path]):
+            return {
+                'success': False,
+                'validation_message': 'Hostname, username, and path are required for rsync validation'
+            }
+        
+        # Test SSH connectivity (reuse existing SSH validation)
+        ssh_config = {
+            'hostname': hostname,
+            'username': username,
+            'port': int(port) if port.isdigit() else 22
+        }
+        
+        from models.validation import ValidationService
+        validation_service = ValidationService()
+        result = validation_service.validate_ssh_source(ssh_config)
+        
+        if result['valid']:
+            return {
+                'success': True,
+                'validation_message': f"SSH connection successful to {hostname}. Path writability not tested."
+            }
+        else:
+            return {
+                'success': False,
+                'validation_message': f"SSH connection failed: {result.get('error', 'Unknown error')}"
+            }
+    
+    def _validate_rsyncd_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate rsyncd destination"""
+        hostname = self._get_form_value(form_data, 'hostname', '')
+        share = self._get_form_value(form_data, 'share', '')
+        port = self._get_form_value(form_data, 'port', '873')
+        
+        if not all([hostname, share]):
+            return {
+                'success': False,
+                'validation_message': 'Hostname and share are required for rsyncd validation'
+            }
+        
+        # Test rsyncd connectivity
+        import subprocess
+        try:
+            port_num = int(port) if port.isdigit() else 873
+            cmd = ['rsync', '--list-only', f'rsync://{hostname}:{port_num}/{share}']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                return {
+                    'success': True,
+                    'validation_message': f"Rsyncd connection successful to {hostname}:{port_num}/{share}"
+                }
+            else:
+                return {
+                    'success': False,
+                    'validation_message': f"Rsyncd connection failed: {result.stderr.strip() or 'Connection error'}"
+                }
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'validation_message': 'Rsyncd connection timeout'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'validation_message': f'Rsyncd validation error: {str(e)}'
+            }
+    
+    def _validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate restic destination"""
+        repo_type = self._get_form_value(form_data, 'repo_type', '')
+        password = self._get_form_value(form_data, 'password', '')
+        
+        if not repo_type:
+            return {
+                'success': False,
+                'validation_message': 'Repository type is required for restic validation'
+            }
+        
+        if not password:
+            return {
+                'success': False,
+                'validation_message': 'Repository password is required for restic validation'
+            }
+        
+        # For now, just validate that we can build the URI
+        # Full restic validation would require container execution
+        from models.forms import DestinationParser
+        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+        
+        if uri_result['valid']:
+            return {
+                'success': True,
+                'validation_message': f"Restic repository URI generated successfully. Full connectivity test requires repository initialization."
+            }
+        else:
+            return {
+                'success': False,
+                'validation_message': f"Restic repository configuration error: {uri_result.get('error', 'Unknown error')}"
+            }
+
+    @handle_page_errors("Destination type fields")
+    def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Load destination type-specific fields (HTMX partial)"""
+        dest_type = self._get_form_value(form_data, 'dest_type', '')
+        
+        if dest_type == 'rsync':
+            template = 'partials/dest_rsync_fields.html'
+        elif dest_type == 'rsyncd':
+            template = 'partials/dest_rsyncd_fields.html'
+        elif dest_type == 'restic':
+            template = 'partials/dest_restic_fields.html'
+        else:
+            return HTMLResponse(content='')
+        
+        html = self.template_service.render_template(template)
+        return HTMLResponse(content=html)
 
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, network_range: str) -> HTMLResponse:
