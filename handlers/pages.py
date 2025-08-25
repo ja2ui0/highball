@@ -2156,11 +2156,10 @@ class ValidationHandlers(BaseHandler):
         check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
         
         if check_success:
-            html = self.template_service.render_template('partials/repository_available.html', {
+            return self._render_html('partials/repository_available.html', {
                 'job_name': job_name,
                 'job_type': 'restic'
             })
-            return HTMLResponse(content=html)
         else:
             return self._send_repository_error_html(job_name, check_message)
 
