@@ -1336,7 +1336,16 @@ class ValidationHandlers:
         hostname = origin_config['ssh_hostname']
         username = origin_config['ssh_username']  
         password = form_data.get('ssh_password', '')
-        use_password = True and password  # Always use Highball mode
+        ssh_highball = form_data.get('ssh_highball') == 'on'
+        
+        # Require password when Highball checkbox is checked
+        if ssh_highball and not password:
+            html = self.template_service.render_template('partials/ssh_validation_result.html',
+                                                        success=False,
+                                                        validation_message='Password is required when "Auto-populate keys using Highball" is checked.')
+            return HTMLResponse(content=html)
+        
+        use_password = ssh_highball and password
         
         # Return immediate progress template, start workflow in background
         import uuid
