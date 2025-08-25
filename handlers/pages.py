@@ -1402,18 +1402,17 @@ class ValidationHandlers(BaseHandler):
         
         if not session['completed']:
             # Still in progress - return progress template with polling
-            html = self.template_service.render_template('partials/ssh_validation_progress.html',
-                                                        session_id=session_id,
-                                                        initial_message=progress_text)
-            return HTMLResponse(content=html)
+            return self._render_html('partials/ssh_validation_progress.html', {
+                'session_id': session_id,
+                'initial_message': progress_text
+            })
         else:
             # Completed - return final result and clean up session
             result = session['result']
             result['edit_mode'] = session['edit_mode']
-            html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
             # Clean up session data
             del self._ssh_sessions[session_id]
-            return HTMLResponse(content=html)
+            return self._render_html('partials/ssh_validation_result.html', result)
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
