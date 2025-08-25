@@ -83,12 +83,10 @@ DESTINATION_TYPE_SCHEMAS = {
         'fields': {
             'friendly_name': {'config_key': 'friendly_name', 'required': False},
             'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
-            'hostname': {'config_key': 'hostname', 'required': True},
-            'port': {'config_key': 'port', 'required': True},
             'type': {'config_key': 'type', 'required': True},
             'password': {'config_key': 'password', 'required': True, 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
         },
-        'required_fields': ['hostname', 'port', 'type', 'password']
+        'required_fields': ['type', 'password']
     }
 }
 
@@ -282,6 +280,17 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'label': 'SFTP Host',
                 'help': 'SFTP server hostname',
                 'placeholder': 'sftp.example.com',
+                'required': True
+            },
+            {
+                'name': 'port',
+                'type': 'number',
+                'label': 'Port',
+                'help': 'SFTP port number (default: 22)',
+                'placeholder': '22',
+                'default': '22',
+                'min': 1,
+                'max': 65535,
                 'required': True
             },
             {

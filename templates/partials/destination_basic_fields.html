@@ -27,22 +27,3 @@
     </select>
     <div class="help-text">Type of destination storage</div>
 </div>
-
-<div class="form-group">
-    <label for="hostname">Hostname:</label>
-    <input type="text" id="hostname" name="hostname" required 
-           placeholder="e.g., server.example.com, 192.168.1.100">
-    <div class="help-text">Hostname or IP address of the destination server</div>
-</div>
-
-<div class="form-group">
-    <label for="port">Port:</label>
-    <input type="number" id="port" name="port" 
-           min="1" max="65535" placeholder="Auto-filled based on type"
-           hx-get="/htmx/destination-port-default"
-           hx-trigger="change from:#dest_type"
-           hx-include="[name='dest_type']"
-           hx-target="this"
-           hx-swap="outerHTML">
-    <div class="help-text">Port number (auto-filled based on destination type)</div>
-</div>
