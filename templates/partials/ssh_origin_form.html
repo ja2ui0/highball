@@ -2,12 +2,22 @@
     <h2 class="section-header">{% if edit_mode %}Edit SSH Origin{% else %}Add SSH Origin{% endif %}</h2>
     
     <form method="post" action="{% if edit_mode %}/ssh/save{% else %}/ssh/add{% endif %}" enctype="multipart/form-data" id="ssh-origin-form">
+        {% if edit_mode %}
+        <input type="hidden" name="original_origin_name" value="{{ origin_name | default('') }}">
+        {% endif %}
+        
+        <!-- Hidden fields for detected capabilities (permanent form fields) -->
+        <div id="capability-fields">
+            <input type="hidden" id="detected_rsync_available" name="detected_rsync_available" 
+                   value="{{ 'true' if rsync_available else 'false' }}">
+            <input type="hidden" id="detected_container_runtime" name="detected_container_runtime" 
+                   value="{{ container_runtime | default('') }}">
+        </div>
         <div class="form-group">
             <label for="origin_name">Origin Name:</label>
             <input type="text" id="origin_name" name="origin_name" required 
                    pattern="[a-zA-Z0-9_-]+" 
                    value="{{ origin_name | default('') }}"
-                   {% if edit_mode %}readonly{% endif %}
                    placeholder="e.g., yeti, main-nas, prod-server">
             <div class="help-text">Filename slug (a-z, 0-9, _, - only) - used for filesystem and code references</div>
         </div>
@@ -79,6 +89,9 @@
                     hx-include="closest form"
                     hx-target="#ssh-config-preview"
                     hx-swap="innerHTML">Preview Config</button>
+            {% if edit_mode %}
+            <button type="submit" class="button button-success">Commit Changes</button>
+            {% endif %}
         </div>
         
         <div id="ssh-config-preview" class="mt-lg"></div>

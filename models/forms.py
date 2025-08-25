@@ -797,6 +797,11 @@ class OriginParser:
             return auth_validation
         
         # Build origin configuration
+        # Parse detected capabilities from validation (if present)
+        detected_rsync = safe_get_value(form_data, 'detected_rsync_available', 'false')
+        detected_runtime = safe_get_value(form_data, 'detected_container_runtime', '')
+        
+        
         origin_config = {
             'origin_name': origin_name,
             'friendly_name': friendly_name,
@@ -804,7 +809,9 @@ class OriginParser:
             'ssh_port': ssh_port,
             'ssh_timeout': ssh_timeout,
             'ssh_username': ssh_username,
-            'ssh_highball': ssh_highball
+            'ssh_highball': ssh_highball,
+            'rsync_available': detected_rsync.lower() == 'true',
+            'container_runtime': detected_runtime if detected_runtime else None
         }
         
         # Add authentication-specific fields

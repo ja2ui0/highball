@@ -647,6 +647,19 @@ class BackupConfig:
         origins = self._load_ssh_origins()
         return origins.get(origin_name)
     
+    def preview_origin_yaml(self, origin_name, origin_config):
+        """Generate preview YAML using the same code path as save_origin (dry-run mode)"""
+        try:
+            # Extract secrets from origin config (same as save operation)
+            clean_config, secrets = self._extract_secrets_from_origin_config(origin_config)
+            
+            # Generate YAML using the same method as actual save, but in preview mode
+            return self._write_origin_files_atomically(origin_name, clean_config, secrets, preview_mode=True)
+            
+        except Exception as e:
+            print(f"Error generating preview for origin {origin_name}: {str(e)}")
+            return f"# Error generating preview: {str(e)}"
+    
     def save_origin(self, origin_name, origin_config):
         """Save an SSH origin: config with ${placeholders}, .env with secrets (only if secrets exist)"""
         try:
@@ -712,13 +725,27 @@ class BackupConfig:
         
         return clean_config, secrets
     
-    def _write_origin_files_atomically(self, origin_name, clean_config, secrets):
-        """Write origin config and secrets files atomically"""
+    def _write_origin_files_atomically(self, origin_name, clean_config, secrets, preview_mode=False):
+        """Write origin config and secrets files atomically, or return YAML content if preview_mode=True"""
         import tempfile
         import shutil
+        import io
         
-        # Write config file
+        # Ensure friendly_name is quoted if it contains spaces
+        if 'friendly_name' in clean_config and ' ' in clean_config['friendly_name']:
+            clean_config['friendly_name'] = f'"{clean_config["friendly_name"]}"'
+        
+        if preview_mode:
+            # Preview mode: return YAML content without writing to disk
+            yaml_output = io.StringIO()
+            yaml.dump(clean_config, yaml_output, default_flow_style=False, indent=2)
+            yaml_content = yaml_output.getvalue()
+            yaml_output.close()
+            return yaml_content
+        
+        # Normal mode: write to disk
         config_file = f"/config/local/origins/{origin_name}.yaml"
+        
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as temp_config:
             yaml.dump(clean_config, temp_config, default_flow_style=False, indent=2)
             temp_config_path = temp_config.name

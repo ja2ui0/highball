@@ -180,7 +180,7 @@ class GETHandlers:
             html = self.template_service.render_template('partials/ssh_origin_form.html')
             return HTMLResponse(content=html)
         
-        # Create edit form with populated values
+        # Create edit form with populated values including existing capabilities
         form_data = {
             'origin_name': origin_name,
             'friendly_name': origin_config.get('friendly_name', ''),
@@ -189,6 +189,8 @@ class GETHandlers:
             'ssh_port': origin_config.get('ssh_port', 22),
             'ssh_timeout': origin_config.get('ssh_timeout', 5),
             'ssh_highball': origin_config.get('ssh_highball', True),
+            'rsync_available': origin_config.get('rsync_available', False),
+            'container_runtime': origin_config.get('container_runtime', None),
             'edit_mode': True  # Flag to indicate this is edit mode
         }
         
@@ -931,6 +933,7 @@ class POSTHandlers:
         """Add new SSH origin"""
         from models.forms import origin_parser
         
+        
         # Parse origin form data
         origin_result = origin_parser.parse_origin_form(form_data)
         if not origin_result['valid']:
@@ -950,10 +953,7 @@ class POSTHandlers:
                 'error': f'Origin "{origin_name}" already exists'
             }, status_code=400)
         
-        # Run validation to detect capabilities before saving
-        origin_config = self._validate_and_update_origin_capabilities(origin_config)
-        
-        # Save origin with detected capabilities
+        # Save origin with capabilities from form parser (including any detected values)
         success = self.backup_config.save_origin(origin_name, origin_config)
         
         if success:
@@ -964,10 +964,34 @@ class POSTHandlers:
                 'error': f"Failed to save origin '{origin_name}'"
             }, status_code=500)
     
+    def _get_recent_validation_results(self, hostname: str, username: str) -> dict:
+        """Get capabilities from recent SSH validation session for this host/user"""
+        if not hasattr(self, '_ssh_sessions'):
+            return {}
+            
+        # Look for completed validation sessions for this hostname/username
+        for session_id, session_data in self._ssh_sessions.items():
+            if (session_data.get('completed') and 
+                session_data.get('success') and 
+                session_data.get('result')):
+                
+                result = session_data['result']
+                # Check if this result is for our hostname/username (rough match)
+                if (result.get('success') and 
+                    'rsync_available' in result and 
+                    'container_runtime' in result):
+                    return {
+                        'rsync_available': result.get('rsync_available', False),
+                        'container_runtime': result.get('container_runtime', None)
+                    }
+        
+        return {}
+    
     @handle_page_errors("Save SSH origin")
     def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save SSH origin changes"""
         from models.forms import origin_parser
+        
         
         # Parse origin form data
         origin_result = origin_parser.parse_origin_form(form_data)
@@ -979,11 +1003,14 @@ class POSTHandlers:
         
         origin_config = origin_result['origin_config']
         origin_name = origin_config['origin_name']
+        original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
         
-        # Run validation to detect capabilities before saving
-        origin_config = self._validate_and_update_origin_capabilities(origin_config)
+        # Handle renaming if the origin name changed
+        if original_origin_name and original_origin_name != origin_name:
+            # Delete the old file
+            self.backup_config.delete_origin(original_origin_name)
         
-        # Save origin with detected capabilities (overwrites existing)
+        # Save origin with detected capabilities (overwrites existing or creates new)
         success = self.backup_config.save_origin(origin_name, origin_config)
         
         if success:
@@ -1488,18 +1515,25 @@ class ValidationHandlers:
         else:
             log_progress("✓ Highball key already present in authorized_keys")
         
-        # Step 4: Copy keypair to remote host
-        log_progress("• Copying Highball keypair to remote host...")
-        copy_result = self._copy_keypair_to_remote(hostname, username)
-        if not copy_result['success']:
-            log_progress(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
-            return {
-                'success': False,
-                'validation_message': copy_result.get('validation_message', 'Keypair copy failed')
-            }
-        log_progress("✓ Keypair copied successfully")
+        # Step 4: Check for existing keypair files on remote host
+        log_progress("• Checking for existing Highball keypair files...")
+        keypair_check = self._check_highball_keypair_on_remote(hostname, username)
         
-        # Step 5: Test final connection and detect capabilities
+        # Step 5: Copy keypair if needed
+        if not keypair_check['keypair_exists']:
+            log_progress("• Highball keypair not found or doesn't match, copying...")
+            copy_result = self._copy_keypair_to_remote(hostname, username)
+            if not copy_result['success']:
+                log_progress(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
+                return {
+                    'success': False,
+                    'validation_message': copy_result.get('validation_message', 'Keypair copy failed')
+                }
+            log_progress("✓ Highball keypair copied successfully")
+        else:
+            log_progress("✓ Highball keypair already present and matches current keys")
+        
+        # Step 6: Test final connection and detect capabilities
         log_progress("• Testing final connection and detecting capabilities...")
         final_test = self._test_connection_and_capabilities(hostname, username)
         if not final_test['success']:
@@ -1598,6 +1632,49 @@ class ValidationHandlers:
         else:
             # If command failed, assume key doesn't exist
             return {'key_exists': False}
+    
+    @handle_page_errors("Check Highball keypair on remote")
+    def _check_highball_keypair_on_remote(self, hostname: str, username: str) -> dict:
+        """Check if Highball keypair files exist on remote host and match our current keys"""
+        import subprocess
+        
+        # Read our local keys
+        with open('/config/local/secrets/.ssh/id_highball', 'r') as f:
+            our_private_key = f.read().strip()
+        with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+            our_public_key = f.read().strip()
+        
+        # Check if remote private key exists and matches
+        private_check_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'test -f ~/.ssh/id_highball && cat ~/.ssh/id_highball'
+        ]
+        
+        private_result = subprocess.run(private_check_cmd, capture_output=True, text=True, timeout=15)
+        private_matches = (private_result.returncode == 0 and private_result.stdout.strip() == our_private_key)
+        
+        # Check if remote public key exists and matches  
+        public_check_cmd = [
+            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            f'{username}@{hostname}',
+            'test -f ~/.ssh/id_highball.pub && cat ~/.ssh/id_highball.pub'
+        ]
+        
+        public_result = subprocess.run(public_check_cmd, capture_output=True, text=True, timeout=15)
+        public_matches = (public_result.returncode == 0 and public_result.stdout.strip() == our_public_key)
+        
+        return {
+            'keypair_exists': private_matches and public_matches
+        }
     
     @handle_page_errors("SSH key push")
     def _push_highball_key(self, hostname: str, username: str, password: str) -> dict:

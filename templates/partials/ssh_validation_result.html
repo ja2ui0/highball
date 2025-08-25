@@ -12,6 +12,13 @@
         <button type="submit" class="button button-success">Save Origin</button>
     </div>
 </div>
+
+<!-- Update the existing form fields with validation results -->
+<script>
+    // Update the hidden form fields with detected capabilities
+    document.getElementById('detected_rsync_available').value = '{{ 'true' if rsync_available else 'false' }}';
+    document.getElementById('detected_container_runtime').value = '{{ container_runtime | default('') }}';
+</script>
 {% else %}
 <div class="alert alert-error">
     <strong>✗ Connection failed</strong><br>

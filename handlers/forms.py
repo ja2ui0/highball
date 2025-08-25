@@ -948,20 +948,20 @@ class FormsHandler:
                                                            preview_content="Error: Required fields missing (origin name, friendly name, hostname, username)",
                                                            origin_name=origin_name or "unknown")
             
-            # Build the config structure that would be written to YAML
-            config = {
-                'friendly_name': friendly_name if ' ' in friendly_name else friendly_name,  # Quote if contains spaces
-                'ssh_hostname': ssh_hostname,
-                'ssh_port': int(ssh_port),
-                'ssh_timeout': int(ssh_timeout),
-                'ssh_username': ssh_username,
-                'ssh_highball': True,  # Always true for Highball-only system
-                'rsync_available': False,  # Will be detected during validation
-                'container_runtime': None  # Will be detected during validation
-            }
+            # Parse form data using the same parser as save operations
+            from models.forms import origin_parser
             
-            # Generate YAML with proper formatting
-            yaml_content = yaml.dump(config, default_flow_style=False, indent=2, sort_keys=False)
+            origin_result = origin_parser.parse_origin_form(form_data)
+            if not origin_result['valid']:
+                return self.template_service.render_template('partials/ssh_config_preview.html',
+                                                           preview_content=f"# Error: {origin_result['error']}",
+                                                           origin_name=origin_name)
+            
+            origin_config = origin_result['origin_config']
+            origin_name = origin_config['origin_name']
+            
+            # Generate YAML using the same code path as config.py save operation
+            yaml_content = self.backup_config.preview_origin_yaml(origin_name, origin_config)
             
             return self.template_service.render_template('partials/ssh_config_preview.html',
                                                        preview_content=yaml_content,
