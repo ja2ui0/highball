@@ -260,7 +260,7 @@ class RsyncService:
                 path = config.dest_config['path']
                 
                 # Test SSH connectivity and path writability
-                cmd = ['ssh', f"{username}@{hostname}", f"test -w '{path}' && echo 'OK'"]
+                cmd = ['ssh', '-i', '/config/local/secrets/.ssh/id_highball', f"{username}@{hostname}", f"test -w '{path}' && echo 'OK'"]
                 
             elif config.is_rsyncd_dest:
                 hostname = config.dest_config['hostname']

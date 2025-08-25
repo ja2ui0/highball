@@ -31,6 +31,7 @@ class SSHConfig(BaseModel):
     def to_ssh_args(self) -> List[str]:
         """Convert configuration to SSH command arguments"""
         return [
+            '-i', '/config/local/secrets/.ssh/id_highball',
             '-o', f'ConnectTimeout={self.connect_timeout}',
             '-o', f'BatchMode={"yes" if self.batch_mode else "no"}',
             '-o', f'StrictHostKeyChecking={"yes" if self.strict_host_checking else "no"}',

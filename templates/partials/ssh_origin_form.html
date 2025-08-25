@@ -51,7 +51,7 @@
                        hx-post="/htmx/toggle-auth-method"
                        hx-target="#auth-method-container"
                        hx-include="closest form"> 
-                Use Highball SSH key (recommended)
+                Auto-populate Highball SSH keys
             </label>
             <div class="help-text">Use Highball's managed SSH keypair. Requires password during setup to install public key.</div>
         </div>
@@ -65,7 +65,7 @@
                     hx-post="/ssh/validate" 
                     hx-target="#validation-result"
                     hx-include="closest form"
-                    class="button">Test Connection</button>
+                    class="button">Push Keys and Validate</button>
             <button type="submit" class="button button-success">Save Origin</button>
         </div>
         

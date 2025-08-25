@@ -178,6 +178,7 @@ class CommandExecutionService:
         
         # Add SSH options
         default_options = [
+            '-i', '/config/local/secrets/.ssh/id_highball',
             '-o', 'ConnectTimeout=10',
             '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no',

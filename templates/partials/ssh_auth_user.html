@@ -1,21 +1,10 @@
 <div class="form-group">
-    <label for="ssh_pubkey">SSH Public Key:</label>
-    <textarea id="ssh_pubkey" name="ssh_pubkey" rows="3" 
-              placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAA..."></textarea>
-    <div class="help-text">Your SSH public key (ssh-rsa, ssh-ed25519, etc.). You must install this key on the target host manually.</div>
-</div>
-
-<div class="form-group">
-    <label>
-        <input type="checkbox" name="requires_passphrase" id="requires_passphrase" 
-               hx-post="/htmx/toggle-passphrase"
-               hx-target="#passphrase-container"
-               hx-include="closest form"> 
-        Requires passphrase
-    </label>
-    <div class="help-text">Check if your private key requires a passphrase</div>
-</div>
-
-<div id="passphrase-container">
-    <!-- Empty by default, populated if passphrase required -->
+    <label for="highball_pubkey">Highball SSH Public Key:</label>
+    <textarea id="highball_pubkey" name="highball_pubkey" rows="3" readonly
+              style="background-color: #f5f5f5;">{{ highball_public_key }}</textarea>
+    <div class="help-text">Copy this key and add it to ~/.ssh/authorized_keys on the target host before proceeding.</div>
+    <button type="button" 
+            hx-post="/htmx/copy-to-clipboard" 
+            hx-vals='{"text": "{{ highball_public_key }}"}'
+            class="button" style="margin-top: 10px;">Copy to Clipboard</button>
 </div>
