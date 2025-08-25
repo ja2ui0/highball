@@ -237,6 +237,12 @@ async def validate_ssh_origin(request: Request):
     return services.handlers['validation_pages'].validate_ssh_origin(form_data)
 
 
+@app.get("/ssh/progress/{session_id}")
+async def get_ssh_progress(session_id: str):
+    """Get SSH validation progress for a session"""
+    return services.handlers['validation_pages'].get_ssh_progress(session_id)
+
+
 # SSH Origin HTMX Partials
 @app.post("/htmx/toggle-auth-method")
 async def toggle_ssh_auth_method(request: Request):

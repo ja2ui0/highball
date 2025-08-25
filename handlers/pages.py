@@ -1286,49 +1286,215 @@ class ValidationHandlers:
         password = form_data.get('ssh_password', '')
         use_password = origin_config.get('ssh_highball', True) and password
         
-        # Execute complete workflow
-        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
+        # Return immediate progress template, start workflow in background
+        import uuid
+        import threading
         
-        # Render result
-        html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
+        # Generate session ID
+        session_id = str(uuid.uuid4())
+        
+        # Store session data
+        if not hasattr(self, '_ssh_sessions'):
+            self._ssh_sessions = {}
+        
+        self._ssh_sessions[session_id] = {
+            'progress': ['• Starting SSH validation workflow...'],
+            'completed': False,
+            'success': None,
+            'result': None
+        }
+        
+        # Start background workflow
+        def run_workflow():
+            result = self._push_keys_and_validate_workflow_with_session(session_id, hostname, username, password, use_password)
+            self._ssh_sessions[session_id]['completed'] = True
+            self._ssh_sessions[session_id]['result'] = result
+        
+        threading.Thread(target=run_workflow, daemon=True).start()
+        
+        # Return initial progress template
+        html = self.template_service.render_template('partials/ssh_validation_progress.html', 
+                                                    session_id=session_id,
+                                                    initial_message="Starting SSH validation workflow...")
         return HTMLResponse(content=html)
+    
+    @handle_page_errors("SSH progress polling")
+    def get_ssh_progress(self, session_id: str) -> HTMLResponse:
+        """Get current SSH validation progress for a session"""
+        if not hasattr(self, '_ssh_sessions') or session_id not in self._ssh_sessions:
+            html = self.template_service.render_template('partials/ssh_validation_result.html',
+                                                        success=False,
+                                                        validation_message="Session not found or expired")
+            return HTMLResponse(content=html)
+        
+        session = self._ssh_sessions[session_id]
+        progress_text = '\n'.join(session['progress'])
+        
+        if not session['completed']:
+            # Still in progress - return progress template with polling
+            html = self.template_service.render_template('partials/ssh_validation_progress.html',
+                                                        session_id=session_id,
+                                                        initial_message=progress_text)
+            return HTMLResponse(content=html)
+        else:
+            # Completed - return final result and clean up session
+            result = session['result']
+            html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
+            # Clean up session data
+            del self._ssh_sessions[session_id]
+            return HTMLResponse(content=html)
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
+        progress_messages = []
+        
         try:
             # Step 1: Test initial connection
+            progress_messages.append("• Testing initial SSH connection...")
             initial_test = self._test_initial_ssh_connection(hostname, username, password, use_password)
             if not initial_test['success']:
-                return initial_test
+                progress_messages.append(f"✗ Initial connection failed: {initial_test.get('validation_message', 'Unknown error')}")
+                return {
+                    'success': False,
+                    'validation_message': '\n'.join(progress_messages)
+                }
+            progress_messages.append("✓ Initial SSH connection successful")
             
             # Step 2: Check for existing key in authorized_keys
+            progress_messages.append("• Checking for existing Highball key in authorized_keys...")
             key_check = self._check_highball_key_in_authorized_keys(hostname, username)
             
             # Step 3: Push key if needed
             if not key_check['key_exists']:
+                progress_messages.append("• Highball key not found, installing...")
                 if not use_password:
+                    progress_messages.append("✗ Password required to install key")
                     return {
                         'success': False,
-                        'validation_message': 'Highball key not found in authorized_keys. Password required to install key.'
+                        'validation_message': '\n'.join(progress_messages)
                     }
                 push_result = self._push_highball_key(hostname, username, password)
                 if not push_result['success']:
-                    return push_result
+                    progress_messages.append(f"✗ Key installation failed: {push_result.get('validation_message', 'Unknown error')}")
+                    return {
+                        'success': False,
+                        'validation_message': '\n'.join(progress_messages)
+                    }
+                progress_messages.append("✓ Highball key installed successfully")
+            else:
+                progress_messages.append("✓ Highball key already present in authorized_keys")
             
             # Step 4: Copy keypair to remote host
+            progress_messages.append("• Copying Highball keypair to remote host...")
             copy_result = self._copy_keypair_to_remote(hostname, username)
             if not copy_result['success']:
-                return copy_result
-                
-            # Step 5: Test connection and detect capabilities
+                progress_messages.append(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
+                return {
+                    'success': False,
+                    'validation_message': '\n'.join(progress_messages)
+                }
+            progress_messages.append("✓ Keypair copied successfully")
+            
+            # Step 5: Test final connection and detect capabilities
+            progress_messages.append("• Testing final connection and detecting capabilities...")
             final_test = self._test_connection_and_capabilities(hostname, username)
-            return final_test
+            if not final_test['success']:
+                progress_messages.append(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
+                return {
+                    'success': False,
+                    'validation_message': '\n'.join(progress_messages)
+                }
+            
+            progress_messages.append("✓ All steps completed successfully!")
+            
+            return {
+                'success': True,
+                'validation_message': '\n'.join(progress_messages),
+                'rsync_available': final_test.get('rsync_available', False),
+                'container_runtime': final_test.get('container_runtime', None)
+            }
             
         except Exception as e:
+            progress_messages.append(f"✗ Workflow failed: {str(e)}")
             return {
                 'success': False,
-                'validation_message': f'Key push workflow failed: {str(e)}'
+                'validation_message': '\n'.join(progress_messages)
             }
+    
+    @handle_page_errors("SSH workflow with session tracking")
+    def _push_keys_and_validate_workflow_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Complete workflow with session progress tracking"""
+        def log_progress(message):
+            if hasattr(self, '_ssh_sessions') and session_id in self._ssh_sessions:
+                self._ssh_sessions[session_id]['progress'].append(message)
+        
+        # Step 1: Test initial connection
+        log_progress("• Testing initial SSH connection...")
+        initial_test = self._test_initial_ssh_connection(hostname, username, password, use_password)
+        if not initial_test['success']:
+            log_progress(f"✗ Initial connection failed: {initial_test.get('validation_message', 'Unknown error')}")
+            return {
+                'success': False,
+                'validation_message': initial_test.get('validation_message', 'Initial connection failed')
+            }
+        log_progress("✓ Initial SSH connection successful")
+        
+        # Step 2: Check for existing key in authorized_keys
+        log_progress("• Checking for existing Highball key in authorized_keys...")
+        key_check = self._check_highball_key_in_authorized_keys(hostname, username)
+        
+        # Step 3: Push key if needed
+        if not key_check['key_exists']:
+            log_progress("• Highball key not found, installing...")
+            if not use_password:
+                log_progress("✗ Password required to install key")
+                return {
+                    'success': False,
+                    'validation_message': 'Password required to install key'
+                }
+            push_result = self._push_highball_key(hostname, username, password)
+            if not push_result['success']:
+                log_progress(f"✗ Key installation failed: {push_result.get('validation_message', 'Unknown error')}")
+                return {
+                    'success': False,
+                    'validation_message': push_result.get('validation_message', 'Key installation failed')
+                }
+            log_progress("✓ Highball key installed successfully")
+        else:
+            log_progress("✓ Highball key already present in authorized_keys")
+        
+        # Step 4: Copy keypair to remote host
+        log_progress("• Copying Highball keypair to remote host...")
+        copy_result = self._copy_keypair_to_remote(hostname, username)
+        if not copy_result['success']:
+            log_progress(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
+            return {
+                'success': False,
+                'validation_message': copy_result.get('validation_message', 'Keypair copy failed')
+            }
+        log_progress("✓ Keypair copied successfully")
+        
+        # Step 5: Test final connection and detect capabilities
+        log_progress("• Testing final connection and detecting capabilities...")
+        final_test = self._test_connection_and_capabilities(hostname, username)
+        if not final_test['success']:
+            log_progress(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
+            return {
+                'success': False,
+                'validation_message': final_test.get('validation_message', 'Final connection test failed')
+            }
+        
+        log_progress("✓ All steps completed successfully!")
+        
+        # Get all progress messages for final display
+        all_progress = '\n'.join(self._ssh_sessions[session_id]['progress']) if hasattr(self, '_ssh_sessions') and session_id in self._ssh_sessions else "All steps completed successfully!"
+        
+        return {
+            'success': True,
+            'validation_message': all_progress,
+            'rsync_available': final_test.get('rsync_available', False),
+            'container_runtime': final_test.get('container_runtime', None)
+        }
     
     @handle_page_errors("Initial SSH connection test")
     def _test_initial_ssh_connection(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
@@ -1410,17 +1576,22 @@ class ValidationHandlers:
     
     @handle_page_errors("SSH key push")
     def _push_highball_key(self, hostname: str, username: str, password: str) -> dict:
-        """Push Highball public key using ssh-copy-id with sshpass"""
+        """Push Highball public key using manual authorized_keys append"""
         import subprocess
         
+        # Read our public key
+        with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+            public_key = f.read().strip()
+        
+        # Create .ssh directory and append key to authorized_keys
         cmd = [
             'sshpass', '-p', password,
-            'ssh-copy-id',
-            '-i', '/config/local/secrets/.ssh/id_highball.pub',
+            'ssh',
             '-o', 'ConnectTimeout=10',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
-            f'{username}@{hostname}'
+            f'{username}@{hostname}',
+            f'mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo "{public_key}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)

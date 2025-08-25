@@ -1,7 +1,7 @@
 {% if success %}
-<div style="color: green; padding: 10px; border: 1px solid green; border-radius: 4px; background-color: #f0fff0;">
+<div class="alert alert-success">
     <strong>✓ Connection successful!</strong><br>
-    {{ validation_message }}
+    <div class="code-container">{{ validation_message }}</div>
     {% if rsync_available %}
     <br>• rsync is available
     {% endif %}
@@ -13,11 +13,11 @@
     <button type="submit" class="button button-success" id="save-origin-btn">Save Origin</button>
 </div>
 {% else %}
-<div style="color: red; padding: 10px; border: 1px solid red; border-radius: 4px; background-color: #fff0f0;">
+<div class="alert alert-error">
     <strong>✗ Connection failed</strong><br>
-    {{ validation_message or error_message or 'Unknown error' }}
+    <div class="code-container">{{ validation_message or error_message or 'Unknown error' }}</div>
 </div>
 <div hx-swap-oob="true" id="save-origin-btn">
-    <button type="submit" class="button button-success" id="save-origin-btn" disabled style="opacity: 0.5;">Save Origin</button>
+    <button type="submit" class="button button-success" id="save-origin-btn" disabled>Save Origin</button>
 </div>
 {% endif %}
