@@ -1542,11 +1542,9 @@ class ValidationHandlers:
         else:
             log_progress("✓ Highball keypair already present and matches current keys")
         
-        # Step 6: Test final connection and detect capabilities
-        log_progress("• Testing final connection and detecting capabilities...")
-        final_test = self._test_connection_and_capabilities(hostname, username)
+        # Step 6: Test final connection and detect capabilities  
+        final_test = self._test_connection_and_capabilities(hostname, username, log_progress)
         if not final_test['success']:
-            log_progress(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
             return {
                 'success': False,
                 'validation_message': final_test.get('validation_message', 'Final connection test failed')
@@ -1793,11 +1791,16 @@ class ValidationHandlers:
         return {'success': True}
     
     @handle_page_errors("Connection and capability detection")
-    def _test_connection_and_capabilities(self, hostname: str, username: str) -> dict:
+    def _test_connection_and_capabilities(self, hostname: str, username: str, log_progress=None) -> dict:
         """Test final connection and detect rsync/container capabilities"""
         import subprocess
         
+        def log(msg):
+            if log_progress:
+                log_progress(msg)
+        
         # Test basic SSH connectivity with key
+        log("• Testing SSH connection with Highball key...")
         ssh_test_cmd = [
             'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
             '-o', 'ConnectTimeout=10',
@@ -1810,12 +1813,15 @@ class ValidationHandlers:
         
         ssh_result = subprocess.run(ssh_test_cmd, capture_output=True, text=True, timeout=15)
         if ssh_result.returncode != 0 or 'SSH_FINAL_OK' not in ssh_result.stdout:
+            log(f"✗ SSH connection test failed: {ssh_result.stderr.strip()}")
             return {
                 'success': False,
-                'validation_message': f'Final SSH test failed: {ssh_result.stderr.strip()}'
+                'validation_message': f'SSH connection test failed: {ssh_result.stderr.strip()}'
             }
+        log("✓ SSH connection test successful")
         
         # Test rsync availability
+        log("• Testing rsync availability...")
         rsync_cmd = [
             'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
             '-o', 'ConnectTimeout=10',
@@ -1830,10 +1836,13 @@ class ValidationHandlers:
         rsync_available = (rsync_result.returncode == 0 and 
                          'rsync' in rsync_result.stdout.lower() and 
                          'RSYNC_MISSING' not in rsync_result.stdout)
+        log(f"✓ Rsync test complete - {'available' if rsync_available else 'not available'}")
         
         # Test container runtime (try docker first, then podman)
+        log("• Testing container runtime availability...")
         container_runtime = None
         for runtime in ['docker', 'podman']:
+            log(f"• Testing {runtime}...")
             runtime_cmd = [
                 'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
                 '-o', 'ConnectTimeout=10',
@@ -1849,7 +1858,13 @@ class ValidationHandlers:
                 runtime in runtime_result.stdout.lower() and 
                 f'{runtime.upper()}_MISSING' not in runtime_result.stdout):
                 container_runtime = runtime
+                log(f"✓ {runtime} detected and available")
                 break
+            else:
+                log(f"✓ {runtime} test complete - not available")
+        
+        if not container_runtime:
+            log("✓ Container runtime test complete - none detected")
         
         # Build validation message
         capabilities = []
@@ -1862,6 +1877,8 @@ class ValidationHandlers:
             message = f'Connection successful - detected: {", ".join(capabilities)}'
         else:
             message = 'Connection successful - no rsync or container runtime detected'
+        
+        log("✓ Capability detection complete")
         
         return {
             'success': True,
