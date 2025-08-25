@@ -639,12 +639,13 @@ class BackupConfig:
     # =============================================================================
     
     def get_ssh_origins(self):
-        """Get all SSH origins"""
-        return self.config.get('ssh_origins', {})
+        """Get all SSH origins - read directly from disk for real-time updates"""
+        return self._load_ssh_origins()
     
     def get_ssh_origin(self, origin_name):
-        """Get specific SSH origin"""
-        return self.config.get('ssh_origins', {}).get(origin_name)
+        """Get specific SSH origin - read directly from disk"""
+        origins = self._load_ssh_origins()
+        return origins.get(origin_name)
     
     def save_origin(self, origin_name, origin_config):
         """Save an SSH origin: config with ${placeholders}, .env with secrets (only if secrets exist)"""
@@ -673,13 +674,13 @@ class BackupConfig:
     def delete_origin(self, origin_name):
         """Delete an SSH origin permanently"""
         try:
-            # Check if origin exists
-            if origin_name not in self.config.get('ssh_origins', {}):
-                return False
-            
             # File paths
             config_file = f"/config/local/origins/{origin_name}.yaml"
             secrets_file = f"/config/local/secrets/origins/{origin_name}.env"
+            
+            # Check if origin exists on disk
+            if not os.path.exists(config_file):
+                return False
             
             # Remove config file
             if os.path.exists(config_file):

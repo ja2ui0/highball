@@ -224,10 +224,16 @@ async def save_ssh_origin(request: Request):
     return services.handlers['post_pages'].save_ssh_origin(form_data)
 
 
-@app.post("/ssh/delete")
-async def delete_ssh_origin(name: str = Query("")):
+@app.get("/ssh/edit/{origin_name}")
+async def edit_ssh_origin(origin_name: str):
+    """Load SSH origin for editing"""
+    return services.handlers['get_pages'].edit_ssh_origin(origin_name)
+
+
+@app.delete("/ssh/{origin_name}")
+async def delete_ssh_origin(origin_name: str):
     """Delete SSH origin"""
-    return services.handlers['post_pages'].delete_ssh_origin(name)
+    return services.handlers['post_pages'].delete_ssh_origin(origin_name)
 
 
 @app.post("/ssh/validate")

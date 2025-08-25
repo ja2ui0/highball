@@ -5,18 +5,14 @@
     <td>{{ origin.capabilities }}</td>
     <td>
         <div class="action-buttons">
-            <button hx-get="/ssh/validate" 
-                    hx-vals='{"origin_name": "{{ origin.name }}"}'
-                    hx-target="#validation-result-{{ origin.name }}"
-                    class="button">Test</button>
-            <button onclick="editOrigin('{{ origin.name }}')" 
+            <button hx-get="/ssh/edit/{{ origin.name }}" 
+                    hx-target="#ssh-origin-form-container"
+                    hx-swap="innerHTML"
                     class="button">Edit</button>
-            <button hx-post="/ssh/delete" 
-                    hx-vals='{"name": "{{ origin.name }}"}'
+            <button hx-delete="/ssh/{{ origin.name }}" 
                     hx-confirm="Are you sure you want to delete SSH origin '{{ origin.friendly_name }}'? This action cannot be undone."
                     hx-on::after-request="window.location.reload()"
                     class="button button-danger">Delete</button>
         </div>
-        <div id="validation-result-{{ origin.name }}" class="mt-sm"></div>
     </td>
 </tr>
