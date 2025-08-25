@@ -79,8 +79,8 @@ class HighballServices:
         import stat
         
         ssh_dir = "/config/local/secrets/.ssh"
-        private_key_path = os.path.join(ssh_dir, "id_rsa")
-        public_key_path = os.path.join(ssh_dir, "id_rsa.pub")
+        private_key_path = os.path.join(ssh_dir, "id_highball")
+        public_key_path = os.path.join(ssh_dir, "id_highball.pub")
         
         # Check if keypair already exists
         if os.path.exists(private_key_path) and os.path.exists(public_key_path):
@@ -103,7 +103,7 @@ class HighballServices:
             '-b', '2048',
             '-f', private_key_path,
             '-N', '',  # No passphrase
-            '-C', 'highball@container',
+            '-C', 'HIGHBALL@HIGHBALL',
             '-q'  # Quiet mode
         ]
         

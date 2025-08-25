@@ -770,7 +770,7 @@ SSH_ORIGIN_SCHEMA = {
         {
             'name': 'ssh_highball',
             'type': 'checkbox',
-            'label': 'Use Highball SSH key (recommended)',
+            'label': 'Auto-populate Highball SSH keys',
             'help': 'Use Highball\'s managed SSH keypair. Requires password during setup to install public key.',
             'default': True
         },
@@ -782,40 +782,6 @@ SSH_ORIGIN_SCHEMA = {
             'placeholder': 'password',
             'conditional': {
                 'show_when': 'ssh_highball',
-                'value': True
-            }
-        },
-        {
-            'name': 'ssh_pubkey',
-            'type': 'textarea',
-            'label': 'SSH Public Key',
-            'help': 'Your SSH public key (ssh-rsa, ssh-ed25519, etc.)',
-            'placeholder': 'ssh-rsa AAAAB3NzaC1yc2EAAAA...',
-            'rows': 3,
-            'conditional': {
-                'show_when': 'ssh_highball',
-                'value': False
-            }
-        },
-        {
-            'name': 'requires_passphrase',
-            'type': 'checkbox',
-            'label': 'Requires passphrase',
-            'help': 'Check if your private key requires a passphrase',
-            'default': False,
-            'conditional': {
-                'show_when': 'ssh_highball',
-                'value': False
-            }
-        },
-        {
-            'name': 'ssh_passphrase',
-            'type': 'password',
-            'label': 'SSH Key Passphrase',
-            'help': 'Passphrase for your private SSH key',
-            'placeholder': 'passphrase',
-            'conditional': {
-                'show_when': 'requires_passphrase',
                 'value': True
             }
         }

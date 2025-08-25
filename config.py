@@ -699,23 +699,9 @@ class BackupConfig:
             return False
     
     def _extract_secrets_from_origin_config(self, origin_config):
-        """Extract secrets from origin config for user-managed keys only"""
+        """Clean origin config - no secrets extracted (Highball-only keys)"""
         clean_config = origin_config.copy()
         secrets = {}
-        
-        # Only extract secrets if using user-managed keys (ssh_highball = false)
-        if not origin_config.get('ssh_highball', True):
-            # Extract SSH_PUBKEY if provided
-            ssh_pubkey = origin_config.get('ssh_pubkey', '')
-            if ssh_pubkey and ssh_pubkey != '${SSH_PUBKEY}':
-                secrets['SSH_PUBKEY'] = ssh_pubkey
-                clean_config['ssh_pubkey'] = '${SSH_PUBKEY}'
-            
-            # Extract SSH_PASSPHRASE if provided
-            ssh_passphrase = origin_config.get('ssh_passphrase', '')
-            if ssh_passphrase and ssh_passphrase != '${SSH_PASSPHRASE}':
-                secrets['SSH_PASSPHRASE'] = ssh_passphrase
-                clean_config['ssh_passphrase'] = '${SSH_PASSPHRASE}'
         
         # Remove fields that shouldn't be stored in YAML
         if 'origin_name' in clean_config:
