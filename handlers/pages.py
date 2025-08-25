@@ -1964,8 +1964,7 @@ class ValidationHandlers(BaseHandler):
             if uri_result['valid']:
                 template_context['uri_generated'] = uri_result['uri']
         
-        html = self.template_service.render_template('partials/destination_validation_result.html', **template_context)
-        return HTMLResponse(content=html)
+        return self._render_html('partials/destination_validation_result.html', template_context)
     
     def _validate_rsync_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate rsync (SSH) destination"""
