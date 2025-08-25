@@ -8,16 +8,13 @@
     {% if container_runtime %}
     <br>• Container runtime: {{ container_runtime }}
     {% endif %}
-</div>
-<div hx-swap-oob="true" id="save-origin-btn">
-    <button type="submit" class="button button-success" id="save-origin-btn">Save Origin</button>
+    <div class="mt-lg">
+        <button type="submit" class="button button-success">Save Origin</button>
+    </div>
 </div>
 {% else %}
 <div class="alert alert-error">
     <strong>✗ Connection failed</strong><br>
     <div class="code-container">{{ validation_message or error_message or 'Unknown error' }}</div>
-</div>
-<div hx-swap-oob="true" id="save-origin-btn">
-    <button type="submit" class="button button-success" id="save-origin-btn" disabled>Save Origin</button>
 </div>
 {% endif %}
