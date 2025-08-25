@@ -312,7 +312,7 @@ class FormsHandler:
     def _validate_restic(self, form_data):
         """HTTP coordination: extract params, delegate restic validation, render response"""
         # HTTP concern: extract parameters from request using correct field names
-        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
         password = self._get_form_value(form_data, 'restic_password')
         
         # Schema-driven validation for required fields

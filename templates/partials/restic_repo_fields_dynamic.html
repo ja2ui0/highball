@@ -20,7 +20,7 @@
            {% if repo_type == 'rest' %}
            hx-post="/htmx/restic-uri-preview"
            hx-target="#uri_preview_container"
-           hx-include="[name='restic_repo_type'], [name^='rest_']"
+           hx-include="[name='restic_repo_type'], [name='repo_type'], [name^='rest_']"
            hx-trigger="input delay:300ms"
            {% endif %}>
     {% if field.help %}
@@ -47,7 +47,7 @@
                {% if repo_type == 'rest' %}
                hx-post="/htmx/restic-uri-preview"
                hx-target="#uri_preview_container"
-               hx-include="[name='restic_repo_type'], [name^='rest_']"
+               hx-include="[name='restic_repo_type'], [name='repo_type'], [name^='rest_']"
                hx-trigger="change"
                {% endif %}> 
         {{ field.label }}

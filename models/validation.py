@@ -417,6 +417,7 @@ class ResticValidator:
             # Test repository access via service
             from services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
+            
             repo_test = repo_service.test_repository_access({'dest_config': restic_config})
             
             if not repo_test.get('success', False):

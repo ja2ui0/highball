@@ -83,10 +83,10 @@ DESTINATION_TYPE_SCHEMAS = {
         'fields': {
             'friendly_name': {'config_key': 'friendly_name', 'required': False},
             'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
-            'type': {'config_key': 'type', 'required': True},
+            'repo_type': {'config_key': 'repo_type', 'required': True},
             'restic_password': {'config_key': 'password', 'required': True, 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
         },
-        'required_fields': ['type', 'restic_password']
+        'required_fields': ['repo_type', 'password']
     }
 }
 
