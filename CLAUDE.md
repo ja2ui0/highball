@@ -2,7 +2,7 @@
 
 Web-based backup orchestration with scheduling and monitoring. Supports rsync and Restic providers with full connectivity validation.
 
-See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md, @LOCAL/CONFIG-SCHEMA.md
+@LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md, @LOCAL/CONFIG-SCHEMA.md
 
 ## 🚨 CRITICAL EXECUTION PATTERNS (READ FIRST)
 
@@ -41,16 +41,11 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 
 ## Primary Critical Testing Requirements
 
-**CRITICAL TESTING PRIORITIES** - These core systems must be tested:
-
 1. **Real backup execution** (not just dry-run) - verify actual data transfer
 2. **Restore operations with overwrite protection** - critical safety feature
 3. **Notification system** (email/telegram success/failure notifications)
 4. **Restic maintenance operations** (discard/prune/check scheduling and execution)
 5. **Rsync patterns** - multi-provider support verification
-
-**FastAPI Migration Status**: ✅ **COMPLETE** - See @LOCAL/MODERNIZATION.md for full details
-**UI functionality** - forms, validation, basic workflows are FULLY FUNCTIONAL.
 
 ## Core Architecture
 
@@ -58,7 +53,6 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 **Stack**: Python 3.13, FastAPI, Pydantic, APScheduler, PyYAML, Jinja2, Docker/Podman (rootless), HTMX
 
 ### Key Principles
-- **Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings)
 - **Pure Orchestration Layer**: Highball orchestrates by SSH-ing to hosts and running binaries there
 - **Container Execution Strategy**: Use official `restic/restic:0.18.0` containers on remote hosts for version consistency
 - **Schema-Driven Everything**: Secret management, validation, and form rendering all use schema definitions
@@ -79,9 +73,6 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 
 ## Architecture Status
 
-**A+ CODE QUALITY ACHIEVED**: Industrial-grade codebase with zero architectural debt.
-
-**Codebase Quality**:
 - ✅ **Unified Execution Service** - All Restic operations use consistent execution patterns
 - ✅ **Modular Architecture** - God Object eliminated, focused single-responsibility modules  
 - ✅ **Complete Type Safety** - 100% type hint coverage across all function signatures
@@ -89,7 +80,6 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 - ✅ **FastAPI/Pydantic** - Modern HTTP and data validation patterns (See @LOCAL/MODERNIZATION.md)
 
 **Technical Foundation**: Python 3.13, FastAPI, Pydantic, comprehensive typing, modular services
-**Code Quality**: Industrial-grade patterns with zero anti-patterns or architectural debt
 
 ## Development Discipline (MANDATORY)
 
@@ -108,16 +98,3 @@ See also: @LOCAL/MODERNIZATION.md, @LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md
 - Test functionality after architectural changes (`./rr` then verify API)
 - Follow established import patterns (`from typing import...`)
 
-**Why this discipline matters**: Prevents drift back to anti-patterns during feature development.
-
-## Next Session Priority
-
-**CRITICAL TESTING** - Core functionality validation (migration complete, now verify functionality):
-
-1. **Real Backup Execution** - Test actual backup execution (not dry-run) with data transfer verification
-2. **Restore Operations** - Test complete restore workflow with overwrite protection 
-3. **Notification System** - Test email/telegram notifications for job success/failure, queue functionality, template variables
-4. **Restic Maintenance Operations** - Test discard/prune/check operations, scheduling, retention policies  
-5. **Rsync Patterns** - Test multi-provider support and rsync execution patterns
-
-**Future Development**: Kopia provider support, enhanced Restic features (progress parsing, retention policies), notification template preview

@@ -1,36 +1,16 @@
-<div class="list-row">
-    <div class="list-row-content">
-        <div class="list-row-header">
-            <h3>{{ destination.friendly_name }}</h3>
-            <div class="list-row-actions">
-                <a href="/dests/edit/{{ destination.name }}" class="button button-small button-secondary">Edit</a>
-                <form style="display: inline;" method="post" action="/dests/delete"
-                      hx-confirm="Are you sure you want to delete destination '{{ destination.friendly_name }}'?"
-                      hx-post="/dests/delete"
-                      hx-target="closest .list-row"
-                      hx-swap="outerHTML">
-                    <input type="hidden" name="name" value="{{ destination.name }}">
-                    <button type="submit" class="button button-small button-danger">Delete</button>
-                </form>
-            </div>
+<tr>
+    <td><strong>{{ destination.friendly_name }}</strong><br><small>{{ destination.name }}</small></td>
+    <td>{{ destination.type_display }}</td>
+    <td class="source-path mono">{{ destination.uri_display }}</td>
+    <td>
+        <div class="action-buttons">
+            <button onclick="editDestination('{{ destination.name }}')" 
+                    class="button">Edit</button>
+            <button hx-post="/dests/delete" 
+                    hx-vals='{"name": "{{ destination.name }}"}'
+                    hx-confirm="Are you sure you want to delete destination '{{ destination.friendly_name }}'? This action cannot be undone."
+                    hx-on::after-request="window.location.reload()"
+                    class="button button-danger">Delete</button>
         </div>
-        <div class="list-row-details">
-            <div class="detail-row">
-                <span class="detail-label">Name:</span>
-                <span class="detail-value">{{ destination.name }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Type:</span>
-                <span class="detail-value">{{ destination.type_display }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Connection:</span>
-                <span class="detail-value">{{ destination.connection_info }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">URI:</span>
-                <span class="detail-value mono">{{ destination.uri_display }}</span>
-            </div>
-        </div>
-    </div>
-</div>
+    </td>
+</tr>

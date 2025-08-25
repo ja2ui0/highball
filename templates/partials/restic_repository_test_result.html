@@ -1,0 +1,39 @@
+{% if success %}
+<div class="repository-test-result success">
+    <div class="test-status">✓ {{ message }}</div>
+    {% if repository_uri %}
+    <div class="test-detail">
+        <strong>Repository URI:</strong> <code>{{ repository_uri }}</code>
+    </div>
+    {% endif %}
+    
+    {% if show_info %}
+    <div class="repository-info">
+        <h4>Repository Information</h4>
+        <p>Repository is initialized and accessible. You can use this destination for backups.</p>
+        {% if snapshot_count is defined and snapshot_count > 0 %}
+        <p><strong>Snapshots:</strong> {{ snapshot_count }} snapshots available</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% if show_init %}
+    <div class="repository-init">
+        <h4>Repository Initialization</h4>
+        <p>No repository found at this location. You can initialize a new repository:</p>
+        <button hx-post="/htmx/initialize-restic-repository" 
+                hx-vals='js:{"form_data": htmx.serialize("#destination-form")}'
+                hx-target="#repository-init-result"
+                class="button button-primary">Initialize Repository</button>
+        <div id="repository-init-result" style="margin-top: 10px;"></div>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="repository-test-result error">
+    <div class="test-status">✗ {{ message }}</div>
+    {% if error %}
+    <div class="test-error">Error: {{ error }}</div>
+    {% endif %}
+</div>
+{% endif %}

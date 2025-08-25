@@ -1,16 +1,20 @@
-<div class="section-container">
-    <h2 class="section-header">
-        Existing Destinations
-        {% if destinations|length == 0 %}
-        <span class="empty-state">(none configured)</span>
-        {% endif %}
-    </h2>
-    
-    {% if destinations|length > 0 %}
-    <div class="list-container">
+<h2>Destinations</h2>
+<table class="job-table destination-table">
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>URI</th>
+        <th>Actions</th>
+    </tr>
+    {% if destinations %}
         {% for destination in destinations %}
-        {% include 'partials/destination_row.html' %}
+            {% include 'partials/destination_row.html' %}
         {% endfor %}
-    </div>
+    {% else %}
+        <tr>
+            <td colspan="4" class="empty-directory">
+                No destinations defined yet. Add your first destination below.
+            </td>
+        </tr>
     {% endif %}
-</div>
+</table>

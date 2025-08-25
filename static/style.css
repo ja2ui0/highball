@@ -321,6 +321,12 @@ tr:hover {
 .origin-table th:nth-child(4), .origin-table td:nth-child(4) { width: 15%; min-width: 100px; }
 .origin-table th:nth-child(5), .origin-table td:nth-child(5) { width: 30%; min-width: 250px; }
 
+/* Destination table layout - 4 columns (Name, Type, URI, Actions) */
+.destination-table th:nth-child(1), .destination-table td:nth-child(1) { width: 20%; min-width: 150px; }
+.destination-table th:nth-child(2), .destination-table td:nth-child(2) { width: 12%; min-width: 80px; }
+.destination-table th:nth-child(3), .destination-table td:nth-child(3) { width: 40%; min-width: 200px; word-break: break-all; }
+.destination-table th:nth-child(4), .destination-table td:nth-child(4) { width: 28%; min-width: 220px; }
+
 /* Monospace text - reusable */
 .monospace, .source-path {
     font-family: 'Courier New', monospace;

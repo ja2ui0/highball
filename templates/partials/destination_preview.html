@@ -1,0 +1,27 @@
+{% if success %}
+<div class="config-preview">
+    <h3>Destination Preview: {{ dest_name }}</h3>
+    <p>The following YAML will be saved to <code>{{ file_path }}</code>:</p>
+    
+    <div class="yaml-preview">
+        <pre><code>{{ yaml_content }}</code></pre>
+    </div>
+    
+    <div class="preview-actions">
+        <button type="button" 
+                onclick="document.getElementById('destination-preview').style.display = 'none'"
+                class="button">Hide Preview</button>
+    </div>
+</div>
+{% else %}
+<div class="config-preview error">
+    <h3>Preview Error</h3>
+    <div class="error-message">{{ message }}</div>
+    
+    <div class="preview-actions">
+        <button type="button" 
+                onclick="document.getElementById('destination-preview').style.display = 'none'"
+                class="button">Close</button>
+    </div>
+</div>
+{% endif %}
