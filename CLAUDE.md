@@ -98,3 +98,6 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 - Test functionality after architectural changes (`./rr` then verify API)
 - Follow established import patterns (`from typing import...`)
 
+**NEVER USE THE TERM PRODUCTION READY OR GIVE ARBITRARY TIME ESTIMATES TO SHANE**
+**NEVER USE EMOJI IN THE CODEBASE**
+
