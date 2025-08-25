@@ -2088,8 +2088,7 @@ class ValidationHandlers(BaseHandler):
         else:
             return HTMLResponse(content='')
         
-        html = self.template_service.render_template(template)
-        return HTMLResponse(content=html)
+        return self._render_html(template, {})
     
     @handle_page_errors("Toggle SSH passphrase field")
     def toggle_ssh_passphrase(self, form_data: Dict[str, Any]) -> HTMLResponse:
