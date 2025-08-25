@@ -254,8 +254,7 @@ class GETHandlers(BaseHandler):
             'page_title': 'Destinations'
         }
         
-        html = self.template_service.render_template('pages/destinations.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/destinations.html', template_data)
     
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
@@ -275,8 +274,7 @@ class GETHandlers(BaseHandler):
         # Add schedule configuration
         form_data.update(self._build_schedule_form_data({}))
         
-        html = self.template_service.render_template('pages/job_form.html', **form_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/job_form.html', form_data)
     
     def _build_source_display_with_type(self, job_config):
         """Build source display string with type prefix"""
@@ -485,8 +483,7 @@ class GETHandlers(BaseHandler):
             'page_title': 'Raw Configuration Editor'
         }
         
-        html = self.template_service.render_template('pages/config_editor.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/config_editor.html', template_data)
     
     def _get_available_themes(self):
         """Get list of available themes by scanning theme directory"""
