@@ -84,9 +84,9 @@ DESTINATION_TYPE_SCHEMAS = {
             'friendly_name': {'config_key': 'friendly_name', 'required': False},
             'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
             'type': {'config_key': 'type', 'required': True},
-            'password': {'config_key': 'password', 'required': True, 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
+            'restic_password': {'config_key': 'password', 'required': True, 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
         },
-        'required_fields': ['type', 'password']
+        'required_fields': ['type', 'restic_password']
     }
 }
 

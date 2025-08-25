@@ -1441,7 +1441,7 @@ class ValidationHandlers:
     def _validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate restic destination"""
         repo_type = self._get_form_value(form_data, 'repo_type', '')
-        password = self._get_form_value(form_data, 'password', '')
+        password = self._get_form_value(form_data, 'restic_password', '')
         
         if not repo_type:
             return {
