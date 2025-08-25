@@ -376,15 +376,17 @@ class GETHandlers(BaseHandler):
     def show_edit_job_form(self, job_name: str) -> HTMLResponse:
         """Show edit job form"""
         if not job_name:
-            error_html = self.template_service.render_template('pages/error.html', 
-                error_message="Job name is required", page_title="Error")
-            return HTMLResponse(content=error_html, status_code=400)
+            return self._render_error('partials/error_page.html', {
+                'error_message': "Job name is required", 
+                'page_title': "Error"
+            }, 400)
         
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            error_html = self.template_service.render_template('pages/error.html', 
-                error_message=f"Job '{job_name}' not found", page_title="Error")
-            return HTMLResponse(content=error_html, status_code=404)
+            return self._render_error('partials/error_page.html', {
+                'error_message': f"Job '{job_name}' not found", 
+                'page_title': "Error"
+            }, 404)
         
         job_config = jobs[job_name]
         form_data = self.job_form_builder.build_form_data_from_job(job_name, job_config)
@@ -426,8 +428,7 @@ class GETHandlers(BaseHandler):
         # Add schedule configuration
         form_data.update(self._build_schedule_form_data(job_config))
         
-        html = self.template_service.render_template('pages/job_form.html', **form_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/job_form.html', form_data)
     
     @handle_page_errors("Config manager")
     def show_config_manager(self) -> HTMLResponse:

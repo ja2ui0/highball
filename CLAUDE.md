@@ -2,8 +2,6 @@
 
 Web-based backup orchestration with scheduling and monitoring. Supports rsync and Restic providers with full connectivity validation.
 
-@LOCAL/ARCHITECTURE.md, @LOCAL/DEVELOPMENT.md, @LOCAL/CONFIG-SCHEMA.md
-
 ## 🚨 CRITICAL EXECUTION PATTERNS (READ FIRST)
 
 **CRITICAL**: The unified execution service and modular architecture are fundamental to all operations.
@@ -15,6 +13,11 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 - **Source Operations**: `OperationType.BACKUP` - Execute via SSH+container on source host
 - **Repository Operations**: `OperationType.BROWSE/INSPECT` - Execute via SSH when source is SSH
 - **Maintenance Operations**: `OperationType.MAINTENANCE/DISCARD/CHECK` - Automatic context detection
+
+**SSH vs Container Execution Intelligence**:
+- **Pattern**: `_should_use_ssh(source_config, operation_type)` determines execution context
+- **Same-as-Origin Exception**: same_as_origin repositories always use SSH execution regardless of operation type
+- **Container Runtime Location**: `container_runtime` field MUST be in `source_config` (not global)
 
 **Execution Service Rules (CRITICAL)**:
 - **ALWAYS use** `ResticExecutionService.execute_restic_command()` from `services/execution.py`
@@ -53,8 +56,9 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **Stack**: Python 3.13, FastAPI, Pydantic, APScheduler, PyYAML, Jinja2, Docker/Podman (rootless), HTMX
 
 ### Key Principles
+- **Job = Source + Destination + Definition**: Each backup job connects a source (host) to a destination (repository) with a definition (paths, schedule, settings). Definitions contain one or more paths with per-path include/exclude rules.
 - **Pure Orchestration Layer**: Highball orchestrates by SSH-ing to hosts and running binaries there
-- **Container Execution Strategy**: Use official `restic/restic:0.18.0` containers on remote hosts for version consistency
+- **Container Execution Strategy**: Use official `restic/restic:0.18.0` containers on remote hosts for version consistency. **CRITICAL**: `restic/restic:0.18.0` has `restic` as entrypoint - container commands use `-r repository command` NOT `restic -r repository command`.
 - **Schema-Driven Everything**: Secret management, validation, and form rendering all use schema definitions
 - **Rootless Container Architecture**: LinuxServer.io-style user management with runtime PUID/PGID support
 
@@ -73,11 +77,18 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 
 ## Architecture Status
 
-- ✅ **Unified Execution Service** - All Restic operations use consistent execution patterns
-- ✅ **Modular Architecture** - God Object eliminated, focused single-responsibility modules  
-- ✅ **Complete Type Safety** - 100% type hint coverage across all function signatures
-- ✅ **Enum-based Operations** - Type-safe operation types throughout execution layer
-- ✅ **FastAPI/Pydantic** - Modern HTTP and data validation patterns (See @LOCAL/MODERNIZATION.md)
+**✅ COMPLETED IMPLEMENTATIONS**:
+- **Unified Execution Service** - All Restic operations use consistent execution patterns
+- **Modular Architecture** - God Object eliminated, focused single-responsibility modules  
+- **Complete Type Safety** - 100% type hint coverage across all function signatures
+- **Enum-based Operations** - Type-safe operation types throughout execution layer
+- **FastAPI/Pydantic** - 100% modernization with zero legacy remnants, Python 3.13 ready
+- **Rootless Containers** - PUID/PGID support (Docker + Podman compatible)
+- **Distributed Config Hierarchy** - Job-scoped secret isolation (`/config/local/` structure)
+- **Schema-Driven Validation** - Zero hardcoded field requirements, unified validation paths
+- **SSH Origin Management** - Complete HTMX-based SSH key and host management system
+- **Same-as-Origin Repository** - Support for local rollbacks on source host filesystem
+- **Anti-Pattern Elimination** - Response Service and Extract Method patterns established
 
 **Technical Foundation**: Python 3.13, FastAPI, Pydantic, comprehensive typing, modular services
 
@@ -91,12 +102,85 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 4. **Enum Usage**: Use `OperationType` enum constants, never operation type strings
 5. **Single Responsibility**: Each module handles one architectural concern only
 
+### Critical HTMX Patterns (DOM-Safe Targeting)
+
+**NEVER target parent containers that contain the triggering button** - causes DOM corruption and HTMX re-scanning failures:
+
+**Multi-Path Source Management**:
+- **Add Operation**: Button targets child list (`#source_paths_list`) with `hx-swap="beforeend"` to append new entries
+- **Remove Operation**: Button targets own container (`#path_entry_{{ index }}`) with `hx-swap="outerHTML"` for clean removal
+- **Form Array Safety**: HTML forms auto-reindex `name="field[]"` arrays, eliminating index gaps from removals
+- **Protection**: Path 0 never shows remove button (`{% if path_index > 0 %}`), ensuring at least one path remains
+
+### Response Handling Architecture
+
+**ResponseUtils Class**: Centralized HTTP response handling in `handlers/api.py` eliminates duplication across all handler classes:
+- **Unified Interface**: `send_html_response()`, `send_json_response()`, `send_redirect()`, `send_htmx_partial()`, `send_error()`, `send_htmx_error()`
+- **Separation of Concerns**: HTTP response logic stays in handlers layer, template rendering stays in services layer
+
+### Anti-Pattern Detection
+
+**Future Claude Detection**: If you see multiple methods with identical try/catch/return error blocks, immediately flag this as an anti-pattern and refactor to decorator + exception pattern.
+
 **When making changes**:
 - Check module line counts after edits - split if >800 lines
 - Add type hints to any new functions immediately  
 - Use existing service patterns - don't create new execution paths
 - Test functionality after architectural changes (`./rr` then verify API)
 - Follow established import patterns (`from typing import...`)
+
+### Development Environment & Authority
+
+**Development Environment**: Claude runs in distrobox container with package installation capabilities.
+
+**Decision Authority**: 
+- **Claude**: Owns technical implementation decisions (patterns, algorithms, code structure)
+- **Shane**: Tech director/product manager - owns design decisions, architectural direction, product requirements
+- **When uncertain** about design preferences or high-level architecture, ask before implementing rather than having changes aborted for clarification
+- **Present options with reasoned recommendations** - not just choices, but grounded opinions based on sound practice and project cohesiveness
+
+**Context Management**: Two-file documentation workflow:
+- **CLAUDE.md** (permanent): architecture, patterns, rules, technical debt
+- **CHANGES.md** (temporal): current session focus, progress, technical notes, next priorities  
+- **Session end**: fold architectural insights into CLAUDE.md, update CHANGES.md for next session
+- **Post-compression**: feed both files to restore complete context efficiently
+
+**Live Testing Environment**: Against `yeti.home.arpa` with actual restic repository at `rest:http://yeti.home.arpa:8000/yeti`
+
+## How to Find Things (Navigation Guide)
+
+### Core Business Logic
+- **Backup Execution**: `services/execution.py` - `ResticExecutionService.execute_restic_command()`
+- **Job Scheduling**: `services/scheduling.py` - APScheduler integration and conflict detection  
+- **Restore Operations**: `services/restore.py` - Provider-agnostic restore orchestration
+- **Repository Management**: `services/repositories.py` - Repository abstraction and browsing
+- **Maintenance Operations**: `services/maintenance.py` - Automated cleanup and health checks
+
+### HTTP & UI Layer
+- **FastAPI Routes**: `app.py` - All HTTP endpoints and route definitions
+- **Page Handlers**: `handlers/pages.py` - HTML page rendering logic
+- **API Handlers**: `handlers/api.py` - JSON endpoints and ResponseUtils class
+- **Form Processing**: `handlers/forms.py` - HTMX form submission handling
+- **Templates**: `templates/` - Jinja2 templates with schema-driven rendering
+
+### Data Models & Validation  
+- **Pydantic Models**: `models/forms.py`, `models/backup.py` - Type-safe data structures
+- **Validation Logic**: `models/validation.py` - Schema-driven validation methods
+- **Schema Definitions**: `models/schemas.py` - Field definitions and requirements
+
+### Configuration & Secrets
+- **Global Settings**: `/config/local/local.yaml` - App-wide configuration
+- **Job Configs**: `/config/local/jobs/{job_name}.yaml` - Individual job definitions  
+- **Job Secrets**: `/config/local/secrets/jobs/{job_name}.env` - Environment variables
+- **SSH Origins**: `/config/local/origins/{origin_name}.yaml` - SSH host configurations
+- **Config Loading**: `config.py` - YAML parsing and secret merging
+
+### Key Files by Function
+- **Container Execution**: `services/execution.py` - Restic container orchestration
+- **SSH Operations**: `services/ssh.py` - SSH connection and key management
+- **HTMX Patterns**: `templates/partials/` - Dynamic form components
+- **Scheduling**: `services/scheduling.py` - Cron job management
+- **Logging**: `/var/log/highball/` - Operational logs and status files
 
 **NEVER USE THE TERM PRODUCTION READY OR GIVE ARBITRARY TIME ESTIMATES TO SHANE**
 **NEVER USE EMOJI IN THE CODEBASE**
