@@ -2213,16 +2213,16 @@ class ValidationHandlers(BaseHandler):
         """HTMX endpoint for repository availability check"""
         
         if not job_name:
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message='Job name is required')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
         
         # Get and validate job configuration
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message=f"Job '{job_name}' not found")
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
         
         job_config = jobs[job_name]
         # Perform repository availability check and return response
@@ -2233,24 +2233,24 @@ class ValidationHandlers(BaseHandler):
         """HTMX endpoint for repository unlock"""
         
         if not job_name:
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message='Job name is required')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
             
         # Get and validate job configuration
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message=f"Job '{job_name}' not found")
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
         
         job_config = jobs[job_name]
         dest_type = job_config.get('dest_type')
         
         if dest_type != 'restic':
-            html = self.template_service.render_template('partials/error_message.html', 
-                                                       error_message='Unlock is only supported for restic repositories')
-            return HTMLResponse(content=html)
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Unlock is only supported for restic repositories'
+            })
 
         # Execute restic unlock command
         dest_config = job_config.get('dest_config', {})
@@ -2264,11 +2264,10 @@ class ValidationHandlers(BaseHandler):
             return self.check_repository_availability_htmx(job_name)
         else:
             # Unlock failed - show error
-            html = self.template_service.render_template('partials/repository_error.html', {
+            return self._render_html('partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'unlock_failed',
                 'error_message': result.get('error', 'Unlock failed')
             })
-            return HTMLResponse(content=html)
 
 
