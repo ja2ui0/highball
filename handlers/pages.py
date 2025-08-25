@@ -2123,8 +2123,7 @@ class ValidationHandlers(BaseHandler):
             'page_title': 'Network Scan Results'
         }
         
-        html = self.template_service.render_template('pages/network_scan.html', **template_data)
-        return HTMLResponse(content=html)
+        return self._render_html('pages/network_scan.html', template_data)
 
     # Job name extraction now handled by FastAPI Query() parameters
 
