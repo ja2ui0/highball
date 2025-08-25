@@ -8,9 +8,11 @@
     {% if container_runtime %}
     <br>• Container runtime: {{ container_runtime }}
     {% endif %}
+    {% if not edit_mode %}
     <div class="mt-lg">
         <button type="submit" class="button button-success">Save Origin</button>
     </div>
+    {% endif %}
 </div>
 
 <!-- Update the existing form fields with validation results -->

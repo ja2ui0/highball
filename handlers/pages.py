@@ -1331,6 +1331,7 @@ class ValidationHandlers:
             return JSONResponse(content=origin_result)
         
         origin_config = origin_result['origin_config']
+        edit_mode = 'original_origin_name' in form_data and form_data['original_origin_name']
         
         # Extract connection details
         hostname = origin_config['ssh_hostname']
@@ -1342,6 +1343,7 @@ class ValidationHandlers:
         if ssh_highball and not password:
             html = self.template_service.render_template('partials/ssh_validation_result.html',
                                                         success=False,
+                                                        edit_mode=edit_mode,
                                                         validation_message='Password is required when "Auto-populate keys using Highball" is checked.')
             return HTMLResponse(content=html)
         
@@ -1362,7 +1364,8 @@ class ValidationHandlers:
             'progress': ['• Starting SSH validation workflow...'],
             'completed': False,
             'success': None,
-            'result': None
+            'result': None,
+            'edit_mode': edit_mode
         }
         
         # Start background workflow
@@ -1400,6 +1403,7 @@ class ValidationHandlers:
         else:
             # Completed - return final result and clean up session
             result = session['result']
+            result['edit_mode'] = session['edit_mode']
             html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
             # Clean up session data
             del self._ssh_sessions[session_id]
