@@ -1915,8 +1915,7 @@ class ValidationHandlers(BaseHandler):
                 'highball_public_key': self._get_highball_public_key()
             }
         
-        html = self.template_service.render_template(template, **template_context)
-        return HTMLResponse(content=html)
+        return self._render_html(template, template_context)
     
     def _get_highball_public_key(self) -> str:
         """Read Highball public key content"""
