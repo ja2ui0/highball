@@ -837,7 +837,8 @@ class FormsHandler:
     
     def _generate_restic_uri_preview(self, form_data):
         """Generate real-time URI preview for repository configuration"""
-        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
         
         if not repo_type:
             return self.template_service.render_template('partials/uri_preview.html',
