@@ -2090,18 +2090,6 @@ class ValidationHandlers(BaseHandler):
         
         return self._render_html(template, {})
     
-    @handle_page_errors("Toggle SSH passphrase field")
-    def toggle_ssh_passphrase(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Toggle SSH passphrase field visibility"""
-        requires_passphrase = 'requires_passphrase' in form_data
-        
-        if requires_passphrase:
-            template = 'partials/ssh_passphrase_field.html'
-            html = self.template_service.render_template(template)
-        else:
-            html = ''
-        
-        return HTMLResponse(content=html)
 
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, network_range: str) -> HTMLResponse:

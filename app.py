@@ -257,11 +257,6 @@ async def toggle_ssh_auth_method(request: Request):
     return services.handlers['validation_pages'].toggle_ssh_auth_method(form_data)
 
 
-@app.post("/htmx/toggle-passphrase")
-async def toggle_ssh_passphrase(request: Request):
-    """Toggle SSH passphrase field (HTMX partial)"""
-    form_data = dict(await request.form())
-    return services.handlers['validation_pages'].toggle_ssh_passphrase(form_data)
 
 # =============================================================================
 # DESTINATIONS MANAGEMENT ROUTES
