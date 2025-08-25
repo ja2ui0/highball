@@ -29,11 +29,15 @@ class BackupConfig:
             # Load SSH origins from /config/local/origins/*.yaml
             ssh_origins = self._load_ssh_origins()
             
+            # Load destinations from /config/local/dests/*.yaml
+            destinations = self._load_destinations()
+            
             return {
                 'global_settings': global_settings,
                 'backup_jobs': backup_jobs,
                 'deleted_jobs': deleted_jobs,
-                'ssh_origins': ssh_origins
+                'ssh_origins': ssh_origins,
+                'destinations': destinations
             }
             
         except Exception as e:
@@ -180,6 +184,43 @@ class BackupConfig:
                 continue
         
         return origins
+    
+    def _load_destinations(self):
+        """Load destinations from /config/local/dests/*.yaml with destination-scoped secrets"""
+        destinations = {}
+        dests_dir = "/config/local/dests"
+        
+        if not os.path.exists(dests_dir):
+            return destinations
+            
+        # Find all .yaml files in destinations directory
+        dest_files = glob.glob(os.path.join(dests_dir, "*.yaml"))
+        
+        for dest_file in dest_files:
+            dest_name = os.path.splitext(os.path.basename(dest_file))[0]
+            
+            try:
+                # Load destination config
+                with open(dest_file, 'r') as f:
+                    dest_config = yaml.safe_load(f.read())
+                
+                if dest_config is None:
+                    print(f"Warning: Empty destination config for {dest_name}")
+                    continue
+                
+                # Load destination-specific secrets if they exist (scoped per destination)
+                secrets_file = f"/config/local/secrets/dests/{dest_name}.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    dest_config = self._merge_secrets(dest_config, secrets)
+                
+                destinations[dest_name] = dest_config
+                
+            except Exception as e:
+                print(f"Warning: Error loading destination {dest_name}: {str(e)}")
+                continue
+        
+        return destinations
     
     def _merge_secrets(self, config, secrets):
         """Merge secrets into config by replacing ${VAR} placeholders - maintains job isolation"""
@@ -710,5 +751,150 @@ class BackupConfig:
             shutil.move(temp_secrets_path, secrets_file)
         else:
             # Remove secrets file if no secrets (e.g., switching from user keys to Highball keys)
+            if os.path.exists(secrets_file):
+                os.remove(secrets_file)
+    
+    # =============================================================================
+    # DESTINATION MANAGEMENT METHODS
+    # =============================================================================
+    
+    def get_destinations(self):
+        """Get all destinations"""
+        return self.config.get('destinations', {})
+    
+    def get_destination(self, dest_name):
+        """Get specific destination"""
+        return self.config.get('destinations', {}).get(dest_name)
+    
+    def save_destination(self, dest_name, dest_config):
+        """Save a destination: config with ${placeholders}, .env with secrets (only if secrets exist)"""
+        try:
+            # Ensure directories exist
+            dests_dir = "/config/local/dests"
+            secrets_dir = "/config/local/secrets/dests"
+            os.makedirs(dests_dir, exist_ok=True)
+            os.makedirs(secrets_dir, exist_ok=True)
+            
+            # Extract secrets from destination config
+            clean_config, secrets = self._extract_secrets_from_dest_config(dest_config)
+            
+            # Write files atomically (only creates .env if secrets dict has content)
+            self._write_dest_files_atomically(dest_name, clean_config, secrets)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving destination {dest_name}: {str(e)}")
+            return False
+    
+    def delete_destination(self, dest_name):
+        """Delete a destination permanently"""
+        try:
+            # Check if destination exists
+            if dest_name not in self.config.get('destinations', {}):
+                return False
+            
+            # File paths
+            config_file = f"/config/local/dests/{dest_name}.yaml"
+            secrets_file = f"/config/local/secrets/dests/{dest_name}.env"
+            
+            # Remove config file
+            if os.path.exists(config_file):
+                os.remove(config_file)
+            
+            # Remove secrets file if it exists
+            if os.path.exists(secrets_file):
+                os.remove(secrets_file)
+            
+            # Reload config to reflect changes
+            self.config = self.load_config()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting destination {dest_name}: {str(e)}")
+            return False
+    
+    def _extract_secrets_from_dest_config(self, dest_config):
+        """Extract secrets from destination config based on schema"""
+        from models.schemas import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS
+        
+        clean_config = dest_config.copy()
+        secrets = {}
+        
+        dest_type = dest_config.get('type')
+        
+        # Handle restic-specific secrets
+        if dest_type == 'restic':
+            repo_type = dest_config.get('repo_type') or dest_config.get('type')
+            
+            # Extract RESTIC_PASSWORD
+            password = dest_config.get('password', '')
+            if password and password != '${RESTIC_PASSWORD}':
+                secrets['RESTIC_PASSWORD'] = password
+                clean_config['password'] = '${RESTIC_PASSWORD}'
+            
+            # Extract restic repository type-specific secrets
+            if repo_type and repo_type in RESTIC_REPOSITORY_TYPE_SCHEMAS:
+                repo_schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
+                if 'fields' in repo_schema:
+                    for field_def in repo_schema['fields']:
+                        if field_def.get('secret') and field_def.get('env_var'):
+                            field_name = field_def['name']
+                            env_var = field_def['env_var']
+                            field_value = dest_config.get(field_name, '')
+                            
+                            if field_value and field_value != f"${{{env_var}}}":
+                                secrets[env_var] = field_value
+                                clean_config[field_name] = f"${{{env_var}}}"
+        
+        # Handle other destination type secrets (rsyncd password, etc.)
+        elif dest_type and dest_type in DESTINATION_TYPE_SCHEMAS:
+            dest_schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+            if 'fields' in dest_schema:
+                for field_name, field_config in dest_schema['fields'].items():
+                    if field_config.get('secret') and field_config.get('env_var'):
+                        env_var = field_config['env_var']
+                        field_value = dest_config.get(field_name, '')
+                        
+                        if field_value and field_value != f"${{{env_var}}}":
+                            secrets[env_var] = field_value
+                            clean_config[field_name] = f"${{{env_var}}}"
+        
+        # Remove fields that shouldn't be stored in YAML
+        if 'dest_name' in clean_config:
+            del clean_config['dest_name']  # Derived from filename, not stored
+        
+        return clean_config, secrets
+    
+    def _write_dest_files_atomically(self, dest_name, clean_config, secrets):
+        """Write destination config and secrets files atomically"""
+        import tempfile
+        import shutil
+        
+        # Write config file
+        config_file = f"/config/local/dests/{dest_name}.yaml"
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as temp_config:
+            yaml.dump(clean_config, temp_config, default_flow_style=False, indent=2)
+            temp_config_path = temp_config.name
+        
+        # Atomically move config file into place
+        shutil.move(temp_config_path, config_file)
+        
+        # Write secrets file only if there are secrets to write
+        secrets_file = f"/config/local/secrets/dests/{dest_name}.env"
+        if secrets:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.env') as temp_secrets:
+                for key, value in secrets.items():
+                    temp_secrets.write(f'{key}="{value}"\n')
+                temp_secrets_path = temp_secrets.name
+            
+            # Atomically move secrets file into place
+            shutil.move(temp_secrets_path, secrets_file)
+        else:
+            # Remove secrets file if no secrets
             if os.path.exists(secrets_file):
                 os.remove(secrets_file)

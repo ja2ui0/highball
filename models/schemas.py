@@ -33,28 +33,29 @@ SOURCE_TYPE_SCHEMAS = {
 # DESTINATION TYPE SCHEMAS
 # =============================================================================
 
+# Base schema for all destination types - shared fields
+DESTINATION_BASE_SCHEMA = {
+    'friendly_name': {'config_key': 'friendly_name', 'required': False},
+    'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
+    'hostname': {'config_key': 'hostname', 'required': True},
+    'port': {'config_key': 'port', 'required': True}
+}
+
 DESTINATION_TYPE_SCHEMAS = {
-    'local': {
-        'display_name': 'Local Path',
-        'description': 'Store backups on local filesystem',
-        'always_available': True,
-        'requires': [],
-        'fields': {
-            'dest_path': {'config_key': 'path'}
-        },
-        'required_fields': ['path']
-    },
-    'ssh': {
+    'rsync': {
         'display_name': 'Rsync (SSH)',
         'description': 'Remote backup using rsync over SSH',
         'always_available': True,
         'requires': ['rsync', 'ssh'],
         'fields': {
-            'dest_hostname': {'config_key': 'hostname'},
-            'dest_username': {'config_key': 'username'}, 
-            'dest_path': {'config_key': 'dest_path'}
+            'friendly_name': {'config_key': 'friendly_name', 'required': False},
+            'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
+            'hostname': {'config_key': 'hostname', 'required': True},
+            'port': {'config_key': 'port', 'required': True, 'default': 22},
+            'username': {'config_key': 'username', 'required': True},
+            'path': {'config_key': 'path', 'required': True}
         },
-        'required_fields': ['hostname', 'username', 'dest_path']
+        'required_fields': ['hostname', 'port', 'username', 'path']
     },
     'rsyncd': {
         'display_name': 'Rsync Daemon',
@@ -62,24 +63,32 @@ DESTINATION_TYPE_SCHEMAS = {
         'always_available': True,
         'requires': ['rsync'],
         'fields': {
-            'rsyncd_hostname': {'config_key': 'hostname'},
-            'rsyncd_share': {'config_key': 'share'}
+            'friendly_name': {'config_key': 'friendly_name', 'required': False},
+            'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
+            'hostname': {'config_key': 'hostname', 'required': True},
+            'port': {'config_key': 'port', 'required': True, 'default': 873},
+            'username': {'config_key': 'username', 'required': False},
+            'password': {'config_key': 'password', 'required': False, 'secret': True, 'env_var': 'RSYNCD_PASSWORD'},
+            'share': {'config_key': 'share', 'required': True}
         },
-        'required_fields': ['hostname', 'share']
+        'required_fields': ['hostname', 'port', 'share']
     },
     'restic': {
         'display_name': 'Restic Repository',
         'description': 'Encrypted, deduplicated backup repository',
-        'always_available': False,  # depends on binary availability
+        'always_available': False,
         'requires': ['restic'],
         'requires_container_runtime': True,
         'availability_check': 'check_restic_availability',
         'fields': {
-            'repo_type': {'config_key': 'repo_type', 'required': True},
-            'repo_uri': {'config_key': 'repo_uri', 'required': True},
-            'password': {'config_key': 'password', 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
+            'friendly_name': {'config_key': 'friendly_name', 'required': False},
+            'uri': {'config_key': 'uri', 'required': True, 'auto_generated': True},
+            'hostname': {'config_key': 'hostname', 'required': True},
+            'port': {'config_key': 'port', 'required': True},
+            'type': {'config_key': 'type', 'required': True},
+            'password': {'config_key': 'password', 'required': True, 'secret': True, 'env_var': 'RESTIC_PASSWORD'}
         },
-        'required_fields': ['repo_type', 'repo_uri', 'password']
+        'required_fields': ['hostname', 'port', 'type', 'password']
     }
 }
 
@@ -125,7 +134,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         },
         'fields': [
             {
-                'name': 'rest_hostname',
+                'name': 'hostname',
                 'type': 'text',
                 'label': 'REST Server Hostname',
                 'help': 'Hostname or IP address of the REST server',
@@ -133,7 +142,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             },
             {
-                'name': 'rest_port',
+                'name': 'port',
                 'type': 'number',
                 'label': 'REST Server Port',
                 'help': 'Port number (default: 8000)',
@@ -143,35 +152,35 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'max': 65535
             },
             {
-                'name': 'rest_path',
+                'name': 'path',
                 'type': 'text',
                 'label': 'Repository Path',
                 'help': 'Path to the repository on the REST server',
                 'placeholder': '/my-backup-repo'
             },
             {
-                'name': 'rest_use_root',
+                'name': 'use_root',
                 'type': 'checkbox',
                 'label': 'Use Repository Root',
                 'help': 'Connect to repository served directly from server root (no additional path)',
                 'default': False
             },
             {
-                'name': 'rest_use_https',
+                'name': 'use_https',
                 'type': 'checkbox',
                 'label': 'Use HTTPS',
                 'help': 'Use HTTPS instead of HTTP (recommended for production)',
                 'default': False
             },
             {
-                'name': 'rest_username',
+                'name': 'username',
                 'type': 'text',
                 'label': 'Username (Optional)',
                 'help': 'HTTP Basic Auth username if server requires authentication',
                 'placeholder': 'username'
             },
             {
-                'name': 'rest_password',
+                'name': 'password',
                 'type': 'password',
                 'label': 'Password (Optional)',
                 'help': 'HTTP Basic Auth password if server requires authentication',
@@ -193,7 +202,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         },
         'fields': [
             {
-                'name': 's3_bucket',
+                'name': 'bucket',
                 'type': 'text',
                 'label': 'S3 Bucket',
                 'help': 'Amazon S3 bucket name',
@@ -205,7 +214,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'htmx_include': "[name='restic_repo_type'], [name^='s3_']"
             },
             {
-                'name': 's3_prefix',
+                'name': 'prefix',
                 'type': 'text',
                 'label': 'S3 Key Prefix (optional)',
                 'help': 'Optional prefix for repository keys within the bucket',
@@ -216,7 +225,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'htmx_include': "[name='restic_repo_type'], [name^='s3_']"
             },
             {
-                'name': 's3_region',
+                'name': 'region',
                 'type': 'text',
                 'label': 'AWS Region (optional)',
                 'help': 'AWS region (defaults to us-east-1). Not required for non-AWS S3-compatible services like Cloudflare R2, MinIO',
@@ -225,7 +234,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'default': 'us-east-1'
             },
             {
-                'name': 's3_access_key',
+                'name': 'access_key',
                 'type': 'text',
                 'label': 'Access Key ID',
                 'help': 'AWS Access Key ID for authentication',
@@ -235,7 +244,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'env_var': 'S3_ACCESS_KEY_ID'
             },
             {
-                'name': 's3_secret_key',
+                'name': 'secret_key',
                 'type': 'password',
                 'label': 'Secret Access Key',
                 'help': 'AWS Secret Access Key for authentication',
@@ -245,7 +254,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'env_var': 'S3_SECRET_ACCESS_KEY'
             },
             {
-                'name': 's3_endpoint',
+                'name': 'endpoint',
                 'type': 'text',
                 'label': 'S3 Endpoint',
                 'help': 'AWS: https://s3.us-east-1.amazonaws.com | Cloudflare R2: your account endpoint | MinIO/other: custom endpoint',
@@ -268,7 +277,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         },
         'fields': [
             {
-                'name': 'sftp_hostname',
+                'name': 'hostname',
                 'type': 'text',
                 'label': 'SFTP Host',
                 'help': 'SFTP server hostname',
@@ -276,7 +285,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             },
             {
-                'name': 'sftp_username',
+                'name': 'username',
                 'type': 'text',
                 'label': 'SFTP Username',
                 'help': 'Username for SFTP authentication',
@@ -284,7 +293,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             },
             {
-                'name': 'sftp_path',
+                'name': 'path',
                 'type': 'text',
                 'label': 'SFTP Path',
                 'help': 'Path on the SFTP server',
@@ -304,7 +313,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         },
         'fields': [
             {
-                'name': 'rclone_remote',
+                'name': 'remote',
                 'type': 'text',
                 'label': 'rclone Remote',
                 'help': 'rclone remote name (configure with "rclone config")',
@@ -312,7 +321,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
                 'required': True
             },
             {
-                'name': 'rclone_path',
+                'name': 'path',
                 'type': 'text',
                 'label': 'Remote Path',
                 'help': 'Path within the rclone remote',
@@ -335,7 +344,7 @@ RESTIC_REPOSITORY_TYPE_SCHEMAS = {
         },
         'fields': [
             {
-                'name': 'origin_repo_path',
+                'name': 'path',
                 'type': 'text',
                 'label': 'Repository Path on Origin Host',
                 'help': 'Path where the repository will be stored on the origin host (requires write permissions)',
@@ -615,6 +624,82 @@ JOB_SCHEDULE_SCHEMA = {
             'label': 'Wait for conflicting jobs (recommended)',
             'help': 'When enabled, this job will wait for other jobs using the same source or destination to finish',
             'default': True
+        }
+    ]
+}
+
+# =============================================================================
+# DESTINATION MANAGEMENT SCHEMAS
+# =============================================================================
+
+# Destination form schema for add/edit destination forms
+DESTINATION_SCHEMA = {
+    'display_name': 'Destination Configuration',
+    'description': 'Configure destination connection details and storage type',
+    'fields': [
+        {
+            'name': 'friendly_name',
+            'type': 'text',
+            'label': 'Friendly Name',
+            'help': 'Display name for this destination (e.g. "My NAS", "Cloud Storage")',
+            'placeholder': 'My Destination',
+            'required': True,
+            'max_length': 100
+        },
+        {
+            'name': 'dest_type',
+            'type': 'select',
+            'label': 'Destination Type',
+            'help': 'Type of destination storage',
+            'required': True,
+            'options': [
+                {'value': 'rsync', 'label': 'Rsync (SSH)'},
+                {'value': 'rsyncd', 'label': 'Rsync Daemon'},
+                {'value': 'restic', 'label': 'Restic Repository'}
+            ]
+        },
+        {
+            'name': 'hostname',
+            'type': 'text',
+            'label': 'Hostname',
+            'help': 'Hostname or IP address of the destination server',
+            'placeholder': 'server.example.com',
+            'required': True
+        },
+        {
+            'name': 'port',
+            'type': 'number',
+            'label': 'Port',
+            'help': 'Port number (auto-filled based on type)',
+            'required': True,
+            'min': 1,
+            'max': 65535
+        }
+    ]
+}
+
+# Destination validation result schema
+DESTINATION_VALIDATION_SCHEMA = {
+    'display_name': 'Destination Validation',
+    'description': 'Destination connectivity validation and capability detection results',
+    'fields': [
+        {
+            'name': 'connection_success',
+            'type': 'status',
+            'label': 'Connection',
+            'help': 'Whether destination connection was successful'
+        },
+        {
+            'name': 'uri_generated',
+            'type': 'text',
+            'label': 'Generated URI',
+            'help': 'Auto-generated URI for this destination configuration'
+        },
+        {
+            'name': 'validation_message',
+            'type': 'text',
+            'label': 'Validation Details',
+            'help': 'Additional details about the validation process'
         }
     ]
 }
