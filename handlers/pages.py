@@ -509,15 +509,17 @@ class GETHandlers(BaseHandler):
     def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
         """Show job inspection page"""
         if not job_name:
-            error_html = self.template_service.render_template('pages/error.html', 
-                error_message="Job name is required", page_title="Error")
-            return HTMLResponse(content=error_html, status_code=400)
+            return self._render_error('partials/error_page.html', {
+                'error_message': "Job name is required", 
+                'page_title': "Error"
+            }, 400)
         
         jobs = self.backup_config.get_backup_jobs()
         if job_name not in jobs:
-            error_html = self.template_service.render_template('pages/error.html', 
-                error_message=f"Job '{job_name}' not found", page_title="Error")
-            return HTMLResponse(content=error_html, status_code=404)
+            return self._render_error('partials/error_page.html', {
+                'error_message': f"Job '{job_name}' not found", 
+                'page_title': "Error"
+            }, 404)
         
         job_config = jobs[job_name]
         
