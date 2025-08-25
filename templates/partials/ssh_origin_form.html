@@ -65,7 +65,7 @@
         <div class="form-group">
             <label>
                 <input type="checkbox" name="ssh_highball" id="ssh_highball" 
-                       {% if ssh_highball | default(true) %}checked{% endif %}
+                       {% if not edit_mode %}checked{% endif %}
                        hx-post="/htmx/toggle-auth-method"
                        hx-target="#auth-method-container"
                        hx-include="closest form"> 

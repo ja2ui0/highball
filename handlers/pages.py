@@ -934,8 +934,8 @@ class POSTHandlers:
         from models.forms import origin_parser
         
         
-        # Parse origin form data
-        origin_result = origin_parser.parse_origin_form(form_data)
+        # Parse origin form data (no password required for save operations)
+        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -993,8 +993,8 @@ class POSTHandlers:
         from models.forms import origin_parser
         
         
-        # Parse origin form data
-        origin_result = origin_parser.parse_origin_form(form_data)
+        # Parse origin form data (no password required for save operations)
+        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -1325,8 +1325,8 @@ class ValidationHandlers:
         """Push keys and validate SSH origin configuration - main workflow orchestrator"""
         from models.forms import origin_parser
         
-        # Parse origin form data
-        origin_result = origin_parser.parse_origin_form(form_data)
+        # Parse origin form data (no password required for save operations)
+        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content=origin_result)
         
@@ -1336,7 +1336,7 @@ class ValidationHandlers:
         hostname = origin_config['ssh_hostname']
         username = origin_config['ssh_username']  
         password = form_data.get('ssh_password', '')
-        use_password = origin_config.get('ssh_highball', True) and password
+        use_password = True and password  # Always use Highball mode
         
         # Return immediate progress template, start workflow in background
         import uuid
@@ -1867,9 +1867,11 @@ class ValidationHandlers:
         ssh_highball = 'ssh_highball' in form_data
         
         if ssh_highball:
+            # Checkbox checked: show password field for automatic key installation
             template = 'partials/ssh_auth_highball.html'
             template_context = {}
         else:
+            # Checkbox unchecked: show manual key copy instructions
             template = 'partials/ssh_auth_user.html'
             # Read Highball public key for display
             template_context = {

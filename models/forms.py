@@ -755,7 +755,7 @@ class OriginParser:
     """Parse SSH origin configurations"""
     
     @staticmethod
-    def parse_origin_form(form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_origin_form(form_data: Dict[str, Any], require_password: bool = True) -> Dict[str, Any]:
         """Parse SSH origin form data"""
         origin_name = safe_get_value(form_data, 'origin_name').strip()
         if not origin_name:
@@ -791,10 +791,7 @@ class OriginParser:
         except ValueError:
             return {'valid': False, 'error': 'SSH port and timeout must be numbers'}
         
-        # Validate authentication configuration
-        auth_validation = OriginParser._validate_auth_config(form_data, ssh_highball)
-        if not auth_validation['valid']:
-            return auth_validation
+        # Note: Auth validation removed - no BYOK fields to validate anymore
         
         # Build origin configuration
         # Parse detected capabilities from validation (if present)
@@ -809,50 +806,24 @@ class OriginParser:
             'ssh_port': ssh_port,
             'ssh_timeout': ssh_timeout,
             'ssh_username': ssh_username,
-            'ssh_highball': ssh_highball,
+            'ssh_highball': True,  # Always true - Highball-only system
             'rsync_available': detected_rsync.lower() == 'true',
             'container_runtime': detected_runtime if detected_runtime else None
         }
         
         # Add authentication-specific fields
         if ssh_highball:
-            # Highball key mode - need transient password for setup
+            # Highball key mode - password only required for validation, not for save operations
             ssh_password = safe_get_value(form_data, 'ssh_password')
-            if not ssh_password:
+            if require_password and not ssh_password:
                 return {'valid': False, 'error': 'SSH password is required for Highball key installation'}
-            origin_config['ssh_password'] = ssh_password  # Transient
-        else:
-            # User key mode - need public key and optional passphrase
-            ssh_pubkey = safe_get_value(form_data, 'ssh_pubkey').strip()
-            if not ssh_pubkey:
-                return {'valid': False, 'error': 'SSH public key is required when not using Highball keys'}
-            
-            origin_config['ssh_pubkey'] = ssh_pubkey
-            
-            requires_passphrase = safe_get_value(form_data, 'requires_passphrase') == 'on'
-            if requires_passphrase:
-                ssh_passphrase = safe_get_value(form_data, 'ssh_passphrase')
-                if not ssh_passphrase:
-                    return {'valid': False, 'error': 'SSH key passphrase is required when "Requires passphrase" is checked'}
-                origin_config['ssh_passphrase'] = ssh_passphrase
+            if ssh_password:
+                origin_config['ssh_password'] = ssh_password  # Transient
+        # Note: When ssh_highball is False, user has existing keys and no additional input is required
         
         return {'valid': True, 'origin_config': origin_config}
     
-    @staticmethod
-    def _validate_auth_config(form_data: Dict[str, Any], ssh_highball: bool) -> Dict[str, Any]:
-        """Validate authentication configuration consistency"""
-        if ssh_highball:
-            # Highball mode: should not have user key fields filled
-            ssh_pubkey = safe_get_value(form_data, 'ssh_pubkey').strip()
-            if ssh_pubkey:
-                return {'valid': False, 'error': 'Cannot specify SSH public key when using Highball keys'}
-        else:
-            # User key mode: should not have password filled
-            ssh_password = safe_get_value(form_data, 'ssh_password')
-            if ssh_password:
-                return {'valid': False, 'error': 'Cannot specify SSH password when using user-managed keys'}
-        
-        return {'valid': True}
+    # _validate_auth_config function removed - no BYOK fields to validate
 
 # =============================================================================
 # EXPORTS - Clean interface

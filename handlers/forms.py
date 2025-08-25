@@ -951,7 +951,7 @@ class FormsHandler:
             # Parse form data using the same parser as save operations
             from models.forms import origin_parser
             
-            origin_result = origin_parser.parse_origin_form(form_data)
+            origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
             if not origin_result['valid']:
                 return self.template_service.render_template('partials/ssh_config_preview.html',
                                                            preview_content=f"# Error: {origin_result['error']}",
