@@ -781,7 +781,8 @@ class FormsHandler:
     
     def _render_restic_repo_fields(self, form_data):
         """Render Restic repository type fields using schema-driven templates"""
-        repo_type = self._get_form_value(form_data, 'restic_repo_type')
+        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
         
         if not repo_type:
             return ''  # No fields for unselected type
