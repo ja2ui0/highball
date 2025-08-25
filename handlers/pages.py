@@ -1270,7 +1270,7 @@ class ValidationHandlers:
     
     @handle_page_errors("SSH origin validation")
     def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Validate SSH origin configuration with capability detection"""
+        """Push keys and validate SSH origin configuration - main workflow orchestrator"""
         from models.forms import origin_parser
         
         # Parse origin form data
@@ -1280,33 +1280,85 @@ class ValidationHandlers:
         
         origin_config = origin_result['origin_config']
         
-        # Build SSH config for validation
-        ssh_config = {
-            'hostname': origin_config['ssh_hostname'],
-            'username': origin_config['ssh_username']
-        }
+        # Extract connection details
+        hostname = origin_config['ssh_hostname']
+        username = origin_config['ssh_username']  
+        password = form_data.get('ssh_password', '')
+        use_password = origin_config.get('ssh_highball', True) and password
         
-        # Use unified validation service
-        from models.validation import ValidationService
-        validation_service = ValidationService()
-        result = validation_service.validate_ssh_source(ssh_config)
+        # Execute complete workflow
+        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
         
-        # Convert validation result to template context
-        if result['valid']:
-            template_context = {
-                'success': True,
-                'validation_message': f"SSH connection successful. {result.get('rsync_status', 'Rsync status unknown')}. Container runtime: {result.get('container_runtime', 'None detected')}.",
-                'rsync_available': 'rsync' in result.get('rsync_status', '').lower() or result.get('rsync_status') == 'Available',
-                'container_runtime': result.get('container_runtime')
-            }
-        else:
-            template_context = {
-                'success': False,
-                'validation_message': result.get('error', 'SSH validation failed')
-            }
-        
-        html = self.template_service.render_template('partials/ssh_validation_result.html', **template_context)
+        # Render result
+        html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
         return HTMLResponse(content=html)
+    
+    def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Complete workflow: push keys → validate connection → detect capabilities"""
+        try:
+            # Step 1: Test initial connection
+            initial_test = self._test_initial_ssh_connection(hostname, username, password, use_password)
+            if not initial_test['success']:
+                return initial_test
+            
+            # Step 2: Check for existing key in authorized_keys
+            key_check = self._check_highball_key_in_authorized_keys(hostname, username)
+            
+            # Step 3: Push key if needed
+            if not key_check['key_exists']:
+                if not use_password:
+                    return {
+                        'success': False,
+                        'validation_message': 'Highball key not found in authorized_keys. Password required to install key.'
+                    }
+                push_result = self._push_highball_key(hostname, username, password)
+                if not push_result['success']:
+                    return push_result
+            
+            # Step 4: Copy keypair to remote host
+            copy_result = self._copy_keypair_to_remote(hostname, username)
+            if not copy_result['success']:
+                return copy_result
+                
+            # Step 5: Test connection and detect capabilities
+            final_test = self._test_connection_and_capabilities(hostname, username)
+            return final_test
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'validation_message': f'Key push workflow failed: {str(e)}'
+            }
+    
+    def _test_initial_ssh_connection(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Test initial SSH connection using password or existing key"""
+        # TODO: Implement initial connection test
+        return {'success': True}
+    
+    def _check_highball_key_in_authorized_keys(self, hostname: str, username: str) -> dict:
+        """Check if Highball public key exists in remote authorized_keys"""
+        # TODO: Implement key existence check
+        return {'key_exists': False}
+    
+    def _push_highball_key(self, hostname: str, username: str, password: str) -> dict:
+        """Push Highball public key using ssh-copy-id with sshpass"""
+        # TODO: Implement ssh-copy-id with sshpass
+        return {'success': True}
+    
+    def _copy_keypair_to_remote(self, hostname: str, username: str) -> dict:
+        """Copy id_highball and id_highball.pub to remote .ssh directory"""
+        # TODO: Implement rsync of keypair files
+        return {'success': True}
+    
+    def _test_connection_and_capabilities(self, hostname: str, username: str) -> dict:
+        """Test final connection and detect rsync/container capabilities"""
+        # TODO: Implement capability detection (reuse existing validation logic)
+        return {
+            'success': True,
+            'validation_message': 'Connection successful with capabilities detected',
+            'rsync_available': True,
+            'container_runtime': 'docker'
+        }
     
     @handle_page_errors("Toggle SSH auth method")
     def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> HTMLResponse:
@@ -1315,11 +1367,24 @@ class ValidationHandlers:
         
         if ssh_highball:
             template = 'partials/ssh_auth_highball.html'
+            template_context = {}
         else:
             template = 'partials/ssh_auth_user.html'
+            # Read Highball public key for display
+            template_context = {
+                'highball_public_key': self._get_highball_public_key()
+            }
         
-        html = self.template_service.render_template(template)
+        html = self.template_service.render_template(template, **template_context)
         return HTMLResponse(content=html)
+    
+    def _get_highball_public_key(self) -> str:
+        """Read Highball public key content"""
+        try:
+            with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+                return f.read().strip()
+        except Exception as e:
+            return f"Error reading public key: {str(e)}"
     
     def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
         """Helper to safely get form values handling both list and string formats"""

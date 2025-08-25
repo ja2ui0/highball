@@ -4,7 +4,6 @@
               style="background-color: #f5f5f5;">{{ highball_public_key }}</textarea>
     <div class="help-text">Copy this key and add it to ~/.ssh/authorized_keys on the target host before proceeding.</div>
     <button type="button" 
-            hx-post="/htmx/copy-to-clipboard" 
-            hx-vals='{"text": "{{ highball_public_key }}"}'
+            onclick="copyToClipboard('{{ highball_public_key }}', this)"
             class="button" style="margin-top: 10px;">Copy to Clipboard</button>
 </div>
