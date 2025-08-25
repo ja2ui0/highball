@@ -2137,11 +2137,10 @@ class ValidationHandlers(BaseHandler):
             return self._check_restic_repository_html(job_name, job_config)
         else:
             # Non-restic repositories - assume available for now
-            html = self.template_service.render_template('partials/repository_available.html', {
+            return self._render_html('partials/repository_available.html', {
                 'job_name': job_name,
                 'job_type': dest_type
             })
-            return HTMLResponse(content=html)
 
     def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check restic repository availability and return HTML response"""
