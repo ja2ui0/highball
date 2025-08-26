@@ -164,7 +164,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard():
     """Main dashboard page"""
-    return services.handlers['get_pages'].show_dashboard()
+    return jobs_handler.show_dashboard()
 
 
 @app.get("/add-job", response_class=HTMLResponse)
@@ -255,7 +255,7 @@ async def get_ssh_progress(session_id: str):
 async def toggle_ssh_auth_method(request: Request):
     """Toggle SSH authentication method (HTMX partial)"""
     form_data = dict(await request.form())
-    return services.handlers['validation_pages'].toggle_ssh_auth_method(form_data)
+    return origins_handler.toggle_ssh_auth_method(form_data)
 
 
 
@@ -310,7 +310,7 @@ async def destination_type_fields(request: Request):
 @app.get("/scan-network")
 async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
     """Scan network for rsyncd services"""
-    return services.handlers['validation_pages'].scan_network_for_rsyncd(range)
+    return destinations_handler.scan_network_for_rsyncd(range)
 
 
 @app.get("/validate-ssh")
@@ -395,13 +395,13 @@ async def get_jobs(state: Optional[str] = Query(None), fields: Optional[str] = Q
 @app.get("/check-repository-availability")
 async def check_repository_availability(job: str = Query("")):
     """Check repository availability"""
-    return services.handlers['validation_pages'].check_repository_availability_htmx(job)
+    return jobs_handler.check_repository_availability_htmx(job)
 
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
     """Unlock repository (GET)"""
-    return services.handlers['validation_pages'].unlock_repository_htmx(job)
+    return jobs_handler.unlock_repository_htmx(job)
 
 
 # =============================================================================
@@ -605,7 +605,7 @@ async def unlock_repository_post(request: Request):
         job_name = params.get('job', [''])[0]
     else:
         job_name = ''
-    return services.handlers['validation_pages'].unlock_repository_htmx(job_name)
+    return jobs_handler.unlock_repository_htmx(job_name)
 
 
 # =============================================================================

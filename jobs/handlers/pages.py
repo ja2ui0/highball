@@ -47,6 +47,162 @@ class JobsHandler(BaseHandler):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
     
+    @handle_page_errors("Dashboard")
+    def show_dashboard(self) -> HTMLResponse:
+        """Show main dashboard with job list"""
+        jobs = self.backup_config.get_backup_jobs()
+        global_settings = self.backup_config.get_global_settings()
+        
+        # Get job status information
+        from services.management import JobManagementService
+        job_management = JobManagementService(self.backup_config)
+        
+        job_list = []
+        for job_name, job_config in jobs.items():
+            # Use enabled/disabled status like original, not execution status
+            enabled = job_config.get('enabled', True)
+            status = "enabled" if enabled else "disabled"
+            status_class = "status-success" if enabled else "status-error"
+            
+            # Build display strings with type prefixes like original
+            source_display = self._build_source_display_with_type(job_config)
+            dest_display = self._build_dest_display_with_type(job_config)
+            
+            job_display = {
+                'name': job_name,
+                'source_display': source_display,
+                'dest_display': dest_display,
+                'status': status.capitalize(),
+                'status_class': status_class,
+                'schedule': job_config.get('schedule', 'manual')
+            }
+            job_list.append(job_display)
+        
+        # Sort jobs by name
+        job_list.sort(key=lambda j: j['name'])
+        
+        # Process deleted jobs into display format
+        deleted_jobs = self.backup_config.config.get('deleted_jobs', {})
+        deleted_job_rows = ""
+        
+        if deleted_jobs:
+            for job_name, job_config in deleted_jobs.items():
+                # Build source and destination displays same way as active jobs
+                source_display = self._build_source_display_with_type(job_config)
+                dest_display = self._build_dest_display_with_type(job_config)
+                
+                # Format deleted_at timestamp (break into date and time)
+                deleted_at_raw = job_config.get('deleted_at', 'Unknown')
+                if deleted_at_raw != 'Unknown' and ' ' in deleted_at_raw:
+                    # Split "2025-08-20 14:30:45" into "2025-08-20\n14:30:45"
+                    date_part, time_part = deleted_at_raw.split(' ', 1)
+                    deleted_at = f"{date_part}\n{time_part}"
+                else:
+                    deleted_at = deleted_at_raw
+                
+                # Render each deleted job row
+                row_html = self.template_service.render_template(
+                    'partials/deleted_job_row.html',
+                    job_name=job_name,
+                    source_display=source_display,
+                    dest_display=dest_display,
+                    deleted_at=deleted_at
+                )
+                deleted_job_rows += row_html
+        
+        template_data = {
+            'jobs': job_list,
+            'deleted_job_rows': deleted_job_rows,
+            'global_settings': global_settings,
+            'page_title': 'Dashboard'
+        }
+        
+        return self._render_html('pages/dashboard.html', template_data)
+
+    def _build_source_display_with_type(self, job_config):
+        """Build source display string with type prefix"""
+        source_type = job_config.get('source_type', 'local')
+        source_config = job_config.get('source_config', {})
+        
+        if source_type == 'local':
+            # Local source - show paths
+            source_paths = source_config.get('source_paths', [])
+            if source_paths:
+                first_path = source_paths[0]
+                if isinstance(first_path, dict):
+                    path_display = first_path.get('path', 'Unknown')
+                else:
+                    path_display = str(first_path)
+                
+                if len(source_paths) > 1:
+                    path_display += f" (+{len(source_paths)-1})"
+            else:
+                path_display = "No paths configured"
+            return f"local: {path_display}"
+            
+        elif source_type == 'ssh':
+            # SSH source - show hostname and paths
+            hostname = source_config.get('hostname', 'unknown')
+            username = source_config.get('username', 'unknown')
+            source_paths = source_config.get('source_paths', [])
+            
+            if source_paths:
+                first_path = source_paths[0]
+                if isinstance(first_path, dict):
+                    path_display = first_path.get('path', 'Unknown')
+                else:
+                    path_display = str(first_path)
+                
+                if len(source_paths) > 1:
+                    path_display += f" (+{len(source_paths)-1})"
+            else:
+                path_display = "No paths configured"
+            
+            return f"ssh: {username}@{hostname}:{path_display}"
+        
+        return f"{source_type}: Unknown configuration"
+    
+    def _build_dest_display_with_type(self, job_config):
+        """Build destination display string with type prefix"""
+        dest_type = job_config.get('dest_type', 'local')
+        dest_config = job_config.get('dest_config', {})
+        
+        if dest_type == 'local':
+            path = dest_config.get('path', 'Unknown')
+            return f"local: {path}"
+            
+        elif dest_type == 'ssh':
+            hostname = dest_config.get('hostname', 'unknown')
+            path = dest_config.get('path', 'unknown')
+            return f"ssh: {hostname}:{path}"
+            
+        elif dest_type == 'rsyncd':
+            hostname = dest_config.get('hostname', 'unknown')
+            share = dest_config.get('share', 'unknown')
+            return f"rsyncd: {hostname}::{share}"
+            
+        elif dest_type == 'restic':
+            repo_type = dest_config.get('repo_type', 'local')
+            repo_uri = dest_config.get('repo_uri', 'Unknown')
+            
+            # Show just the repo type and a simplified URI
+            if repo_type == 'local':
+                return f"restic: local:{repo_uri}"
+            elif repo_type == 'rest':
+                return f"restic: rest-server"
+            elif repo_type == 's3':
+                return f"restic: s3-bucket"
+            elif repo_type == 'sftp':
+                return f"restic: sftp"
+            elif repo_type == 'rclone':
+                return f"restic: rclone"
+            elif repo_type == 'same_as_origin':
+                return f"restic: same-as-origin"
+            else:
+                return f"restic: {repo_type}"
+        
+        return f"{dest_type}: Unknown configuration"
+
     @handle_page_errors("Job inspect")
     def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
         """Show job inspection page"""
@@ -239,6 +395,117 @@ class JobsHandler(BaseHandler):
             })
         
         return validation_results
+    
+    @handle_page_errors("Repository check")
+    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository availability check"""
+        
+        if not job_name:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
+        
+        # Get and validate job configuration
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        # Perform repository availability check and return response
+        return self._check_and_respond_repository_status_html(job_name, job_config)
+    
+    @handle_page_errors("Repository unlock")
+    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository unlock"""
+        
+        if not job_name:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
+            
+        # Get and validate job configuration
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        dest_type = job_config.get('dest_type')
+        
+        if dest_type != 'restic':
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Unlock is only supported for restic repositories'
+            })
+        # Execute restic unlock command
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.unlock_repository(dest_config, source_config)
+        
+        if result.get('success'):
+            # Unlock successful - automatically retry availability check
+            return self.check_repository_availability_htmx(job_name)
+        else:
+            # Unlock failed - show error
+            return self._render_html('partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'unlock_failed',
+                'error_message': result.get('error', 'Unlock failed')
+            })
+    
+    def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check repository availability and return appropriate HTMX HTML response"""
+        dest_type = job_config.get('dest_type')
+        
+        if dest_type == 'restic':
+            return self._check_restic_repository_html(job_name, job_config)
+        else:
+            # Non-restic repositories - assume available for now
+            return self._render_html('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': dest_type
+            })
+    
+    def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check restic repository availability and return HTML response"""
+        dest_config = job_config.get('dest_config', {})
+        repo_uri = dest_config.get('repo_uri')
+        
+        if not repo_uri:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Repository URI not configured'
+            })
+            
+        from jobs.services.backup import backup_service
+        check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
+        
+        if check_success:
+            return self._render_html('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': 'restic'
+            })
+        else:
+            return self._send_repository_error_html(job_name, check_message)
+    
+    def _send_repository_error_html(self, job_name: str, error_message: str) -> HTMLResponse:
+        """Send appropriate repository error HTMX partial based on error type"""
+        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
+            # Repository locked - render unlock interface
+            return self._render_html('partials/repository_locked_error.html', {
+                'job_name': job_name,
+                'error_message': error_message
+            })
+        else:
+            # Other error - render error template
+            return self._render_html('partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'connection_error',
+                'error_message': error_message or 'Unknown error'
+            })
 
 # Global handler instance
 jobs_handler = JobsHandler()

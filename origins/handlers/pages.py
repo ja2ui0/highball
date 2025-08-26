@@ -394,6 +394,33 @@ class OriginsHandler(BaseHandler):
                 pass  # Ignore session update errors
         
         return result
+    
+    @handle_page_errors("Toggle SSH auth method")
+    def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Toggle between Highball and user SSH authentication methods"""
+        ssh_highball = 'ssh_highball' in form_data
+        
+        if ssh_highball:
+            # Checkbox checked: show password field for automatic key installation
+            template = 'partials/ssh_auth_highball.html'
+            template_context = {}
+        else:
+            # Checkbox unchecked: show manual key copy instructions
+            template = 'partials/ssh_auth_user.html'
+            # Read Highball public key for display
+            template_context = {
+                'highball_public_key': self._get_highball_public_key()
+            }
+        
+        return self._render_html(template, template_context)
+    
+    def _get_highball_public_key(self) -> str:
+        """Read Highball public key content"""
+        try:
+            with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+                return f.read().strip()
+        except Exception as e:
+            return f"Error reading public key: {str(e)}"
 
 # Global handler instance
 origins_handler = OriginsHandler()

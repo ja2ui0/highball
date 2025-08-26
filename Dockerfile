@@ -15,6 +15,7 @@ RUN apt-get update && \
         tzdata \
         jq \
         netcat-openbsd \
+        nmap \
         gosu && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     apt-get clean && \
