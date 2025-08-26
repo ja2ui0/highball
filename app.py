@@ -228,7 +228,7 @@ async def save_ssh_origin(request: Request):
 @app.get("/ssh/edit/{origin_name}")
 async def edit_ssh_origin(origin_name: str):
     """Load SSH origin for editing"""
-    return services.handlers['get_pages'].edit_ssh_origin(origin_name)
+    return origins_handler.edit_ssh_origin(origin_name)
 
 
 @app.delete("/ssh/{origin_name}")

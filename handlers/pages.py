@@ -141,32 +141,6 @@ class GETHandlers(BaseHandler):
         
         return self._render_html('pages/dashboard.html', template_data)
     
-    @handle_page_errors("SSH origins")
-    @handle_page_errors("Edit SSH origin")
-    def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
-        """Load SSH origin for editing"""
-        origin_config = self.backup_config.get_ssh_origin(origin_name)
-        
-        if not origin_config:
-            # Return empty form if origin not found
-            return self._render_html('partials/ssh_origin_form.html', {})
-        
-        # Create edit form with populated values including existing capabilities
-        form_data = {
-            'origin_name': origin_name,
-            'friendly_name': origin_config.get('friendly_name', ''),
-            'ssh_hostname': origin_config.get('ssh_hostname', ''),
-            'ssh_username': origin_config.get('ssh_username', ''),
-            'ssh_port': origin_config.get('ssh_port', 22),
-            'ssh_timeout': origin_config.get('ssh_timeout', 5),
-            'ssh_highball': origin_config.get('ssh_highball', True),
-            'rsync_available': origin_config.get('rsync_available', False),
-            'container_runtime': origin_config.get('container_runtime', None),
-            'edit_mode': True  # Flag to indicate this is edit mode
-        }
-        
-        return self._render_html('partials/ssh_origin_form.html', form_data)
-    
     @handle_page_errors("Destinations")
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
