@@ -422,25 +422,25 @@ async def save_job(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['post_pages'].save_backup_job(form_data)
+    return jobs_handler.save_backup_job(form_data)
 
 
 @app.get("/delete-job")
 async def delete_job(name: str = Query("")):
     """Delete backup job"""
-    return services.handlers['post_pages'].delete_backup_job(name)
+    return jobs_handler.delete_backup_job(name)
 
 
 @app.get("/purge-job")
 async def purge_job(name: str = Query("")):
     """Permanently purge backup job from deleted jobs"""
-    return services.handlers['post_pages'].purge_backup_job(name)
+    return jobs_handler.purge_backup_job(name)
 
 
 @app.get("/restore-job")
 async def restore_job(name: str = Query("")):
     """Restore backup job from deleted jobs"""
-    return services.handlers['post_pages'].restore_backup_job(name)
+    return jobs_handler.restore_backup_job(name)
 
 
 @app.post("/run-backup")
