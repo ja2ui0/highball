@@ -265,7 +265,7 @@ class NotificationFormDataBuilder:
         Returns:
             Dict containing notification form fields for all providers
         """
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         # Get global notification settings from config
         global_settings = self.backup_config.get_global_settings()

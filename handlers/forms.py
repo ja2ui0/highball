@@ -9,7 +9,7 @@ import time
 from typing import Dict, Any, Optional
 from urllib.parse import parse_qs
 from fastapi.responses import JSONResponse, RedirectResponse
-from models.validation import ValidationService
+from jobs.services.validate import ValidationService
 from models.forms import JobFormParser, DestinationParser
 from services.template import TemplateService
 
@@ -144,7 +144,7 @@ class FormsHandler:
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: delegate to restore service
-        from services.restore import RestoreService
+        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details
@@ -174,7 +174,7 @@ class FormsHandler:
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
-        from services.restore import RestoreService
+        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details
@@ -206,7 +206,7 @@ class FormsHandler:
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
-        from services.restore import RestoreService
+        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details
@@ -1057,7 +1057,7 @@ class DestinationValidationHandler:
             'port': int(port) if port.isdigit() else 22
         }
         
-        from models.validation import ValidationService
+        from jobs.services.validate import ValidationService
         validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
         

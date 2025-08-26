@@ -380,9 +380,9 @@ class JobManagementService:
     def run_backup_job_async(self, job_name: str, job_config: Optional[Dict[str, Any]] = None, dry_run: bool = False) -> None:
         """Execute backup operation asynchronously with full orchestration"""
         from datetime import datetime
-        from models.backup import backup_service
-        from models.rsync import rsync_service
-        from models.notifications import NotificationService
+        from jobs.services.backup import backup_service
+        from dests.services.rsync import rsync_service
+        from jobs.services.notify import NotificationService
         import logging
         
         if not job_config and self.backup_config:

@@ -16,11 +16,11 @@ from handlers.pages import GETHandlers, POSTHandlers, ValidationHandlers
 from handlers.operations import OperationsHandler
 from handlers.api import APIHandler
 from handlers.forms import FormsHandler
-from handlers.scheduler import JobSchedulerHandler
+from jobs.services.scheduler import JobSchedulerHandler
 
 # Services
 from services.template import TemplateService
-from services.scheduling import SchedulingService
+from jobs.services.schedule import SchedulingService
 from services.data_services import JobFormDataBuilder
 from config import BackupConfig
 

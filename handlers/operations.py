@@ -15,9 +15,9 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 
 # Import unified models
-from models.backup import backup_service, ResticArgumentBuilder
-from models.rsync import rsync_service
-from models.notifications import create_notification_service
+from jobs.services.backup import backup_service, ResticArgumentBuilder
+from dests.services.rsync import rsync_service
+from jobs.services.notify import create_notification_service
 
 # Import services
 from services.management import JobManagementService
@@ -187,7 +187,7 @@ class OperationsHandler:
                     target_path = source_paths[0]['path']  # Use first source path
             
             # Use backup service for restore
-            from services.restic import ResticRepositoryService
+            from dests.services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
             
             # Build restore arguments
@@ -376,7 +376,7 @@ class OperationsHandler:
                 })
             
             # Add job to scheduler
-            from services.scheduling import SchedulingService
+            from jobs.services.schedule import SchedulingService
             scheduler = SchedulingService()
             
             job_config = jobs[job_name]

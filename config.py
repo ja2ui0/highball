@@ -243,7 +243,7 @@ class BackupConfig:
         """Discover ALL secret fields from ALL schemas based on job configuration"""
         from dests.schema import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS
         from origins.schema import SOURCE_TYPE_SCHEMAS
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         secret_fields = {}
         

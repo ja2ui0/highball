@@ -13,8 +13,8 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 
 # Import unified models
-from models.backup import backup_service
-from models.notifications import create_notification_service
+from jobs.services.backup import backup_service
+from jobs.services.notify import create_notification_service
 
 logger = logging.getLogger(__name__)
 

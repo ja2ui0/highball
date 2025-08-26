@@ -17,7 +17,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Import models for unified validation and forms
-from models.validation import validation_service
+from jobs.services.validate import validation_service
 from models.forms import job_parser
 
 # Import services
@@ -436,7 +436,7 @@ class GETHandlers(BaseHandler):
     @handle_page_errors("Config manager")
     def show_config_manager(self) -> HTMLResponse:
         """Show configuration management page"""
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         global_settings = self.backup_config.get_global_settings()
         
@@ -713,7 +713,7 @@ class POSTHandlers(BaseHandler):
         notification_config = global_settings.setdefault('notification', {})
         
         # Process each provider using the schema-driven approach
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
             provider_config = notification_config.setdefault(provider_name, {})
@@ -831,7 +831,7 @@ class POSTHandlers(BaseHandler):
         notification_config = global_settings.setdefault('notification', {})
         
         # Process each provider using the schema-driven approach
-        from models.notifications import PROVIDER_FIELD_SCHEMAS
+        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         for provider_name, schema in PROVIDER_FIELD_SCHEMAS.items():
             provider_config = notification_config.setdefault(provider_name, {})
@@ -896,7 +896,7 @@ class POSTHandlers(BaseHandler):
             'username': origin_config['ssh_username']
         }
         
-        from models.validation import ValidationService
+        from jobs.services.validate import ValidationService
         validation_service = ValidationService()
         validation_result = validation_service.validate_ssh_source(ssh_config)
         
@@ -1174,7 +1174,7 @@ class ValidationHandlers(BaseHandler):
         ssh_config = {'username': username, 'hostname': hostname}
         
         # Use unified validation service
-        from models.validation import ValidationService
+        from jobs.services.validate import ValidationService
         validation_service = ValidationService()
         result = validation_service.validate_ssh_source(ssh_config)
         return JSONResponse(content=result)
@@ -1454,7 +1454,7 @@ class ValidationHandlers(BaseHandler):
                 'error_message': 'Repository URI not configured'
             })
             
-        from models.backup import backup_service
+        from jobs.services.backup import backup_service
         check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
         
         if check_success:
@@ -1491,7 +1491,7 @@ class ValidationHandlers(BaseHandler):
 
     def _validate_individual_paths(self, source_type: str, source_paths: List[Dict[str, Any]], ssh_config: Dict[str, str]) -> List[Dict[str, Any]]:
         """Validate each individual source path"""
-        from models.validation import ValidationService
+        from jobs.services.validate import ValidationService
         validation_service = ValidationService()
         
         validation_results = []
@@ -1558,7 +1558,7 @@ class ValidationHandlers(BaseHandler):
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
-        from models.backup import backup_service
+        from jobs.services.backup import backup_service
         result = backup_service.unlock_repository(dest_config, source_config)
         
         if result.get('success'):
