@@ -215,7 +215,7 @@ async def show_ssh_origins():
 async def add_ssh_origin(request: Request):
     """Add new SSH origin"""
     form_data = dict(await request.form())
-    return services.handlers['post_pages'].add_ssh_origin(form_data)
+    return origins_handler.add_ssh_origin(form_data)
 
 
 @app.post("/ssh/save")

@@ -841,42 +841,6 @@ class POSTHandlers(BaseHandler):
         
         return origin_config
     
-    @handle_page_errors("Add SSH origin")
-    def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new SSH origin"""
-        from models.forms import origin_parser
-        
-        
-        # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        
-        # Check if origin already exists
-        existing_origins = self.backup_config.get_ssh_origins()
-        if origin_name in existing_origins:
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Origin "{origin_name}" already exists'
-            }, status_code=400)
-        
-        # Save origin with capabilities from form parser (including any detected values)
-        success = self.backup_config.save_origin(origin_name, origin_config)
-        
-        if success:
-            return RedirectResponse(url='/ssh', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': f"Failed to save origin '{origin_name}'"
-            }, status_code=500)
-    
     def _get_recent_validation_results(self, hostname: str, username: str) -> dict:
         """Get capabilities from recent SSH validation session for this host/user"""
         if not hasattr(self, '_ssh_sessions'):
