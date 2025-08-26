@@ -243,13 +243,9 @@ async def delete_ssh_origin(origin_name: str):
 async def validate_ssh_origin(request: Request):
     """Validate SSH origin configuration"""
     form_data = dict(await request.form())
-    return services.handlers['validation_pages'].validate_ssh_origin(form_data)
+    return origins_handler.validate_ssh_origin(form_data)
 
 
-@app.get("/ssh/progress/{session_id}")
-async def get_ssh_progress(session_id: str):
-    """Get SSH validation progress for a session"""
-    return services.handlers['validation_pages'].get_ssh_progress(session_id)
 
 
 # SSH Origin HTMX Partials

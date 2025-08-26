@@ -230,5 +230,48 @@ class OriginsHandler(BaseHandler):
         result = validation_service.validate_ssh_source(ssh_config)
         return JSONResponse(content=result)
 
+    @handle_page_errors("SSH origin validation")
+    def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Push keys and validate SSH origin configuration - simplified synchronous version"""
+        from models.forms import origin_parser
+        
+        # Parse origin form data (no password required for save operations)
+        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
+        if not origin_result['valid']:
+            return JSONResponse(content=origin_result)
+        
+        origin_config = origin_result['origin_config']
+        edit_mode = 'original_origin_name' in form_data and form_data['original_origin_name']
+        
+        # Extract connection details
+        hostname = origin_config['ssh_hostname']
+        username = origin_config['ssh_username']  
+        password = form_data.get('ssh_password', '')
+        ssh_highball = form_data.get('ssh_highball') == 'on'
+        
+        # Require password when Highball checkbox is checked
+        if ssh_highball and not password:
+            return self._render_html('partials/ssh_validation_result.html', {
+                'success': False,
+                'edit_mode': edit_mode,
+                'validation_message': 'Password is required when "Auto-populate keys using Highball" is checked.'
+            })
+        
+        use_password = ssh_highball and password
+        
+        # Run validation synchronously (simpler and more reliable)
+        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
+        result['edit_mode'] = edit_mode
+        
+        return self._render_html('partials/ssh_validation_result.html', result)
+    
+    def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Complete workflow: push keys → validate connection → detect capabilities"""
+        # Initialize SSH workflow service
+        from services.execution import SSHWorkflowService
+        ssh_service = SSHWorkflowService()
+        # Delegate to SSH service - this is pure business logic
+        return ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
+
 # Global handler instance
 origins_handler = OriginsHandler()

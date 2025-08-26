@@ -683,124 +683,12 @@ class ValidationHandlers(BaseHandler):
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
-        # Initialize SSH workflow service
-        from services.execution import SSHWorkflowService
-        self.ssh_service = SSHWorkflowService()
         # Initialize destination validation handler
         from handlers.forms import DestinationValidationHandler
         self.destination_validator = DestinationValidationHandler()
         # ResponseUtils removed - all methods now return FastAPI responses directly
     
     # CGI utility methods removed - all handlers now return FastAPI responses directly
-    
-    
-    @handle_page_errors("SSH origin validation")
-    def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Push keys and validate SSH origin configuration - main workflow orchestrator"""
-        from models.forms import origin_parser
-        
-        # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content=origin_result)
-        
-        origin_config = origin_result['origin_config']
-        edit_mode = 'original_origin_name' in form_data and form_data['original_origin_name']
-        
-        # Extract connection details
-        hostname = origin_config['ssh_hostname']
-        username = origin_config['ssh_username']  
-        password = form_data.get('ssh_password', '')
-        ssh_highball = form_data.get('ssh_highball') == 'on'
-        
-        # Require password when Highball checkbox is checked
-        if ssh_highball and not password:
-            return self._render_html('partials/ssh_validation_result.html', {
-                'success': False,
-                'edit_mode': edit_mode,
-                'validation_message': 'Password is required when "Auto-populate keys using Highball" is checked.'
-            })
-        
-        use_password = ssh_highball and password
-        
-        # Return immediate progress template, start workflow in background
-        import uuid
-        import threading
-        
-        # Generate session ID
-        session_id = str(uuid.uuid4())
-        
-        # Store session data
-        if not hasattr(self, '_ssh_sessions'):
-            self._ssh_sessions = {}
-        
-        self._ssh_sessions[session_id] = {
-            'progress': ['• Starting SSH validation workflow...'],
-            'completed': False,
-            'success': None,
-            'result': None,
-            'edit_mode': edit_mode
-        }
-        
-        # Start background workflow
-        def run_workflow():
-            result = self._push_keys_and_validate_workflow_with_session(session_id, hostname, username, password, use_password)
-            self._ssh_sessions[session_id]['completed'] = True
-            self._ssh_sessions[session_id]['result'] = result
-        
-        threading.Thread(target=run_workflow, daemon=True).start()
-        
-        # Return initial progress template
-        return self._render_html('partials/ssh_validation_progress.html', {
-            'session_id': session_id,
-            'initial_message': "Starting SSH validation workflow..."
-        })
-    
-    @handle_page_errors("SSH progress polling")
-    def get_ssh_progress(self, session_id: str) -> HTMLResponse:
-        """Get current SSH validation progress for a session"""
-        if not hasattr(self, '_ssh_sessions') or session_id not in self._ssh_sessions:
-            return self._render_html('partials/ssh_validation_result.html', {
-                'success': False,
-                'validation_message': "Session not found or expired"
-            })
-        
-        session = self._ssh_sessions[session_id]
-        progress_text = '\n'.join(session['progress'])
-        
-        if not session['completed']:
-            # Still in progress - return progress template with polling
-            return self._render_html('partials/ssh_validation_progress.html', {
-                'session_id': session_id,
-                'initial_message': progress_text
-            })
-        else:
-            # Completed - return final result and clean up session
-            result = session['result']
-            result['edit_mode'] = session['edit_mode']
-            # Clean up session data
-            del self._ssh_sessions[session_id]
-            return self._render_html('partials/ssh_validation_result.html', result)
-    
-    def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow: push keys → validate connection → detect capabilities"""
-        # Delegate to SSH service - this is pure business logic
-        return self.ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
-    
-    @handle_page_errors("SSH workflow with session tracking")
-    def _push_keys_and_validate_workflow_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow with session progress tracking"""
-        # Delegate to SSH service - this handles all the business logic
-        result = self.ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
-        
-        # Update session progress with service result
-        if hasattr(self, '_ssh_sessions') and session_id in self._ssh_sessions:
-            # Split the service's validation message into progress steps
-            if result.get('validation_message'):
-                progress_lines = result['validation_message'].split('\n')
-                self._ssh_sessions[session_id]['progress'].extend(progress_lines)
-        
-        return result
     
     
     @handle_page_errors("Toggle SSH auth method")
