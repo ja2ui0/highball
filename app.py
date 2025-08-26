@@ -19,6 +19,7 @@ from handlers.forms import FormsHandler
 from jobs.services.scheduler import JobSchedulerHandler
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
+from jobs.handlers.pages import jobs_handler
 
 # Services
 from services.template import TemplateService
@@ -199,7 +200,7 @@ async def show_dev_logs(type: str = Query("app")):
 @app.get("/inspect", response_class=HTMLResponse)
 async def show_job_inspect(name: str = Query("")):
     """Job inspection page"""
-    return services.handlers['get_pages'].show_job_inspect(name)
+    return jobs_handler.show_job_inspect(name)
 
 
 # =============================================================================

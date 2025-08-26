@@ -390,44 +390,6 @@ class GETHandlers(BaseHandler):
     
     # CGI error method removed - all page handlers now return FastAPI responses directly
 
-    @handle_page_errors("Job inspection")
-    def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
-        """Show job inspection page"""
-        if not job_name:
-            return self._render_error('partials/error_page.html', {
-                'error_message': "Job name is required", 
-                'page_title': "Error"
-            }, 400)
-        
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            return self._render_error('partials/error_page.html', {
-                'error_message': f"Job '{job_name}' not found", 
-                'page_title': "Error"
-            }, 404)
-        
-        job_config = jobs[job_name]
-        
-        # Get job status and logs
-        from services.management import JobManagementService
-        job_management = JobManagementService(self.backup_config)
-        status_info = job_management.get_status(job_name)
-        recent_logs = job_management.get_log_entries(job_name, max_lines=100)
-        
-        # Format log content as string
-        job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
-        
-        template_data = {
-            'job_name': job_name,
-            'job_type': job_config.get('dest_type', 'unknown'),
-            'last_run': status_info.get('last_updated', 'Never'), 
-            'status': status_info.get('status', 'No runs'),
-            'message': status_info.get('details', 'No message'),
-            'job_log_content': job_log_content
-        }
-        
-        return self._render_html('pages/job_inspect.html', template_data)
-
     @handle_page_errors("Dev logs")
     def show_dev_logs(self, log_type: str = 'app') -> HTMLResponse:
         """Show development/debug logs page"""
