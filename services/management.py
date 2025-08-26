@@ -449,3 +449,51 @@ class JobManagementService:
         finally:
             # Unregister running job
             self.unregister_running_job(job_name)
+
+
+# =============================================================================
+# **SYSTEM LOGGING CONCERN** - System log retrieval from various sources
+# =============================================================================
+
+class SystemLoggingService:
+    """System logging functionality - ONLY handles system log retrieval"""
+    
+    def get_system_logs(self, log_type: str) -> List[str]:
+        """Get system logs by type"""
+        import os
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            if log_type == 'app':
+                # Application logs from docker
+                import subprocess
+                result = subprocess.run(['docker', 'logs', '--tail', '100', 'highball'], 
+                                      capture_output=True, text=True, timeout=10)
+                return result.stdout.split('\n') if result.returncode == 0 else ['Log retrieval failed']
+            
+            elif log_type == 'system':
+                # System logs
+                log_files = ['/var/log/syslog', '/var/log/messages']
+                for log_file in log_files:
+                    if os.path.exists(log_file):
+                        with open(log_file, 'r') as f:
+                            lines = f.readlines()
+                        return lines[-100:]  # Last 100 lines
+                return ['No system logs found']
+            
+            elif log_type in ['job_status', 'validation', 'running_jobs', 'deleted_jobs']:
+                # Highball operational logs
+                log_file = f'/var/log/highball/{log_type}.yaml'
+                if os.path.exists(log_file):
+                    with open(log_file, 'r') as f:
+                        content = f.read()
+                    return [content] if content.strip() else ['Empty log file']
+                return ['Log file not found']
+            
+            else:
+                return ['Unknown log type']
+                
+        except Exception as e:
+            logger.error(f"Get logs error: {e}")
+            return [f'Error retrieving logs: {str(e)}']
