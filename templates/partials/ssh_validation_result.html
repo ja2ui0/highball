@@ -15,6 +15,9 @@
     {% endif %}
 </div>
 
+<!-- Stop the polling by removing the polling element -->
+<div hx-swap-oob="delete:#ssh-progress-poller"></div>
+
 <!-- Update the existing form fields with validation results -->
 <script>
     // Update the hidden form fields with detected capabilities
@@ -26,4 +29,7 @@
     <strong>✗ Connection failed</strong><br>
     <div class="code-container">{{ validation_message or error_message or 'Unknown error' }}</div>
 </div>
+
+<!-- Stop the polling by removing the polling element -->
+<div hx-swap-oob="delete:#ssh-progress-poller"></div>
 {% endif %}

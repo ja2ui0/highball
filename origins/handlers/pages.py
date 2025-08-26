@@ -232,8 +232,12 @@ class OriginsHandler(BaseHandler):
 
     @handle_page_errors("SSH origin validation")
     def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Push keys and validate SSH origin configuration - simplified synchronous version"""
+        """Push keys and validate SSH origin configuration with persistent session tracking"""
         from models.forms import origin_parser
+        import uuid
+        import threading
+        import json
+        import os
         
         # Parse origin form data (no password required for save operations)
         origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
@@ -259,11 +263,98 @@ class OriginsHandler(BaseHandler):
         
         use_password = ssh_highball and password
         
-        # Run validation synchronously (simpler and more reliable)
-        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
-        result['edit_mode'] = edit_mode
+        # Generate session ID and create persistent session file
+        session_id = str(uuid.uuid4())
+        session_dir = '/tmp/ssh_validation_sessions'
+        os.makedirs(session_dir, exist_ok=True)
+        session_file = f"{session_dir}/{session_id}.json"
         
-        return self._render_html('partials/ssh_validation_result.html', result)
+        # Initialize session data
+        session_data = {
+            'progress': ['• Starting SSH validation workflow...'],
+            'completed': False,
+            'success': None,
+            'result': None,
+            'edit_mode': edit_mode
+        }
+        
+        with open(session_file, 'w') as f:
+            json.dump(session_data, f)
+        
+        # Start background workflow
+        def run_workflow():
+            try:
+                result = self._push_keys_and_validate_workflow_with_session(session_id, hostname, username, password, use_password)
+                # Update session with completion
+                session_data['completed'] = True
+                session_data['result'] = result
+                with open(session_file, 'w') as f:
+                    json.dump(session_data, f)
+            except Exception as e:
+                # Handle workflow errors
+                error_result = {
+                    'success': False,
+                    'validation_message': f'Validation failed: {str(e)}'
+                }
+                session_data['completed'] = True
+                session_data['result'] = error_result
+                with open(session_file, 'w') as f:
+                    json.dump(session_data, f)
+        
+        threading.Thread(target=run_workflow, daemon=True).start()
+        
+        # Return initial progress template
+        return self._render_html('partials/ssh_validation_progress.html', {
+            'session_id': session_id,
+            'initial_message': "Starting SSH validation workflow..."
+        })
+    
+    @handle_page_errors("SSH progress polling")
+    def get_ssh_progress(self, session_id: str) -> HTMLResponse:
+        """Get current SSH validation progress for a session using persistent storage"""
+        import json
+        import os
+        
+        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+        
+        if not os.path.exists(session_file):
+            return self._render_html('partials/ssh_validation_result.html', {
+                'success': False,
+                'validation_message': "Session not found or expired"
+            })
+        
+        try:
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return self._render_html('partials/ssh_validation_result.html', {
+                'success': False,
+                'validation_message': "Session data corrupted"
+            })
+        
+        progress_text = '\n'.join(session_data['progress'])
+        
+        if not session_data['completed']:
+            # Still in progress - return progress template with polling
+            return self._render_html('partials/ssh_validation_progress.html', {
+                'session_id': session_id,
+                'initial_message': progress_text
+            })
+        else:
+            # Completed - return final result and schedule cleanup
+            result = session_data['result']
+            result['edit_mode'] = session_data['edit_mode']
+            # Schedule cleanup after a delay to prevent race conditions
+            import threading
+            def delayed_cleanup():
+                import time
+                time.sleep(5)  # Wait 5 seconds before cleanup
+                try:
+                    os.remove(session_file)
+                except OSError:
+                    pass  # Ignore cleanup errors
+            threading.Thread(target=delayed_cleanup, daemon=True).start()
+            return self._render_html('partials/ssh_validation_result.html', result)
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
@@ -272,6 +363,37 @@ class OriginsHandler(BaseHandler):
         ssh_service = SSHWorkflowService()
         # Delegate to SSH service - this is pure business logic
         return ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
+    
+    def _push_keys_and_validate_workflow_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Complete workflow with session progress tracking using persistent storage"""
+        import json
+        import os
+        
+        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+        
+        # Get the result from the SSH service
+        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
+        
+        # Update session progress with service result
+        if os.path.exists(session_file):
+            try:
+                with open(session_file, 'r') as f:
+                    session_data = json.load(f)
+                
+                # Split the service's validation message into progress steps
+                if result.get('validation_message'):
+                    progress_lines = result['validation_message'].split('\n')
+                    session_data['progress'] = progress_lines
+                else:
+                    session_data['progress'].append('• SSH validation completed')
+                
+                # Save updated progress
+                with open(session_file, 'w') as f:
+                    json.dump(session_data, f)
+            except (json.JSONDecodeError, IOError):
+                pass  # Ignore session update errors
+        
+        return result
 
 # Global handler instance
 origins_handler = OriginsHandler()

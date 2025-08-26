@@ -5,7 +5,8 @@
 <div hx-swap-oob="true" id="save-origin-btn">
     <button type="submit" class="button button-success" id="save-origin-btn" disabled>Save Origin</button>
 </div>
-<div hx-get="/ssh/progress/{{ session_id }}" 
+<div id="ssh-progress-poller"
+     hx-get="/ssh/progress/{{ session_id }}" 
      hx-trigger="load delay:500ms, every 1s" 
      hx-target="#ssh-validation-container" 
      hx-swap="outerHTML"></div>
