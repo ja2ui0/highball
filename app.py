@@ -281,7 +281,7 @@ async def add_destination(request: Request):
 async def save_destination(request: Request):
     """Save destination changes"""
     form_data = dict(await request.form())
-    return services.handlers['post_pages'].save_destination(form_data)
+    return destinations_handler.save_destination(form_data)
 
 
 @app.post("/dests/delete")
