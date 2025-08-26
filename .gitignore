@@ -136,3 +136,4 @@ config/config.yaml
 #REFACTOR.md
 Dockerfile.*
 LOCAL/
+.obsidian/*
