@@ -318,7 +318,7 @@ async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
 @app.get("/validate-ssh")
 async def validate_ssh_source(source: str = Query("")):
     """Validate SSH source configuration"""
-    return services.handlers['validation_pages'].validate_ssh_source(source)
+    return origins_handler.validate_ssh_source(source)
 
 
 @app.get("/validate-restic")
@@ -471,7 +471,7 @@ async def validate_source_paths(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['validation_pages'].validate_source_paths(form_data)
+    return jobs_handler.validate_source_paths(form_data)
 
 
 @app.post("/initialize-restic-repo")
