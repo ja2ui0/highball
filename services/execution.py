@@ -524,7 +524,12 @@ class SSHWorkflowService:
             
             # Step 5: Test final connection and detect capabilities
             progress_messages.append("• Testing final connection and detecting capabilities...")
-            final_test = self._test_connection_and_capabilities(hostname, username)
+            
+            # Create progress callback for detailed capability detection
+            def log_capability_progress(message):
+                progress_messages.append(message)
+            
+            final_test = self._test_connection_and_capabilities(hostname, username, log_capability_progress)
             if not final_test['success']:
                 progress_messages.append(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
                 return {
