@@ -573,6 +573,9 @@ class POSTHandlers(BaseHandler):
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+        # Initialize form processing handler
+        from handlers.forms import FormProcessingHandler
+        self.form_processor = FormProcessingHandler(backup_config)
         # ResponseUtils removed - all methods now return FastAPI responses directly
     
     def _send_job_form_error(self, request_handler, form_data: Dict[str, Any], error_message: str):
@@ -1071,118 +1074,8 @@ class POSTHandlers(BaseHandler):
     
     @handle_page_errors("Add destination")
     def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new destination"""
-        
-        # Extract basic destination info
-        dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
-        friendly_name = self._get_form_value(form_data, 'friendly_name', '').strip()
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        hostname = self._get_form_value(form_data, 'hostname', '').strip()
-        port = self._get_form_value(form_data, 'port', '')
-        
-        # Validation
-        if not dest_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination name is required'
-            }, status_code=400)
-            
-        if not dest_type:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination type is required'
-            }, status_code=400)
-        
-        # Check if destination already exists
-        existing_destinations = self.backup_config.get_destinations()
-        if dest_name in existing_destinations:
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Destination "{dest_name}" already exists'
-            }, status_code=400)
-        
-        # Build nested destination config following example pattern
-        dest_config = {
-            'type': dest_type,
-            'uri': '',  # Will be generated
-            'hostname': hostname,
-            'port': int(port) if port else self._get_default_port(dest_type),
-            'friendly_name': friendly_name or dest_name
-        }
-        
-        # Add type-specific nested sections
-        if dest_type == 'rsync':
-            username = self._get_form_value(form_data, 'username', '').strip()
-            path = self._get_form_value(form_data, 'path', '').strip()
-            
-            if not username or not path:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Username and path are required for rsync destinations'
-                }, status_code=400)
-            
-            dest_config['rsync'] = {
-                'username': username,
-                'path': path
-            }
-            
-        elif dest_type == 'rsyncd':
-            share = self._get_form_value(form_data, 'share', '').strip()
-            
-            if not share:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Share is required for rsyncd destinations'
-                }, status_code=400)
-            
-            rsyncd_config = {'share': share}
-            
-            # Optional fields
-            username = self._get_form_value(form_data, 'username', '').strip()
-            password = self._get_form_value(form_data, 'password', '').strip()
-            if username:
-                rsyncd_config['username'] = username
-            if password:
-                rsyncd_config['password'] = password
-                
-            dest_config['rsyncd'] = rsyncd_config
-            
-        elif dest_type == 'restic':
-            repo_type = self._get_form_value(form_data, 'repo_type', '')
-            password = self._get_form_value(form_data, 'password', '')
-            
-            if not repo_type or not password:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Repository type and password are required for restic destinations'
-                }, status_code=400)
-            
-            dest_config['restic'] = {
-                'type': repo_type,
-                'password': password
-            }
-            
-            # Add repo type-specific nested config
-            if repo_type == 'rest':
-                rest_config = {}
-                # Add REST-specific fields as they're implemented
-                dest_config['restic']['rest'] = rest_config
-            # Other restic types can be added similarly
-        
-        # Generate URI using the nested structure
-        flat_data = self._flatten_dest_config_for_uri(dest_config)
-        dest_config['uri'] = self._build_destination_uri(flat_data)
-        
-        # Save destination
-        success = self.backup_config.save_destination(dest_name, dest_config)
-        
-        if success:
-            return RedirectResponse(url='/dests', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': f"Failed to save destination '{dest_name}'"
-            }, status_code=500)
+        """Add new destination - delegate to form processor"""
+        return self.form_processor.add_destination(form_data)
     
     @handle_page_errors("Save destination")
     def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
