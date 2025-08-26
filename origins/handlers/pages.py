@@ -117,6 +117,7 @@ class OriginsHandler(BaseHandler):
         
         return self._render_html('partials/ssh_origin_form.html', form_data)
 
+    @handle_page_errors("Delete SSH origin")
     def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
         """Delete SSH origin"""
         
@@ -136,6 +137,7 @@ class OriginsHandler(BaseHandler):
                 'error': f"Failed to delete origin '{origin_name}'"
             }, status_code=500)
 
+    @handle_page_errors("Add SSH origin")
     def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new SSH origin"""
         from models.forms import origin_parser
