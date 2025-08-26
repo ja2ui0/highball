@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Specialized Handlers
-from handlers.pages import GETHandlers, POSTHandlers, ValidationHandlers
+# God object handlers eliminated - functionality moved to domain-specific pillars
 from handlers.operations import OperationsHandler
 from handlers.api import APIHandler
 from handlers.forms import FormsHandler
@@ -20,6 +20,7 @@ from jobs.services.scheduler import JobSchedulerHandler
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
 from jobs.handlers.pages import jobs_handler
+from admin.handlers.pages import admin_handler
 
 # Services
 from services.template import TemplateService
@@ -66,9 +67,6 @@ class HighballServices:
 
         # Initialize handlers
         self.handlers = {
-            'get_pages': GETHandlers(self.backup_config, self.template_service, self.job_form_builder),
-            'post_pages': POSTHandlers(self.backup_config, self.template_service, self.job_form_builder),
-            'validation_pages': ValidationHandlers(self.backup_config, self.template_service, self.job_form_builder),
             'operations': OperationsHandler(self.backup_config, self.template_service),
             'api': APIHandler(self.backup_config, self.template_service),
             'forms': FormsHandler(self.backup_config, self.template_service),
@@ -170,31 +168,31 @@ async def show_dashboard():
 @app.get("/add-job", response_class=HTMLResponse)
 async def show_add_job_form():
     """Add new backup job form"""
-    return services.handlers['get_pages'].show_add_job_form()
+    return jobs_handler.show_add_job_form()
 
 
 @app.get("/edit-job", response_class=HTMLResponse)
 async def show_edit_job_form(name: str = Query("")):
     """Edit existing backup job form"""
-    return services.handlers['get_pages'].show_edit_job_form(name)
+    return jobs_handler.show_edit_job_form(name)
 
 
 @app.get("/config", response_class=HTMLResponse)
 async def show_config_manager():
     """Configuration manager page"""
-    return services.handlers['get_pages'].show_config_manager()
+    return admin_handler.show_config_manager()
 
 
 @app.get("/config/raw", response_class=HTMLResponse)
 async def show_raw_editor():
     """Raw YAML configuration editor"""
-    return services.handlers['get_pages'].show_raw_editor()
+    return admin_handler.show_raw_editor()
 
 
 @app.get("/dev", response_class=HTMLResponse)
 async def show_dev_logs(type: str = Query("app")):
     """Development logs and debugging"""
-    return services.handlers['get_pages'].show_dev_logs(type)
+    return admin_handler.show_dev_logs(type)
 
 
 @app.get("/inspect", response_class=HTMLResponse)
@@ -499,7 +497,7 @@ async def preview_config_changes(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['post_pages'].preview_config_changes(form_data)
+    return admin_handler.preview_config_changes(form_data)
 
 
 @app.post("/save-config")
@@ -514,7 +512,7 @@ async def save_config(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['post_pages'].save_structured_config(form_data)
+    return admin_handler.save_structured_config(form_data)
 
 
 @app.post("/save-config/raw")
@@ -529,7 +527,7 @@ async def save_raw_config(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['post_pages'].save_raw_config(form_data)
+    return admin_handler.save_raw_config(form_data)
 
 
 @app.post("/schedule-job")

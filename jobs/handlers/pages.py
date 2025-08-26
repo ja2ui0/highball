@@ -203,6 +203,101 @@ class JobsHandler(BaseHandler):
         
         return f"{dest_type}: Unknown configuration"
 
+    @handle_page_errors("Add job form")
+    def show_add_job_form(self) -> HTMLResponse:
+        """Show add job form"""
+        from services.data_services import JobFormDataBuilder, DestinationTypeService
+        job_form_builder = JobFormDataBuilder()
+        
+        form_data = job_form_builder.build_empty_form_data()
+        form_data['page_title'] = 'Add Job'
+        form_data['form_title'] = 'Add New Backup Job'
+        form_data['submit_button_text'] = 'Create Job'
+        
+        # Add available destination types
+        destination_service = DestinationTypeService()
+        form_data['available_destination_types'] = destination_service.get_available_destination_types()
+        
+        # Add notification configuration
+        form_data.update(self._build_notification_form_data([]))
+        
+        # Add schedule configuration
+        form_data.update(self._build_schedule_form_data({}))
+        
+        return self._render_html('pages/job_form.html', form_data)
+
+    @handle_page_errors("Edit job form")
+    def show_edit_job_form(self, job_name: str) -> HTMLResponse:
+        """Show edit job form"""
+        from services.data_services import JobFormDataBuilder, DestinationTypeService, JobFormTemplateBuilder
+        job_form_builder = JobFormDataBuilder()
+        
+        if not job_name:
+            return self._render_error('partials/error_page.html', {
+                'error_message': "Job name is required", 
+                'page_title': "Error"
+            }, 400)
+        
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self._render_error('partials/error_page.html', {
+                'error_message': f"Job '{job_name}' not found", 
+                'page_title': "Error"
+            }, 404)
+        
+        job_config = jobs[job_name]
+        form_data = job_form_builder.build_form_data_from_job(job_name, job_config)
+        form_data['page_title'] = f'Edit Job: {job_name}'
+        form_data['form_title'] = f'Edit Backup Job: {job_name}'
+        form_data['submit_button_text'] = 'Commit Changes'
+        form_data['form_has_changes'] = False  # Initially no changes
+        
+        # Store original config for change detection (as JSON string)
+        import json
+        form_data['original_job_config'] = json.dumps(job_config, sort_keys=True)
+        
+        # Add available destination types (could be context-aware based on source)
+        source_config = job_config.get('source_config', {})
+        destination_service = DestinationTypeService()
+        form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
+        
+        # Pre-select source and destination types for edit mode
+        source_type = job_config.get('source_type', 'local')
+        form_data['selected_source_type'] = source_type
+        form_data['source_local_selected'] = (source_type == 'local')
+        form_data['source_ssh_selected'] = (source_type == 'ssh')
+        form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
+        
+        # Build source fields HTML using template builder
+        template_builder = JobFormTemplateBuilder(self.template_service)
+        form_data['source_fields_html'] = template_builder.build_source_fields_html(source_type, source_config)
+        
+        # Build destination fields HTML using template builder
+        dest_type = job_config.get('dest_type', 'local')
+        dest_config = job_config.get('dest_config', {})
+        form_data['dest_fields_html'] = template_builder.build_destination_fields_html(dest_type, dest_config, form_data)
+        
+        # Add notification configuration
+        existing_notifications = job_config.get('notifications', [])
+        form_data.update(self._build_notification_form_data(existing_notifications))
+        
+        # Add schedule configuration
+        form_data.update(self._build_schedule_form_data(job_config))
+        
+        return self._render_html('pages/job_form.html', form_data)
+
+    def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Build notification form data structure (delegated to service)"""
+        from services.data_services import NotificationFormDataBuilder
+        builder = NotificationFormDataBuilder(self.backup_config)
+        return builder.build_notification_context(existing_notifications)
+        
+    def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build schedule form data structure (delegated to service)"""
+        from services.data_services import ScheduleFormDataBuilder
+        builder = ScheduleFormDataBuilder()
+        return builder.build_schedule_context(job_config)
+
     @handle_page_errors("Job inspect")
     def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
         """Show job inspection page"""
