@@ -301,7 +301,7 @@ async def validate_destination(request: Request):
 async def destination_type_fields(request: Request):
     """Load destination type-specific fields (HTMX partial)"""
     form_data = dict(await request.form())
-    return services.handlers['validation_pages'].destination_type_fields(form_data)
+    return destinations_handler.destination_type_fields(form_data)
 
 
 # =============================================================================

@@ -242,5 +242,21 @@ class DestinationsHandler(BaseHandler):
         
         return self._render_html('partials/destination_validation_result.html', template_context)
 
+    @handle_page_errors("Destination type fields")
+    def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
+        """Load destination type-specific fields (HTMX partial)"""
+        dest_type = self._get_form_value(form_data, 'dest_type', '')
+        
+        if dest_type == 'rsync':
+            template = 'partials/dest_rsync_fields.html'
+        elif dest_type == 'rsyncd':
+            template = 'partials/dest_rsyncd_fields.html'
+        elif dest_type == 'restic':
+            template = 'partials/dest_restic_fields.html'
+        else:
+            return HTMLResponse(content='')
+        
+        return self._render_html(template, {})
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

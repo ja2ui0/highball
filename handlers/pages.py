@@ -1019,23 +1019,6 @@ class ValidationHandlers(BaseHandler):
             return value[0] if value else default
         return str(value)
     
-    @handle_page_errors("Destination type fields")
-    def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Load destination type-specific fields (HTMX partial)"""
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        
-        if dest_type == 'rsync':
-            template = 'partials/dest_rsync_fields.html'
-        elif dest_type == 'rsyncd':
-            template = 'partials/dest_rsyncd_fields.html'
-        elif dest_type == 'restic':
-            template = 'partials/dest_restic_fields.html'
-        else:
-            return HTMLResponse(content='')
-        
-        return self._render_html(template, {})
-    
-
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, network_range: str) -> HTMLResponse:
         """Scan network for rsyncd services"""
