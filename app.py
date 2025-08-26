@@ -18,6 +18,7 @@ from handlers.api import APIHandler
 from handlers.forms import FormsHandler
 from jobs.services.scheduler import JobSchedulerHandler
 from origins.handlers.pages import origins_handler
+from dests.handlers.pages import destinations_handler
 
 # Services
 from services.template import TemplateService
@@ -266,7 +267,7 @@ async def toggle_ssh_auth_method(request: Request):
 @app.get("/dests", response_class=HTMLResponse)
 async def show_destinations():
     """Destinations management page"""
-    return services.handlers['get_pages'].show_destinations()
+    return destinations_handler.show_destinations()
 
 
 @app.post("/dests/add")
