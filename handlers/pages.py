@@ -1019,40 +1019,6 @@ class ValidationHandlers(BaseHandler):
             return value[0] if value else default
         return str(value)
     
-    @handle_page_errors("Destination validation")
-    def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Validate destination configuration"""
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        
-        if not dest_type or not hostname:
-            template_context = {
-                'success': False,
-                'validation_message': 'Destination type and hostname are required for validation'
-            }
-        else:
-            # Test basic connectivity based on destination type - delegate to destination validator
-            if dest_type == 'rsync':
-                template_context = self.destination_validator.validate_rsync_destination(form_data)
-            elif dest_type == 'rsyncd':
-                template_context = self.destination_validator.validate_rsyncd_destination(form_data)
-            elif dest_type == 'restic':
-                template_context = self.destination_validator.validate_restic_destination(form_data)
-            else:
-                template_context = {
-                    'success': False,
-                    'validation_message': f'Validation not implemented for destination type: {dest_type}'
-                }
-        
-        # Generate URI preview
-        if template_context.get('success'):
-            from models.forms import DestinationParser
-            uri_result = DestinationParser.build_destination_uri(dest_type, form_data)
-            if uri_result['valid']:
-                template_context['uri_generated'] = uri_result['uri']
-        
-        return self._render_html('partials/destination_validation_result.html', template_context)
-
     @handle_page_errors("Destination type fields")
     def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Load destination type-specific fields (HTMX partial)"""

@@ -294,7 +294,7 @@ async def delete_destination(name: str = Query("")):
 async def validate_destination(request: Request):
     """Validate destination configuration"""
     form_data = dict(await request.form())
-    return services.handlers['validation_pages'].validate_destination(form_data)
+    return destinations_handler.validate_destination(form_data)
 
 # Destination HTMX Partials
 @app.post("/htmx/destination-type-fields")
