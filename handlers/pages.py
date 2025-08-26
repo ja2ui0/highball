@@ -142,50 +142,6 @@ class GETHandlers(BaseHandler):
         return self._render_html('pages/dashboard.html', template_data)
     
     @handle_page_errors("SSH origins")
-    def show_ssh_origins(self) -> HTMLResponse:
-        """Show SSH origins management page"""
-        origins = self.backup_config.get_ssh_origins()
-        global_settings = self.backup_config.get_global_settings()
-        
-        # Build origin display list
-        origin_list = []
-        for origin_name, origin_config in origins.items():
-            # Determine authentication method display
-            auth_method = "Highball SSH Key" if origin_config.get('ssh_highball', True) else "User SSH Key"
-            
-            # Connection info display
-            connection_info = f"{origin_config.get('ssh_username')}@{origin_config.get('ssh_hostname')}:{origin_config.get('ssh_port', 22)}"
-            
-            # Capabilities display
-            capabilities = []
-            if origin_config.get('rsync_available'):
-                capabilities.append("rsync")
-            if origin_config.get('container_runtime'):
-                capabilities.append(origin_config['container_runtime'])
-            capabilities_display = ", ".join(capabilities) if capabilities else "Not detected"
-            
-            origin_display = {
-                'name': origin_name,
-                'friendly_name': origin_config.get('friendly_name', origin_name),
-                'connection_info': connection_info,
-                'auth_method': auth_method,
-                'capabilities': capabilities_display,
-                'config': origin_config
-            }
-            origin_list.append(origin_display)
-        
-        # Sort by friendly name for consistent display
-        origin_list.sort(key=lambda x: x['friendly_name'].lower())
-        
-        template_data = {
-            'origins': origin_list,
-            'global_settings': global_settings,
-            'theme_css_path': '',
-            'page_title': 'SSH Origins'
-        }
-        
-        return self._render_html('pages/ssh_config.html', template_data)
-    
     @handle_page_errors("Edit SSH origin")
     def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
         """Load SSH origin for editing"""

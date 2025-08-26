@@ -17,6 +17,7 @@ from handlers.operations import OperationsHandler
 from handlers.api import APIHandler
 from handlers.forms import FormsHandler
 from jobs.services.scheduler import JobSchedulerHandler
+from origins.handlers.pages import origins_handler
 
 # Services
 from services.template import TemplateService
@@ -207,7 +208,7 @@ async def show_job_inspect(name: str = Query("")):
 @app.get("/ssh", response_class=HTMLResponse)
 async def show_ssh_origins():
     """SSH origins management page"""
-    return services.handlers['get_pages'].show_ssh_origins()
+    return origins_handler.show_ssh_origins()
 
 
 @app.post("/ssh/add")
