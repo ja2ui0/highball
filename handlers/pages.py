@@ -1260,6 +1260,9 @@ class ValidationHandlers(BaseHandler):
         # Initialize SSH workflow service
         from services.execution import SSHWorkflowService
         self.ssh_service = SSHWorkflowService()
+        # Initialize destination validation handler
+        from handlers.forms import DestinationValidationHandler
+        self.destination_validator = DestinationValidationHandler()
         # ResponseUtils removed - all methods now return FastAPI responses directly
     
     # CGI utility methods removed - all handlers now return FastAPI responses directly
@@ -1458,13 +1461,13 @@ class ValidationHandlers(BaseHandler):
                 'validation_message': 'Destination type and hostname are required for validation'
             }
         else:
-            # Test basic connectivity based on destination type
+            # Test basic connectivity based on destination type - delegate to destination validator
             if dest_type == 'rsync':
-                template_context = self._validate_rsync_destination(form_data)
+                template_context = self.destination_validator.validate_rsync_destination(form_data)
             elif dest_type == 'rsyncd':
-                template_context = self._validate_rsyncd_destination(form_data)
+                template_context = self.destination_validator.validate_rsyncd_destination(form_data)
             elif dest_type == 'restic':
-                template_context = self._validate_restic_destination(form_data)
+                template_context = self.destination_validator.validate_restic_destination(form_data)
             else:
                 template_context = {
                     'success': False,
@@ -1479,114 +1482,6 @@ class ValidationHandlers(BaseHandler):
                 template_context['uri_generated'] = uri_result['uri']
         
         return self._render_html('partials/destination_validation_result.html', template_context)
-    
-    def _validate_rsync_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate rsync (SSH) destination"""
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        username = self._get_form_value(form_data, 'username', '')
-        path = self._get_form_value(form_data, 'path', '')
-        port = self._get_form_value(form_data, 'port', '22')
-        
-        if not all([hostname, username, path]):
-            return {
-                'success': False,
-                'validation_message': 'Hostname, username, and path are required for rsync validation'
-            }
-        
-        # Test SSH connectivity (reuse existing SSH validation)
-        ssh_config = {
-            'hostname': hostname,
-            'username': username,
-            'port': int(port) if port.isdigit() else 22
-        }
-        
-        from models.validation import ValidationService
-        validation_service = ValidationService()
-        result = validation_service.validate_ssh_source(ssh_config)
-        
-        if result['valid']:
-            return {
-                'success': True,
-                'validation_message': f"SSH connection successful to {hostname}. Path writability not tested."
-            }
-        else:
-            return {
-                'success': False,
-                'validation_message': f"SSH connection failed: {result.get('error', 'Unknown error')}"
-            }
-    
-    def _validate_rsyncd_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate rsyncd destination"""
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        share = self._get_form_value(form_data, 'share', '')
-        port = self._get_form_value(form_data, 'port', '873')
-        
-        if not all([hostname, share]):
-            return {
-                'success': False,
-                'validation_message': 'Hostname and share are required for rsyncd validation'
-            }
-        
-        # Test rsyncd connectivity
-        import subprocess
-        try:
-            port_num = int(port) if port.isdigit() else 873
-            cmd = ['rsync', '--list-only', f'rsync://{hostname}:{port_num}/{share}']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                return {
-                    'success': True,
-                    'validation_message': f"Rsyncd connection successful to {hostname}:{port_num}/{share}"
-                }
-            else:
-                return {
-                    'success': False,
-                    'validation_message': f"Rsyncd connection failed: {result.stderr.strip() or 'Connection error'}"
-                }
-        except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'validation_message': 'Rsyncd connection timeout'
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'validation_message': f'Rsyncd validation error: {str(e)}'
-            }
-    
-    def _validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate restic destination"""
-        repo_type = self._get_form_value(form_data, 'repo_type', '')
-        password = self._get_form_value(form_data, 'restic_password', '')
-        
-        if not repo_type:
-            return {
-                'success': False,
-                'validation_message': 'Repository type is required for restic validation'
-            }
-        
-        if not password:
-            return {
-                'success': False,
-                'validation_message': 'Repository password is required for restic validation'
-            }
-        
-        # For now, just validate that we can build the URI
-        # Full restic validation would require container execution
-        from models.forms import DestinationParser
-        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
-        
-        if uri_result['valid']:
-            return {
-                'success': True,
-                'validation_message': f"Restic repository URI generated successfully. Full connectivity test requires repository initialization."
-            }
-        else:
-            return {
-                'success': False,
-                'validation_message': f"Restic repository configuration error: {uri_result.get('error', 'Unknown error')}"
-            }
 
     @handle_page_errors("Destination type fields")
     def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
