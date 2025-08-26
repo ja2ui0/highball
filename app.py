@@ -222,7 +222,7 @@ async def add_ssh_origin(request: Request):
 async def save_ssh_origin(request: Request):
     """Save SSH origin changes"""
     form_data = dict(await request.form())
-    return services.handlers['post_pages'].save_ssh_origin(form_data)
+    return origins_handler.save_ssh_origin(form_data)
 
 
 @app.get("/ssh/edit/{origin_name}")

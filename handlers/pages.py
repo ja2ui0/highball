@@ -864,40 +864,6 @@ class POSTHandlers(BaseHandler):
         
         return {}
     
-    @handle_page_errors("Save SSH origin")
-    def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save SSH origin changes"""
-        from models.forms import origin_parser
-        
-        
-        # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
-        
-        # Handle renaming if the origin name changed
-        if original_origin_name and original_origin_name != origin_name:
-            # Delete the old file
-            self.backup_config.delete_origin(original_origin_name)
-        
-        # Save origin with detected capabilities (overwrites existing or creates new)
-        success = self.backup_config.save_origin(origin_name, origin_config)
-        
-        if success:
-            return RedirectResponse(url='/ssh', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': f"Failed to save origin '{origin_name}'"
-            }, status_code=500)
-    
     # =============================================================================
     # DESTINATION MANAGEMENT HANDLERS
     # =============================================================================
