@@ -5,7 +5,7 @@ SSH host management, origin configuration, and capability validation
 
 import logging
 from typing import Dict, Any, Callable
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from services.template import TemplateService
 from config import BackupConfig
@@ -116,6 +116,25 @@ class OriginsHandler(BaseHandler):
         }
         
         return self._render_html('partials/ssh_origin_form.html', form_data)
+
+    def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
+        """Delete SSH origin"""
+        
+        if not origin_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Origin name is required'
+            }, status_code=400)
+        
+        success = self.backup_config.delete_origin(origin_name)
+        
+        if success:
+            return RedirectResponse(url='/ssh', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to delete origin '{origin_name}'"
+            }, status_code=500)
 
 # Global handler instance
 origins_handler = OriginsHandler()

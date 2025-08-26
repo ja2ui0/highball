@@ -934,26 +934,6 @@ class POSTHandlers(BaseHandler):
                 'error': f"Failed to save origin '{origin_name}'"
             }, status_code=500)
     
-    @handle_page_errors("Delete SSH origin")
-    def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
-        """Delete SSH origin"""
-        
-        if not origin_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Origin name is required'
-            }, status_code=400)
-        
-        success = self.backup_config.delete_origin(origin_name)
-        
-        if success:
-            return RedirectResponse(url='/ssh', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': f"Failed to delete origin '{origin_name}'"
-            }, status_code=500)
-    
     # =============================================================================
     # DESTINATION MANAGEMENT HANDLERS
     # =============================================================================

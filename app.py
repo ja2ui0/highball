@@ -234,7 +234,7 @@ async def edit_ssh_origin(origin_name: str):
 @app.delete("/ssh/{origin_name}")
 async def delete_ssh_origin(origin_name: str):
     """Delete SSH origin"""
-    return services.handlers['post_pages'].delete_ssh_origin(origin_name)
+    return origins_handler.delete_ssh_origin(origin_name)
 
 
 @app.post("/ssh/validate")
