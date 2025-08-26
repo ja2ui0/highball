@@ -1285,6 +1285,9 @@ class ValidationHandlers(BaseHandler):
         self.backup_config = backup_config
         self.template_service = template_service
         self.job_form_builder = job_form_builder
+        # Initialize SSH workflow service
+        from services.execution import SSHWorkflowService
+        self.ssh_service = SSHWorkflowService()
         # ResponseUtils removed - all methods now return FastAPI responses directly
     
     # CGI utility methods removed - all handlers now return FastAPI responses directly
@@ -1418,80 +1421,8 @@ class ValidationHandlers(BaseHandler):
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
-        progress_messages = []
-        
-        try:
-            # Step 1: Test initial connection
-            progress_messages.append("• Testing initial SSH connection...")
-            initial_test = self._test_initial_ssh_connection(hostname, username, password, use_password)
-            if not initial_test['success']:
-                progress_messages.append(f"✗ Initial connection failed: {initial_test.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            progress_messages.append("✓ Initial SSH connection successful")
-            
-            # Step 2: Check for existing key in authorized_keys
-            progress_messages.append("• Checking for existing Highball key in authorized_keys...")
-            key_check = self._check_highball_key_in_authorized_keys(hostname, username)
-            
-            # Step 3: Push key if needed
-            if not key_check['key_exists']:
-                progress_messages.append("• Highball key not found, installing...")
-                if not use_password:
-                    progress_messages.append("✗ Password required to install key")
-                    return {
-                        'success': False,
-                        'validation_message': '\n'.join(progress_messages)
-                    }
-                push_result = self._push_highball_key(hostname, username, password)
-                if not push_result['success']:
-                    progress_messages.append(f"✗ Key installation failed: {push_result.get('validation_message', 'Unknown error')}")
-                    return {
-                        'success': False,
-                        'validation_message': '\n'.join(progress_messages)
-                    }
-                progress_messages.append("✓ Highball key installed successfully")
-            else:
-                progress_messages.append("✓ Highball key already present in authorized_keys")
-            
-            # Step 4: Copy keypair to remote host
-            progress_messages.append("• Copying Highball keypair to remote host...")
-            copy_result = self._copy_keypair_to_remote(hostname, username)
-            if not copy_result['success']:
-                progress_messages.append(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            progress_messages.append("✓ Keypair copied successfully")
-            
-            # Step 5: Test final connection and detect capabilities
-            progress_messages.append("• Testing final connection and detecting capabilities...")
-            final_test = self._test_connection_and_capabilities(hostname, username)
-            if not final_test['success']:
-                progress_messages.append(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            
-            progress_messages.append("✓ All steps completed successfully!")
-            
-            return {
-                'success': True,
-                'validation_message': '\n'.join(progress_messages),
-                'rsync_available': final_test.get('rsync_available', False),
-                'container_runtime': final_test.get('container_runtime', None)
-            }
-            
-        except Exception as e:
-            progress_messages.append(f"✗ Workflow failed: {str(e)}")
-            return {
-                'success': False,
-                'validation_message': '\n'.join(progress_messages)
-            }
+        # Delegate to SSH service - this is pure business logic
+        return self.ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
     
     @handle_page_errors("SSH workflow with session tracking")
     def _push_keys_and_validate_workflow_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
