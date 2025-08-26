@@ -17,7 +17,7 @@ from functools import wraps
 # Import dependencies
 from services.execution import OperationType, ResticExecutionService
 from models.builders import ResticArgumentBuilder
-from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
+from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class ResticRepositoryService:
     
     def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
         """Validate required fields exist or raise exception with actionable message"""
-        from models.schemas import DESTINATION_TYPE_SCHEMAS
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
         
         schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
         required_fields = schema.get('required_fields', [])
@@ -933,7 +933,7 @@ class ResticMaintenanceService:
     
     def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
         """Validate required fields exist or raise exception with actionable message"""
-        from models.schemas import DESTINATION_TYPE_SCHEMAS
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
         
         schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
         required_fields = schema.get('required_fields', [])

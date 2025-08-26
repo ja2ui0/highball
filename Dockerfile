@@ -36,6 +36,10 @@ COPY *.py /app/
 COPY handlers/ /app/handlers/
 COPY models/ /app/models/
 COPY services/ /app/services/
+COPY origins/ /app/origins/
+COPY dests/ /app/dests/
+COPY jobs/ /app/jobs/
+COPY admin/ /app/admin/
 COPY templates/ /app/templates/
 COPY static/ /app/static/
 

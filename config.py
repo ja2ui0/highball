@@ -241,7 +241,8 @@ class BackupConfig:
     
     def _get_secret_fields_from_schemas(self, job_config):
         """Discover ALL secret fields from ALL schemas based on job configuration"""
-        from models.schemas import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, SOURCE_TYPE_SCHEMAS
+        from dests.schema import DESTINATION_TYPE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS
+        from origins.schema import SOURCE_TYPE_SCHEMAS
         from models.notifications import PROVIDER_FIELD_SCHEMAS
         
         secret_fields = {}

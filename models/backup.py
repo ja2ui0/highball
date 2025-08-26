@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from services.execution import OperationType
 
 # Import extracted modules
-from models.schemas import SOURCE_PATH_SCHEMA
+from origins.schema import SOURCE_PATH_SCHEMA
 from models.builders import ResticArgumentBuilder
 from services.restic import ResticRunner, ResticRepositoryService, ResticContentAnalyzer, ResticMaintenanceService
 

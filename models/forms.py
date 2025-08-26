@@ -264,7 +264,7 @@ class DestinationParser:
         password = safe_get_value(form_data, 'restic_password')
         
         # Schema-driven validation for required fields
-        from models.schemas import DESTINATION_TYPE_SCHEMAS
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
         schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
         required_fields = schema.get('required_fields', [])
         
@@ -453,7 +453,7 @@ class DestinationParser:
     @staticmethod
     def _store_discrete_fields(config, repo_type, form_data):
         """Store discrete fields for form editing round-trip data integrity using schema"""
-        from models.schemas import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
         
         if repo_type in RESTIC_REPOSITORY_TYPE_SCHEMAS:
             schema = RESTIC_REPOSITORY_TYPE_SCHEMAS[repo_type]
@@ -690,7 +690,7 @@ class JobFormParser:
             return {'valid': False, 'error': 'Source type is required'}
         
         # Schema-driven source parsing
-        from models.schemas import SOURCE_TYPE_SCHEMAS
+        from origins.schema import SOURCE_TYPE_SCHEMAS
         
         if source_type not in SOURCE_TYPE_SCHEMAS:
             return {'valid': False, 'error': f'Unknown source type: {source_type}'}
@@ -726,7 +726,7 @@ class JobFormParser:
             return {'valid': False, 'error': 'Destination type is required'}
         
         # Schema-driven destination parsing
-        from models.schemas import DESTINATION_TYPE_SCHEMAS
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
         
         if dest_type not in DESTINATION_TYPE_SCHEMAS:
             return {'valid': False, 'error': f'Unknown destination type: {dest_type}'}
