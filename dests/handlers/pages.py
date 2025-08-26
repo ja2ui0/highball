@@ -95,5 +95,32 @@ class DestinationsHandler(BaseHandler):
         
         return self._render_html('pages/destinations.html', template_data)
 
+    @handle_page_errors("Delete destination")
+    def delete_destination(self, dest_name: str) -> JSONResponse:
+        """Delete destination"""
+        
+        if not dest_name:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Destination name is required'
+            }, status_code=400)
+        
+        # Delete destination
+        success = self.backup_config.delete_destination(dest_name)
+        
+        if success:
+            return RedirectResponse(url='/dests', status_code=302)
+        else:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Failed to delete destination '{dest_name}'"
+            }, status_code=500)
+
+    def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Add new destination - delegate to form processor"""
+        from handlers.forms import FormProcessingHandler
+        form_processor = FormProcessingHandler(self.backup_config)
+        return form_processor.add_destination(form_data)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

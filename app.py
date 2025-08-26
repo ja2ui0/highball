@@ -274,7 +274,7 @@ async def show_destinations():
 async def add_destination(request: Request):
     """Add new destination"""
     form_data = dict(await request.form())
-    return services.handlers['post_pages'].add_destination(form_data)
+    return destinations_handler.add_destination(form_data)
 
 
 @app.post("/dests/save")
@@ -287,7 +287,7 @@ async def save_destination(request: Request):
 @app.post("/dests/delete")
 async def delete_destination(name: str = Query("")):
     """Delete destination"""
-    return services.handlers['post_pages'].delete_destination(name)
+    return destinations_handler.delete_destination(name)
 
 
 @app.post("/dests/validate")
