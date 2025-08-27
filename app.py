@@ -636,6 +636,11 @@ async def notification_providers_endpoint(request: Request):
     """Render notification providers for job configuration - Jobs pillar"""
     return await jobs_handler.render_notification_providers_htmx(request)
 
+@app.post("/jobs/add-notification-provider")
+async def add_notification_provider_endpoint(request: Request):
+    """Add notification provider to job configuration - Jobs pillar"""
+    return await jobs_handler.add_notification_provider_htmx(request)
+
 @app.post("/destinations/dest-fields")
 async def render_dest_fields_endpoint(request: Request):
     """Render destination-specific form fields - Destinations pillar"""

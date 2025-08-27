@@ -39,7 +39,6 @@ class FormsHandler:
             # Source path management
             
             # Notification management
-            'add-notification-provider': self._add_notification_provider,
             'remove-notification-provider': self._remove_notification_provider,
             'toggle-success-message': self._toggle_success_message,
             'toggle-failure-message': self._toggle_failure_message,
@@ -168,38 +167,6 @@ class FormsHandler:
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling
     # =============================================================================
-    
-    def _add_notification_provider(self, form_data):
-        """Add a new notification provider"""
-        provider_name = form_data.get('provider', [''])[0]
-        if not provider_name:
-            return self._render_error("Invalid provider selection")
-        
-        # Generate unique ID
-        timestamp = int(time.time() * 1000)
-        provider_id = f"notification_{provider_name}_{timestamp}"
-        
-        new_provider_html = self._render_notification_provider({
-            'provider': provider_name,
-            'notify_on_success': False,
-            'notify_on_failure': True,  # Default to True for failures
-            'notify_on_maintenance_failure': False,
-            'success_message': '',
-            'failure_message': ''
-        }, timestamp, provider_id)
-        
-        # Get currently configured providers from form data instead of instance state
-        current_providers = self._get_form_providers(form_data)
-        current_providers.append(provider_name)
-        
-        # Update dropdown with remaining providers
-        available_providers = self._get_enabled_global_providers()
-        self.configured_providers = current_providers  # Update state
-        updated_selection = self._render_provider_selection(available_providers)
-        
-        return self.template_service.render_template('partials/notification_provider_added_response.html',
-                                                   new_provider_html=new_provider_html,
-                                                   updated_selection_html=updated_selection)
     
     def _remove_notification_provider(self, form_data):
         """Remove a notification provider"""

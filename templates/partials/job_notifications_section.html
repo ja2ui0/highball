@@ -9,7 +9,7 @@
             <div id="add_provider_section" class="form-group {{ add_provider_class }}">
                 <label for="add_notification_provider">Add Notification Provider:</label>
                 <select id="add_notification_provider"
-                        hx-post="/htmx/add-notification-provider"
+                        hx-post="/jobs/add-notification-provider"
                         hx-trigger="change[target.value != '']"
                         hx-vals="js:{provider: event.target.value}">
                     <option value="">Select a provider...</option>

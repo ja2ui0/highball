@@ -875,5 +875,65 @@ class JobsHandler(BaseHandler):
         return self.template_service.render_template('partials/provider_selection_dropdown.html',
                                                    available_options=available_options)
 
+    async def add_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Add a new notification provider to job configuration for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        provider_name = get_form_value(form_data, 'provider')
+        if not provider_name:
+            html_response = self.template_service.render_template('partials/error_message.html',
+                                                               message="Invalid provider selection")
+            return HTMLResponse(content=html_response)
+        
+        # Generate unique ID
+        import time
+        timestamp = int(time.time() * 1000)
+        provider_id = f"notification_{provider_name}_{timestamp}"
+        
+        new_provider_html = self._render_notification_provider({
+            'provider': provider_name,
+            'notify_on_success': False,
+            'notify_on_failure': True,  # Default to True for failures
+            'notify_on_maintenance_failure': False,
+            'success_message': '',
+            'failure_message': ''
+        }, timestamp, provider_id)
+        
+        # Get currently configured providers from form data
+        current_providers = self._get_form_providers(form_data)
+        current_providers.append(provider_name)
+        
+        # Update dropdown with remaining providers
+        available_providers = self._get_enabled_global_providers()
+        self.configured_providers = current_providers  # Update state
+        updated_selection = self._render_provider_selection(available_providers)
+        
+        html_response = self.template_service.render_template('partials/notification_provider_added_response.html',
+                                                            new_provider_html=new_provider_html,
+                                                            updated_selection_html=updated_selection)
+        return HTMLResponse(content=html_response)
+
+    def _get_form_providers(self, form_data):
+        """Get currently configured providers from form data"""
+        providers = form_data.get('notification_providers[]', [])
+        # Handle both single string and list formats
+        if isinstance(providers, str):
+            return [providers] if providers else []
+        return [p for p in providers if p]  # Filter out empty strings
+
 # Global handler instance
 jobs_handler = JobsHandler()
