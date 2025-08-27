@@ -444,5 +444,67 @@ class DestinationsHandler(BaseHandler):
         html_response = self.template_service.render_validation_status('ssh_dest', result)
         return HTMLResponse(content=html_response)
 
+    async def validate_restic_htmx(self, request) -> HTMLResponse:
+        """Validate Restic repository configuration for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        # Extract parameters from request using correct field names
+        repo_type = get_form_value(form_data, 'restic_repo_type') or get_form_value(form_data, 'repo_type')
+        password = get_form_value(form_data, 'restic_password')
+        
+        # Schema-driven validation for required fields
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
+        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
+        required_fields = schema.get('required_fields', [])
+        
+        # Map form fields to config keys
+        field_values = {
+            'repo_type': repo_type,
+            'password': password
+        }
+        
+        for field in required_fields:
+            if field in field_values and not field_values[field]:
+                display_name = schema.get('display_name', 'Restic')
+                html_response = self.template_service.render_validation_status('restic', {
+                    'valid': False, 'error': f'{display_name} destination missing {field}'
+                })
+                return HTMLResponse(content=html_response)
+        
+        # Build URI from individual repository fields using existing URI builder
+        from models.forms import DestinationParser
+        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+        
+        if not uri_result.get('valid'):
+            html_response = self.template_service.render_validation_status('restic', {
+                'valid': False, 'error': uri_result.get('error', 'Invalid repository configuration')
+            })
+            return HTMLResponse(content=html_response)
+        
+        repo_uri = uri_result['uri']
+        
+        # Business logic: delegate to validation service
+        from jobs.services.validate import ValidationService
+        validation_service = ValidationService(self.backup_config)
+        result = validation_service.validate_restic_config(repo_type, repo_uri, password)
+        
+        # View: delegate to template service
+        html_response = self.template_service.render_validation_status('restic', result)
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

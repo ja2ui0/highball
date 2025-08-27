@@ -34,7 +34,6 @@ class FormsHandler:
         actions = {
             # Validation actions
             'validate-origin-repo-path': self._validate_origin_repo_path,
-            'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
             
             # Field rendering actions
@@ -191,46 +190,6 @@ class FormsHandler:
                                                     target_text=target_text,
                                                     dry_run=dry_run)
     
-    def _validate_restic(self, form_data):
-        """HTTP coordination: extract params, delegate restic validation, render response"""
-        # HTTP concern: extract parameters from request using correct field names
-        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
-        password = self._get_form_value(form_data, 'restic_password')
-        
-        # Schema-driven validation for required fields
-        from dests.schema import DESTINATION_TYPE_SCHEMAS
-        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
-        required_fields = schema.get('required_fields', [])
-        
-        # Map form fields to config keys
-        field_values = {
-            'repo_type': repo_type,
-            'password': password
-        }
-        
-        for field in required_fields:
-            if field in field_values and not field_values[field]:
-                display_name = schema.get('display_name', 'Restic')
-                return self.template_service.render_validation_status('restic', {
-                    'valid': False, 'error': f'{display_name} destination missing {field}'
-                })
-        
-        # Build URI from individual repository fields using existing URI builder
-        from models.forms import DestinationParser
-        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
-        
-        if not uri_result.get('valid'):
-            return self.template_service.render_validation_status('restic', {
-                'valid': False, 'error': uri_result.get('error', 'Invalid repository configuration')
-            })
-        
-        repo_uri = uri_result['uri']
-        
-        # Business logic concern: delegate to validation service
-        result = self.validation_service.validate_restic_config(repo_type, repo_uri, password)
-        
-        # View concern: delegate to template service
-        return self.template_service.render_validation_status('restic', result)
     
     def _validate_origin_repo_path(self, form_data):
         """Validate same_as_origin repository path with RWX requirements"""
