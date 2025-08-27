@@ -1005,5 +1005,32 @@ class JobsHandler(BaseHandler):
                                                             success_message=success_message)
         return HTMLResponse(content=html_response)
 
+    async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
+        """Toggle failure message field visibility for job notification configuration"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        # Check if checkbox is checked
+        enabled = 'notify_on_failure[]' in form_data
+        failure_message = get_form_value(form_data, 'notification_failure_messages[]')
+        
+        html_response = self.template_service.render_template('partials/notification_failure_message.html',
+                                                            enabled=enabled,
+                                                            failure_message=failure_message)
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 jobs_handler = JobsHandler()

@@ -39,7 +39,6 @@ class FormsHandler:
             # Source path management
             
             # Notification management
-            'toggle-failure-message': self._toggle_failure_message,
             
             # Repository management
             'init-restic-repository': self._init_restic_repository,
@@ -165,15 +164,6 @@ class FormsHandler:
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling
     # =============================================================================
-    
-    def _toggle_failure_message(self, form_data):
-        """Toggle failure message field visibility"""
-        enabled = 'notify_on_failure[]' in form_data
-        failure_message = self._get_form_value(form_data, 'notification_failure_messages[]')
-        
-        return self.template_service.render_template('partials/notification_failure_message.html',
-                                                   enabled=enabled,
-                                                   failure_message=failure_message)
     
     # =============================================================================
     # REPOSITORY MANAGEMENT - Direct operations

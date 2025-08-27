@@ -27,7 +27,7 @@
         <div class="form-group">
             <label>
                 <input type="checkbox" name="notify_on_failure[]" {% if notify_on_failure %}checked{% endif %}
-                       hx-post="/htmx/toggle-failure-message"
+                       hx-post="/jobs/toggle-failure-message"
                        hx-target="next .failure-message-group"
                        hx-trigger="change"
                        hx-swap="outerHTML"> 
