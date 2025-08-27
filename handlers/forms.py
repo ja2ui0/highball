@@ -39,7 +39,6 @@ class FormsHandler:
             'check-restore-overwrites': self._check_restore_overwrites,
             
             # Field rendering actions
-            'restic-fields': self._render_restic_fields,
             
             # Source path management
             
@@ -277,20 +276,6 @@ class FormsHandler:
     # =============================================================================
     # FIELD RENDERING ACTIONS - Inline HTML, no renderer services
     # =============================================================================
-    
-    def _render_restic_fields(self, form_data):
-        """Render Restic repository configuration fields using template"""
-        from services.data_services import ResticRepositoryTypeService
-        
-        repo_service = ResticRepositoryTypeService()
-        available_repository_types = repo_service.get_available_repository_types()
-        
-        return self.template_service.render_template('partials/job_form_dest_restic.html',
-                                                   restic_password='',
-                                                   restic_repo_type='',
-                                                   available_repository_types=available_repository_types,
-                                                   selected_repo_type='',
-                                                   show_wrapper=False)
     
     # =============================================================================
     # SOURCE PATH MANAGEMENT - Direct array manipulation

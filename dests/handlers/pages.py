@@ -359,12 +359,7 @@ class DestinationsHandler(BaseHandler):
         
         # Special handling for restic (has complex sub-types)
         if dest_type == 'restic':
-            # For now, delegate to the existing restic fields handler
-            # TODO: This will be extracted later when we get to restic-fields
-            from handlers.forms import FormsHandler
-            forms_handler = FormsHandler(self.backup_config, self.template_service)
-            html_content = forms_handler._render_restic_fields(form_data)
-            return HTMLResponse(content=html_content)
+            return await self.render_restic_fields_htmx(request)
         
         schema = DESTINATION_TYPE_SCHEMAS[dest_type]
         
@@ -390,6 +385,32 @@ class DestinationsHandler(BaseHandler):
             html_response = self.template_service.render_template('partials/info_message.html',
                                                                message=f'{schema["display_name"]} destination - configuration needed')
             return HTMLResponse(content=html_response)
+
+    async def render_restic_fields_htmx(self, request) -> HTMLResponse:
+        """Render Restic repository configuration fields for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        from services.data_services import ResticRepositoryTypeService
+        
+        repo_service = ResticRepositoryTypeService()
+        available_repository_types = repo_service.get_available_repository_types()
+        
+        html_response = self.template_service.render_template('partials/job_form_dest_restic.html',
+                                                           restic_password='',
+                                                           restic_repo_type='',
+                                                           available_repository_types=available_repository_types,
+                                                           selected_repo_type='',
+                                                           show_wrapper=False)
+        return HTMLResponse(content=html_response)
 
 # Global handler instance
 destinations_handler = DestinationsHandler()

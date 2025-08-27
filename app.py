@@ -645,6 +645,11 @@ async def render_dest_fields_endpoint(request: Request):
     """Render destination-specific form fields - Destinations pillar"""
     return await destinations_handler.render_dest_fields_htmx(request)
 
+@app.post("/destinations/restic-fields")
+async def render_restic_fields_endpoint(request: Request):
+    """Render Restic repository configuration fields - Destinations pillar"""
+    return await destinations_handler.render_restic_fields_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""
