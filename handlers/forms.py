@@ -34,7 +34,6 @@ class FormsHandler:
         actions = {
             # Validation actions
             'validate-ssh-dest': self._validate_ssh_dest,
-            'validate-source-path': self._validate_source_path,
             'validate-origin-repo-path': self._validate_origin_repo_path,
             'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
@@ -211,91 +210,6 @@ class FormsHandler:
                                                     has_overwrites=has_overwrites,
                                                     target_text=target_text,
                                                     dry_run=dry_run)
-    
-    def _validate_source_path(self, form_data):
-        """HTTP coordination: robust path validation with proper user workflow handling"""
-        try:
-            # Extract path from array format
-            path_array = form_data.get('source_path[]', [])
-            path_index = int(self._get_form_value(form_data, 'path_index', '0'))
-            path = path_array[path_index] if path_index < len(path_array) else ''
-            
-            if not path or not path.strip():
-                result = {'valid': False, 'error': 'Please enter a path'}
-                return self.template_service.render_validation_status('source_path', result)
-            
-            # Extract source configuration
-            source_type = self._get_form_value(form_data, 'source_type')
-            hostname = self._get_form_value(form_data, 'hostname')
-            username = self._get_form_value(form_data, 'username')
-            
-            # Validate based on source type (robust handling from working version)
-            if source_type == 'ssh':
-                result = self._check_ssh_path(hostname, username, path)
-            elif source_type == 'local':
-                result = self._check_local_path(path)
-            else:
-                result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
-            
-            return self.template_service.render_validation_status('source_path', result)
-            
-        except Exception as e:
-            result = {'valid': False, 'error': f'Validation error: {str(e)}'}
-            return self.template_service.render_validation_status('source_path', result)
-    
-    def _check_ssh_path(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
-        """Check SSH path permissions with robust RX/RWX analysis (from working version)"""
-        if not hostname or not username:
-            return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
-        
-        try:
-            from services.execution import ExecutionService
-            executor = ExecutionService()
-            
-            # Test RX permissions (required for backup) + write test in one command
-            test_cmd = f'[ -d "{path}" ] && [ -r "{path}" ] && [ -x "{path}" ] && echo "RX_OK" && ([ -w "{path}" ] && echo "W_OK" || echo "W_FAIL") || echo "RX_FAIL"'
-            result = executor.execute_ssh_command(hostname, username, ['bash', '-c', test_cmd])
-            
-            if result.returncode != 0:
-                return {'valid': False, 'error': f'SSH connection failed: {result.stderr}'}
-            
-            output = result.stdout.strip()
-            
-            if 'RX_OK' not in output:
-                return {'valid': False, 'error': f'Path not accessible (missing read/execute permissions or does not exist)'}
-            
-            has_write = 'W_OK' in output
-            if has_write:
-                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
-            else:
-                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
-            
-        except Exception as e:
-            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
-    
-    def _check_local_path(self, path: str) -> Dict[str, Any]:
-        """Check local path permissions with robust RX/RWX analysis (from working version)"""
-        try:
-            import os
-            
-            if not os.path.exists(path):
-                return {'valid': False, 'error': 'Path does not exist'}
-            
-            if not os.path.isdir(path):
-                return {'valid': False, 'error': 'Path is not a directory'}
-            
-            # Check RX permissions
-            if not (os.access(path, os.R_OK) and os.access(path, os.X_OK)):
-                return {'valid': False, 'error': 'Missing read/execute permissions'}
-            
-            has_write = os.access(path, os.W_OK)
-            if has_write:
-                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
-            else:
-                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
-            
-        except Exception as e:
-            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
     
     def _validate_restic(self, form_data):
         """HTTP coordination: extract params, delegate restic validation, render response"""

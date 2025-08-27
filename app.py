@@ -615,6 +615,11 @@ async def validate_ssh_source_endpoint(request: Request):
     """Validate SSH source configuration - Origins pillar"""
     return await origins_handler.validate_ssh_source_htmx(request)
 
+@app.post("/jobs/validate-source-path")
+async def validate_source_path_endpoint(request: Request):
+    """Validate source path with permission checking - Jobs pillar"""
+    return await jobs_handler.validate_source_path_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""

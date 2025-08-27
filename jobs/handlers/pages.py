@@ -602,5 +602,109 @@ class JobsHandler(BaseHandler):
                 'error_message': error_message or 'Unknown error'
             })
 
+    async def validate_source_path_htmx(self, request) -> HTMLResponse:
+        """Validate source path with robust permission checking for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        try:
+            # Extract path from array format
+            path_array = form_data.get('source_path[]', [])
+            path_index = int(get_form_value(form_data, 'path_index', '0'))
+            path = path_array[path_index] if path_index < len(path_array) else ''
+            
+            if not path or not path.strip():
+                result = {'valid': False, 'error': 'Please enter a path'}
+                html_response = self.template_service.render_validation_status('source_path', result)
+                return HTMLResponse(content=html_response)
+            
+            # Extract source configuration
+            source_type = get_form_value(form_data, 'source_type')
+            hostname = get_form_value(form_data, 'hostname')
+            username = get_form_value(form_data, 'username')
+            
+            # Validate based on source type (robust handling from working version)
+            if source_type == 'ssh':
+                result = self._check_ssh_path(hostname, username, path)
+            elif source_type == 'local':
+                result = self._check_local_path(path)
+            else:
+                result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
+            
+            html_response = self.template_service.render_validation_status('source_path', result)
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            result = {'valid': False, 'error': f'Validation error: {str(e)}'}
+            html_response = self.template_service.render_validation_status('source_path', result)
+            return HTMLResponse(content=html_response)
+
+    def _check_ssh_path(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
+        """Check SSH path permissions with robust RX/RWX analysis (from working version)"""
+        if not hostname or not username:
+            return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
+        
+        try:
+            from services.execution import ExecutionService
+            executor = ExecutionService()
+            
+            # Test RX permissions (required for backup) + write test in one command
+            test_cmd = f'[ -d "{path}" ] && [ -r "{path}" ] && [ -x "{path}" ] && echo "RX_OK" && ([ -w "{path}" ] && echo "W_OK" || echo "W_FAIL") || echo "RX_FAIL"'
+            result = executor.execute_ssh_command(hostname, username, ['bash', '-c', test_cmd])
+            
+            if result.returncode != 0:
+                return {'valid': False, 'error': f'SSH connection failed: {result.stderr}'}
+            
+            output = result.stdout.strip()
+            
+            if 'RX_OK' not in output:
+                return {'valid': False, 'error': f'Path not accessible (missing read/execute permissions or does not exist)'}
+            
+            has_write = 'W_OK' in output
+            if has_write:
+                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+            else:
+                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
+    
+    def _check_local_path(self, path: str) -> Dict[str, Any]:
+        """Check local path permissions with robust RX/RWX analysis (from working version)"""
+        try:
+            import os
+            
+            if not os.path.exists(path):
+                return {'valid': False, 'error': 'Path does not exist'}
+            
+            if not os.path.isdir(path):
+                return {'valid': False, 'error': 'Path is not a directory'}
+            
+            # Check RX permissions
+            if not (os.access(path, os.R_OK) and os.access(path, os.X_OK)):
+                return {'valid': False, 'error': 'Missing read/execute permissions'}
+            
+            has_write = os.access(path, os.W_OK)
+            if has_write:
+                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+            else:
+                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
+
 # Global handler instance
 jobs_handler = JobsHandler()

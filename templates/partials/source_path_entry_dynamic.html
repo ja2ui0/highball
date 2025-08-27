@@ -41,7 +41,7 @@
             <!-- Add validation button for path field -->
             <div class="path-validation-row">
                 <button type="button" class="validate-path-btn button button-secondary" 
-                        hx-post="/htmx/validate-source-path" 
+                        hx-post="/jobs/validate-source-path" 
                         hx-target="#path_validation_{{ path_index }}"
                         hx-vals='{"path_index": "{{ path_index }}"}'
                         hx-include="#source_{{ field.name }}_{{ path_index }}, [name='hostname'], [name='username']">
