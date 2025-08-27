@@ -620,6 +620,11 @@ async def render_source_fields_endpoint(request: Request):
     """Render source-specific form fields - Origins pillar"""
     return await origins_handler.render_source_fields_htmx(request)
 
+@app.post("/origins/preview-ssh-config")
+async def preview_ssh_config_endpoint(request: Request):
+    """Preview SSH origin configuration - Origins pillar"""
+    return await origins_handler.preview_ssh_config_htmx(request)
+
 @app.post("/jobs/validate-source-path")
 async def validate_source_path_endpoint(request: Request):
     """Validate source path with permission checking - Jobs pillar"""

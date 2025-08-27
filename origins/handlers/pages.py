@@ -551,5 +551,70 @@ class OriginsHandler(BaseHandler):
                                                                message=f'{schema["display_name"]} source - no additional configuration needed')
             return HTMLResponse(content=html_response)
 
+    async def preview_ssh_config_htmx(self, request) -> HTMLResponse:
+        """Generate and display SSH origin config preview for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        try:
+            import yaml
+            
+            if not form_data:
+                html_response = self.template_service.render_template('partials/ssh_config_preview.html',
+                                                                   preview_content="Error: No form data received",
+                                                                   origin_name="unknown")
+                return HTMLResponse(content=html_response)
+            
+            # Extract form values
+            origin_name = get_form_value(form_data, 'origin_name', '').strip()
+            friendly_name = get_form_value(form_data, 'friendly_name', '').strip()
+            ssh_hostname = get_form_value(form_data, 'ssh_hostname', '').strip()
+            ssh_username = get_form_value(form_data, 'ssh_username', '').strip()
+            ssh_port = get_form_value(form_data, 'ssh_port', '22')
+            ssh_timeout = get_form_value(form_data, 'ssh_timeout', '5')
+            
+            if not all([origin_name, friendly_name, ssh_hostname, ssh_username]):
+                html_response = self.template_service.render_template('partials/ssh_config_preview.html',
+                                                                   preview_content="Error: Required fields missing (origin name, friendly name, hostname, username)",
+                                                                   origin_name=origin_name or "unknown")
+                return HTMLResponse(content=html_response)
+            
+            # Parse form data using the same parser as save operations
+            from models.forms import origin_parser
+            
+            origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
+            if not origin_result['valid']:
+                html_response = self.template_service.render_template('partials/ssh_config_preview.html',
+                                                                   preview_content=f"# Error: {origin_result['error']}",
+                                                                   origin_name=origin_name)
+                return HTMLResponse(content=html_response)
+            
+            origin_config = origin_result['origin_config']
+            origin_name = origin_config['origin_name']
+            
+            # Generate YAML using the same code path as config.py save operation
+            yaml_content = self.backup_config.preview_origin_yaml(origin_name, origin_config)
+            
+            html_response = self.template_service.render_template('partials/ssh_config_preview.html',
+                                                               preview_content=yaml_content,
+                                                               origin_name=origin_name)
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            html_response = self.template_service.render_template('partials/ssh_config_preview.html',
+                                                               preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.",
+                                                               origin_name=get_form_value(form_data, 'origin_name', 'unknown'))
+            return HTMLResponse(content=html_response)
+
 # Global handler instance
 origins_handler = OriginsHandler()
