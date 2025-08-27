@@ -706,5 +706,41 @@ class JobsHandler(BaseHandler):
         except Exception as e:
             return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
 
+    async def add_source_path_htmx(self, request) -> HTMLResponse:
+        """Add a new source path entry for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        from origins.schema import SOURCE_PATH_SCHEMA
+        
+        # Get path count from JavaScript via hx-vals
+        path_count = int(get_form_value(form_data, 'path_count', '0'))
+        new_path_index = path_count  # Next sequential index
+        
+        # Create new empty path data
+        path_data = {'path': '', 'includes': [], 'excludes': []}
+        source_paths = ['', '']  # Always show remove button for new paths
+        
+        # Return just the new path entry wrapped in its container
+        html_response = self.template_service.render_template('partials/source_path_entry_container.html',
+                                                           path_index=new_path_index,
+                                                           path_data=path_data,
+                                                           source_paths=source_paths,
+                                                           source_path_schema=SOURCE_PATH_SCHEMA)
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 jobs_handler = JobsHandler()

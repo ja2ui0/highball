@@ -44,7 +44,6 @@ class FormsHandler:
             'restic-fields': self._render_restic_fields,
             
             # Source path management
-            'add-source-path': self._add_source_path,
             'remove-source-path': self._remove_source_path,
             
             # Notification management
@@ -370,25 +369,6 @@ class FormsHandler:
     # =============================================================================
     # SOURCE PATH MANAGEMENT - Direct array manipulation
     # =============================================================================
-    
-    def _add_source_path(self, form_data):
-        """Add a new source path entry"""
-        from origins.schema import SOURCE_PATH_SCHEMA
-        
-        # Get path count from JavaScript via hx-vals
-        path_count = int(self._get_form_value(form_data, 'path_count', '0'))
-        new_path_index = path_count  # Next sequential index
-        
-        # Create new empty path data
-        path_data = {'path': '', 'includes': [], 'excludes': []}
-        source_paths = ['', '']  # Always show remove button for new paths
-        
-        # Return just the new path entry wrapped in its container
-        return self.template_service.render_template('partials/source_path_entry_container.html',
-                                                   path_index=new_path_index,
-                                                   path_data=path_data,
-                                                   source_paths=source_paths,
-                                                   source_path_schema=SOURCE_PATH_SCHEMA)
     
     def _remove_source_path(self, form_data):
         """Remove a source path entry - returns empty response for DELETE"""
