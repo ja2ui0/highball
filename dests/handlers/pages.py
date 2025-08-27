@@ -329,5 +329,67 @@ class DestinationsHandler(BaseHandler):
             # If we can't get modules, just return basic info
             return [{'path': 'rsync', 'description': 'Rsync service available'}]
 
+    async def render_dest_fields_htmx(self, request) -> HTMLResponse:
+        """Render destination-specific fields based on destination type for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        dest_type = form_data.get('dest_type', [''])[0]
+        
+        # Schema-driven destination field rendering
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
+        
+        if dest_type not in DESTINATION_TYPE_SCHEMAS:
+            html_response = self.template_service.render_template('partials/info_message.html',
+                                                               message='Select a destination type to configure')
+            return HTMLResponse(content=html_response)
+        
+        # Special handling for restic (has complex sub-types)
+        if dest_type == 'restic':
+            # For now, delegate to the existing restic fields handler
+            # TODO: This will be extracted later when we get to restic-fields
+            from handlers.forms import FormsHandler
+            forms_handler = FormsHandler(self.backup_config, self.template_service)
+            html_content = forms_handler._render_restic_fields(form_data)
+            return HTMLResponse(content=html_content)
+        
+        schema = DESTINATION_TYPE_SCHEMAS[dest_type]
+        
+        # Check if this destination type has fields requiring a template
+        if schema.get('fields'):
+            template_name = f'partials/dest_{dest_type}_fields.html'
+            try:
+                # Extract field values using schema field definitions
+                template_values = {}
+                for field_name, field_config in schema['fields'].items():
+                    # Use the form field name directly (already mapped in schema)
+                    template_values[field_name] = get_form_value(form_data, field_name)
+                
+                html_response = self.template_service.render_template(template_name, **template_values)
+                return HTMLResponse(content=html_response)
+            except Exception:
+                # Template doesn't exist or failed to render
+                html_response = self.template_service.render_template('partials/info_message.html',
+                                                                   message=f'{schema["display_name"]} destination configuration')
+                return HTMLResponse(content=html_response)
+        else:
+            # No fields defined in schema
+            html_response = self.template_service.render_template('partials/info_message.html',
+                                                               message=f'{schema["display_name"]} destination - configuration needed')
+            return HTMLResponse(content=html_response)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

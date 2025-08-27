@@ -640,6 +640,11 @@ async def remove_source_path_endpoint(request: Request):
     """Remove source path entry - Jobs pillar"""
     return await jobs_handler.remove_source_path_htmx(request)
 
+@app.post("/destinations/dest-fields")
+async def render_dest_fields_endpoint(request: Request):
+    """Render destination-specific form fields - Destinations pillar"""
+    return await destinations_handler.render_dest_fields_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""

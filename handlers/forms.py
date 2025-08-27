@@ -39,7 +39,6 @@ class FormsHandler:
             'check-restore-overwrites': self._check_restore_overwrites,
             
             # Field rendering actions
-            'dest-fields': self._render_dest_fields,
             'restic-fields': self._render_restic_fields,
             
             # Source path management
@@ -278,43 +277,6 @@ class FormsHandler:
     # =============================================================================
     # FIELD RENDERING ACTIONS - Inline HTML, no renderer services
     # =============================================================================
-    
-    def _render_dest_fields(self, form_data):
-        """Render destination-specific fields based on destination type"""
-        dest_type = form_data.get('dest_type', [''])[0]
-        
-        # Schema-driven destination field rendering
-        from dests.schema import DESTINATION_TYPE_SCHEMAS
-        
-        if dest_type not in DESTINATION_TYPE_SCHEMAS:
-            return self.template_service.render_template('partials/info_message.html',
-                                                       message='Select a destination type to configure')
-        
-        # Special handling for restic (has complex sub-types)
-        if dest_type == 'restic':
-            return self._render_restic_fields(form_data)
-        
-        schema = DESTINATION_TYPE_SCHEMAS[dest_type]
-        
-        # Check if this destination type has fields requiring a template
-        if schema.get('fields'):
-            template_name = f'partials/dest_{dest_type}_fields.html'
-            try:
-                # Extract field values using schema field definitions
-                template_values = {}
-                for field_name, field_config in schema['fields'].items():
-                    # Use the form field name directly (already mapped in schema)
-                    template_values[field_name] = self._get_form_value(form_data, field_name)
-                
-                return self.template_service.render_template(template_name, **template_values)
-            except Exception:
-                # Template doesn't exist or failed to render
-                return self.template_service.render_template('partials/info_message.html',
-                                                           message=f'{schema["display_name"]} destination configuration')
-        else:
-            # No fields defined in schema
-            return self.template_service.render_template('partials/info_message.html',
-                                                       message=f'{schema["display_name"]} destination - configuration needed')
     
     def _render_restic_fields(self, form_data):
         """Render Restic repository configuration fields using template"""
