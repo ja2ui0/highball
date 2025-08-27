@@ -506,5 +506,54 @@ class DestinationsHandler(BaseHandler):
         html_response = self.template_service.render_validation_status('restic', result)
         return HTMLResponse(content=html_response)
 
+    async def validate_origin_repo_path_htmx(self, request) -> HTMLResponse:
+        """Validate same-as-origin repository path with RWX requirements for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        try:
+            # Extract repository path
+            repo_path = get_form_value(form_data, 'origin_repo_path')
+            if not repo_path or not repo_path.strip():
+                result = {'valid': False, 'error': 'Please enter a repository path'}
+                html_response = self.template_service.render_validation_status('origin_repo_path', result)
+                return HTMLResponse(content=html_response)
+            
+            # Extract SSH configuration (required for same_as_origin)
+            hostname = get_form_value(form_data, 'hostname')
+            username = get_form_value(form_data, 'username')
+            
+            if not hostname or not username:
+                result = {'valid': False, 'error': 'SSH configuration required for same-as-origin repositories'}
+                html_response = self.template_service.render_validation_status('origin_repo_path', result)
+                return HTMLResponse(content=html_response)
+            
+            # Business logic: delegate to validation service
+            from jobs.services.validate import ValidationService
+            validation_service = ValidationService(self.backup_config)
+            result = validation_service.ssh.validate_ssh_repo_path_with_creation(hostname, username, repo_path)
+            
+            # View: delegate to template service
+            html_response = self.template_service.render_validation_status('origin_repo_path', result)
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            result = {'valid': False, 'error': f'Validation failed: {str(e)}'}
+            html_response = self.template_service.render_validation_status('origin_repo_path', result)
+            return HTMLResponse(content=html_response)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()
