@@ -503,5 +503,53 @@ class OriginsHandler(BaseHandler):
         html_response = self.template_service.render_validation_status('ssh_source', result)
         return HTMLResponse(content=html_response)
 
+    async def render_source_fields_htmx(self, request) -> HTMLResponse:
+        """Render source-specific fields based on source type for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        source_type = form_data.get('source_type', [''])[0]
+        
+        # Schema-driven source field rendering
+        from origins.schema import SOURCE_TYPE_SCHEMAS
+        
+        if source_type not in SOURCE_TYPE_SCHEMAS:
+            html_response = self.template_service.render_template('partials/info_message.html',
+                                                               message='Select a source type to configure')
+            return HTMLResponse(content=html_response)
+        
+        schema = SOURCE_TYPE_SCHEMAS[source_type]
+        
+        # Check if this source type has additional fields requiring a template
+        if schema.get('fields'):
+            template_name = f'partials/source_{source_type}_fields.html'
+            try:
+                # Extract field values using schema field definitions
+                template_values = {}
+                for field_name, field_config in schema['fields'].items():
+                    config_key = field_config.get('config_key', field_name)
+                    template_values[config_key] = get_form_value(form_data, config_key)
+                
+                html_response = self.template_service.render_template(template_name, **template_values)
+                return HTMLResponse(content=html_response)
+            except Exception:
+                # Template doesn't exist or failed to render
+                html_response = self.template_service.render_template('partials/info_message.html',
+                                                                   message=f'{schema["display_name"]} source configuration')
+                return HTMLResponse(content=html_response)
+        else:
+            # No additional fields needed (e.g., local)
+            html_response = self.template_service.render_template('partials/info_message.html',
+                                                               message=f'{schema["display_name"]} source - no additional configuration needed')
+            return HTMLResponse(content=html_response)
+
 # Global handler instance
 origins_handler = OriginsHandler()

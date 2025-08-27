@@ -38,8 +38,7 @@ class FormsHandler:
             'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
             
-            # Field rendering actions  
-            'source-fields': self._render_source_fields,
+            # Field rendering actions
             'dest-fields': self._render_dest_fields,
             'restic-fields': self._render_restic_fields,
             
@@ -280,39 +279,6 @@ class FormsHandler:
     # =============================================================================
     # FIELD RENDERING ACTIONS - Inline HTML, no renderer services
     # =============================================================================
-    
-    def _render_source_fields(self, form_data):
-        """Render source-specific fields based on source type"""
-        source_type = form_data.get('source_type', [''])[0]
-        
-        # Schema-driven source field rendering
-        from origins.schema import SOURCE_TYPE_SCHEMAS
-        
-        if source_type not in SOURCE_TYPE_SCHEMAS:
-            return self.template_service.render_template('partials/info_message.html',
-                                                       message='Select a source type to configure')
-        
-        schema = SOURCE_TYPE_SCHEMAS[source_type]
-        
-        # Check if this source type has additional fields requiring a template
-        if schema.get('fields'):
-            template_name = f'partials/source_{source_type}_fields.html'
-            try:
-                # Extract field values using schema field definitions
-                template_values = {}
-                for field_name, field_config in schema['fields'].items():
-                    config_key = field_config.get('config_key', field_name)
-                    template_values[config_key] = self._get_form_value(form_data, config_key)
-                
-                return self.template_service.render_template(template_name, **template_values)
-            except Exception:
-                # Template doesn't exist or failed to render
-                return self.template_service.render_template('partials/info_message.html',
-                                                           message=f'{schema["display_name"]} source configuration')
-        else:
-            # No additional fields needed (e.g., local)
-            return self.template_service.render_template('partials/info_message.html',
-                                                       message=f'{schema["display_name"]} source - no additional configuration needed')
     
     def _render_dest_fields(self, form_data):
         """Render destination-specific fields based on destination type"""
