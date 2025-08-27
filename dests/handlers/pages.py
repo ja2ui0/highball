@@ -412,5 +412,37 @@ class DestinationsHandler(BaseHandler):
                                                            show_wrapper=False)
         return HTMLResponse(content=html_response)
 
+    async def validate_ssh_dest_htmx(self, request) -> HTMLResponse:
+        """Validate SSH destination configuration for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        # Extract parameters from request
+        hostname = get_form_value(form_data, 'dest_hostname')
+        username = get_form_value(form_data, 'dest_username')
+        path = get_form_value(form_data, 'dest_path')
+        
+        # Business logic: delegate to validation service
+        from jobs.services.validate import ValidationService
+        validation_service = ValidationService(self.backup_config)
+        result = validation_service.ssh.validate_ssh_destination(hostname, username, path)
+        
+        # View: delegate to template service
+        html_response = self.template_service.render_validation_status('ssh_dest', result)
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

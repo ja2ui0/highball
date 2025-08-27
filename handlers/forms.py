@@ -33,7 +33,6 @@ class FormsHandler:
         # Action dispatch table
         actions = {
             # Validation actions
-            'validate-ssh-dest': self._validate_ssh_dest,
             'validate-origin-repo-path': self._validate_origin_repo_path,
             'validate-restic': self._validate_restic,
             'check-restore-overwrites': self._check_restore_overwrites,
@@ -100,19 +99,6 @@ class FormsHandler:
     # =============================================================================
     # VALIDATION ACTIONS - Direct validator calls, no coordinators
     # =============================================================================
-    
-    def _validate_ssh_dest(self, form_data):
-        """HTTP coordination: extract params, delegate SSH destination validation, render response"""
-        # HTTP concern: extract parameters from request
-        hostname = self._get_form_value(form_data, 'dest_hostname')
-        username = self._get_form_value(form_data, 'dest_username')
-        path = self._get_form_value(form_data, 'dest_path')
-        
-        # Business logic concern: delegate to validation service
-        result = self.validation_service.ssh.validate_ssh_destination(hostname, username, path)
-        
-        # View concern: delegate to template service
-        return self.template_service.render_validation_status('ssh_dest', result)
     
     def _check_restore_overwrites(self, form_data):
         """HTTP coordination: check restore overwrites via service"""

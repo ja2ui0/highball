@@ -650,6 +650,11 @@ async def render_restic_fields_endpoint(request: Request):
     """Render Restic repository configuration fields - Destinations pillar"""
     return await destinations_handler.render_restic_fields_htmx(request)
 
+@app.post("/destinations/validate-ssh-dest")
+async def validate_ssh_dest_endpoint(request: Request):
+    """Validate SSH destination configuration - Destinations pillar"""
+    return await destinations_handler.validate_ssh_dest_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""
