@@ -625,6 +625,11 @@ async def add_source_path_endpoint(request: Request):
     """Add new source path entry - Jobs pillar"""
     return await jobs_handler.add_source_path_htmx(request)
 
+@app.post("/jobs/remove-source-path")
+async def remove_source_path_endpoint(request: Request):
+    """Remove source path entry - Jobs pillar"""
+    return await jobs_handler.remove_source_path_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""

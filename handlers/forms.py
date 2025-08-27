@@ -44,7 +44,6 @@ class FormsHandler:
             'restic-fields': self._render_restic_fields,
             
             # Source path management
-            'remove-source-path': self._remove_source_path,
             
             # Notification management
             'notification-providers': self._render_notification_providers,
@@ -369,13 +368,6 @@ class FormsHandler:
     # =============================================================================
     # SOURCE PATH MANAGEMENT - Direct array manipulation
     # =============================================================================
-    
-    def _remove_source_path(self, form_data):
-        """Remove a source path entry - returns empty response for DELETE"""
-        # Since we're using hx-delete and hx-swap="outerHTML", 
-        # the target element will be removed automatically.
-        # We just need to return an empty response.
-        return ""
     
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling

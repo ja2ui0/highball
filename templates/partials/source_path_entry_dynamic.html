@@ -5,7 +5,7 @@
             <span>{{ source_path_schema.display_name }}</span>
             {% if path_index > 0 %}
             <button type="button" class="button button-danger path-remove-btn" 
-                    hx-post="/htmx/remove-source-path"
+                    hx-post="/jobs/remove-source-path"
                     hx-vals='{"path_index": "{{ path_index }}"}'
                     hx-target="#path_entry_{{ path_index }}"
                     hx-swap="outerHTML">

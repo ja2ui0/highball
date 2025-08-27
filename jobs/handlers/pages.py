@@ -742,5 +742,12 @@ class JobsHandler(BaseHandler):
                                                            source_path_schema=SOURCE_PATH_SCHEMA)
         return HTMLResponse(content=html_response)
 
+    async def remove_source_path_htmx(self, request) -> HTMLResponse:
+        """Remove a source path entry - returns empty response for HTMX DELETE"""
+        # Since we're using hx-delete and hx-swap="outerHTML", 
+        # the target element will be removed automatically.
+        # We just need to return an empty response.
+        return HTMLResponse(content="")
+
 # Global handler instance
 jobs_handler = JobsHandler()
