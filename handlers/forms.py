@@ -39,7 +39,6 @@ class FormsHandler:
             # Source path management
             
             # Notification management
-            'remove-notification-provider': self._remove_notification_provider,
             'toggle-success-message': self._toggle_success_message,
             'toggle-failure-message': self._toggle_failure_message,
             
@@ -167,32 +166,6 @@ class FormsHandler:
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling
     # =============================================================================
-    
-    def _remove_notification_provider(self, form_data):
-        """Remove a notification provider"""
-        provider_id = form_data.get('provider_id', [''])[0]
-        
-        # Extract provider name from ID (format: notification_{provider}_{timestamp})
-        provider_name = None
-        if provider_id and '_' in provider_id:
-            parts = provider_id.split('_')
-            if len(parts) >= 2:
-                provider_name = parts[1]
-        
-        # Get current providers from form and remove this one
-        current_providers = self._get_form_providers(form_data)
-        if provider_name and provider_name in current_providers:
-            current_providers.remove(provider_name)
-        
-        # Update state and render dropdown
-        self.configured_providers = current_providers
-        available_providers = self._get_enabled_global_providers()
-        updated_selection = self._render_provider_selection(available_providers)
-        
-        # Return response that removes provider config and updates dropdown
-        return self.template_service.render_template('partials/notification_provider_removed_response.html',
-                                                   provider_id=provider_id,
-                                                   updated_selection_html=updated_selection)
     
     def _toggle_success_message(self, form_data):
         """Toggle success message field visibility"""

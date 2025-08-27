@@ -3,7 +3,7 @@
         <h3 class="provider-header">
             <span class="provider-name">{{ display_name }}</span>
             <button type="button" class="remove-provider-btn button button-danger"
-                    hx-post="/htmx/remove-notification-provider"
+                    hx-post="/jobs/remove-notification-provider"
                     hx-include="closest form"
                     hx-vals="js:{provider_id: '{{ provider_id }}'}">Remove</button>
         </h3>

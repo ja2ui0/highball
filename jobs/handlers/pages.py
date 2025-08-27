@@ -935,5 +935,48 @@ class JobsHandler(BaseHandler):
             return [providers] if providers else []
         return [p for p in providers if p]  # Filter out empty strings
 
+    async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Remove a notification provider from job configuration for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        provider_id = get_form_value(form_data, 'provider_id')
+        
+        # Extract provider name from ID (format: notification_{provider}_{timestamp})
+        provider_name = None
+        if provider_id and '_' in provider_id:
+            parts = provider_id.split('_')
+            if len(parts) >= 2:
+                provider_name = parts[1]
+        
+        # Get current providers from form and remove this one
+        current_providers = self._get_form_providers(form_data)
+        if provider_name and provider_name in current_providers:
+            current_providers.remove(provider_name)
+        
+        # Update state and render dropdown
+        self.configured_providers = current_providers
+        available_providers = self._get_enabled_global_providers()
+        updated_selection = self._render_provider_selection(available_providers)
+        
+        # Return response that removes provider config and updates dropdown
+        html_response = self.template_service.render_template('partials/notification_provider_removed_response.html',
+                                                            provider_id=provider_id,
+                                                            updated_selection_html=updated_selection)
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 jobs_handler = JobsHandler()
