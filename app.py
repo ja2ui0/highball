@@ -560,19 +560,10 @@ async def process_restore_request(request: Request):
     return services.handlers['operations'].process_restore_request(form_data)
 
 
-@app.post("/check-restore-overwrites")
+@app.post("/jobs/check-restore-overwrites")
 async def check_restore_overwrites(request: Request):
-    """Check restore overwrites"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return services.handlers['operations'].check_restore_overwrites(form_data)
+    """Check restore overwrites - Jobs pillar"""
+    return await jobs_handler.check_restore_overwrites_htmx(request)
 
 
 @app.post("/test-telegram-notification")

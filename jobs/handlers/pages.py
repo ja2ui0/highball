@@ -749,5 +749,51 @@ class JobsHandler(BaseHandler):
         # We just need to return an empty response.
         return HTMLResponse(content="")
 
+    async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
+        """Check restore overwrites for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        def get_form_value(form_data, key, default=''):
+            """Extract single value from form data (works with FastAPI form parsing)"""
+            value_list = form_data.get(key, [default])
+            return value_list[0] if value_list else default
+        
+        # HTTP concern: extract parameters
+        job_name = get_form_value(form_data, 'job_name')
+        restore_target = get_form_value(form_data, 'restore_target', 'highball')
+        select_all = get_form_value(form_data, 'select_all') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+        
+        # Business logic concern: delegate to restore service
+        from jobs.services.restore import RestoreService
+        restore_service = RestoreService()
+        
+        # Get job config for source details
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+        
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths, select_all
+        )
+        
+        # Template concern: pass data to Jinja2 template for conditional rendering
+        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        return self._render_html('partials/restore_overwrite_warning.html', {
+            'has_overwrites': has_overwrites,
+            'target_text': target_text,
+            'dry_run': False
+        })
+
 # Global handler instance
 jobs_handler = JobsHandler()
