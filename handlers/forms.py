@@ -33,7 +33,6 @@ class FormsHandler:
         # Action dispatch table
         actions = {
             # Validation actions
-            'validate-ssh-source': self._validate_ssh_source,
             'validate-ssh-dest': self._validate_ssh_dest,
             'validate-source-path': self._validate_source_path,
             'validate-origin-repo-path': self._validate_origin_repo_path,
@@ -108,19 +107,6 @@ class FormsHandler:
     # =============================================================================
     # VALIDATION ACTIONS - Direct validator calls, no coordinators
     # =============================================================================
-    
-    def _validate_ssh_source(self, form_data):
-        """HTTP coordination: extract params, delegate validation, render response"""
-        # HTTP concern: extract parameters from request
-        hostname = self._get_form_value(form_data, 'hostname')
-        username = self._get_form_value(form_data, 'username')
-        
-        # Business logic concern: delegate to validation service 
-        source_config = {'hostname': hostname, 'username': username}
-        result = self.validation_service.ssh.validate_ssh_source(source_config)
-        
-        # View concern: delegate to template service
-        return self.template_service.render_validation_status('ssh_source', result)
     
     def _validate_ssh_dest(self, form_data):
         """HTTP coordination: extract params, delegate SSH destination validation, render response"""

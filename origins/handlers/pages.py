@@ -4,13 +4,64 @@ SSH host management, origin configuration, and capability validation
 """
 
 import logging
+from functools import wraps
 from typing import Dict, Any, Callable
+from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from dataclasses import dataclass
 
 from services.template import TemplateService
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class HtmxFormData:
+    """Parsed HTMX form data with common headers"""
+    form_data: Dict[str, Any]
+    hx_request: bool
+    hx_target: str | None
+    hx_trigger: str | None
+    hx_current_url: str | None
+
+def parse_htmx_form(func: Callable) -> Callable:
+    """Decorator that parses HTMX form data and provides clean error responses"""
+    @wraps(func)
+    async def wrapper(self, request: Request, form_data: Dict[str, Any]) -> HTMLResponse:
+        try:
+            # Extract HTMX headers
+            hx_request = request.headers.get('HX-Request', 'false').lower() == 'true'
+            hx_target = request.headers.get('HX-Target')
+            hx_trigger = request.headers.get('HX-Trigger')
+            hx_current_url = request.headers.get('HX-Current-URL')
+            
+            # Create parsed form data object
+            parsed_form = HtmxFormData(
+                form_data=form_data,
+                hx_request=hx_request,
+                hx_target=hx_target,
+                hx_trigger=hx_trigger,
+                hx_current_url=hx_current_url
+            )
+            
+            # Call the actual handler with clean parsed data
+            html_response = await func(self, parsed_form)
+            
+            # Return HTMX-compatible HTML response
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            logger.error(f"HTMX form processing failed in {func.__name__}: {e}")
+            # Return basic error HTML that works with any HTMX target
+            error_html = f'<div class="error">Form processing failed: {str(e)}</div>'
+            return HTMLResponse(content=error_html, status_code=500)
+    
+    return wrapper
+
+def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> str:
+    """Extract single value from form data (works with FastAPI form parsing)"""
+    value_list = form_data.get(key, [default])
+    return value_list[0] if value_list else default
 
 def handle_page_errors(operation_name: str) -> Callable:
     """Decorator to handle common page operation errors consistently"""
@@ -421,6 +472,36 @@ class OriginsHandler(BaseHandler):
                 return f.read().strip()
         except Exception as e:
             return f"Error reading public key: {str(e)}"
+
+    async def validate_ssh_source_htmx(self, request) -> HTMLResponse:
+        """Validate SSH source configuration for HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Extract parameters from form data
+        hostname = get_form_value(form_data, 'hostname')
+        username = get_form_value(form_data, 'username')
+        
+        # Build source config
+        source_config = {'hostname': hostname, 'username': username}
+        
+        # Use validation service for business logic
+        from jobs.services.validate import ValidationService
+        backup_config = BackupConfig()
+        validation_service = ValidationService(backup_config)
+        result = validation_service.ssh.validate_ssh_source(source_config)
+        
+        # Render validation status using template service
+        html_response = self.template_service.render_validation_status('ssh_source', result)
+        return HTMLResponse(content=html_response)
 
 # Global handler instance
 origins_handler = OriginsHandler()

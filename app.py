@@ -610,22 +610,15 @@ async def unlock_repository_post(request: Request):
 # HTMX ROUTES
 # =============================================================================
 
+@app.post("/origins/validate-ssh-source")
+async def validate_ssh_source_endpoint(request: Request):
+    """Validate SSH source configuration - Origins pillar"""
+    return await origins_handler.validate_ssh_source_htmx(request)
+
 @app.post("/htmx/{action}")
 async def handle_htmx_request(action: str, request: Request):
     """Handle HTMX requests"""
-    # Parse form data using FastAPI (replaces CGI parsing)
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    
-    html = services.handlers['forms'].handle_htmx_request(request, action, form_data)
-    return HTMLResponse(content=html)
+    return await services.handlers['forms'].handle_htmx_request_async(request, action)
 
 
 # =============================================================================
