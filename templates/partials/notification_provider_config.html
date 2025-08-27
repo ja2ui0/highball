@@ -11,7 +11,7 @@
         <div class="form-group">
             <label>
                 <input type="checkbox" name="notify_on_success[]" {% if notify_on_success %}checked{% endif %}
-                       hx-post="/htmx/toggle-success-message"
+                       hx-post="/jobs/toggle-success-message"
                        hx-target="next .success-message-group"
                        hx-trigger="change"
                        hx-swap="outerHTML"> 

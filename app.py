@@ -646,6 +646,11 @@ async def remove_notification_provider_endpoint(request: Request):
     """Remove notification provider from job configuration - Jobs pillar"""
     return await jobs_handler.remove_notification_provider_htmx(request)
 
+@app.post("/jobs/toggle-success-message")
+async def toggle_success_message_endpoint(request: Request):
+    """Toggle success message visibility in job notification configuration - Jobs pillar"""
+    return await jobs_handler.toggle_success_message_htmx(request)
+
 @app.post("/destinations/dest-fields")
 async def render_dest_fields_endpoint(request: Request):
     """Render destination-specific form fields - Destinations pillar"""

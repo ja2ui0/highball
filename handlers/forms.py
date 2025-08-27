@@ -39,7 +39,6 @@ class FormsHandler:
             # Source path management
             
             # Notification management
-            'toggle-success-message': self._toggle_success_message,
             'toggle-failure-message': self._toggle_failure_message,
             
             # Repository management
@@ -166,16 +165,6 @@ class FormsHandler:
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling
     # =============================================================================
-    
-    def _toggle_success_message(self, form_data):
-        """Toggle success message field visibility"""
-        # Check if checkbox is checked
-        enabled = 'notify_on_success[]' in form_data
-        success_message = self._get_form_value(form_data, 'notification_success_messages[]')
-        
-        return self.template_service.render_template('partials/notification_success_message.html',
-                                                   enabled=enabled,
-                                                   success_message=success_message)
     
     def _toggle_failure_message(self, form_data):
         """Toggle failure message field visibility"""
