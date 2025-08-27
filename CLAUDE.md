@@ -188,3 +188,5 @@ Web-based backup orchestration with scheduling and monitoring. Supports rsync an
 **TODO**: Refactor `check_repository_availability_htmx()` and `unlock_repository_htmx()` in jobs/handlers/pages.py - these are 90% restic destination operations with job coordination wrapper, violates SoC by mixing job orchestration with destination-specific repository logic
 **TODO**: Refactor `scan_network_for_rsyncd()` in dests/handlers/pages.py - move core nmap scanning logic to dests/services/rsyncd.py for proper SoC (network discovery vs HTTP handling)
 
+
+- note: validate_origin_repo_path_htmx() (dests handler) should just make the user pick an origin from a dropdown.

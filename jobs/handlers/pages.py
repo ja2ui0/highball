@@ -795,5 +795,85 @@ class JobsHandler(BaseHandler):
             'dry_run': False
         })
 
+    async def render_notification_providers_htmx(self, request) -> HTMLResponse:
+        """Render notification providers section for job configuration HTMX forms"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Get available providers from global config
+        available_providers = self._get_enabled_global_providers()
+        existing_notifications = []  # Parse from form if editing
+        
+        # Build provider configurations
+        provider_html = ""
+        for i, provider in enumerate(existing_notifications):
+            provider_html += self._render_notification_provider(provider, i)
+        
+        # Build provider selection dropdown
+        self.configured_providers = []  # Initialize for rendering
+        selection_html = self._render_provider_selection(available_providers)
+        
+        html_response = self.template_service.render_template('partials/notification_providers_section.html',
+                                                            provider_html=provider_html,
+                                                            selection_html=selection_html)
+        return HTMLResponse(content=html_response)
+
+    def _get_enabled_global_providers(self):
+        """Get list of globally enabled notification providers"""
+        global_settings = self.backup_config.get_global_settings()
+        notification_config = global_settings.get('notification', {})
+        
+        enabled_providers = []
+        for provider, config in notification_config.items():
+            if isinstance(config, dict) and config.get('enabled', False):
+                enabled_providers.append(provider)
+        
+        return enabled_providers
+
+    def _render_notification_provider(self, config, index, provider_id=None):
+        """Render a single notification provider configuration"""
+        import html
+        provider_name = config.get('provider', '')
+        display_name = provider_name.capitalize()
+        
+        if not provider_id:
+            provider_id = f"notification_{provider_name}_{index}"
+        
+        notify_on_success = config.get('notify_on_success', False)
+        success_message = html.escape(config.get('success_message', ''))
+        
+        notify_on_failure = config.get('notify_on_failure', False)
+        failure_message = html.escape(config.get('failure_message', ''))
+        
+        notify_on_maintenance_failure = config.get('notify_on_maintenance_failure', False)
+        
+        return self.template_service.render_template('partials/notification_provider_config.html',
+                                                   provider_id=provider_id,
+                                                   provider_name=provider_name,
+                                                   display_name=display_name,
+                                                   notify_on_success=notify_on_success,
+                                                   success_message=success_message,
+                                                   notify_on_failure=notify_on_failure,
+                                                   failure_message=failure_message,
+                                                   notify_on_maintenance_failure=notify_on_maintenance_failure)
+
+    def _render_provider_selection(self, available_providers):
+        """Render provider selection dropdown"""
+        # Filter out configured providers
+        if not hasattr(self, 'configured_providers'):
+            self.configured_providers = []
+        available_options = [p for p in available_providers if p not in self.configured_providers]
+        
+        return self.template_service.render_template('partials/provider_selection_dropdown.html',
+                                                   available_options=available_options)
+
 # Global handler instance
 jobs_handler = JobsHandler()

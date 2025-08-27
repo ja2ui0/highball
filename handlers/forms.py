@@ -39,7 +39,6 @@ class FormsHandler:
             # Source path management
             
             # Notification management
-            'notification-providers': self._render_notification_providers,
             'add-notification-provider': self._add_notification_provider,
             'remove-notification-provider': self._remove_notification_provider,
             'toggle-success-message': self._toggle_success_message,
@@ -61,7 +60,6 @@ class FormsHandler:
             'refresh-logs': self._refresh_logs,
             
             # Configuration management (connect to existing notification functionality)
-            'notification-settings': self._render_notification_providers,
             'queue-settings': self._handle_queue_settings,
             
             # Global notification provider management (config manager)
@@ -170,24 +168,6 @@ class FormsHandler:
     # =============================================================================
     # NOTIFICATION MANAGEMENT - Simplified provider handling
     # =============================================================================
-    
-    def _render_notification_providers(self, form_data):
-        """Render notification providers section"""
-        # Get available providers from global config
-        available_providers = self._get_enabled_global_providers()
-        existing_notifications = []  # Parse from form if editing
-        
-        # Build provider configurations
-        provider_html = ""
-        for i, provider in enumerate(existing_notifications):
-            provider_html += self._render_notification_provider(provider, i)
-        
-        # Build provider selection dropdown
-        selection_html = self._render_provider_selection(available_providers)
-        
-        return self.template_service.render_template('partials/notification_providers_section.html',
-                                                   provider_html=provider_html,
-                                                   selection_html=selection_html)
     
     def _add_notification_provider(self, form_data):
         """Add a new notification provider"""

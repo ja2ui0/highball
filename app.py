@@ -631,6 +631,11 @@ async def remove_source_path_endpoint(request: Request):
     """Remove source path entry - Jobs pillar"""
     return await jobs_handler.remove_source_path_htmx(request)
 
+@app.post("/jobs/notification-providers")
+async def notification_providers_endpoint(request: Request):
+    """Render notification providers for job configuration - Jobs pillar"""
+    return await jobs_handler.render_notification_providers_htmx(request)
+
 @app.post("/destinations/dest-fields")
 async def render_dest_fields_endpoint(request: Request):
     """Render destination-specific form fields - Destinations pillar"""
