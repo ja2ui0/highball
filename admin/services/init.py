@@ -56,6 +56,9 @@ class HighballServices:
             print(f"[SCHEDULER] disabled at startup: {e}")
 
         # Initialize handlers
+        from dests.services.restic import ResticAPIService
+        self.restic_api = ResticAPIService(self.backup_config)
+        
         self.handlers = {
             'operations': OperationsHandler(self.backup_config, self.template_service),
             'api': APIHandler(self.backup_config, self.template_service),

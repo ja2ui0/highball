@@ -244,31 +244,31 @@ async def validate_restic_form(request: Request):
 @app.get("/restic-repo-info")
 async def get_repository_info(job: str = Query("")):
     """Get Restic repository information"""
-    return services.handlers['api'].get_repository_info(job)
+    return services.restic_api.get_repository_info(job)
 
 
 @app.get("/restic-snapshots")
 async def list_snapshots(job: str = Query("")):
     """List Restic repository snapshots"""
-    return services.handlers['api'].list_snapshots(job)
+    return services.restic_api.list_snapshots(job)
 
 
 @app.get("/restic-snapshot-stats")
 async def get_snapshot_stats(job: str = Query(""), snapshot: str = Query("")):
     """Get statistics for specific snapshot"""
-    return services.handlers['api'].get_snapshot_stats(job, snapshot)
+    return services.restic_api.get_snapshot_stats(job, snapshot)
 
 
 @app.get("/restic-browse")
 async def browse_directory(job: str = Query(""), snapshot: str = Query(""), path: str = Query("/")):
     """Browse directory in snapshot"""
-    return services.handlers['api'].browse_directory(job, snapshot, path)
+    return services.restic_api.browse_directory(job, snapshot, path)
 
 
 @app.get("/restic-init")
 async def init_repository(job: str = Query("")):
     """Initialize Restic repository"""
-    return services.handlers['api'].init_repository(job)
+    return services.restic_api.init_repository(job)
 
 
 @app.get("/filesystem-browse")
@@ -381,7 +381,7 @@ async def initialize_restic_repo(request: Request):
             form_data[key].append(value)
         else:
             form_data[key] = [value]
-    return services.handlers['api'].initialize_restic_repo(form_data)
+    return services.restic_api.initialize_restic_repo(form_data)
 
 
 @app.post("/preview-config-changes")

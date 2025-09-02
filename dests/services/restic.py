@@ -1039,5 +1039,121 @@ class ResticMaintenanceService:
                 'output': result.stdout
             }
 
-# Export the service
+# =============================================================================
+# RESTIC API SERVICE - JSON API wrappers moved from handlers/api.py
+# =============================================================================
+
+class ResticAPIService:
+    """JSON API wrappers for Restic operations - moved from handlers/api.py"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+        self.restic_service = ResticRepositoryService()
+    
+    def _validate_job(self, job_name: str):
+        """Common job validation logic"""
+        if not job_name:
+            return None, {'success': False, 'error': 'Job name is required'}
+        
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return None, {'success': False, 'error': f"Job '{job_name}' not found"}
+        
+        return jobs[job_name], None
+    
+    def get_repository_info(self, job_name: str):
+        """Get Restic repository information"""
+        from fastapi.responses import JSONResponse
+        
+        job_config, error = self._validate_job(job_name)
+        if error:
+            return JSONResponse(content=error)
+        
+        dest_config = job_config.get('dest_config', {})
+        from jobs.services.backup import backup_service
+        analysis_result = backup_service.analyze_content(dest_config, job_name)
+        return JSONResponse(content=analysis_result)
+    
+    def list_snapshots(self, job_name: str):
+        """List snapshots for a job"""
+        from fastapi.responses import JSONResponse
+        
+        job_config, error = self._validate_job(job_name)
+        if error:
+            return JSONResponse(content=error)
+        
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        filters = {'job_name': job_name}
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.list_snapshots(dest_config, filters, source_config)
+        return JSONResponse(content=result)
+    
+    def get_snapshot_stats(self, job_name: str, snapshot_id: str):
+        """Get statistics for a specific snapshot"""
+        from fastapi.responses import JSONResponse
+        
+        if not snapshot_id:
+            return JSONResponse(content={'success': False, 'error': 'Snapshot ID is required'})
+        
+        job_config, error = self._validate_job(job_name)
+        if error:
+            return JSONResponse(content=error)
+        
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
+        return JSONResponse(content=result)
+    
+    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/'):
+        """Browse directory contents in a snapshot"""
+        from fastapi.responses import JSONResponse
+        
+        if not snapshot_id:
+            return JSONResponse(content={'success': False, 'error': 'Snapshot ID is required'})
+        
+        job_config, error = self._validate_job(job_name)
+        if error:
+            return JSONResponse(content=error)
+        
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
+        return JSONResponse(content=result)
+    
+    def init_repository(self, job_name: str):
+        """Initialize Restic repository for a job"""
+        from fastapi.responses import JSONResponse
+        
+        job_config, error = self._validate_job(job_name)
+        if error:
+            return JSONResponse(content=error)
+        
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.initialize_repository(dest_config, source_config)
+        return JSONResponse(content=result)
+    
+    def initialize_restic_repo(self, form_data: Dict[str, Any]):
+        """Initialize Restic repository from form data"""
+        from fastapi.responses import JSONResponse
+        
+        from models.forms import destination_parser
+        restic_result = destination_parser.parse_restic_destination(form_data)
+        
+        if not restic_result['valid']:
+            return JSONResponse(content={'success': False, 'error': restic_result['error']})
+        
+        from jobs.services.backup import backup_service
+        result = backup_service.initialize_repository(restic_result['config'])
+        return JSONResponse(content=result)
+
+# Export the services
 restic_service = ResticRepositoryService()

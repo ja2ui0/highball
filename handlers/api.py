@@ -96,7 +96,7 @@ class APIHandler:
             )
     
     # =============================================================================
-    # RESTIC REPOSITORY OPERATIONS
+    # RESTIC REPOSITORY OPERATIONS - MOVED TO dests/services/restic.py
     # =============================================================================
     
     def validate_restic_job(self, job_name: str) -> JSONResponse:
@@ -156,37 +156,6 @@ class APIHandler:
             return JSONResponse(content={
                 'success': False,
                 'error': f'Form validation failed: {str(e)}'
-            })
-    
-    def get_repository_info(self, job_name: str) -> JSONResponse:
-        """Get Restic repository information"""
-        try:
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            
-            # Get repository analysis
-            dest_config = job_config.get('dest_config', {})
-            analysis_result = backup_service.analyze_content(dest_config, job_name)
-            
-            return JSONResponse(content=analysis_result)
-            
-        except Exception as e:
-            logger.error(f"Repository info error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Repository info failed: {str(e)}'
             })
     
     def check_repository_availability(self, job_name: str) -> JSONResponse:
@@ -299,157 +268,6 @@ class APIHandler:
                 'success': False,
                 'error': f'Repository unlock failed: {str(e)}'
             })
-    
-    def list_snapshots(self, job_name: str) -> JSONResponse:
-        """List snapshots for a job"""
-        try:
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            dest_config = job_config.get('dest_config', {})
-            source_config = job_config.get('source_config', {})
-            
-            # Pass source_config to backup_service so it can handle SSH execution
-            filters = {'job_name': job_name}
-            result = backup_service.list_snapshots(dest_config, filters, source_config)
-            
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"List snapshots error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Snapshot listing failed: {str(e)}'
-            })
-    
-    def get_snapshot_stats(self, job_name: str, snapshot_id: str) -> JSONResponse:
-        """Get statistics for a specific snapshot"""
-        try:
-            if not job_name or not snapshot_id:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name and snapshot ID are required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            dest_config = job_config.get('dest_config', {})
-            source_config = job_config.get('source_config', {})
-            
-            # Use unified backup service for snapshot statistics
-            result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Snapshot stats error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Stats retrieval failed: {str(e)}'
-            })
-    
-    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/') -> JSONResponse:
-        """Browse directory contents in a snapshot"""
-        try:
-            if not job_name or not snapshot_id:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name and snapshot ID are required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            dest_config = job_config.get('dest_config', {})
-            source_config = job_config.get('source_config', {})
-            
-            # Use unified backup service for directory browsing
-            result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Directory browse error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Browse failed: {str(e)}'
-            })
-    
-    def init_repository(self, job_name: str) -> JSONResponse:
-        """Initialize Restic repository for a job"""
-        try:
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            dest_config = job_config.get('dest_config', {})
-            source_config = job_config.get('source_config', {})
-            
-            # Initialize repository using backup service (pass source_config for SSH detection)
-            result = backup_service.initialize_repository(dest_config, source_config)
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Repository init error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Repository initialization failed: {str(e)}'
-            })
-    
-    def initialize_restic_repo(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Initialize Restic repository from form data"""
-        try:
-            # Parse Restic destination from form
-            from models.forms import destination_parser
-            restic_result = destination_parser.parse_restic_destination(form_data)
-            
-            if not restic_result['valid']:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': restic_result['error']
-                })
-            
-            # Initialize repository
-            result = backup_service.initialize_repository(restic_result['config'])
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Form repository init error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Repository initialization failed: {str(e)}'
-            })
-    
     
     # =============================================================================
     # NOTIFICATION TESTING
