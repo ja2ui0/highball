@@ -267,7 +267,7 @@ async def check_repository_availability(job: str = Query("")):
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
     """Unlock repository (GET)"""
-    return jobs_handler.unlock_repository_htmx(job)
+    return destinations_handler.unlock_repository_htmx(job)
 
 
 # =============================================================================
@@ -464,16 +464,7 @@ async def schedule_job(request: Request):
 @app.post("/restore")
 async def process_restore_request(request: Request):
     """Process restore request"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return services.handlers['operations'].process_restore_request(form_data)
+    return await jobs_handler.process_restore_request_htmx(request)
 
 
 @app.post("/jobs/check-restore-overwrites")
@@ -501,16 +492,7 @@ async def test_email_notification(request: Request):
 @app.post("/unlock-repository")
 async def unlock_repository_post(request: Request):
     """Unlock repository (POST)"""
-    form = await request.form()
-    # Extract job name from query params for POST
-    url_parts = str(request.url).split('?')
-    if len(url_parts) > 1:
-        from urllib.parse import parse_qs
-        params = parse_qs(url_parts[1])
-        job_name = params.get('job', [''])[0]
-    else:
-        job_name = ''
-    return jobs_handler.unlock_repository_htmx(job_name)
+    return await destinations_handler.unlock_repository_post_htmx(request)
 
 
 # =============================================================================

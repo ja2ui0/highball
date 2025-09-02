@@ -512,47 +512,6 @@ class JobsHandler(BaseHandler):
         # Perform repository availability check and return response
         return self._check_and_respond_repository_status_html(job_name, job_config)
     
-    @handle_page_errors("Repository unlock")
-    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository unlock"""
-        
-        if not job_name:
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Job name is required'
-            })
-            
-        # Get and validate job configuration
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            return self._render_html('partials/error_message.html', {
-                'error_message': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        dest_type = job_config.get('dest_type')
-        
-        if dest_type != 'restic':
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Unlock is only supported for restic repositories'
-            })
-        # Execute restic unlock command
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
-        from jobs.services.backup import backup_service
-        result = backup_service.unlock_repository(dest_config, source_config)
-        
-        if result.get('success'):
-            # Unlock successful - automatically retry availability check
-            return self.check_repository_availability_htmx(job_name)
-        else:
-            # Unlock failed - show error
-            return self._render_html('partials/repository_error.html', {
-                'job_name': job_name,
-                'error_type': 'unlock_failed',
-                'error_message': result.get('error', 'Unlock failed')
-            })
-    
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""
         dest_type = job_config.get('dest_type')
@@ -1228,6 +1187,149 @@ class JobsHandler(BaseHandler):
         
         # Call existing business logic
         return self.validate_source_paths(form_data)
+
+    async def process_restore_request_htmx(self, request) -> JSONResponse:
+        """Process restore request with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic (moved from operations handler)
+        return self.process_restore_request(form_data)
+
+    def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Process restore request from form - moved from operations handler"""
+        try:
+            job_name = form_data.get('job_name', [''])[0]
+            snapshot_id = form_data.get('snapshot_id', [''])[0]
+            target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
+            dry_run = 'dry_run' in form_data
+            
+            if not job_name:
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Job name is required'
+                })
+            
+            if not snapshot_id:
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Snapshot ID is required'
+                })
+            
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                return JSONResponse(content={
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                })
+            
+            job_config = jobs[job_name]
+            
+            # Only support Restic restores for now
+            if job_config.get('dest_type') != 'restic':
+                return JSONResponse(content={
+                    'success': False,
+                    'error': 'Restore only supported for Restic repositories'
+                })
+            
+            # Build restore request
+            restore_request = {
+                'job_name': job_name,
+                'job_config': job_config,
+                'snapshot_id': snapshot_id,
+                'target_type': target_type,
+                'dry_run': dry_run
+            }
+            
+            # Add include patterns if specified
+            include_patterns = form_data.get('include_patterns', [''])
+            if include_patterns[0]:
+                restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
+            
+            # Execute restore (using operations handler implementation)
+            result = self._execute_restore(restore_request)
+            return JSONResponse(content=result)
+                
+        except Exception as e:
+            logger.error(f"Restore request error: {e}")
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Restore error: {str(e)}'
+            })
+
+    def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute restore operation - moved from operations handler"""
+        # Import here to avoid circular dependencies
+        from services.execution import ResticExecutionService
+        
+        job_config = restore_request['job_config']
+        dest_config = job_config.get('dest_config', {})
+        
+        # Determine target path based on target type
+        if restore_request['target_type'] == 'source':
+            # Restore to original source location
+            source_paths = job_config.get('source_config', {}).get('paths', [])
+            if not source_paths:
+                return {'success': False, 'error': 'No source paths defined for restore'}
+            
+            # For same-as-origin restores, use container root since paths match mounts
+            if dest_config.get('repo_type') == 'same_as_origin':
+                target_path = '/'
+            else:
+                target_path = source_paths[0]['path']  # Use first source path
+        else:
+            # Safe restore to /tmp/highball-restore
+            target_path = '/tmp/highball-restore'
+        
+        # Build restore arguments
+        restore_args = [
+            'restore', restore_request['snapshot_id'],
+            '--target', target_path
+        ]
+        
+        # Add include patterns if specified
+        if 'include_patterns' in restore_request:
+            for pattern in restore_request['include_patterns']:
+                restore_args.extend(['--include', pattern])
+        
+        if restore_request['dry_run']:
+            restore_args.append('--dry-run')
+        
+        restore_args.extend(['--verbose'])
+        
+        # Execute restore command using unified ResticExecutionService
+        restic_executor = ResticExecutionService()
+        
+        result = restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=restore_args,
+            source_config=job_config.get('source_config'),
+            operation_type='restore'
+        )
+        
+        if result['success']:
+            return {
+                'success': True,
+                'message': f'Restore completed successfully to {target_path}',
+                'target_path': target_path,
+                'output': result.get('output', '')
+            }
+        else:
+            return {
+                'success': False,
+                'error': result.get('error', 'Unknown restore error'),
+                'output': result.get('output', '')
+            }
 
 # Global handler instance
 jobs_handler = JobsHandler()

@@ -904,5 +904,134 @@ class DestinationsHandler(BaseHandler):
         from admin.services.init import services
         return services.restic_api.initialize_restic_repo(form_data)
 
+    @handle_page_errors("Repository unlock")
+    async def unlock_repository_post_htmx(self, request) -> HTMLResponse:
+        """HTMX endpoint for repository unlock (POST) - pure switchboard compliance"""
+        # Parse form data (though there might not be any)
+        form = await request.form()
+        
+        # Extract job name from query params for POST
+        url_parts = str(request.url).split('?')
+        if len(url_parts) > 1:
+            from urllib.parse import parse_qs
+            params = parse_qs(url_parts[1])
+            job_name = params.get('job', [''])[0]
+        else:
+            job_name = ''
+        
+        # Call existing business logic
+        return self.unlock_repository_htmx(job_name)
+
+    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository unlock - business logic calls destinations service"""
+        
+        if not job_name:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
+            
+        # Get and validate job configuration
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        dest_type = job_config.get('dest_type')
+        
+        if dest_type != 'restic':
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Unlock is only supported for restic repositories'
+            })
+        
+        # Execute restic unlock command via destinations service
+        dest_config = job_config.get('dest_config', {})
+        source_config = job_config.get('source_config', {})
+        
+        from dests.services.restic import restic_service
+        result = restic_service.unlock_repository(dest_config, source_config)
+        
+        if result.get('success'):
+            # Unlock successful - automatically retry availability check
+            return self.check_repository_availability_htmx(job_name)
+        else:
+            # Unlock failed - show error
+            return self._render_html('partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'unlock_failed',
+                'error_message': result.get('error', 'Unlock failed')
+            })
+
+    @handle_page_errors("Repository check")
+    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository availability check"""
+        
+        if not job_name:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
+        
+        # Get and validate job configuration
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        # Perform repository availability check and return response
+        return self._check_and_respond_repository_status_html(job_name, job_config)
+
+    def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check repository availability and return appropriate HTMX HTML response"""
+        dest_type = job_config.get('dest_type')
+        
+        if dest_type == 'restic':
+            return self._check_restic_repository_html(job_name, job_config)
+        else:
+            # Non-restic repositories - assume available for now
+            return self._render_html('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': dest_type
+            })
+
+    def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
+        """Check restic repository availability and return HTML response"""
+        dest_config = job_config.get('dest_config', {})
+        repo_uri = dest_config.get('repo_uri')
+        
+        if not repo_uri:
+            return self._render_html('partials/error_message.html', {
+                'error_message': 'Repository URI not configured'
+            })
+            
+        from dests.services.restic import restic_service
+        check_success, check_message = restic_service._quick_repository_check(repo_uri, dest_config)
+        
+        if check_success:
+            return self._render_html('partials/repository_available.html', {
+                'job_name': job_name,
+                'job_type': 'restic'
+            })
+        else:
+            return self._send_repository_error_html(job_name, check_message)
+
+    def _send_repository_error_html(self, job_name: str, error_message: str) -> HTMLResponse:
+        """Send appropriate repository error HTMX partial based on error type"""
+        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
+            # Repository locked - render unlock interface
+            return self._render_html('partials/repository_locked_error.html', {
+                'job_name': job_name,
+                'error_message': error_message
+            })
+        else:
+            # Other error - render error template
+            return self._render_html('partials/repository_error.html', {
+                'job_name': job_name,
+                'error_type': 'connection_error',
+                'error_message': error_message or 'Unknown error'
+            })
+
 # Global handler instance
 destinations_handler = DestinationsHandler()
