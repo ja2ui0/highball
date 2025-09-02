@@ -101,8 +101,10 @@ class DestinationsHandler(BaseHandler):
 
     def _get_form_value(self, form_data: Dict[str, Any], key: str, default: str = '') -> str:
         """HTTP concern: extract single value from form data"""
-        value_list = form_data.get(key, [default])
-        return value_list[0] if value_list else default
+        value = form_data.get(key, default)
+        if isinstance(value, list) and len(value) > 0:
+            return str(value[0])
+        return str(value) if value else default
 
     def _render_validation_result(self, status: str, message: str) -> str:
         """Render validation result with consistent styling"""
@@ -243,7 +245,8 @@ class DestinationsHandler(BaseHandler):
             
             html_response = self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
                                                                repo_type=repo_type,
-                                                               repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS)
+                                                               repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
+                                                               field_values={})
 
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
@@ -319,10 +322,6 @@ class DestinationsHandler(BaseHandler):
         from handlers.forms import FormProcessingHandler
         form_processor = FormProcessingHandler(self.backup_config)
         return form_processor.add_destination(form_data)
-
-    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
-        """Helper to get form value with default"""
-        return form_data.get(field_name, default)
 
     def _flatten_dest_config_for_uri(self, dest_config):
         """Flatten nested destination config for URI generation"""
