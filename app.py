@@ -15,7 +15,6 @@ from fastapi.staticfiles import StaticFiles
 # God object handlers eliminated - functionality moved to domain-specific pillars
 from handlers.operations import OperationsHandler
 from handlers.api import APIHandler
-from handlers.forms import FormsHandler
 from jobs.services.scheduler import JobSchedulerHandler
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
@@ -69,7 +68,6 @@ class HighballServices:
         self.handlers = {
             'operations': OperationsHandler(self.backup_config, self.template_service),
             'api': APIHandler(self.backup_config, self.template_service),
-            'forms': FormsHandler(self.backup_config, self.template_service),
             'job_scheduler': JobSchedulerHandler(self.scheduler_service),
         }
     
