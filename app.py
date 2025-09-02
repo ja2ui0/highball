@@ -554,11 +554,6 @@ async def validate_origin_repo_path_endpoint(request: Request):
     """Validate same-as-origin repository path - Destinations pillar"""
     return await destinations_handler.validate_origin_repo_path_htmx(request)
 
-@app.post("/htmx/{action}")
-async def handle_htmx_request(action: str, request: Request):
-    """Handle HTMX requests"""
-    return await services.handlers['forms'].handle_htmx_request_async(request, action)
-
 
 # =============================================================================
 # OPTIONS for CORS
