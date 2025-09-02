@@ -414,15 +414,22 @@ class DestinationsHandler(BaseHandler):
                 'validation_message': 'Destination type and hostname are required for validation'
             }
         else:
-            # Test basic connectivity based on destination type - delegate to destination validator
-            from handlers.forms import DestinationValidationHandler
-            destination_validator = DestinationValidationHandler()
-            
+            # Test basic connectivity based on destination type using atomic services
             if dest_type == 'rsync':
+                from handlers.forms import DestinationValidationHandler
+                destination_validator = DestinationValidationHandler()
                 template_context = destination_validator.validate_rsync_destination(form_data)
             elif dest_type == 'rsyncd':
-                template_context = destination_validator.validate_rsyncd_destination(form_data)
+                # Use superior rsyncd validation from atomic service
+                from dests.services.rsync import rsync_service
+                result = rsync_service.validate_rsyncd_destination(form_data)
+                template_context = {
+                    'success': result['success'],
+                    'validation_message': result.get('message') or result.get('error', 'Unknown error')
+                }
             elif dest_type == 'restic':
+                from handlers.forms import DestinationValidationHandler
+                destination_validator = DestinationValidationHandler()
                 template_context = destination_validator.validate_restic_destination(form_data)
             else:
                 template_context = {

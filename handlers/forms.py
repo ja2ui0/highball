@@ -63,45 +63,6 @@ class DestinationValidationHandler:
                 'validation_message': f"SSH connection failed: {result.get('error', 'Unknown error')}"
             }
     
-    def validate_rsyncd_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate rsyncd destination"""
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        share = self._get_form_value(form_data, 'share', '')
-        port = self._get_form_value(form_data, 'port', '873')
-        
-        if not all([hostname, share]):
-            return {
-                'success': False,
-                'validation_message': 'Hostname and share are required for rsyncd validation'
-            }
-        
-        # Test rsyncd connectivity
-        import subprocess
-        try:
-            port_num = int(port) if port.isdigit() else 873
-            cmd = ['rsync', '--list-only', f'rsync://{hostname}:{port_num}/{share}']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                return {
-                    'success': True,
-                    'validation_message': f"Rsyncd connection successful to {hostname}:{port_num}/{share}"
-                }
-            else:
-                return {
-                    'success': False,
-                    'validation_message': f"Rsyncd connection failed: {result.stderr.strip() or 'Connection error'}"
-                }
-        except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'validation_message': 'Rsyncd connection timeout'
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'validation_message': f'Rsyncd validation error: {str(e)}'
-            }
     
     def validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate restic destination"""

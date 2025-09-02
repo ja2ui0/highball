@@ -313,5 +313,51 @@ class RsyncService:
                 error=f'Destination test failed: {str(e)}'
             ).to_dict()
 
+    def validate_rsyncd_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate rsyncd destination with superior port handling and error parsing"""
+        def _get_form_value(field_name: str, default: str = '') -> str:
+            """Get form field value with default"""
+            value = form_data.get(field_name, default)
+            if isinstance(value, list):
+                return value[0] if value else default
+            return str(value)
+        
+        hostname = _get_form_value('hostname', '')
+        share = _get_form_value('share', '')
+        port = _get_form_value('port', '873')
+        
+        if not all([hostname, share]):
+            return RsyncResult(
+                success=False,
+                error='Hostname and share are required for rsyncd validation'
+            ).to_dict()
+        
+        # Test rsyncd connectivity with superior error handling
+        try:
+            port_num = int(port) if port.isdigit() else 873
+            cmd = ['rsync', '--list-only', f'rsync://{hostname}:{port_num}/{share}']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                return RsyncResult(
+                    success=True,
+                    message=f"Rsyncd connection successful to {hostname}:{port_num}/{share}"
+                ).to_dict()
+            else:
+                return RsyncResult(
+                    success=False,
+                    error=f"Rsyncd connection failed: {result.stderr.strip() or 'Connection error'}"
+                ).to_dict()
+        except subprocess.TimeoutExpired:
+            return RsyncResult(
+                success=False,
+                error='Rsyncd connection timeout'
+            ).to_dict()
+        except Exception as e:
+            return RsyncResult(
+                success=False,
+                error=f'Rsyncd validation error: {str(e)}'
+            ).to_dict()
+
 # Export the service
 rsync_service = RsyncService()
