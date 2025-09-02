@@ -1,5 +1,9 @@
 # handlers/job_scheduler.py
+import logging
+from typing import Dict, Any
 from fastapi.responses import HTMLResponse, JSONResponse
+
+logger = logging.getLogger(__name__)
 
 class JobSchedulerHandler:
     def __init__(self, scheduler_service):
@@ -49,3 +53,59 @@ class JobSchedulerHandler:
                 'success': False,
                 'error': f'Failed to schedule job: {str(e)}'
             }, status_code=500)
+
+
+# =============================================================================
+# JOB SCHEDULING ORCHESTRATION SERVICE
+# =============================================================================
+
+class JobSchedulingOrchestrationService:
+    """Orchestrates job scheduling with validation and actual scheduler integration"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+    
+    def schedule_job(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Schedule a job for execution - extracted from operations.py"""
+        try:
+            job_name = form_data.get('job_name', [''])[0]
+            
+            if not job_name:
+                return {
+                    'success': False,
+                    'error': 'Job name is required'
+                }
+            
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                return {
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                }
+            
+            # Add job to scheduler
+            from jobs.services.schedule import SchedulingService
+            scheduler = SchedulingService()
+            
+            job_config = jobs[job_name]
+            schedule = job_config.get('schedule', 'manual')
+            
+            if schedule != 'manual':
+                scheduler.schedule_job(job_name, job_config)
+                message = f"Job '{job_name}' scheduled with pattern: {schedule}"
+            else:
+                message = f"Job '{job_name}' is set to manual execution"
+            
+            return {
+                'success': True,
+                'message': message,
+                'job_name': job_name,
+                'schedule': schedule
+            }
+            
+        except Exception as e:
+            logger.error(f"Schedule job error: {e}")
+            return {
+                'success': False,
+                'error': f'Schedule error: {str(e)}'
+            }

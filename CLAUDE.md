@@ -197,5 +197,43 @@ async def unlock_repository_unified(request: Request, job: str = Query(None)):
 
 **Priority:** Medium - addresses technical debt but doesn't block core functionality.
 
+## 🚨 TECHNICAL DEBT: Duplicate Restore Service Implementations
+
+**Issue:** Two separate restore implementations exist with overlapping functionality, creating maintenance overhead and potential inconsistencies.
+
+**Current State:**
+1. **`jobs/services/restore.py`**: Full-featured async restore service (733 lines)
+   - Background execution with threading
+   - Progress tracking and JSON parsing
+   - Health monitoring with timeouts
+   - Advanced error parsing and categorization
+   - Overwrite checking with risk analysis
+   - Status tracking for active restores
+
+2. **`jobs/handlers/pages.py`**: Simpler sync restore implementation (moved from operations.py)
+   - Direct synchronous execution
+   - Basic form data processing  
+   - Simple target path logic
+   - Manual restic command building
+   - Immediate response (no backgrounding)
+
+**Problem:** Both implementations serve restore functionality but with different approaches:
+- The async version (restore.py) is more sophisticated but may not be used by current UI forms
+- The sync version (handlers/pages.py) is actively used by restore forms but less feature-rich
+- Duplication violates DRY principle and creates maintenance burden
+
+**Recommended Consolidation:**
+1. **Research which implementation is actively used** by current restore forms/routes
+2. **Merge functionality** - combine the best of both:
+   - Use async background execution for UI responsiveness (from restore.py)
+   - Keep form processing and validation logic (from handlers/pages.py)
+   - Preserve progress tracking and error parsing (from restore.py)
+3. **Single restore service** that handles both simple and complex restore scenarios
+4. **Update all restore endpoints** to use the unified implementation
+
+**Priority:** Medium-High - Multiple restore paths create confusion and maintenance issues.
+
+**Similar Issue:** The backup services may also have duplication between `jobs/services/backup.py` implementations that should be reviewed.
+
 
 ---

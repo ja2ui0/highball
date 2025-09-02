@@ -6,16 +6,14 @@ Replaces: backup.py, backup_executor.py, backup_command_builder.py, backup_confl
 """
 
 import logging
-import threading
-from datetime import datetime
-from typing import Dict, Any, Optional
-from pathlib import Path
+from typing import Dict, Any
 
 # FastAPI imports
 from fastapi.responses import JSONResponse
 
 # Import unified models
 from jobs.services.backup import backup_service, ResticArgumentBuilder, BackupOrchestrationService
+from jobs.services.scheduler import JobSchedulingOrchestrationService
 from dests.services.rsync import rsync_service
 from jobs.services.notify import create_notification_service
 
@@ -34,6 +32,7 @@ class OperationsHandler:
         self.job_management = JobManagementService(backup_config)
         self.notification_service = create_notification_service(backup_config.get_global_settings())
         self.backup_orchestration = BackupOrchestrationService(backup_config)
+        self.scheduling_orchestration = JobSchedulingOrchestrationService(backup_config)
     
     # =============================================================================
     # BACKUP OPERATIONS
@@ -44,260 +43,6 @@ class OperationsHandler:
         result = self.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
-    # =============================================================================
-    # RESTORE OPERATIONS
-    # =============================================================================
-    
-    def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Process restore request from form"""
-        try:
-            job_name = form_data.get('job_name', [''])[0]
-            snapshot_id = form_data.get('snapshot_id', [''])[0]
-            target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
-            dry_run = 'dry_run' in form_data
-            
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            if not snapshot_id:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Snapshot ID is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            
-            # Only support Restic restores for now
-            if job_config.get('dest_type') != 'restic':
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Restore only supported for Restic repositories'
-                })
-            
-            # Build restore request
-            restore_request = {
-                'job_name': job_name,
-                'job_config': job_config,
-                'snapshot_id': snapshot_id,
-                'target_type': target_type,
-                'dry_run': dry_run
-            }
-            
-            # Add include patterns if specified
-            include_patterns = form_data.get('include_patterns', [''])
-            if include_patterns[0]:
-                restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
-            
-            # Execute restore
-            result = self._execute_restore(restore_request)
-            return JSONResponse(content=result)
-                
-        except Exception as e:
-            logger.error(f"Restore request error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Restore error: {str(e)}'
-            })
-    
-    def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute restore operation"""
-        try:
-            job_config = restore_request['job_config']
-            dest_config = job_config['dest_config']
-            
-            # Determine target path
-            if restore_request['target_type'] == 'safe':
-                # Restore to safe location (/restore)
-                target_path = f"/restore/{restore_request['job_name']}"
-                Path(target_path).mkdir(parents=True, exist_ok=True)
-            else:
-                # Restore to original source location (risky)
-                source_paths = job_config['source_config'].get('source_paths', [])
-                if not source_paths:
-                    return {'success': False, 'error': 'No source paths defined for restore'}
-                
-                # For same-as-origin restores, use container root since paths match mounts
-                if dest_config.get('repo_type') == 'same_as_origin':
-                    target_path = '/'
-                else:
-                    target_path = source_paths[0]['path']  # Use first source path
-            
-            # Use backup service for restore
-            from dests.services.restic import ResticRepositoryService
-            repo_service = ResticRepositoryService()
-            
-            # Build restore arguments
-            restore_args = [
-                '-r', dest_config['repo_uri'],
-                'restore', restore_request['snapshot_id'],
-                '--target', target_path
-            ]
-            
-            # Add include patterns if specified
-            if 'include_patterns' in restore_request:
-                for pattern in restore_request['include_patterns']:
-                    restore_args.extend(['--include', pattern])
-            
-            if restore_request['dry_run']:
-                restore_args.append('--dry-run')
-            
-            restore_args.extend(['--verbose'])
-            
-            # Execute restore command using unified ResticExecutionService
-            from services.execution import ResticExecutionService
-            restic_executor = ResticExecutionService()
-            
-            # Extract command args (remove 'restic' and repo args handled by service)
-            command_args = []
-            skip_next = False
-            for i, arg in enumerate(restore_args):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if arg == '-r':
-                    skip_next = True  # skip the repo URI
-                    continue
-                command_args.append(arg)
-            
-            result = restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=command_args,
-                source_config=job_config.get('source_config'),
-                operation_type=OperationType.RESTORE,
-                timeout=1800  # 30 minute timeout
-            )
-            
-            if result.returncode == 0:
-                return {
-                    'success': True,
-                    'message': f"Restore completed successfully to {target_path}",
-                    'target_path': target_path,
-                    'output': result.stdout,
-                    'dry_run': restore_request['dry_run']
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f"Restore failed: {result.stderr}",
-                    'output': result.stdout
-                }
-                
-        except subprocess.TimeoutExpired:
-            return {
-                'success': False,
-                'error': 'Restore operation timeout (30 minute limit)'
-            }
-        except Exception as e:
-            logger.error(f"Restore execution error: {e}")
-            return {
-                'success': False,
-                'error': f'Restore failed: {str(e)}'
-            }
-    
-    def check_restore_overwrites(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Check for potential restore overwrites"""
-        try:
-            job_name = form_data.get('job_name', [''])[0]
-            snapshot_id = form_data.get('snapshot_id', [''])[0]
-            target_type = form_data.get('target_type', ['safe'])[0]
-            
-            if not job_name or not snapshot_id:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name and snapshot ID are required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            
-            # Analyze potential overwrites
-            overwrite_analysis = self._analyze_restore_overwrites(job_config, snapshot_id, target_type)
-            
-            return JSONResponse(content={
-                'success': True,
-                'analysis': overwrite_analysis
-            })
-            
-        except Exception as e:
-            logger.error(f"Overwrite check error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Overwrite check failed: {str(e)}'
-            })
-    
-    def _analyze_restore_overwrites(self, job_config: Dict[str, Any], snapshot_id: str, target_type: str) -> Dict[str, Any]:
-        """Analyze potential file overwrites for restore"""
-        try:
-            if target_type == 'safe':
-                # Safe restore to /restore - minimal risk
-                return {
-                    'risk_level': 'low',
-                    'target_path': f"/restore/{job_config.get('job_name', 'unknown')}",
-                    'potential_overwrites': [],
-                    'warnings': ['Files will be restored to safe location'],
-                    'recommendations': ['Review restored files before moving to final location']
-                }
-            else:
-                # Restore to original location - high risk
-                source_paths = job_config['source_config'].get('source_paths', [])
-                if not source_paths:
-                    return {
-                        'risk_level': 'unknown',
-                        'error': 'No source paths defined'
-                    }
-                
-                target_path = source_paths[0]['path']
-                
-                # Check if target path exists and has files
-                existing_files = []
-                if Path(target_path).exists():
-                    try:
-                        for file_path in Path(target_path).rglob('*'):
-                            if file_path.is_file():
-                                existing_files.append(str(file_path))
-                                if len(existing_files) >= 10:  # Limit for performance
-                                    break
-                    except PermissionError:
-                        pass
-                
-                return {
-                    'risk_level': 'high' if existing_files else 'medium',
-                    'target_path': target_path,
-                    'potential_overwrites': existing_files[:10],  # Show first 10
-                    'total_existing_files': len(existing_files),
-                    'warnings': [
-                        'Restoring to original location may overwrite existing files',
-                        'Consider using safe restore option instead'
-                    ],
-                    'recommendations': [
-                        'Backup existing files before restore',
-                        'Use dry run to preview changes',
-                        'Consider restoring to safe location first'
-                    ]
-                }
-                
-        except Exception as e:
-            logger.error(f"Overwrite analysis error: {e}")
-            return {
-                'risk_level': 'unknown',
-                'error': f'Analysis failed: {str(e)}'
-            }
     
     # =============================================================================
     # JOB SCHEDULING
@@ -305,48 +50,8 @@ class OperationsHandler:
     
     def schedule_job(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Schedule a job for execution"""
-        try:
-            job_name = form_data.get('job_name', [''])[0]
-            
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            # Add job to scheduler
-            from jobs.services.schedule import SchedulingService
-            scheduler = SchedulingService()
-            
-            job_config = jobs[job_name]
-            schedule = job_config.get('schedule', 'manual')
-            
-            if schedule != 'manual':
-                scheduler.schedule_job(job_name, job_config)
-                message = f"Job '{job_name}' scheduled with pattern: {schedule}"
-            else:
-                message = f"Job '{job_name}' is set to manual execution"
-            
-            return JSONResponse(content={
-                'success': True,
-                'message': message,
-                'job_name': job_name,
-                'schedule': schedule
-            })
-            
-        except Exception as e:
-            logger.error(f"Schedule job error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Schedule error: {str(e)}'
-            })
+        result = self.scheduling_orchestration.schedule_job(form_data)
+        return JSONResponse(content=result)
     
     # =============================================================================
     # UTILITY METHODS
