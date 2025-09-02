@@ -99,41 +99,6 @@ class APIHandler:
     # RESTIC REPOSITORY OPERATIONS - MOVED TO dests/services/restic.py
     # =============================================================================
     
-    def validate_restic_job(self, job_name: str) -> JSONResponse:
-        """Validate Restic repository for a job"""
-        try:
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            
-            if job_config.get('dest_type') != 'restic':
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job is not configured for Restic'
-                })
-            
-            # Test repository access using unified backup service
-            result = backup_service.test_repository(job_config)
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Restic validation error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Validation failed: {str(e)}'
-            })
-    
     def validate_restic_form(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Validate Restic configuration from form data"""
         try:

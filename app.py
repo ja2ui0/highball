@@ -216,10 +216,6 @@ async def validate_ssh_source(source: str = Query("")):
     return origins_handler.validate_ssh_source(source)
 
 
-@app.get("/validate-restic")
-async def validate_restic_job(job: str = Query("")):
-    """Validate Restic repository configuration"""
-    return services.handlers['api'].validate_restic_job(job)
 
 
 @app.post("/validate-restic-form")
