@@ -142,7 +142,6 @@ config.py          # CRUD for config/
 Temporary, safe to delete post-refactor:
 
 - Old top-level `/handlers`, `/services`, `/models` still exist but frozen.
-- `app.py` still has some cruft; pure switchboard is target.
 
 ---
 # Notes
@@ -160,5 +159,43 @@ During the MVC switchboard refactor, we moved form parsing from app.py to indivi
 This inconsistency could lead to future bugs when form parsing patterns change or new `*_htmx` methods are added. We should investigate creating a standardized form parsing helper that all handlers can inherit or import, ensuring consistent behavior across the entire application.
 
 The immediate fix for the config preview button (admin handler) worked, but this underlying inconsistency remains a technical debt item.
+
+## 🚨 TECHNICAL DEBT: GET/POST Route Duplication
+
+**Issue:** Multiple endpoints have redundant GET/POST routes doing the same operation, creating DRY violations and maintenance overhead.
+
+**Example:** `/unlock-repository` has both GET and POST routes that essentially do the same thing - unlock a repository given a job parameter.
+
+**Current Pattern:**
+```python
+@app.get("/unlock-repository") 
+async def unlock_repository_get(job: str = Query("")):
+    return handler.unlock_repository_htmx(job)
+
+@app.post("/unlock-repository")
+async def unlock_repository_post(request: Request):
+    # Parse URL params to extract job
+    return handler.unlock_repository_post_htmx(request)
+    # Which then calls the same unlock_repository_htmx(job) method
+```
+
+**Suggested Solution:**
+1. **Single endpoint approach:** Use FastAPI's flexible parameter handling to accept both GET query params and POST form data in one route
+2. **Method consolidation:** One handler method that can extract parameters from either source
+3. **Low risk implementation:**
+   - Create new unified route alongside existing ones
+   - Test thoroughly 
+   - Remove old routes once confirmed working
+   - Update all HTMX templates to use new unified endpoint
+
+**Fast/Easy Implementation:**
+```python
+@app.api_route("/unlock-repository", methods=["GET", "POST"])
+async def unlock_repository_unified(request: Request, job: str = Query(None)):
+    return await handler.unlock_repository_unified_htmx(request, job)
+```
+
+**Priority:** Medium - addresses technical debt but doesn't block core functionality.
+
 
 ---

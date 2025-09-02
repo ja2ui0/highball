@@ -135,6 +135,79 @@ class BackupService:
             }
 
 # =============================================================================
+# BACKUP ORCHESTRATION SERVICE
+# =============================================================================
+
+class BackupOrchestrationService:
+    """Orchestrates backup job execution with validation, conflict checking, and threading"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+        from services.management import JobManagementService
+        self.job_management = JobManagementService(backup_config)
+    
+    def run_backup_job(self, job_name: str, dry_run: bool = False) -> Dict[str, Any]:
+        """Execute backup job with full orchestration"""
+        try:
+            if not job_name:
+                return {
+                    'success': False,
+                    'error': 'Job name is required'
+                }
+            
+            jobs = self.backup_config.get_backup_jobs()
+            if job_name not in jobs:
+                return {
+                    'success': False,
+                    'error': f"Job '{job_name}' not found"
+                }
+            
+            job_config = jobs[job_name]
+            # Add job name to config for proper tagging
+            job_config['job_name'] = job_name
+            
+            # Check if job is enabled
+            if not job_config.get('enabled', True):
+                return {
+                    'success': False,
+                    'error': f"Job '{job_name}' is disabled"
+                }
+            
+            # Check for conflicts if required
+            if job_config.get('respect_conflicts', True):
+                conflicts = self.job_management.check_conflicts(job_name)
+                if conflicts:
+                    return {
+                        'success': False,
+                        'error': f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}"
+                    }
+            
+            # Start backup via JobManagementService in background thread
+            import threading
+            backup_thread = threading.Thread(
+                target=self.job_management.run_backup_job_async,
+                args=(job_name, job_config, dry_run)
+            )
+            backup_thread.daemon = True
+            backup_thread.start()
+            
+            # Send immediate response
+            status_message = f"{'Dry run' if dry_run else 'Backup'} started for job '{job_name}'"
+            return {
+                'success': True,
+                'message': status_message,
+                'job_name': job_name,
+                'dry_run': dry_run
+            }
+            
+        except Exception as e:
+            logger.error(f"Backup job error: {e}")
+            return {
+                'success': False,
+                'error': f'Backup error: {str(e)}'
+            }
+
+# =============================================================================
 # MODULE EXPORTS - Backward compatibility
 # =============================================================================
 

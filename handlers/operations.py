@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 
 # Import unified models
-from jobs.services.backup import backup_service, ResticArgumentBuilder
+from jobs.services.backup import backup_service, ResticArgumentBuilder, BackupOrchestrationService
 from dests.services.rsync import rsync_service
 from jobs.services.notify import create_notification_service
 
@@ -33,6 +33,7 @@ class OperationsHandler:
         self.template_service = template_service
         self.job_management = JobManagementService(backup_config)
         self.notification_service = create_notification_service(backup_config.get_global_settings())
+        self.backup_orchestration = BackupOrchestrationService(backup_config)
     
     # =============================================================================
     # BACKUP OPERATIONS
@@ -40,63 +41,8 @@ class OperationsHandler:
     
     def run_backup_job(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration"""
-        try:
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            # Add job name to config for proper tagging
-            job_config['job_name'] = job_name
-            
-            # Check if job is enabled
-            if not job_config.get('enabled', True):
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' is disabled"
-                })
-            
-            # Check for conflicts if required
-            if job_config.get('respect_conflicts', True):
-                conflicts = self.job_management.check_conflicts(job_name)
-                if conflicts:
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f"Job '{job_name}' conflicts with running jobs: {', '.join(conflicts)}"
-                    })
-            
-            # Start backup via JobManagementService in background thread
-            backup_thread = threading.Thread(
-                target=self.job_management.run_backup_job_async,
-                args=(job_name, job_config, dry_run)
-            )
-            backup_thread.daemon = True
-            backup_thread.start()
-            
-            # Send immediate response
-            status_message = f"{'Dry run' if dry_run else 'Backup'} started for job '{job_name}'"
-            return JSONResponse(content={
-                'success': True,
-                'message': status_message,
-                'job_name': job_name,
-                'dry_run': dry_run
-            })
-            
-        except Exception as e:
-            logger.error(f"Backup job error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Backup error: {str(e)}'
-            })
+        result = self.backup_orchestration.run_backup_job(job_name, dry_run)
+        return JSONResponse(content=result)
     
     # =============================================================================
     # RESTORE OPERATIONS
