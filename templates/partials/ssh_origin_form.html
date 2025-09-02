@@ -16,7 +16,6 @@
         <div class="form-group">
             <label for="origin_name">Origin Name:</label>
             <input type="text" id="origin_name" name="origin_name" required 
-                   pattern="[a-zA-Z0-9_-]+" 
                    value="{{ origin_name | default('') }}"
                    placeholder="e.g., yeti, main-nas, prod-server">
             <div class="help-text">Filename slug (a-z, 0-9, _, - only) - used for filesystem and code references</div>

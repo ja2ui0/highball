@@ -1,12 +1,7 @@
-<div class="alert alert-info" id="ssh-validation-container">
+<div class="alert alert-info" id="ssh-validation-container"
+     hx-ext="sse" 
+     sse-connect="/ssh/stream/{{ session_id }}"
+     sse-swap="progress,success,error">
     <strong>🔄 SSH Validation in Progress...</strong><br>
     <div class="code-container" id="ssh-progress-log">{{ initial_message }}</div>
 </div>
-<div hx-swap-oob="true" id="save-origin-btn">
-    <button type="submit" class="button button-success" id="save-origin-btn" disabled>Save Origin</button>
-</div>
-<div id="ssh-progress-poller"
-     hx-get="/ssh/progress/{{ session_id }}" 
-     hx-trigger="load delay:500ms, every 1s [this]" 
-     hx-target="#ssh-validation-container" 
-     hx-swap="outerHTML"></div>

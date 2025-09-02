@@ -105,6 +105,10 @@ async def validate_ssh_origin(request: Request):
 async def get_ssh_progress(session_id: str):
     return origins_handler.get_ssh_progress(session_id)
 
+@app.get("/ssh/stream/{session_id}")
+async def stream_ssh_progress(session_id: str, request: Request):
+    return await origins_handler.stream_ssh_progress(session_id, request)
+
 @app.post("/htmx/toggle-auth-method")
 async def toggle_ssh_auth_method(request: Request):
     return await origins_handler.toggle_ssh_auth_method_htmx(request)

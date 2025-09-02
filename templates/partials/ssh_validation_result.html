@@ -1,7 +1,7 @@
 {% if success %}
 <div class="alert alert-success" id="ssh-validation-container">
     <strong>✓ Connection successful!</strong><br>
-    <div class="code-container">{{ validation_message }}</div>
+    <div class="code-container">{{ validation_message | replace('\n', '<br>') | safe }}</div>
     {% if rsync_available %}
     <br>• rsync is available
     {% endif %}
@@ -15,22 +15,14 @@
     {% endif %}
 </div>
 
-<!-- Stop the polling by replacing with empty element -->
-<div hx-swap-oob="outerHTML:#ssh-progress-poller" id="ssh-progress-poller" style="display:none;"></div>
-
 <!-- Update the existing form fields with validation results using HTMX -->
-{% if rsync_available is defined %}
-<input hx-swap-oob="outerHTML:#detected_rsync_available" type="hidden" id="detected_rsync_available" name="detected_rsync_available" value="{{ 'true' if rsync_available else 'false' }}">
-{% endif %}
-{% if container_runtime %}
-<input hx-swap-oob="outerHTML:#detected_container_runtime" type="hidden" id="detected_container_runtime" name="detected_container_runtime" value="{{ container_runtime }}">
-{% endif %}
+<div hx-swap-oob="innerHTML:#capability-fields">
+    <input type="hidden" id="detected_rsync_available" name="detected_rsync_available" value="{{ 'true' if rsync_available else 'false' }}">
+    <input type="hidden" id="detected_container_runtime" name="detected_container_runtime" value="{{ container_runtime | default('') }}">
+</div>
 {% else %}
 <div class="alert alert-error" id="ssh-validation-container">
     <strong>✗ Connection failed</strong><br>
-    <div class="code-container">{{ validation_message or error_message or 'Unknown error' }}</div>
+    <div class="code-container">{{ (validation_message or error_message or 'Unknown error') | replace('\n', '<br>') | safe }}</div>
 </div>
-
-<!-- Stop the polling by replacing with empty element -->
-<div hx-swap-oob="outerHTML:#ssh-progress-poller" id="ssh-progress-poller" style="display:none;"></div>
 {% endif %}

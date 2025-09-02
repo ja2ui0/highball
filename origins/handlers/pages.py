@@ -7,8 +7,9 @@ import logging
 from functools import wraps
 from typing import Dict, Any, Callable
 from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from dataclasses import dataclass
+import asyncio
 
 from services.template import TemplateService
 from config import BackupConfig
@@ -431,6 +432,89 @@ class OriginsHandler(BaseHandler):
             # Sessions accumulate but validation completes without console spam
             pass
             return self._render_html('partials/ssh_validation_result.html', result)
+    
+    @handle_page_errors("SSH progress streaming")
+    async def stream_ssh_progress(self, session_id: str, request: Request) -> StreamingResponse:
+        """Stream SSH validation progress using Server-Sent Events"""
+        import json
+        import os
+        import time
+        
+        async def event_generator():
+            session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+            last_progress_count = 0
+            max_wait_time = 60  # Maximum wait time in seconds
+            start_time = time.time()
+            
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    break
+                    
+                # Check for timeout
+                if time.time() - start_time > max_wait_time:
+                    error_result = {
+                        'success': False, 
+                        'validation_message': 'Validation timeout. Please try again.',
+                        'edit_mode': False
+                    }
+                    inner_error_html = self.template_service.render_template('partials/ssh_validation_result.html', **error_result)
+                    final_html = self.template_service.render_template('partials/ssh_validation_final_result.html', 
+                                                                     result_html=inner_error_html)
+                    # Remove newlines and extra whitespace from HTML for SSE
+                    final_html = ' '.join(final_html.split())
+                    yield f"event: error\ndata: {final_html}\n\n"
+                    break
+                
+                # Wait for session file to be created (don't immediately error)
+                if not os.path.exists(session_file):
+                    await asyncio.sleep(0.5)
+                    continue
+                
+                try:
+                    with open(session_file, 'r') as f:
+                        session_data = json.load(f)
+                    
+                    # Send new progress messages  
+                    current_progress = session_data['progress']
+                    if len(current_progress) > last_progress_count:
+                        progress_content = "<br>".join(current_progress)
+                        progress_html = self.template_service.render_template('partials/ssh_validation_progress_update.html', 
+                                                                           progress_content=progress_content)
+                        progress_html = ' '.join(progress_html.split())
+                        yield f"event: progress\ndata: {progress_html}\n\n"
+                        last_progress_count = len(current_progress)
+                    
+                    # Check if completed
+                    if session_data['completed']:
+                        result = session_data['result']
+                        result['edit_mode'] = session_data['edit_mode']
+                        
+                        # Render the final result template
+                        inner_result_html = self.template_service.render_template('partials/ssh_validation_result.html', **result)
+                        final_html = self.template_service.render_template('partials/ssh_validation_final_result.html', 
+                                                                         result_html=inner_result_html)
+                        # Remove newlines and extra whitespace from HTML for SSE
+                        final_html = ' '.join(final_html.split())
+                        event_type = "success" if result['success'] else "error"
+                        yield f"event: {event_type}\ndata: {final_html}\n\n"
+                        
+                        # Clean up session after successful completion
+                        try:
+                            os.remove(session_file)
+                        except OSError:
+                            pass
+                        break
+                    
+                    await asyncio.sleep(0.5)  # Poll every 500ms
+                    
+                except (json.JSONDecodeError, IOError):
+                    await asyncio.sleep(0.5)  # Retry on file access errors
+        
+        return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        })
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
