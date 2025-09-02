@@ -359,5 +359,68 @@ class RsyncService:
                 error=f'Rsyncd validation error: {str(e)}'
             ).to_dict()
 
+    def validate_rsync_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate rsync (SSH) destination with superior SSH + path writability testing"""
+        def _get_form_value(field_name: str, default: str = '') -> str:
+            """Get form field value with default"""
+            value = form_data.get(field_name, default)
+            if isinstance(value, list):
+                return value[0] if value else default
+            return str(value)
+        
+        hostname = _get_form_value('hostname', '')
+        username = _get_form_value('username', '')
+        path = _get_form_value('path', '')
+        port = _get_form_value('port', '22')
+        
+        if not all([hostname, username, path]):
+            return RsyncResult(
+                success=False,
+                error='Hostname, username, and path are required for rsync validation'
+            ).to_dict()
+        
+        # Test SSH connectivity and path writability (superior implementation from test_destination)
+        try:
+            cmd = [
+                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
+                '-o', 'ConnectTimeout=10',
+                '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+            ]
+            
+            # Add port if not default
+            if port and port != '22':
+                cmd.extend(['-p', port])
+            
+            cmd.extend([
+                f"{username}@{hostname}",
+                f"test -w '{path}' && echo 'OK'"
+            ])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                return RsyncResult(
+                    success=True,
+                    message=f"SSH connection successful to {hostname}. Path '{path}' is writable."
+                ).to_dict()
+            else:
+                return RsyncResult(
+                    success=False,
+                    error=f"SSH connection or path test failed: {result.stderr.strip() or 'Unknown error'}"
+                ).to_dict()
+                
+        except subprocess.TimeoutExpired:
+            return RsyncResult(
+                success=False,
+                error='SSH connection timeout'
+            ).to_dict()
+        except Exception as e:
+            return RsyncResult(
+                success=False,
+                error=f'Rsync validation error: {str(e)}'
+            ).to_dict()
+
 # Export the service
 rsync_service = RsyncService()

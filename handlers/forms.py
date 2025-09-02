@@ -28,40 +28,6 @@ class DestinationValidationHandler:
             return value[0] if value else default
         return str(value)
     
-    def validate_rsync_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate rsync (SSH) destination"""
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        username = self._get_form_value(form_data, 'username', '')
-        path = self._get_form_value(form_data, 'path', '')
-        port = self._get_form_value(form_data, 'port', '22')
-        
-        if not all([hostname, username, path]):
-            return {
-                'success': False,
-                'validation_message': 'Hostname, username, and path are required for rsync validation'
-            }
-        
-        # Test SSH connectivity (reuse existing SSH validation)
-        ssh_config = {
-            'hostname': hostname,
-            'username': username,
-            'port': int(port) if port.isdigit() else 22
-        }
-        
-        from jobs.services.validate import ValidationService
-        validation_service = ValidationService()
-        result = validation_service.validate_ssh_source(ssh_config)
-        
-        if result['valid']:
-            return {
-                'success': True,
-                'validation_message': f"SSH connection successful to {hostname}. Path writability not tested."
-            }
-        else:
-            return {
-                'success': False,
-                'validation_message': f"SSH connection failed: {result.get('error', 'Unknown error')}"
-            }
     
     
     def validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -416,9 +416,13 @@ class DestinationsHandler(BaseHandler):
         else:
             # Test basic connectivity based on destination type using atomic services
             if dest_type == 'rsync':
-                from handlers.forms import DestinationValidationHandler
-                destination_validator = DestinationValidationHandler()
-                template_context = destination_validator.validate_rsync_destination(form_data)
+                # Use superior rsync validation from atomic service (SSH + path writability)
+                from dests.services.rsync import rsync_service
+                result = rsync_service.validate_rsync_destination(form_data)
+                template_context = {
+                    'success': result['success'],
+                    'validation_message': result.get('message') or result.get('error', 'Unknown error')
+                }
             elif dest_type == 'rsyncd':
                 # Use superior rsyncd validation from atomic service
                 from dests.services.rsync import rsync_service
