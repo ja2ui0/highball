@@ -317,6 +317,14 @@ class DestinationsHandler(BaseHandler):
                 'error': f"Failed to delete destination '{dest_name}'"
             }, status_code=500)
 
+    async def add_destination_htmx(self, request) -> JSONResponse:
+        """Add destination with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.add_destination(form_data)
+
     def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new destination"""
         
@@ -477,6 +485,14 @@ class DestinationsHandler(BaseHandler):
             return f"Error: {uri_result.get('error', 'URI generation failed')}"
 
     @handle_page_errors("Save destination")
+    async def save_destination_htmx(self, request) -> JSONResponse:
+        """Save destination with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.save_destination(form_data)
+
     def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save destination changes"""
         
@@ -521,6 +537,14 @@ class DestinationsHandler(BaseHandler):
             }, status_code=500)
 
     @handle_page_errors("Validate destination")
+    async def validate_destination_htmx(self, request) -> HTMLResponse:
+        """Validate destination with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.validate_destination(form_data)
+
     def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Validate destination configuration"""
         dest_type = self._get_form_value(form_data, 'dest_type', '')
@@ -573,6 +597,14 @@ class DestinationsHandler(BaseHandler):
         return self._render_html('partials/destination_validation_result.html', template_context)
 
     @handle_page_errors("Destination type fields")
+    async def destination_type_fields_htmx(self, request) -> HTMLResponse:
+        """Load destination type fields with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.destination_type_fields(form_data)
+
     def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Load destination type-specific fields (HTMX partial)"""
         dest_type = self._get_form_value(form_data, 'dest_type', '')

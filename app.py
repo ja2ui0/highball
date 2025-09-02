@@ -157,15 +157,13 @@ async def show_destinations():
 @app.post("/dests/add")
 async def add_destination(request: Request):
     """Add new destination"""
-    form_data = dict(await request.form())
-    return destinations_handler.add_destination(form_data)
+    return await destinations_handler.add_destination_htmx(request)
 
 
 @app.post("/dests/save")
 async def save_destination(request: Request):
     """Save destination changes"""
-    form_data = dict(await request.form())
-    return destinations_handler.save_destination(form_data)
+    return await destinations_handler.save_destination_htmx(request)
 
 
 @app.post("/dests/delete")
@@ -177,15 +175,13 @@ async def delete_destination(name: str = Query("")):
 @app.post("/dests/validate")
 async def validate_destination(request: Request):
     """Validate destination configuration"""
-    form_data = dict(await request.form())
-    return destinations_handler.validate_destination(form_data)
+    return await destinations_handler.validate_destination_htmx(request)
 
 # Destination HTMX Partials
 @app.post("/htmx/destination-type-fields")
 async def destination_type_fields(request: Request):
     """Load destination type-specific fields (HTMX partial)"""
-    form_data = dict(await request.form())
-    return destinations_handler.destination_type_fields(form_data)
+    return await destinations_handler.destination_type_fields_htmx(request)
 
 
 # =============================================================================
