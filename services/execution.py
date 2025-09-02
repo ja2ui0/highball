@@ -6,6 +6,7 @@ Replaces: command_execution_service.py, command_obfuscation.py
 import subprocess
 import shlex
 import re
+import base64
 from enum import Enum
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
@@ -653,53 +654,50 @@ class SSHWorkflowService:
     def _copy_keypair_to_remote(self, hostname: str, username: str) -> dict:
         """Copy Highball keypair to remote host ~/.ssh/ directory"""
         import subprocess
+        from services.shared import SSHCommandFactory
         
         try:
-            # Copy private key
-            private_copy_cmd = [
-                'scp', '-i', '/config/local/secrets/.ssh/id_highball',
-                '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                '/config/local/secrets/.ssh/id_highball',
-                f'{username}@{hostname}:~/.ssh/'
-            ]
+            # Read both keys
+            with open('/config/local/secrets/.ssh/id_highball', 'r') as f:
+                private_key = f.read()
+            with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
+                public_key = f.read()
             
-            result = subprocess.run(private_copy_cmd, capture_output=True, text=True, timeout=30)
+            # Use SSHCommandFactory with subprocess.run (cleaner than SCP)
+            ssh_factory = SSHCommandFactory()
+            
+            # Copy private key using base64 for safe transfer
+            private_b64 = base64.b64encode(private_key.encode()).decode()
+            private_cmd = ssh_factory.build_ssh_command(
+                hostname, username,
+                f'echo "{private_b64}" | base64 -d > ~/.ssh/id_highball'
+            )
+            result = subprocess.run(private_cmd, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 return {
                     'success': False,
                     'validation_message': f'Private key copy failed: {result.stderr.strip()}'
                 }
             
-            # Copy public key
-            public_copy_cmd = [
-                'scp', '-i', '/config/local/secrets/.ssh/id_highball',
-                '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                '/config/local/secrets/.ssh/id_highball.pub',
-                f'{username}@{hostname}:~/.ssh/'
-            ]
-            
-            result = subprocess.run(public_copy_cmd, capture_output=True, text=True, timeout=30)
+            # Copy public key using base64 for safe transfer  
+            public_b64 = base64.b64encode(public_key.encode()).decode()
+            public_cmd = ssh_factory.build_ssh_command(
+                hostname, username,
+                f'echo "{public_b64}" | base64 -d > ~/.ssh/id_highball.pub'
+            )
+            result = subprocess.run(public_cmd, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 return {
                     'success': False,
                     'validation_message': f'Public key copy failed: {result.stderr.strip()}'
                 }
             
-            # Set proper permissions
-            chmod_cmd = [
-                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-                '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                f'{username}@{hostname}',
+            # Set permissions
+            chmod_cmd = ssh_factory.build_ssh_command(
+                hostname, username,
                 'chmod 600 ~/.ssh/id_highball && chmod 644 ~/.ssh/id_highball.pub'
-            ]
-            
-            result = subprocess.run(chmod_cmd, capture_output=True, text=True, timeout=15)
+            )
+            result = subprocess.run(chmod_cmd, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 return {
                     'success': False,

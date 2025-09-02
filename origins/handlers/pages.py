@@ -401,7 +401,7 @@ class OriginsHandler(BaseHandler):
         session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
         
         if not os.path.exists(session_file):
-            return self._render_html('partials/ssh_validation_result.html', {
+            return self._render_html('partials/ssh_validation_expired.html', {
                 'success': False,
                 'validation_message': "Session not found or expired"
             })
@@ -410,7 +410,7 @@ class OriginsHandler(BaseHandler):
             with open(session_file, 'r') as f:
                 session_data = json.load(f)
         except (json.JSONDecodeError, IOError):
-            return self._render_html('partials/ssh_validation_result.html', {
+            return self._render_html('partials/ssh_validation_expired.html', {
                 'success': False,
                 'validation_message': "Session data corrupted"
             })
@@ -427,11 +427,11 @@ class OriginsHandler(BaseHandler):
             # Completed - return final result and schedule cleanup
             result = session_data['result']
             result['edit_mode'] = session_data['edit_mode']
-            # Schedule cleanup after a delay to prevent race conditions
+            # Schedule cleanup after a longer delay to prevent race conditions
             import threading
             def delayed_cleanup():
                 import time
-                time.sleep(5)  # Wait 5 seconds before cleanup
+                time.sleep(15)  # Wait 15 seconds before cleanup (was 5, too short)
                 try:
                     os.remove(session_file)
                 except OSError:

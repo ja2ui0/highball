@@ -1,0 +1,7 @@
+<div class="alert alert-error" id="ssh-validation-container">
+    <strong>✗ Connection failed</strong><br>
+    <div class="code-container">{{ validation_message }}</div>
+</div>
+
+<!-- Stop the polling by removing the polling element if it exists -->
+<div hx-swap-oob="delete:#ssh-progress-poller" style="display:none;"></div>

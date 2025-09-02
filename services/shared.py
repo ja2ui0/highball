@@ -14,14 +14,18 @@ import shlex
 class SSHCommandFactory:
     """Centralized SSH command building to eliminate 15+ instances of duplication"""
     
-    def __init__(self, ssh_key_path: str = '/config/local/secrets/.ssh/id_highball'):
+    def __init__(self, 
+                 ssh_key_path: str = '/config/local/secrets/.ssh/id_highball',
+                 connect_timeout: Optional[int] = None):
         self.ssh_key_path = ssh_key_path
-        self.standard_options = [
-            '-o', 'ConnectTimeout=10',
+        # Future: could read from origin/dest config here
+        self.connect_timeout = connect_timeout or 5  # Default 5s - reasonable for most networks
+        self.base_options = [
             '-o', 'BatchMode=yes', 
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null'
         ]
+    
     
     def build_ssh_command(
         self, 
@@ -29,53 +33,41 @@ class SSHCommandFactory:
         username: str, 
         remote_command: str,
         use_key: bool = True,
-        port: Optional[int] = None
+        port: Optional[int] = None,
+        connect_timeout: Optional[int] = None,
+        password: Optional[str] = None
     ) -> List[str]:
         """Build standard SSH command with consistent options"""
         cmd = ['ssh']
         
-        if use_key:
+        # Password auth: no key, no BatchMode (interactive)
+        if password:
+            # Don't use key for password auth
+            pass
+        elif use_key:
+            # Key auth: use Highball key + BatchMode
             cmd.extend(['-i', self.ssh_key_path])
         
         if port:
             cmd.extend(['-p', str(port)])
-            
-        cmd.extend(self.standard_options)
+        
+        # Build options - exclude BatchMode for password auth
+        timeout = connect_timeout or self.connect_timeout
+        cmd.extend(['-o', f'ConnectTimeout={timeout}'])
+        cmd.extend(['-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'])
+        
+        # Only add BatchMode for key authentication
+        if not password:
+            cmd.extend(['-o', 'BatchMode=yes'])
+        
         cmd.append(f'{username}@{hostname}')
         cmd.append(remote_command)
         
-        return cmd
-    
-    def build_scp_command(
-        self,
-        source: str,
-        destination: str, 
-        hostname: str,
-        username: str,
-        use_key: bool = True,
-        port: Optional[int] = None,
-        recursive: bool = False
-    ) -> List[str]:
-        """Build SCP command with consistent options"""
-        cmd = ['scp']
-        
-        if use_key:
-            cmd.extend(['-i', self.ssh_key_path])
-            
-        if port:
-            cmd.extend(['-P', str(port)])  # Note: scp uses -P not -p
-            
-        if recursive:
-            cmd.append('-r')
-            
-        cmd.extend(self.standard_options)
-        cmd.extend([source, f'{username}@{hostname}:{destination}'])
+        # Wrap with sshpass if password provided
+        if password:
+            cmd = ['sshpass', '-p', password] + cmd
         
         return cmd
-    
-    def wrap_with_sshpass(self, ssh_command: List[str], password: str) -> List[str]:
-        """Wrap SSH command with sshpass for password authentication"""
-        return ['sshpass', '-p', password] + ssh_command
 
 
 # =============================================================================

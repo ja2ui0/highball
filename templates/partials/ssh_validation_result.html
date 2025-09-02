@@ -18,12 +18,13 @@
 <!-- Stop the polling by removing the polling element -->
 <div hx-swap-oob="delete:#ssh-progress-poller"></div>
 
-<!-- Update the existing form fields with validation results -->
-<script>
-    // Update the hidden form fields with detected capabilities
-    document.getElementById('detected_rsync_available').value = '{{ 'true' if rsync_available else 'false' }}';
-    document.getElementById('detected_container_runtime').value = '{{ container_runtime | default('') }}';
-</script>
+<!-- Update the existing form fields with validation results using HTMX -->
+{% if rsync_available is defined %}
+<input hx-swap-oob="outerHTML:#detected_rsync_available" type="hidden" id="detected_rsync_available" name="detected_rsync_available" value="{{ 'true' if rsync_available else 'false' }}">
+{% endif %}
+{% if container_runtime %}
+<input hx-swap-oob="outerHTML:#detected_container_runtime" type="hidden" id="detected_container_runtime" name="detected_container_runtime" value="{{ container_runtime }}">
+{% endif %}
 {% else %}
 <div class="alert alert-error" id="ssh-validation-container">
     <strong>✗ Connection failed</strong><br>
