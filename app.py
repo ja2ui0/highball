@@ -620,6 +620,18 @@ async def generate_restic_uri_preview(request: Request):
     return await destinations_handler.generate_restic_uri_preview_htmx(request)
 
 
+@app.post("/jobs/restore-target-change")
+async def handle_restore_target_change(request: Request):
+    """Handle restore target change and check overwrites"""
+    return await jobs_handler.handle_restore_target_change_htmx(request)
+
+
+@app.post("/jobs/restore-dry-run-change")
+async def handle_restore_dry_run_change(request: Request):
+    """Handle dry run toggle and update warning"""
+    return await jobs_handler.handle_restore_dry_run_change_htmx(request)
+
+
 @app.post("/schedule-job")
 async def schedule_job(request: Request):
     """Schedule a job"""

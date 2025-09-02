@@ -42,9 +42,6 @@ class FormsHandler:
             
             # Repository management
             
-            # Restore actions
-            'restore-target-change': self._handle_restore_target_change,
-            'restore-dry-run-change': self._handle_restore_dry_run_change,
             
         }
         
@@ -63,66 +60,6 @@ class FormsHandler:
     # VALIDATION ACTIONS - Direct validator calls, no coordinators
     # =============================================================================
     
-    def _handle_restore_target_change(self, form_data):
-        """HTTP coordination: handle restore target change and check overwrites"""
-        # HTTP concern: extract parameters
-        job_name = self._get_form_value(form_data, 'job_name')
-        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
-        selected_paths = form_data.get('selected_paths', [])
-        
-        # Business logic concern: check for overwrites using restore service
-        from jobs.services.restore import RestoreService
-        restore_service = RestoreService()
-        
-        # Get job config for source details
-        jobs = self.validation_service.backup_config.config.get('backup_jobs', {})
-        job_config = jobs.get(job_name, {})
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'local')
-        
-        has_overwrites = restore_service.check_restore_overwrites(
-            restore_target, source_type, source_config, selected_paths
-        )
-        
-        # Template concern: use template service to render partial
-        template_vars = {
-            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
-            'RESTORE_TARGET': restore_target,
-            'DRY_RUN': 'true' if dry_run else 'false',
-            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-        }
-        
-        return self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
-    
-    def _handle_restore_dry_run_change(self, form_data):
-        """HTTP coordination: handle dry run toggle and update warning"""
-        # HTTP concern: extract parameters  
-        job_name = self._get_form_value(form_data, 'job_name')
-        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
-        selected_paths = form_data.get('selected_paths', [])
-        
-        # Business logic concern: check for overwrites using restore service
-        from jobs.services.restore import RestoreService
-        restore_service = RestoreService()
-        
-        # Get job config for source details
-        jobs = self.validation_service.backup_config.config.get('backup_jobs', {})
-        job_config = jobs.get(job_name, {})
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'local')
-        
-        has_overwrites = restore_service.check_restore_overwrites(
-            restore_target, source_type, source_config, selected_paths
-        )
-        
-        # Template concern: pass data to Jinja2 template for conditional rendering
-        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-        return self.template_service.render_template('partials/restore_overwrite_warning.html', 
-                                                    has_overwrites=has_overwrites,
-                                                    target_text=target_text,
-                                                    dry_run=dry_run)
     
     
     # =============================================================================
