@@ -715,5 +715,29 @@ class AdminHandler(BaseHandler):
         # Call existing business logic
         return self.save_raw_config(form_data)
 
+    async def test_telegram_notification_htmx(self, request) -> JSONResponse:
+        """Test Telegram notification with form parsing - pure switchboard compliance"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        test_message = form.get('test_message', 'Test notification from Highball')
+        
+        # Call existing business logic (notification test service)
+        from admin.services.notifications import NotificationTestService
+        from config import BackupConfig
+        notification_service = NotificationTestService(BackupConfig())
+        return notification_service.test_telegram_notification(test_message)
+
+    async def test_email_notification_htmx(self, request) -> JSONResponse:
+        """Test email notification with form parsing - pure switchboard compliance"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        test_message = form.get('test_message', 'Test notification from Highball')
+        
+        # Call existing business logic (notification test service)
+        from admin.services.notifications import NotificationTestService
+        from config import BackupConfig
+        notification_service = NotificationTestService(BackupConfig())
+        return notification_service.test_email_notification(test_message)
+
 # Global handler instance
 admin_handler = AdminHandler()
