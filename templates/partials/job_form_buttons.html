@@ -6,7 +6,7 @@
            id="submit-button"
            {% if submit_button_text == 'Commit Changes' and not form_has_changes %}disabled{% endif %}>
     <button type="button" class="button" 
-            hx-post="/htmx/preview-config"
+            hx-post="/admin/preview-config"
             hx-include="closest form"
             hx-target="#config_preview"
             hx-swap="innerHTML">Preview Config</button>
@@ -18,7 +18,7 @@
 <input type="hidden" name="original_job_config" value="{{ original_job_config | e }}">
 
 <!-- HTMX change detection -->
-<div hx-post="/htmx/check-form-changes"
+<div hx-post="/admin/check-form-changes"
      hx-trigger="input from:form, change from:form"
      hx-include="closest form"
      hx-target="#submit-button"

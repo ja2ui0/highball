@@ -51,29 +51,12 @@ class FormsHandler:
             'restore-target-change': self._handle_restore_target_change,
             'restore-dry-run-change': self._handle_restore_dry_run_change,
             
-            # Log management (connect to pages handler functionality)
-            'clear-logs': self._clear_logs,
-            'refresh-logs': self._refresh_logs,
-            
-            # Configuration management (connect to existing notification functionality)
-            'queue-settings': self._handle_queue_settings,
-            
-            # Global notification provider management (config manager)
-            'add-global-notification-provider': self._add_global_notification_provider,
-            'remove-global-notification-provider': self._remove_global_notification_provider,
-            
             # Form field rendering (connect to existing implementations)
             'maintenance-toggle': self._render_maintenance_fields,
             'restic-repo-fields': self._render_restic_repo_fields,
-            'cron-field': self._render_cron_field,
-            'toggle-password-visibility': self._toggle_password_visibility,
             
             # URI preview
             'restic-uri-preview': self._generate_restic_uri_preview,
-            
-            # Config preview
-            'preview-config': self._preview_config,
-            'check-form-changes': self._check_form_changes,
         }
         
         handler_func = actions.get(action)
@@ -328,27 +311,6 @@ class FormsHandler:
     # MISSING ENDPOINT IMPLEMENTATIONS - Connect to existing functionality
     # =============================================================================
     
-    def _clear_logs(self, form_data):
-        """Clear logs using existing pages handler functionality"""
-        # Connect to existing _get_system_logs in pages.py for log clearing
-        return self.template_service.render_template('partials/log_cleared.html')
-    
-    def _refresh_logs(self, form_data):
-        """Refresh logs using existing pages handler log system"""
-        # Connect to existing _get_system_logs in pages.py for log refresh
-        job_name = self._get_form_value(form_data, 'job_name')
-        return self.template_service.render_template('partials/logs_refreshed.html', 
-                                                   job_name=job_name)
-    
-    def _handle_queue_settings(self, form_data):
-        """Handle notification queue settings using existing queue system"""
-        provider = self._get_form_value(form_data, 'provider')
-        enabled = self._get_form_value(form_data, 'enabled') == 'true'
-        
-        # Connect to existing notification queue system
-        return self.template_service.render_template('partials/queue_settings.html',
-                                                   provider=provider,
-                                                   enabled=enabled)
     
     def _render_restic_repo_fields(self, form_data):
         """Render Restic repository type fields using schema-driven templates"""
@@ -364,47 +326,7 @@ class FormsHandler:
                                                    repo_type=repo_type,
                                                    repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS)
     
-    def _render_cron_field(self, form_data):
-        """Render cron field using existing template logic"""
-        schedule = self._get_form_value(form_data, 'schedule')
-        cron_pattern = self._get_form_value(form_data, 'cron_pattern')
-        
-        return self.template_service.render_template('partials/cron_field.html',
-                                                   schedule=schedule,
-                                                   cron_pattern=cron_pattern,
-                                                   show_field=(schedule == 'custom'))
     
-    def _toggle_password_visibility(self, form_data):
-        """Toggle password field visibility state"""
-        field_id = self._get_form_value(form_data, 'field_id')
-        current_hidden = self._get_form_value(form_data, 'hidden') == 'true'
-        new_hidden = not current_hidden
-        
-        return self.template_service.render_template('partials/password_field.html',
-                                                   field_id=field_id,
-                                                   field_name=field_id,  # Assume same as ID
-                                                   field_value='',  # Don't echo passwords for security
-                                                   hidden=new_hidden)
-    
-    def _add_global_notification_provider(self, form_data):
-        """Add a new global notification provider to config manager"""
-        provider = self._get_form_value(form_data, 'add_provider')
-        if not provider or provider not in ['telegram', 'email']:
-            return self._render_error("Invalid provider selection")
-        
-        # TODO: Add provider to global config and render updated notification section
-        return self.template_service.render_template('partials/notification_provider_added.html',
-                                                    provider=provider)
-    
-    def _remove_global_notification_provider(self, form_data):
-        """Remove a global notification provider from config manager"""
-        provider = self._get_form_value(form_data, 'provider')
-        if not provider or provider not in ['telegram', 'email']:
-            return self._render_error("Invalid provider")
-        
-        # TODO: Remove provider from global config and render updated notification section
-        return self.template_service.render_template('partials/notification_provider_removed.html',
-                                                    provider=provider)
     
     def _generate_restic_uri_preview(self, form_data):
         """Generate real-time URI preview for repository configuration"""
@@ -436,107 +358,6 @@ class FormsHandler:
             return self.template_service.render_template('partials/uri_preview.html',
                                                        uri=uri_result.get('error', 'Invalid configuration'))
     
-    def _preview_config(self, form_data):
-        """Generate and display job config preview"""
-        try:
-            if not form_data:
-                return self.template_service.render_template('partials/job_config_preview.html',
-                                                           preview_content="Error: No form data received")
-            
-            # Parse the form data using the existing parser
-            from models.forms import JobFormParser
-            parser = JobFormParser()
-            
-            result = parser.parse_job_form(form_data)
-            
-            if not result.get('valid', False):
-                error_msg = result.get('error', 'Unknown parsing error')
-                # Add some debug info to the error
-                from models.forms import safe_get_value
-                restic_repo_type = safe_get_value(form_data, 'restic_repo_type')
-                dest_type = safe_get_value(form_data, 'dest_type')
-                
-                debug_error = f"Form Validation Error: {error_msg}\n\n"
-                debug_error += f"Debug Info:\n"
-                debug_error += f"- restic_repo_type extracted: '{restic_repo_type}'\n"
-                debug_error += f"- dest_type extracted: '{dest_type}'\n"
-                debug_error += f"- Form data keys: {list(form_data.keys())}\n"
-                
-                return self.template_service.render_template('partials/job_config_preview.html',
-                                                           preview_content=debug_error)
-            
-            # Parse the form data using the existing parser  
-            from models.forms import JobFormParser
-            parser = JobFormParser()
-            
-            result = parser.parse_job_form(form_data)
-            
-            if not result.get('valid', False):
-                error_msg = result.get('error', 'Unknown parsing error')
-                return self.template_service.render_template('partials/job_config_preview.html',
-                                                           preview_content=f"Form Validation Error: {error_msg}")
-            
-            # Build the job config as it would appear in config.yaml
-            job_data = result.copy()
-            if 'valid' in job_data:
-                del job_data['valid']  # Remove the validation flag
-            
-            # Format as YAML for display
-            import yaml
-            yaml_content = yaml.dump({job_data.get('job_name', 'unnamed_job'): job_data}, 
-                                   default_flow_style=False, sort_keys=False)
-            
-            return self.template_service.render_template('partials/job_config_preview.html',
-                                                       preview_content=yaml_content)
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return self.template_service.render_template('partials/job_config_preview.html',
-                                                       preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.")
-    
-    def _check_form_changes(self, form_data):
-        """Check if form has changes compared to original config"""
-        try:
-            import json
-            from models.forms import job_parser
-            
-            # Get original config from hidden field
-            original_config_str = self._get_form_value(form_data, 'original_job_config')
-            if not original_config_str:
-                # No original config means this is add mode, always enable
-                return self.template_service.render_template('partials/submit_button.html',
-                                                           button_text='Create Job',
-                                                           enabled=True)
-            
-            # Parse current form data
-            current_result = job_parser.parse_job_form(form_data)
-            if not current_result['valid']:
-                # Form is invalid, disable button
-                return self.template_service.render_template('partials/submit_button.html',
-                                                           button_text='Commit Changes',
-                                                           enabled=False)
-            
-            # Compare configs (normalize for comparison)
-            original_config = json.loads(original_config_str)
-            current_config = current_result.copy()
-            if 'valid' in current_config:
-                del current_config['valid']
-            
-            # Compare as JSON strings for deep equality
-            original_json = json.dumps(original_config, sort_keys=True)
-            current_json = json.dumps(current_config, sort_keys=True)
-            
-            has_changes = original_json != current_json
-            return self.template_service.render_template('partials/submit_button.html',
-                                                       button_text='Commit Changes',
-                                                       enabled=has_changes)
-            
-        except Exception as e:
-            # On error, default to enabled
-            return self.template_service.render_template('partials/submit_button.html',
-                                                       button_text='Commit Changes',
-                                                       enabled=True)
 
 
 # =============================================================================

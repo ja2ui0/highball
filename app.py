@@ -530,6 +530,60 @@ async def save_raw_config(request: Request):
     return admin_handler.save_raw_config(form_data)
 
 
+@app.post("/admin/add-global-notification-provider")
+async def add_global_notification_provider(request: Request):
+    """Add global notification provider"""
+    return await admin_handler.add_global_notification_provider_htmx(request)
+
+
+@app.post("/admin/remove-global-notification-provider")
+async def remove_global_notification_provider(request: Request):
+    """Remove global notification provider"""
+    return await admin_handler.remove_global_notification_provider_htmx(request)
+
+
+@app.post("/admin/clear-logs")
+async def clear_logs(request: Request):
+    """Clear logs"""
+    return await admin_handler.clear_logs_htmx(request)
+
+
+@app.post("/admin/refresh-logs")
+async def refresh_logs(request: Request):
+    """Refresh logs"""
+    return await admin_handler.refresh_logs_htmx(request)
+
+
+@app.post("/admin/queue-settings")
+async def handle_queue_settings(request: Request):
+    """Handle notification queue settings"""
+    return await admin_handler.handle_queue_settings_htmx(request)
+
+
+@app.post("/admin/cron-field")
+async def render_cron_field(request: Request):
+    """Render cron field"""
+    return await admin_handler.render_cron_field_htmx(request)
+
+
+@app.post("/admin/toggle-password-visibility")
+async def toggle_password_visibility(request: Request):
+    """Toggle password field visibility"""
+    return await admin_handler.toggle_password_visibility_htmx(request)
+
+
+@app.post("/admin/preview-config")
+async def preview_config(request: Request):
+    """Generate job config preview"""
+    return await admin_handler.preview_config_htmx(request)
+
+
+@app.post("/admin/check-form-changes")
+async def check_form_changes(request: Request):
+    """Check if form has changes"""
+    return await admin_handler.check_form_changes_htmx(request)
+
+
 @app.post("/schedule-job")
 async def schedule_job(request: Request):
     """Schedule a job"""

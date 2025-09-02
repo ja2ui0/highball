@@ -16,7 +16,7 @@
         <div class="form-group">
             <label for="add_provider">Select Provider:</label>
             <select id="add_provider" name="add_provider"
-                    hx-post="/htmx/add-global-notification-provider"
+                    hx-post="/admin/add-global-notification-provider"
                     hx-target="#notification-providers"
                     hx-swap="outerHTML"
                     hx-trigger="change[target.value != '']">

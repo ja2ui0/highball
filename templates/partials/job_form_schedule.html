@@ -14,7 +14,7 @@ documents/**">{{ includes }}</textarea>
             <div class="form-group">
                 <label for="schedule">Schedule:</label>
                 <select id="schedule" name="schedule" 
-                        hx-post="/htmx/cron-field" 
+                        hx-post="/admin/cron-field" 
                         hx-target="#cron_field" 
                         hx-swap="outerHTML"
                         hx-include="[name='cron_pattern']">

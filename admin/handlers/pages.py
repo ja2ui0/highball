@@ -326,5 +326,337 @@ class AdminHandler(BaseHandler):
             'success': True
         })
 
+    # =============================================================================
+    # NOTIFICATION PROVIDER MANAGEMENT - Admin pillar methods
+    # =============================================================================
+
+    def _render_error(self, message):
+        """Render error message"""
+        import html
+        return self.template_service.render_template('partials/error_message.html',
+                                                   message=html.escape(message))
+
+    async def add_global_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Add a new global notification provider to config manager - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        provider = self._get_form_value(form_data, 'add_provider')
+        if not provider or provider not in ['telegram', 'email']:
+            html_response = self._render_error("Invalid provider selection")
+        else:
+            # TODO: Add provider to global config and render updated notification section
+            html_response = self.template_service.render_template('partials/notification_provider_added.html',
+                                                                provider=provider)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def remove_global_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Remove a global notification provider from config manager - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        provider = self._get_form_value(form_data, 'provider')
+        if not provider or provider not in ['telegram', 'email']:
+            html_response = self._render_error("Invalid provider")
+        else:
+            # TODO: Remove provider from global config and render updated notification section
+            html_response = self.template_service.render_template('partials/notification_provider_removed.html',
+                                                                provider=provider)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    # =============================================================================
+    # LOG MANAGEMENT - Admin pillar methods
+    # =============================================================================
+
+    async def clear_logs_htmx(self, request) -> HTMLResponse:
+        """Clear logs using existing pages handler functionality - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        # Connect to existing _get_system_logs in pages.py for log clearing
+        html_response = self.template_service.render_template('partials/log_cleared.html')
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def refresh_logs_htmx(self, request) -> HTMLResponse:
+        """Refresh logs using existing pages handler log system - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        job_name = self._get_form_value(form_data, 'job_name')
+        html_response = self.template_service.render_template('partials/logs_refreshed.html', 
+                                                           job_name=job_name)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    # =============================================================================
+    # QUEUE SETTINGS - Admin pillar methods
+    # =============================================================================
+
+    async def handle_queue_settings_htmx(self, request) -> HTMLResponse:
+        """Handle notification queue settings using existing queue system - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        provider = self._get_form_value(form_data, 'provider')
+        enabled = self._get_form_value(form_data, 'enabled') == 'true'
+        
+        # Connect to existing notification queue system
+        html_response = self.template_service.render_template('partials/queue_settings.html',
+                                                           provider=provider,
+                                                           enabled=enabled)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    # =============================================================================
+    # FIELD RENDERING - Admin pillar methods
+    # =============================================================================
+
+    async def render_cron_field_htmx(self, request) -> HTMLResponse:
+        """Render cron field using existing template logic - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        schedule = self._get_form_value(form_data, 'schedule')
+        cron_pattern = self._get_form_value(form_data, 'cron_pattern')
+        
+        html_response = self.template_service.render_template('partials/cron_field.html',
+                                                           schedule=schedule,
+                                                           cron_pattern=cron_pattern,
+                                                           show_field=(schedule == 'custom'))
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def toggle_password_visibility_htmx(self, request) -> HTMLResponse:
+        """Toggle password field visibility state - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        field_id = self._get_form_value(form_data, 'field_id')
+        current_hidden = self._get_form_value(form_data, 'hidden') == 'true'
+        new_hidden = not current_hidden
+        
+        html_response = self.template_service.render_template('partials/password_field.html',
+                                                           field_id=field_id,
+                                                           field_name=field_id,  # Assume same as ID
+                                                           field_value='',  # Don't echo passwords for security
+                                                           hidden=new_hidden)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    # =============================================================================
+    # CONFIG PREVIEW AND FORM PROCESSING - Admin pillar methods
+    # =============================================================================
+
+    async def preview_config_htmx(self, request) -> HTMLResponse:
+        """Generate and display job config preview - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        try:
+            if not form_data:
+                html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content="Error: No form data received")
+                return HTMLResponse(content=html_response)
+            
+            # Parse the form data using the existing parser
+            from models.forms import JobFormParser
+            parser = JobFormParser()
+            
+            result = parser.parse_job_form(form_data)
+            
+            if not result.get('valid', False):
+                error_msg = result.get('error', 'Unknown parsing error')
+                # Add some debug info to the error
+                from models.forms import safe_get_value
+                restic_repo_type = safe_get_value(form_data, 'restic_repo_type')
+                dest_type = safe_get_value(form_data, 'dest_type')
+                
+                debug_error = f"Form Validation Error: {error_msg}\n\n"
+                debug_error += f"Debug Info:\n"
+                debug_error += f"- restic_repo_type extracted: '{restic_repo_type}'\n"
+                debug_error += f"- dest_type extracted: '{dest_type}'\n"
+                debug_error += f"- Form data keys: {list(form_data.keys())}\n"
+                
+                html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=debug_error)
+                return HTMLResponse(content=html_response)
+            
+            # Parse the form data using the existing parser  
+            from models.forms import JobFormParser
+            parser = JobFormParser()
+            
+            result = parser.parse_job_form(form_data)
+            
+            if not result.get('valid', False):
+                error_msg = result.get('error', 'Unknown parsing error')
+                html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=f"Form Validation Error: {error_msg}")
+                return HTMLResponse(content=html_response)
+            
+            # Build the job config as it would appear in config.yaml
+            job_data = result.copy()
+            if 'valid' in job_data:
+                del job_data['valid']  # Remove the validation flag
+            
+            # Format as YAML for display
+            import yaml
+            yaml_content = yaml.dump({job_data.get('job_name', 'unnamed_job'): job_data}, 
+                                   default_flow_style=False, sort_keys=False)
+            
+            html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=yaml_content)
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.")
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def check_form_changes_htmx(self, request) -> HTMLResponse:
+        """Check if form has changes compared to original config - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        try:
+            import json
+            from models.forms import job_parser
+            
+            # Get original config from hidden field
+            original_config_str = self._get_form_value(form_data, 'original_job_config')
+            if not original_config_str:
+                # No original config means this is add mode, always enable
+                html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Create Job',
+                                                       enabled=True)
+                return HTMLResponse(content=html_response)
+            
+            # Parse current form data
+            current_result = job_parser.parse_job_form(form_data)
+            if not current_result['valid']:
+                # Form is invalid, disable button
+                html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=False)
+                return HTMLResponse(content=html_response)
+            
+            # Compare configs (normalize for comparison)
+            original_config = json.loads(original_config_str)
+            current_config = current_result.copy()
+            if 'valid' in current_config:
+                del current_config['valid']
+            
+            # Compare as JSON strings for deep equality
+            original_json = json.dumps(original_config, sort_keys=True)
+            current_json = json.dumps(current_config, sort_keys=True)
+            
+            has_changes = original_json != current_json
+            html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=has_changes)
+            
+        except Exception as e:
+            # On error, default to enabled
+            html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=True)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
 # Global handler instance
 admin_handler = AdminHandler()
