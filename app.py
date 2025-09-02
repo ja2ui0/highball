@@ -293,17 +293,13 @@ async def restore_job(name: str = Query("")):
 @app.post("/run-backup")
 async def run_backup(request: Request):
     """Run backup job"""
-    form = await request.form()
-    job_name = form.get('job_name', '')
-    return services.handlers['operations'].run_backup_job(job_name, False)
+    return await jobs_handler.run_backup_htmx(request)
 
 
 @app.post("/dry-run-backup")
 async def dry_run_backup(request: Request):
     """Dry run backup job"""
-    form = await request.form()
-    job_name = form.get('job_name', '')
-    return services.handlers['operations'].run_backup_job(job_name, True)
+    return await jobs_handler.dry_run_backup_htmx(request)
 
 
 @app.post("/validate-source-paths")

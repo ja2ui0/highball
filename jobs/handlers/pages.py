@@ -1353,5 +1353,35 @@ class JobsHandler(BaseHandler):
         operations_handler = OperationsHandler(BackupConfig(), TemplateService())
         return operations_handler.schedule_job(form_data)
 
+    async def run_backup_htmx(self, request) -> JSONResponse:
+        """Run backup job with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        job_name = form.get('job_name', '')
+        
+        # Call existing business logic (operations handler)
+        from handlers.operations import OperationsHandler
+        from config import BackupConfig
+        from services.template import TemplateService
+        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
+        return operations_handler.run_backup_job(job_name, False)
+
+    async def dry_run_backup_htmx(self, request) -> JSONResponse:
+        """Dry run backup job with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        job_name = form.get('job_name', '')
+        
+        # Call existing business logic (operations handler)
+        from handlers.operations import OperationsHandler
+        from config import BackupConfig
+        from services.template import TemplateService
+        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
+        return operations_handler.run_backup_job(job_name, True)
+
 # Global handler instance
 jobs_handler = JobsHandler()
