@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from services.management import JobManagementService
 from services.execution import ResticExecutionService, OperationType
+from services.shared import SSHCommandFactory
 
 # =============================================================================
 # RESPONSE MODELS
@@ -330,20 +331,14 @@ class RestoreOverwriteChecker:
         # Use SSH to check if files exist
         for path in paths_to_check:
             if path:
-                # Build SSH command to check if path exists and has contents
-                ssh_cmd = [
-                    'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', 
-                    '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null'
-                ]
+                # Use SSH factory to build command
+                ssh_factory = SSHCommandFactory(connect_timeout=10)
+                check_cmd = f'[ -e "{path}" ] && ([ -f "{path}" ] || [ "$(ls -A "{path}" 2>/dev/null)" ])'
                 
                 if username:
-                    ssh_cmd.append(f'{username}@{hostname}')
+                    ssh_cmd = ssh_factory.build_ssh_command(hostname, username, check_cmd)
                 else:
-                    ssh_cmd.append(hostname)
-                
-                # Check if path exists and is non-empty
-                check_cmd = f'[ -e "{path}" ] && ([ -f "{path}" ] || [ "$(ls -A "{path}" 2>/dev/null)" ])'
-                ssh_cmd.append(check_cmd)
+                    ssh_cmd = ssh_factory.build_ssh_command(hostname, 'root', check_cmd)
                 
                 try:
                     result = subprocess.run(ssh_cmd, capture_output=True, timeout=10)
