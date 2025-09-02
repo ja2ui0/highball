@@ -19,134 +19,6 @@ class MountStrategy(Enum):
     RESTORE_TO_SOURCE = "restore_to_source"
 
 
-# =============================================================================
-# **BINARY AVAILABILITY CONCERN** - Check for backup tool availability
-# =============================================================================
-
-class BinaryCheckerService:
-    """Binary availability checking - ONLY handles binary detection and versioning"""
-    
-    SUPPORTED_BINARIES = {
-        'restic': {
-            'version_command': 'restic version',
-            'description': 'Restic backup tool'
-        },
-        'borg': {
-            'version_command': 'borg --version',
-            'description': 'Borg backup tool'
-        },
-        'kopia': {
-            'version_command': 'kopia --version',
-            'description': 'Kopia backup tool'
-        },
-        'rclone': {
-            'version_command': 'rclone version --check=false',
-            'description': 'Rclone cloud storage tool'
-        }
-    }
-    
-    def __init__(self):
-        from services.execution import ExecutionService
-        self.executor = ExecutionService()
-    
-    def check_binary_availability(self, binary_name: str, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Binary concern: check if backup binary is available locally or remotely"""
-        if binary_name not in self.SUPPORTED_BINARIES:
-            return {
-                'available': False,
-                'error': f'Unsupported binary: {binary_name}',
-                'supported_binaries': list(self.SUPPORTED_BINARIES.keys())
-            }
-        
-        binary_info = self.SUPPORTED_BINARIES[binary_name]
-        version_command = binary_info['version_command'].split()
-        
-        try:
-            if ssh_config:
-                # Check on remote host via SSH
-                result = self.executor.execute_ssh_command(
-                    ssh_config['hostname'],
-                    ssh_config['username'],
-                    version_command
-                )
-            else:
-                # Check locally
-                result = self.executor.execute_local_command(version_command)
-            
-            if result.returncode == 0:
-                return {
-                    'available': True,
-                    'version': result.stdout.strip(),
-                    'description': binary_info['description'],
-                    'location': 'remote' if ssh_config else 'local'
-                }
-            else:
-                return {
-                    'available': False,
-                    'error': f'{binary_name} not found or not executable',
-                    'stderr': result.stderr.strip() if result.stderr else None
-                }
-                
-        except Exception as e:
-            return {
-                'available': False,
-                'error': f'Failed to check {binary_name}: {str(e)}'
-            }
-    
-    def check_container_runtime_availability(self, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Binary concern: check for container runtime availability (docker/podman)"""
-        runtimes = ['podman', 'docker']  # Prefer podman over docker
-        
-        for runtime in runtimes:
-            try:
-                version_command = [runtime, '--version']
-                
-                if ssh_config:
-                    result = self.executor.execute_ssh_command(
-                        ssh_config['hostname'],
-                        ssh_config['username'],
-                        version_command
-                    )
-                else:
-                    result = self.executor.execute_local_command(version_command)
-                
-                if result.returncode == 0:
-                    return {
-                        'available': True,
-                        'runtime': runtime,
-                        'version': result.stdout.strip(),
-                        'location': 'remote' if ssh_config else 'local'
-                    }
-                    
-            except Exception:
-                continue
-        
-        return {
-            'available': False,
-            'error': 'No container runtime found (tried: podman, docker)'
-        }
-    
-    def get_system_capabilities(self, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Binary concern: get comprehensive system capabilities for backup operations"""
-        capabilities = {
-            'binaries': {},
-            'container_runtime': None,
-            'location': 'remote' if ssh_config else 'local'
-        }
-        
-        # Check all supported binaries
-        for binary_name in self.SUPPORTED_BINARIES:
-            capabilities['binaries'][binary_name] = self.check_binary_availability(binary_name, ssh_config)
-        
-        # Check container runtime
-        runtime_check = self.check_container_runtime_availability(ssh_config)
-        if runtime_check['available']:
-            capabilities['container_runtime'] = runtime_check['runtime']
-        
-        return capabilities
-
-
-# =============================================================================
 # **CONTAINER COMMAND BUILDING CONCERN** - Generate container execution commands
 # =============================================================================
 
@@ -302,21 +174,8 @@ class ContainerService:
     """Unified container service - ONLY coordinates between container concerns"""
     
     def __init__(self, container_runtime: str = 'docker'):
-        self.binary_checker = BinaryCheckerService()
         self.command_builder = ContainerCommandBuilder(container_runtime)
     
-    # **BINARY CHECKING DELEGATION** - Pure delegation to binary concern
-    def check_binary(self, binary_name: str, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Delegation: check binary availability"""
-        return self.binary_checker.check_binary_availability(binary_name, ssh_config)
-    
-    def check_container_runtime(self, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Delegation: check container runtime availability"""
-        return self.binary_checker.check_container_runtime_availability(ssh_config)
-    
-    def get_system_capabilities(self, ssh_config: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Delegation: get system capabilities"""
-        return self.binary_checker.get_system_capabilities(ssh_config)
     
     # **CONTAINER BUILDING DELEGATION** - Pure delegation to building concern
     def build_backup_container_command(
