@@ -239,19 +239,8 @@ class APIHandler:
     # =============================================================================
     
     # =============================================================================
-    # CORS HANDLING
+    # CORS HANDLING - MOVED TO admin/services/init.py
     # =============================================================================
-    
-    def handle_options(self) -> JSONResponse:
-        """Handle CORS preflight requests for API endpoints"""
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization"
-            }
-        )
 
 
 # ResponseUtils class removed - all CGI patterns eliminated for Python 3.13 compatibility

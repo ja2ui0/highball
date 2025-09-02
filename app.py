@@ -691,7 +691,7 @@ async def handle_htmx_request(action: str, request: Request):
 @app.options("/api/{path:path}")
 async def handle_options(path: str):
     """Handle CORS preflight requests for API endpoints"""
-    return services.handlers['api'].handle_options()
+    return services.handle_options()
 
 
 # =============================================================================

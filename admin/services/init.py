@@ -17,6 +17,7 @@ from services.template import TemplateService
 from jobs.services.schedule import SchedulingService
 from services.data_services import JobFormDataBuilder
 from config import BackupConfig
+from fastapi.responses import JSONResponse
 
 
 class HighballServices:
@@ -114,3 +115,14 @@ class HighballServices:
             with open(known_hosts_path, 'w') as f:
                 f.write("# SSH known hosts for Highball\n")
             os.chmod(known_hosts_path, 0o644)
+    
+    def handle_options(self) -> JSONResponse:
+        """Handle CORS preflight requests for API endpoints - moved from handlers/api.py"""
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            }
+        )
