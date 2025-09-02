@@ -10,7 +10,6 @@ import subprocess
 import stat
 from typing import Dict, Any, Optional
 
-from handlers.operations import OperationsHandler
 from jobs.services.scheduler import JobSchedulerHandler
 from services.template import TemplateService
 from jobs.services.schedule import SchedulingService
@@ -63,7 +62,6 @@ class HighballServices:
         self.notification_test = NotificationTestService(self.backup_config)
         
         self.handlers = {
-            'operations': OperationsHandler(self.backup_config, self.template_service),
             'job_scheduler': JobSchedulerHandler(self.scheduler_service),
         }
     

@@ -47,6 +47,12 @@ class JobsHandler(BaseHandler):
     def __init__(self):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        
+        # Initialize service orchestrators (moved from operations handler)
+        from jobs.services.backup import BackupOrchestrationService
+        from jobs.services.scheduler import JobSchedulingOrchestrationService
+        self.backup_orchestration = BackupOrchestrationService(self.backup_config)
+        self.scheduling_orchestration = JobSchedulingOrchestrationService(self.backup_config)
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
@@ -1346,12 +1352,8 @@ class JobsHandler(BaseHandler):
             else:
                 form_data[key] = [value]
         
-        # Call existing business logic (operations handler)
-        from handlers.operations import OperationsHandler
-        from config import BackupConfig
-        from services.template import TemplateService
-        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
-        return operations_handler.schedule_job(form_data)
+        # Call direct business logic (moved from operations handler)
+        return self.schedule_job_direct(form_data)
 
     async def run_backup_htmx(self, request) -> JSONResponse:
         """Run backup job with form parsing - pure switchboard compliance"""
@@ -1361,12 +1363,8 @@ class JobsHandler(BaseHandler):
         form = await request.form()
         job_name = form.get('job_name', '')
         
-        # Call existing business logic (operations handler)
-        from handlers.operations import OperationsHandler
-        from config import BackupConfig
-        from services.template import TemplateService
-        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
-        return operations_handler.run_backup_job(job_name, False)
+        # Call direct business logic (moved from operations handler)
+        return self.run_backup_job_direct(job_name, False)
 
     async def dry_run_backup_htmx(self, request) -> JSONResponse:
         """Dry run backup job with form parsing - pure switchboard compliance"""
@@ -1376,12 +1374,24 @@ class JobsHandler(BaseHandler):
         form = await request.form()
         job_name = form.get('job_name', '')
         
-        # Call existing business logic (operations handler)
-        from handlers.operations import OperationsHandler
-        from config import BackupConfig
-        from services.template import TemplateService
-        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
-        return operations_handler.run_backup_job(job_name, True)
+        # Call direct business logic (moved from operations handler)
+        return self.run_backup_job_direct(job_name, True)
+    
+    # =============================================================================
+    # DIRECT ORCHESTRATION METHODS (moved from operations handler)
+    # =============================================================================
+    
+    def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
+        """Execute backup job with full orchestration - moved from operations handler"""
+        from fastapi.responses import JSONResponse
+        result = self.backup_orchestration.run_backup_job(job_name, dry_run)
+        return JSONResponse(content=result)
+    
+    def schedule_job_direct(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Schedule a job for execution - moved from operations handler"""
+        from fastapi.responses import JSONResponse
+        result = self.scheduling_orchestration.schedule_job(form_data)
+        return JSONResponse(content=result)
 
 # Global handler instance
 jobs_handler = JobsHandler()
