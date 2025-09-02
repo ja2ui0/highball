@@ -1331,5 +1331,27 @@ class JobsHandler(BaseHandler):
                 'output': result.get('output', '')
             }
 
+    async def schedule_job_htmx(self, request) -> JSONResponse:
+        """Schedule job with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic (operations handler)
+        from handlers.operations import OperationsHandler
+        from config import BackupConfig
+        from services.template import TemplateService
+        operations_handler = OperationsHandler(BackupConfig(), TemplateService())
+        return operations_handler.schedule_job(form_data)
+
 # Global handler instance
 jobs_handler = JobsHandler()

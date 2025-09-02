@@ -449,16 +449,7 @@ async def handle_restore_dry_run_change(request: Request):
 @app.post("/schedule-job")
 async def schedule_job(request: Request):
     """Schedule a job"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return services.handlers['operations'].schedule_job(form_data)
+    return await jobs_handler.schedule_job_htmx(request)
 
 
 @app.post("/restore")
@@ -601,11 +592,8 @@ async def handle_options(path: str):
 
 @app.get("/favicon.ico")
 async def favicon():
-    """Serve favicon"""
-    if os.path.exists('favicon.ico'):
-        return FileResponse('favicon.ico')
-    else:
-        raise HTTPException(status_code=404)
+    """Serve favicon - pure switchboard (static file)"""
+    return FileResponse('favicon.ico')
 
 
 # =============================================================================
