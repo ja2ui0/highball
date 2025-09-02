@@ -232,6 +232,30 @@ class OriginsHandler(BaseHandler):
                 'error': f"Failed to save origin '{origin_name}'"
             }, status_code=500)
 
+    async def save_ssh_origin_htmx(self, request) -> JSONResponse:
+        """Save SSH origin with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.save_ssh_origin(form_data)
+
+    async def validate_ssh_origin_htmx(self, request) -> JSONResponse:
+        """Validate SSH origin with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.validate_ssh_origin(form_data)
+
+    async def toggle_ssh_auth_method_htmx(self, request) -> HTMLResponse:
+        """Toggle SSH auth method with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.toggle_ssh_auth_method(form_data)
+
     @handle_page_errors("Save SSH origin")
     def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save SSH origin changes"""

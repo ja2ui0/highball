@@ -111,8 +111,7 @@ async def add_ssh_origin(request: Request):
 @app.post("/ssh/save")
 async def save_ssh_origin(request: Request):
     """Save SSH origin changes"""
-    form_data = dict(await request.form())
-    return origins_handler.save_ssh_origin(form_data)
+    return await origins_handler.save_ssh_origin_htmx(request)
 
 
 @app.get("/ssh/edit/{origin_name}")
@@ -130,8 +129,7 @@ async def delete_ssh_origin(origin_name: str):
 @app.post("/ssh/validate")
 async def validate_ssh_origin(request: Request):
     """Validate SSH origin configuration"""
-    form_data = dict(await request.form())
-    return origins_handler.validate_ssh_origin(form_data)
+    return await origins_handler.validate_ssh_origin_htmx(request)
 
 @app.get("/ssh/progress/{session_id}")
 async def get_ssh_progress(session_id: str):
@@ -142,8 +140,7 @@ async def get_ssh_progress(session_id: str):
 @app.post("/htmx/toggle-auth-method")
 async def toggle_ssh_auth_method(request: Request):
     """Toggle SSH authentication method (HTMX partial)"""
-    form_data = dict(await request.form())
-    return origins_handler.toggle_ssh_auth_method(form_data)
+    return await origins_handler.toggle_ssh_auth_method_htmx(request)
 
 
 
