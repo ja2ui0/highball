@@ -643,6 +643,69 @@ class ResticRepositoryService:
                 'error': f'Failed to parse directory listing: {str(e)}'
             }
 
+    def validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate restic destination with superior repository connectivity testing"""
+        def _get_form_value(field_name: str, default: str = '') -> str:
+            """Get form field value with default"""
+            value = form_data.get(field_name, default)
+            if isinstance(value, list):
+                return value[0] if value else default
+            return str(value)
+        
+        repo_type = _get_form_value('repo_type', '')
+        password = _get_form_value('restic_password', '')
+        
+        if not repo_type:
+            return {
+                'success': False,
+                'message': 'Repository type is required for restic validation'
+            }
+        
+        if not password:
+            return {
+                'success': False,
+                'message': 'Repository password is required for restic validation'
+            }
+        
+        # Build basic repository URI from form data (simplified version)
+        try:
+            from models.forms import DestinationParser
+            uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+            
+            if not uri_result.get('valid'):
+                return {
+                    'success': False,
+                    'message': f"Repository configuration error: {uri_result.get('error', 'Invalid URI')}"
+                }
+            
+            # Test actual repository access using superior implementation
+            # Create minimal dest_config for testing
+            dest_config = {
+                'repo_uri': uri_result['uri'],
+                'password': password,
+                'repo_type': repo_type
+            }
+            
+            # Use the superior test_repository_access method (real repository connectivity)
+            test_result = self.test_repository_access({'dest_config': dest_config})
+            
+            if test_result.get('success'):
+                return {
+                    'success': True,
+                    'message': f"Repository connection successful. {test_result.get('message', 'Repository is accessible.')}"
+                }
+            else:
+                return {
+                    'success': False, 
+                    'message': f"Repository connection failed: {test_result.get('error', 'Unknown error')}"
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Repository validation error: {str(e)}'
+            }
+
 
 # =============================================================================
 # RESTIC CONTENT ANALYZER - Repository content analysis
@@ -975,3 +1038,6 @@ class ResticMaintenanceService:
                 'error': f'{operation.capitalize()} operation failed: {result.stderr}',
                 'output': result.stdout
             }
+
+# Export the service
+restic_service = ResticRepositoryService()

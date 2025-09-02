@@ -432,9 +432,13 @@ class DestinationsHandler(BaseHandler):
                     'validation_message': result.get('message') or result.get('error', 'Unknown error')
                 }
             elif dest_type == 'restic':
-                from handlers.forms import DestinationValidationHandler
-                destination_validator = DestinationValidationHandler()
-                template_context = destination_validator.validate_restic_destination(form_data)
+                # Use superior restic validation from atomic service (real repository connectivity)
+                from dests.services.restic import restic_service
+                result = restic_service.validate_restic_destination(form_data)
+                template_context = {
+                    'success': result['success'],
+                    'validation_message': result.get('message', 'Unknown error')
+                }
             else:
                 template_context = {
                     'success': False,

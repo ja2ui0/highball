@@ -29,39 +29,6 @@ class DestinationValidationHandler:
         return str(value)
     
     
-    
-    def validate_restic_destination(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate restic destination"""
-        repo_type = self._get_form_value(form_data, 'repo_type', '')
-        password = self._get_form_value(form_data, 'restic_password', '')
-        
-        if not repo_type:
-            return {
-                'success': False,
-                'validation_message': 'Repository type is required for restic validation'
-            }
-        
-        if not password:
-            return {
-                'success': False,
-                'validation_message': 'Repository password is required for restic validation'
-            }
-        
-        # For now, just validate that we can build the URI
-        # Full restic validation would require container execution
-        from models.forms import DestinationParser
-        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
-        
-        if uri_result['valid']:
-            return {
-                'success': True,
-                'validation_message': f"Restic repository URI generated successfully. Full connectivity test requires repository initialization."
-            }
-        else:
-            return {
-                'success': False,
-                'validation_message': f"Restic repository configuration error: {uri_result.get('error', 'Unknown error')}"
-            }
 
 
 # =============================================================================
