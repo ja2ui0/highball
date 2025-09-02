@@ -27,7 +27,8 @@ class APIHandler:
         self.notification_service = create_notification_service(backup_config.get_global_settings())
     
     # =============================================================================
-    # REST API ENDPOINTS
+    # EXTERNAL API ENDPOINTS - FOR DASHBOARD WIDGETS & EXTERNAL CONSUMERS ONLY
+    # TODO: Review these methods when app core is complete - may need refactoring
     # =============================================================================
     
     def get_jobs(self, state_filter: Optional[str] = None, fields_filter: Optional[str] = None) -> JSONResponse:
@@ -449,73 +450,6 @@ class APIHandler:
                 'error': f'Repository initialization failed: {str(e)}'
             })
     
-    # =============================================================================
-    # FILESYSTEM OPERATIONS
-    # =============================================================================
-    
-    def browse_filesystem(self, path: str = '/') -> JSONResponse:
-        """Browse local filesystem for path selection"""
-        try:
-            try:
-                path_obj = Path(path)
-                if not path_obj.exists():
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Path does not exist: {path}'
-                    })
-                
-                if not path_obj.is_dir():
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Path is not a directory: {path}'
-                    })
-                
-                # List directory contents
-                entries = []
-                try:
-                    for item in path_obj.iterdir():
-                        if item.is_dir():
-                            entries.append({
-                                'name': item.name,
-                                'path': str(item),
-                                'type': 'directory'
-                            })
-                        elif item.is_file():
-                            entries.append({
-                                'name': item.name,
-                                'path': str(item),
-                                'type': 'file',
-                                'size': item.stat().st_size
-                            })
-                    
-                    # Sort: directories first, then files
-                    entries.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
-                    
-                except PermissionError:
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Permission denied: {path}'
-                    })
-                
-                return JSONResponse(content={
-                    'success': True,
-                    'path': str(path_obj),
-                    'parent': str(path_obj.parent) if path_obj.parent != path_obj else None,
-                    'entries': entries
-                })
-                
-            except Exception as e:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f'Filesystem error: {str(e)}'
-                })
-            
-        except Exception as e:
-            logger.error(f"Filesystem browse error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Browse failed: {str(e)}'
-            })
     
     # =============================================================================
     # NOTIFICATION TESTING

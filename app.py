@@ -274,7 +274,7 @@ async def init_repository(job: str = Query("")):
 @app.get("/filesystem-browse")
 async def browse_filesystem(path: str = Query("/")):
     """Browse filesystem"""
-    return services.handlers['api'].browse_filesystem(path)
+    return jobs_handler.browse_filesystem(path)
 
 
 @app.get("/jobs")
