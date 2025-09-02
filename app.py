@@ -602,6 +602,24 @@ async def render_rsyncd_fields(request: Request):
     return await destinations_handler.render_rsyncd_fields_htmx(request)
 
 
+@app.post("/dests/maintenance-toggle")
+async def render_maintenance_toggle(request: Request):
+    """Render maintenance fields (same as maintenance-fields)"""
+    return await destinations_handler.render_maintenance_fields_htmx(request)
+
+
+@app.post("/dests/restic-repo-fields")
+async def render_restic_repo_fields(request: Request):
+    """Render Restic repository type fields"""
+    return await destinations_handler.render_restic_repo_fields_htmx(request)
+
+
+@app.post("/dests/restic-uri-preview")
+async def generate_restic_uri_preview(request: Request):
+    """Generate real-time URI preview"""
+    return await destinations_handler.generate_restic_uri_preview_htmx(request)
+
+
 @app.post("/schedule-job")
 async def schedule_job(request: Request):
     """Schedule a job"""

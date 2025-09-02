@@ -18,7 +18,7 @@
            {% if field.max %}max="{{ field.max }}"{% endif %}
            {% if field.required %}required{% endif %}
            {% if repo_type == 'rest' %}
-           hx-post="/htmx/restic-uri-preview"
+           hx-post="/dests/restic-uri-preview"
            hx-target="#uri_preview_container"
            hx-include="[name='restic_repo_type'], [name='repo_type'], [name^='rest_']"
            hx-trigger="input delay:300ms"
@@ -45,7 +45,7 @@
                name="{{ field.name }}" 
                {% if field_values and field_values[field.name] %}checked{% endif %}
                {% if repo_type == 'rest' %}
-               hx-post="/htmx/restic-uri-preview"
+               hx-post="/dests/restic-uri-preview"
                hx-target="#uri_preview_container"
                hx-include="[name='restic_repo_type'], [name='repo_type'], [name^='rest_']"
                hx-trigger="change"

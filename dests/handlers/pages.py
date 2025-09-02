@@ -219,6 +219,80 @@ class DestinationsHandler(BaseHandler):
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
 
+    async def render_restic_repo_fields_htmx(self, request) -> HTMLResponse:
+        """Render Restic repository type fields using schema-driven templates - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
+        
+        if not repo_type:
+            html_response = ''  # No fields for unselected type
+        else:
+            from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
+            
+            html_response = self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
+                                                               repo_type=repo_type,
+                                                               repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def generate_restic_uri_preview_htmx(self, request) -> HTMLResponse:
+        """Generate real-time URI preview for repository configuration - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
+        
+        if not repo_type:
+            html_response = self.template_service.render_template('partials/uri_preview.html',
+                                                               uri='Select repository type to see URI preview')
+        else:
+            # Use existing URI builder from forms module
+            from models.forms import DestinationParser
+            uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+            
+            if uri_result.get('valid'):
+                # Mask password in display
+                uri = uri_result['uri']
+                if ':' in uri and '@' in uri:
+                    # Replace password with *** for display
+                    parts = uri.split('@')
+                    if len(parts) == 2:
+                        auth_part = parts[0]
+                        if ':' in auth_part:
+                            scheme_and_user = auth_part.rsplit(':', 1)[0]
+                            uri = f"{scheme_and_user}:***@{parts[1]}"
+                
+                html_response = self.template_service.render_template('partials/uri_preview.html', uri=uri)
+            else:
+                html_response = self.template_service.render_template('partials/uri_preview.html',
+                                                                   uri=uri_result.get('error', 'Invalid configuration'))
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
     @handle_page_errors("Delete destination")
     def delete_destination(self, dest_name: str) -> JSONResponse:
         """Delete destination"""

@@ -46,12 +46,6 @@ class FormsHandler:
             'restore-target-change': self._handle_restore_target_change,
             'restore-dry-run-change': self._handle_restore_dry_run_change,
             
-            # Form field rendering (connect to existing implementations)
-            'maintenance-toggle': self._render_maintenance_fields,
-            'restic-repo-fields': self._render_restic_repo_fields,
-            
-            # URI preview
-            'restic-uri-preview': self._generate_restic_uri_preview,
         }
         
         handler_func = actions.get(action)
@@ -256,51 +250,6 @@ class FormsHandler:
     # =============================================================================
     
     
-    def _render_restic_repo_fields(self, form_data):
-        """Render Restic repository type fields using schema-driven templates"""
-        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
-        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
-        
-        if not repo_type:
-            return ''  # No fields for unselected type
-            
-        from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
-        
-        return self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
-                                                   repo_type=repo_type,
-                                                   repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS)
-    
-    
-    
-    def _generate_restic_uri_preview(self, form_data):
-        """Generate real-time URI preview for repository configuration"""
-        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
-        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
-        
-        if not repo_type:
-            return self.template_service.render_template('partials/uri_preview.html',
-                                                       uri='Select repository type to see URI preview')
-        
-        # Use existing URI builder from forms module
-        from models.forms import DestinationParser
-        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
-        
-        if uri_result.get('valid'):
-            # Mask password in display
-            uri = uri_result['uri']
-            if ':' in uri and '@' in uri:
-                # Replace password with *** for display
-                parts = uri.split('@')
-                if len(parts) == 2:
-                    auth_part = parts[0]
-                    if ':' in auth_part:
-                        scheme_and_user = auth_part.rsplit(':', 1)[0]
-                        uri = f"{scheme_and_user}:***@{parts[1]}"
-            
-            return self.template_service.render_template('partials/uri_preview.html', uri=uri)
-        else:
-            return self.template_service.render_template('partials/uri_preview.html',
-                                                       uri=uri_result.get('error', 'Invalid configuration'))
     
 
 
