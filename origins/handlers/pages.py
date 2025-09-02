@@ -188,6 +188,14 @@ class OriginsHandler(BaseHandler):
                 'error': f"Failed to delete origin '{origin_name}'"
             }, status_code=500)
 
+    async def add_ssh_origin_htmx(self, request) -> JSONResponse:
+        """Add SSH origin with form parsing - pure switchboard compliance"""
+        # Parse form data using dict() approach (matches current app.py pattern)
+        form_data = dict(await request.form())
+        
+        # Call existing business logic
+        return self.add_ssh_origin(form_data)
+
     @handle_page_errors("Add SSH origin")
     def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new SSH origin"""

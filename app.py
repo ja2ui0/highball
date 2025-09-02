@@ -105,8 +105,7 @@ async def show_ssh_origins():
 @app.post("/ssh/add")
 async def add_ssh_origin(request: Request):
     """Add new SSH origin"""
-    form_data = dict(await request.form())
-    return origins_handler.add_ssh_origin(form_data)
+    return await origins_handler.add_ssh_origin_htmx(request)
 
 
 @app.post("/ssh/save")
