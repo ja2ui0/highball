@@ -218,21 +218,6 @@ async def validate_ssh_source(source: str = Query("")):
 
 
 
-@app.post("/validate-restic-form")
-async def validate_restic_form(request: Request):
-    """Validate Restic configuration from form data"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return services.handlers['api'].validate_restic_form(form_data)
-
-
 # =============================================================================
 # API ENDPOINTS
 # =============================================================================
@@ -279,10 +264,6 @@ async def list_jobs():
     return services.handlers['job_scheduler'].list_jobs()
 
 
-@app.get("/api/highball/jobs")
-async def get_jobs(state: Optional[str] = Query(None), fields: Optional[str] = Query(None)):
-    """API endpoint for jobs"""
-    return services.handlers['api'].get_jobs(state, fields)
 
 
 @app.get("/check-repository-availability")
