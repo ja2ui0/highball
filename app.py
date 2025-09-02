@@ -323,61 +323,25 @@ async def validate_source_paths(request: Request):
 @app.post("/initialize-restic-repo")
 async def initialize_restic_repo(request: Request):
     """Initialize Restic repository"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return services.restic_api.initialize_restic_repo(form_data)
+    return await destinations_handler.initialize_restic_repo_htmx(request)
 
 
 @app.post("/preview-config-changes")
 async def preview_config_changes(request: Request):
     """Preview configuration changes"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return admin_handler.preview_config_changes(form_data)
+    return await admin_handler.preview_config_changes_htmx(request)
 
 
 @app.post("/save-config")
 async def save_config(request: Request):
     """Save structured configuration"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return admin_handler.save_structured_config(form_data)
+    return await admin_handler.save_structured_config_htmx(request)
 
 
 @app.post("/save-config/raw")
 async def save_raw_config(request: Request):
     """Save raw YAML configuration"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return admin_handler.save_raw_config(form_data)
+    return await admin_handler.save_raw_config_htmx(request)
 
 
 @app.post("/admin/add-global-notification-provider")

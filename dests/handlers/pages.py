@@ -885,5 +885,24 @@ class DestinationsHandler(BaseHandler):
             html_response = self.template_service.render_validation_status('origin_repo_path', result)
             return HTMLResponse(content=html_response)
 
+    async def initialize_restic_repo_htmx(self, request) -> JSONResponse:
+        """Initialize Restic repository with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing restic API service
+        from admin.services.init import services
+        return services.restic_api.initialize_restic_repo(form_data)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

@@ -58,7 +58,11 @@ class AdminHandler(BaseHandler):
     
     def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
         """Helper to get form value with default"""
-        return form_data.get(field_name, default)
+        value = form_data.get(field_name, default)
+        # Handle list format from HTMX form parsing
+        if isinstance(value, list) and len(value) > 0:
+            return value[0]
+        return value if isinstance(value, str) else default
 
     def _get_available_themes(self):
         """Get list of available theme files from static/themes directory"""
@@ -153,11 +157,11 @@ class AdminHandler(BaseHandler):
         # Process each provider's configuration
         for provider_name, provider_schema in PROVIDER_FIELD_SCHEMAS.items():
             # Only process if provider fields are present in form
-            if any(f"{provider_name}_{field['name']}" in form_data for field in provider_schema):
+            if any(f"{provider_name}_{field['name']}" in form_data for field in provider_schema.get('fields', [])):
                 provider_config = notification_config.setdefault(provider_name, {})
                 
                 # Process individual fields
-                for field_info in provider_schema:
+                for field_info in provider_schema.get('fields', []):
                     self._process_notification_field(provider_config, provider_name, field_info, form_data)
                 
                 # Handle all sections (smtp_config, queue_settings, etc.)
@@ -275,11 +279,11 @@ class AdminHandler(BaseHandler):
         from admin.schema import PROVIDER_FIELD_SCHEMAS
         for provider_name, provider_schema in PROVIDER_FIELD_SCHEMAS.items():
             # Only process if provider fields are present in form
-            if any(f"{provider_name}_{field['name']}" in form_data for field in provider_schema):
+            if any(f"{provider_name}_{field['name']}" in form_data for field in provider_schema.get('fields', [])):
                 provider_config = notification_config.setdefault(provider_name, {})
                 
                 # Process individual fields
-                for field_info in provider_schema:
+                for field_info in provider_schema.get('fields', []):
                     self._process_notification_field(provider_config, provider_name, field_info, form_data)
                 
                 # Handle all sections (smtp_config, queue_settings, etc.)
@@ -657,6 +661,59 @@ class AdminHandler(BaseHandler):
 
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
+
+    async def preview_config_changes_htmx(self, request) -> HTMLResponse:
+        """Preview configuration changes with form parsing - pure switchboard compliance"""
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic
+        return self.preview_config_changes(form_data)
+
+    async def save_structured_config_htmx(self, request) -> JSONResponse:
+        """Save structured configuration with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic
+        return self.save_structured_config(form_data)
+
+    async def save_raw_config_htmx(self, request) -> JSONResponse:
+        """Save raw YAML configuration with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic
+        return self.save_raw_config(form_data)
 
 # Global handler instance
 admin_handler = AdminHandler()

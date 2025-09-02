@@ -148,4 +148,17 @@ Temporary, safe to delete post-refactor:
 # Notes
 Claude code auto-appends after this line.
 
+## Form Parsing Consistency Issue (2025-09-02)
+
+During the MVC switchboard refactor, we moved form parsing from app.py to individual `*_htmx` handler methods. Each handler now has its own `_get_form_value()` helper method, but they have different implementations:
+
+- **admin/handlers/pages.py**: Uses `isinstance(value, list)` check to handle list format
+- **jobs/handlers/pages.py**: Uses `value_list[0]` assuming list format  
+- **dests/handlers/pages.py**: Uses `isinstance(value, list)` check with `str()` casting
+- **origins/handlers/pages.py**: Simple `form_data.get()` (old format, but apparently still works)
+
+This inconsistency could lead to future bugs when form parsing patterns change or new `*_htmx` methods are added. We should investigate creating a standardized form parsing helper that all handlers can inherit or import, ensuring consistent behavior across the entire application.
+
+The immediate fix for the config preview button (admin handler) worked, but this underlying inconsistency remains a technical debt item.
+
 ---
