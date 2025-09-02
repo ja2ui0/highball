@@ -235,5 +235,23 @@ async def unlock_repository_unified(request: Request, job: str = Query(None)):
 
 **Similar Issue:** The backup services may also have duplication between `jobs/services/backup.py` implementations that should be reviewed.
 
+## SSH Timeout Configuration (2025-09-02)
+
+The SSHCommandFactory in `services/shared.py` supports configurable SSH connection timeouts with a sensible default of 5 seconds. Currently uses code-level configuration, but is scaffolded for future per-host timeout configuration:
+
+**Current Implementation:**
+- Default: 5 seconds (reasonable for most networks)
+- Code override: `ssh_factory.build_ssh_command(..., connect_timeout=3)`
+- Instance override: `SSHCommandFactory(connect_timeout=10)`
+
+**Future Enhancement Options:**
+- Per-origin/destination timeout configuration in setup forms
+- Global timeout defaults in `config/local.yaml`
+- Network-type-based defaults (local vs internet)
+
+**Rationale:** 5 seconds is sufficient for TCP connection establishment on most networks, down from the previous 10-second default that made users wait unnecessarily when hosts were unreachable.
+
+**Note:** SSH and SCP use different port flags (`-p` vs `-P`) due to OpenSSH tool conventions.
+
 
 ---

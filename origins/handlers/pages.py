@@ -427,16 +427,9 @@ class OriginsHandler(BaseHandler):
             # Completed - return final result and schedule cleanup
             result = session_data['result']
             result['edit_mode'] = session_data['edit_mode']
-            # Schedule cleanup after a longer delay to prevent race conditions
-            import threading
-            def delayed_cleanup():
-                import time
-                time.sleep(15)  # Wait 15 seconds before cleanup (was 5, too short)
-                try:
-                    os.remove(session_file)
-                except OSError:
-                    pass  # Ignore cleanup errors
-            threading.Thread(target=delayed_cleanup, daemon=True).start()
+            # DISABLE session cleanup - known HTMX polling issue
+            # Sessions accumulate but validation completes without console spam
+            pass
             return self._render_html('partials/ssh_validation_result.html', result)
     
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:

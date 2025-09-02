@@ -15,8 +15,8 @@
     {% endif %}
 </div>
 
-<!-- Stop the polling by removing the polling element -->
-<div hx-swap-oob="delete:#ssh-progress-poller"></div>
+<!-- Stop the polling by replacing with empty element -->
+<div hx-swap-oob="outerHTML:#ssh-progress-poller" id="ssh-progress-poller" style="display:none;"></div>
 
 <!-- Update the existing form fields with validation results using HTMX -->
 {% if rsync_available is defined %}
@@ -31,6 +31,6 @@
     <div class="code-container">{{ validation_message or error_message or 'Unknown error' }}</div>
 </div>
 
-<!-- Stop the polling by removing the polling element -->
-<div hx-swap-oob="delete:#ssh-progress-poller"></div>
+<!-- Stop the polling by replacing with empty element -->
+<div hx-swap-oob="outerHTML:#ssh-progress-poller" id="ssh-progress-poller" style="display:none;"></div>
 {% endif %}

@@ -7,6 +7,6 @@
 </div>
 <div id="ssh-progress-poller"
      hx-get="/ssh/progress/{{ session_id }}" 
-     hx-trigger="load delay:500ms, every 1s" 
+     hx-trigger="load delay:500ms, every 1s [this]" 
      hx-target="#ssh-validation-container" 
      hx-swap="outerHTML"></div>

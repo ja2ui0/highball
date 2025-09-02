@@ -3,5 +3,5 @@
     <div class="code-container">{{ validation_message }}</div>
 </div>
 
-<!-- Stop the polling by removing the polling element if it exists -->
-<div hx-swap-oob="delete:#ssh-progress-poller" style="display:none;"></div>
+<!-- Stop the polling by replacing with empty element -->
+<div hx-swap-oob="outerHTML:#ssh-progress-poller" id="ssh-progress-poller" style="display:none;"></div>
