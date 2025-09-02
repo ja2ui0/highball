@@ -41,11 +41,6 @@ class FormsHandler:
             # Notification management
             
             # Repository management
-            'init-restic-repository': self._init_restic_repository,
-            
-            # Maintenance fields
-            'maintenance-fields': self._render_maintenance_fields,
-            'rsyncd-fields': self._render_rsyncd_fields,
             
             # Restore actions
             'restore-target-change': self._handle_restore_target_change,
@@ -152,57 +147,6 @@ class FormsHandler:
     # REPOSITORY MANAGEMENT - Direct operations
     # =============================================================================
     
-    def _init_restic_repository(self, form_data):
-        """Initialize Restic repository"""
-        # Parse Restic config from unified parser
-        restic_result = DestinationParser.parse_restic_destination(form_data)
-        
-        if not restic_result['valid']:
-            return self._render_validation_result("error", restic_result['error'])
-        
-        # Direct repository initialization
-        try:
-            from services.restic_repository_service import ResticRepositoryService
-            repo_service = ResticRepositoryService()
-            result = repo_service.initialize_repository(restic_result['config'])
-            
-            if result['success']:
-                return self._render_validation_result("success", "Repository initialized successfully")
-            else:
-                return self._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
-        except Exception as e:
-            return self._render_validation_result("error", f"Initialization error: {str(e)}")
-    
-    # =============================================================================
-    # MAINTENANCE AND RSYNCD FIELDS - Simple rendering
-    # =============================================================================
-    
-    def _render_maintenance_fields(self, form_data):
-        """Render maintenance configuration fields based on selected mode"""
-        maintenance_mode = self._get_form_value(form_data, 'restic_maintenance', 'auto')
-        
-        from dests.schema import MAINTENANCE_MODE_SCHEMAS
-        
-        # Extract current field values from form data or use defaults
-        field_values = {}
-        if maintenance_mode == 'user':
-            schema = MAINTENANCE_MODE_SCHEMAS.get('user', {})
-            for field in schema.get('fields', []):
-                field_values[field['name']] = self._get_form_value(form_data, field['name'], field.get('default', ''))
-        
-        return self.template_service.render_template('partials/maintenance_mode_dynamic.html',
-                                                   maintenance_mode=maintenance_mode,
-                                                   maintenance_schemas=MAINTENANCE_MODE_SCHEMAS,
-                                                   field_values=field_values)
-    
-    def _render_rsyncd_fields(self, form_data):
-        """Render rsyncd-specific fields based on current state"""
-        rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
-        rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
-        
-        return self.template_service.render_template('partials/dest_rsyncd_fields.html',
-                                                   rsyncd_hostname=rsyncd_hostname,
-                                                   rsyncd_share=rsyncd_share)
     
     # =============================================================================
     # UTILITY METHODS - Inline rendering helpers

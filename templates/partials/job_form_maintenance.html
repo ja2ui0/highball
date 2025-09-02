@@ -7,7 +7,7 @@
     <div class="form-group">
         <label for="restic_maintenance">Maintenance Mode:</label>
         <select id="restic_maintenance" name="restic_maintenance"
-                hx-post="/htmx/maintenance-fields"
+                hx-post="/dests/maintenance-fields"
                 hx-target="#maintenance_display"
                 hx-trigger="change"
                 hx-include="[name^='maintenance_'], [name^='keep_']">

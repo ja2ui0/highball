@@ -584,6 +584,24 @@ async def check_form_changes(request: Request):
     return await admin_handler.check_form_changes_htmx(request)
 
 
+@app.post("/dests/init-restic-repository")
+async def init_restic_repository(request: Request):
+    """Initialize Restic repository"""
+    return await destinations_handler.init_restic_repository_htmx(request)
+
+
+@app.post("/dests/maintenance-fields")
+async def render_maintenance_fields(request: Request):
+    """Render maintenance configuration fields"""
+    return await destinations_handler.render_maintenance_fields_htmx(request)
+
+
+@app.post("/dests/rsyncd-fields")
+async def render_rsyncd_fields(request: Request):
+    """Render rsyncd-specific fields"""
+    return await destinations_handler.render_rsyncd_fields_htmx(request)
+
+
 @app.post("/schedule-job")
 async def schedule_job(request: Request):
     """Schedule a job"""

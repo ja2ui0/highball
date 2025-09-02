@@ -95,6 +95,130 @@ class DestinationsHandler(BaseHandler):
         
         return self._render_html('pages/destinations.html', template_data)
 
+    # =============================================================================
+    # DESTINATION FIELD RENDERING AND OPERATIONS - Extracted from mega-dispatcher
+    # =============================================================================
+
+    def _get_form_value(self, form_data: Dict[str, Any], key: str, default: str = '') -> str:
+        """HTTP concern: extract single value from form data"""
+        value_list = form_data.get(key, [default])
+        return value_list[0] if value_list else default
+
+    def _render_validation_result(self, status: str, message: str) -> str:
+        """Render validation result with consistent styling"""
+        import html
+        
+        status_class = {
+            'success': 'success',
+            'error': 'error', 
+            'warning': 'warning'
+        }.get(status, 'info')
+        
+        status_label = {
+            'success': '[OK]',
+            'error': '[ERROR]',
+            'warning': '[WARN]'
+        }.get(status, '[INFO]')
+        
+        return self.template_service.render_template('partials/validation_result.html',
+                                                   status_class=status_class,
+                                                   status_label=status_label,
+                                                   message=html.escape(message))
+
+    async def init_restic_repository_htmx(self, request) -> HTMLResponse:
+        """Initialize Restic repository - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        # Parse Restic config from unified parser
+        from models.forms import DestinationParser
+        restic_result = DestinationParser.parse_restic_destination(form_data)
+        
+        if not restic_result['valid']:
+            html_response = self._render_validation_result("error", restic_result['error'])
+        else:
+            # Direct repository initialization
+            try:
+                from services.restic_repository_service import ResticRepositoryService
+                repo_service = ResticRepositoryService()
+                result = repo_service.initialize_repository(restic_result['config'])
+                
+                if result['success']:
+                    html_response = self._render_validation_result("success", "Repository initialized successfully")
+                else:
+                    html_response = self._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
+            except Exception as e:
+                html_response = self._render_validation_result("error", f"Initialization error: {str(e)}")
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def render_maintenance_fields_htmx(self, request) -> HTMLResponse:
+        """Render maintenance configuration fields based on selected mode - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        maintenance_mode = self._get_form_value(form_data, 'restic_maintenance', 'auto')
+        
+        from dests.schema import MAINTENANCE_MODE_SCHEMAS
+        
+        # Extract current field values from form data or use defaults
+        field_values = {}
+        if maintenance_mode == 'user':
+            schema = MAINTENANCE_MODE_SCHEMAS.get('user', {})
+            for field in schema.get('fields', []):
+                field_values[field['name']] = self._get_form_value(form_data, field['name'], field.get('default', ''))
+        
+        html_response = self.template_service.render_template('partials/maintenance_mode_dynamic.html',
+                                                           maintenance_mode=maintenance_mode,
+                                                           maintenance_schemas=MAINTENANCE_MODE_SCHEMAS,
+                                                           field_values=field_values)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def render_rsyncd_fields_htmx(self, request) -> HTMLResponse:
+        """Render rsyncd-specific fields based on current state - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
+        rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
+        
+        html_response = self.template_service.render_template('partials/dest_rsyncd_fields.html',
+                                                           rsyncd_hostname=rsyncd_hostname,
+                                                           rsyncd_share=rsyncd_share)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
     @handle_page_errors("Delete destination")
     def delete_destination(self, dest_name: str) -> JSONResponse:
         """Delete destination"""
