@@ -34,7 +34,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY config/ /config/
 COPY favicon.ico /app/
 COPY *.py /app/
-COPY handlers/ /app/handlers/
 COPY models/ /app/models/
 COPY services/ /app/services/
 COPY origins/ /app/origins/
