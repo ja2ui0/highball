@@ -1197,5 +1197,37 @@ class JobsHandler(BaseHandler):
                 'error': f'Browse failed: {str(e)}'
             })
 
+    async def save_backup_job_htmx(self, request) -> JSONResponse:
+        """Save backup job with form parsing - pure switchboard compliance"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic
+        return self.save_backup_job(form_data)
+
+    async def validate_source_paths_htmx(self, request) -> JSONResponse:
+        """Validate source paths with form parsing - pure switchboard compliance"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+        
+        # Call existing business logic
+        return self.validate_source_paths(form_data)
+
 # Global handler instance
 jobs_handler = JobsHandler()

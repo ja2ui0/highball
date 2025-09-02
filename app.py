@@ -22,8 +22,6 @@ from admin.handlers.pages import admin_handler
 from admin.services.init import HighballServices
 
 
-
-
 # Global services instance
 services = HighballServices()
 
@@ -45,12 +43,6 @@ app = FastAPI(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-# =============================================================================
-# BRIDGE FUNCTION ELIMINATED - 100% FASTAPI MODERNIZATION COMPLETE  
-# =============================================================================
-# All handlers now return FastAPI responses directly - zero legacy remnants
 
 
 # =============================================================================
@@ -285,16 +277,7 @@ async def unlock_repository_get(job: str = Query("")):
 @app.post("/save-job")
 async def save_job(request: Request):
     """Save backup job"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return jobs_handler.save_backup_job(form_data)
+    return await jobs_handler.save_backup_job_htmx(request)
 
 
 @app.get("/delete-job")
@@ -334,16 +317,7 @@ async def dry_run_backup(request: Request):
 @app.post("/validate-source-paths")
 async def validate_source_paths(request: Request):
     """Validate source paths from form"""
-    form = await request.form()
-    form_data = {}
-    for key, value in form.items():
-        if key in form_data:
-            if not isinstance(form_data[key], list):
-                form_data[key] = [form_data[key]]
-            form_data[key].append(value)
-        else:
-            form_data[key] = [value]
-    return jobs_handler.validate_source_paths(form_data)
+    return await jobs_handler.validate_source_paths_htmx(request)
 
 
 @app.post("/initialize-restic-repo")
