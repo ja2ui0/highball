@@ -270,34 +270,8 @@ class APIHandler:
             })
     
     # =============================================================================
-    # NOTIFICATION TESTING
+    # NOTIFICATION TESTING - MOVED TO admin/services/notifications.py
     # =============================================================================
-    
-    def test_telegram_notification(self, test_message: str = 'Test notification from Highball') -> JSONResponse:
-        """Test Telegram notification"""
-        try:
-            result = self.notification_service.test_provider('telegram')
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Telegram test error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Telegram test failed: {str(e)}'
-            })
-    
-    def test_email_notification(self, test_message: str = 'Test notification from Highball') -> JSONResponse:
-        """Test email notification"""
-        try:
-            result = self.notification_service.test_provider('email')
-            return JSONResponse(content=result)
-            
-        except Exception as e:
-            logger.error(f"Email test error: {e}")
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Email test failed: {str(e)}'
-            })
     
     # =============================================================================
     # CORS HANDLING

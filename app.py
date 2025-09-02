@@ -572,7 +572,7 @@ async def test_telegram_notification(request: Request):
     """Test Telegram notification"""
     form = await request.form()
     test_message = form.get('test_message', 'Test notification from Highball')
-    return services.handlers['api'].test_telegram_notification(test_message)
+    return services.notification_test.test_telegram_notification(test_message)
 
 
 @app.post("/test-email-notification")
@@ -580,7 +580,7 @@ async def test_email_notification(request: Request):
     """Test email notification"""
     form = await request.form()
     test_message = form.get('test_message', 'Test notification from Highball')
-    return services.handlers['api'].test_email_notification(test_message)
+    return services.notification_test.test_email_notification(test_message)
 
 
 @app.post("/unlock-repository")
