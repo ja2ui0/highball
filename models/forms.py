@@ -87,99 +87,13 @@ class SourceParser:
 # SOURCE PATHS PARSER
 # =============================================================================
 
-class SourcePathsParser:
-    """Parse multi-path source configurations"""
-    
-    @staticmethod
-    def parse_multi_path_options(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse multi-path source options from form data"""
-        source_paths = safe_get_list(form_data, 'source_path[]')
-        source_includes = safe_get_list(form_data, 'source_includes[]') 
-        source_excludes = safe_get_list(form_data, 'source_excludes[]')
-        
-        if not source_paths:
-            return {'valid': False, 'error': 'At least one source path is required'}
-        
-        # Build source paths array with per-path includes/excludes
-        parsed_paths = []
-        for i, path in enumerate(source_paths):
-            path = path.strip()
-            if not path:
-                continue  # Skip empty paths instead of failing
-            
-            # Get includes/excludes for this path (or empty if not provided)
-            includes_text = source_includes[i] if i < len(source_includes) else ''
-            excludes_text = source_excludes[i] if i < len(source_excludes) else ''
-            
-            path_config = {
-                'path': path,
-                'includes': parse_lines(includes_text),
-                'excludes': parse_lines(excludes_text)
-            }
-            parsed_paths.append(path_config)
-        
-        # Ensure we have at least one valid path after filtering empty ones
-        if not parsed_paths:
-            return {'valid': False, 'error': 'At least one source path is required'}
-        
-        return {'valid': True, 'source_paths': parsed_paths}
+# SOURCE PATHS PARSER MOVED TO jobs/handlers/pages.py
 
 # =============================================================================
 # NOTIFICATION CONFIGURATION PARSER
 # =============================================================================
 
-class NotificationParser:
-    """Parse notification provider configurations"""
-    
-    @staticmethod
-    def parse_notification_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse notification configuration from form data"""
-        # Get notification form arrays
-        providers = safe_get_list(form_data, 'notification_providers[]')
-        notify_success_flags = safe_get_list(form_data, 'notify_on_success[]')
-        success_messages = safe_get_list(form_data, 'notification_success_messages[]')
-        notify_failure_flags = safe_get_list(form_data, 'notify_on_failure[]')
-        failure_messages = safe_get_list(form_data, 'notification_failure_messages[]')
-        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_on_maintenance_failure[]')
-        
-        notifications = []
-        
-        # Process each provider configuration
-        for i, provider in enumerate(providers):
-            if not provider:  # Skip empty providers
-                continue
-                
-            # Get corresponding values for this provider (with safe indexing)
-            notify_success = i < len(notify_success_flags) and notify_success_flags[i] == 'on'
-            success_message = success_messages[i] if i < len(success_messages) else ''
-            notify_failure = i < len(notify_failure_flags) and notify_failure_flags[i] == 'on'
-            failure_message = failure_messages[i] if i < len(failure_messages) else ''
-            notify_maintenance_failure = i < len(notify_maintenance_failure_flags) and notify_maintenance_failure_flags[i] == 'on'
-            
-            # Validate - at least one notification type must be enabled
-            if not notify_success and not notify_failure:
-                return {
-                    'valid': False, 
-                    'error': f'Provider {provider}: At least one notification type (success or failure) must be enabled'
-                }
-            
-            # Build notification config
-            notification_config = {
-                'provider': provider,
-                'notify_on_success': notify_success,
-                'notify_on_failure': notify_failure,
-                'notify_on_maintenance_failure': notify_maintenance_failure
-            }
-            
-            # Add custom messages if provided
-            if notify_success and success_message.strip():
-                notification_config['success_message'] = success_message.strip()
-            if notify_failure and failure_message.strip():
-                notification_config['failure_message'] = failure_message.strip()
-            
-            notifications.append(notification_config)
-        
-        return {'valid': True, 'notifications': notifications}
+# NOTIFICATION PARSER MOVED TO jobs/handlers/pages.py
 
 # =============================================================================
 # MAINTENANCE CONFIGURATION PARSER
@@ -227,6 +141,7 @@ class JobFormParser:
         respect_conflicts = 'respect_conflicts' in form_data
         
         # Parse notification configuration
+        from jobs.handlers.pages import NotificationParser
         notification_result = NotificationParser.parse_notification_config(form_data)
         if not notification_result['valid']:
             return notification_result
@@ -286,6 +201,7 @@ class JobFormParser:
         source_config = source_result['config']
         
         # Parse source paths (common to all source types)
+        from jobs.handlers.pages import SourcePathsParser
         source_paths_data = SourcePathsParser.parse_multi_path_options(form_data)
         if not source_paths_data['valid']:
             return source_paths_data
@@ -335,7 +251,7 @@ class JobFormParser:
 job_parser = JobFormParser()
 source_parser = SourceParser()
 # destination_parser moved to dests/handlers/pages.py
-notification_parser = NotificationParser()
+# notification_parser moved to jobs/handlers/pages.py
 # maintenance_parser moved to dests/handlers/pages.py
-source_paths_parser = SourcePathsParser()
+# source_paths_parser moved to jobs/handlers/pages.py
 # origin_parser moved to origins/handlers/pages.py
