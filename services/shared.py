@@ -172,6 +172,85 @@ class SSHCommandFactory:
         return cmd
 
 
+class SSHExecutionService:
+    """SSH command execution - ONLY handles SSH execution using centralized SSHCommandFactory"""
+    
+    def __init__(self, ssh_factory: Optional[SSHCommandFactory] = None):
+        self.ssh_factory = ssh_factory or SSHCommandFactory()
+        self.obfuscation = CommandObfuscationService()
+    
+    def execute_via_ssh(
+        self,
+        hostname: str,
+        username: str,
+        command: List[str],
+        ssh_password: Optional[str] = None,
+        ssh_port: Optional[int] = None,
+        timeout: int = 120
+    ) -> ExecutionResult:
+        """Execute command on remote host via SSH using centralized factory"""
+        
+        # Convert command list to shell string for SSH transmission
+        container_cmd_str = shlex.join(command)
+        # Allow shell evaluation of $(id -u):$(id -g) on remote host (like highball-main)
+        container_cmd_str = container_cmd_str.replace("'$(id -u):$(id -g)'", "$(id -u):$(id -g)")
+        
+        # Build SSH command using centralized factory (eliminates DRY violation)
+        ssh_cmd = self.ssh_factory.build_ssh_command(
+            hostname=hostname,
+            username=username,
+            remote_command=container_cmd_str,
+            password=ssh_password,
+            port=ssh_port,
+            connect_timeout=10
+        )
+        
+        # Execute with proper logging obfuscation
+        try:
+            result = subprocess.run(
+                ssh_cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            return ExecutionResult(
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                timeout_expired=False
+            )
+            
+        except subprocess.TimeoutExpired:
+            return ExecutionResult(
+                returncode=-1,
+                stdout="",
+                stderr=f"SSH command timed out after {timeout} seconds",
+                timeout_expired=True
+            )
+        except Exception as e:
+            return ExecutionResult(
+                returncode=-1,
+                stdout="",
+                stderr=f"SSH execution failed: {str(e)}",
+                timeout_expired=False
+            )
+    
+    def execute_container_via_ssh(
+        self,
+        hostname: str,
+        username: str,
+        container_command: List[str],
+        ssh_password: Optional[str] = None,
+        ssh_port: Optional[int] = None,
+        timeout: int = 120
+    ) -> ExecutionResult:
+        """Execute container command via SSH using centralized execution"""
+        return self.execute_via_ssh(
+            hostname, username, container_command, ssh_password, ssh_port, timeout
+        )
+
+
 # =============================================================================
 # ===                       CONTAINER OPERATIONS                           ===
 # =============================================================================
