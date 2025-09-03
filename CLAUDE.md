@@ -3,6 +3,11 @@
 Web backup orchestration with scheduling, monitoring, notification. Providers: **rsync, restic**.
 
 ---
+## Application Setup
+
+- `Dockerfile`: single-stage GitHub action, not used locally
+- `Dockerfile.base` + `Dockerfile.app` + `rr`: local (re)build chain
+
 ## Critical Execution
 
 **OpType**: **Exec Context**
@@ -55,7 +60,7 @@ dests/             # handlers/, services/, schema.py
 jobs/              # handlers/, services/, schema.py
 admin/             # handlers/, services/, schema.py
 models/            # Legacy shared validation/builders - NO NEW CONTENT
-services/          # Legacy shared (execution, ssh, repos, maintenance) - NO NEW CONTENT
+services/          # shared (execution, ssh, templates) - NO NEW CONTENT
 templates/         # schema-driven, HTMX
 static/            # CSS, JavaScript, themes
 config/            # local/{jobs,dests,origins,secrets}, local.yaml

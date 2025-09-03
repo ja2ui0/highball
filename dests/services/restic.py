@@ -17,7 +17,7 @@ from functools import wraps
 # Import dependencies
 from services.exec import OperationType
 from services.exec import ResticExecutionService
-from models.builders import ResticArgumentBuilder
+from services.exec import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)

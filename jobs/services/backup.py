@@ -21,7 +21,7 @@ from services.exec import OperationType
 
 # Import extracted modules
 from origins.schema import SOURCE_PATH_SCHEMA
-from models.builders import ResticArgumentBuilder
+from services.exec import ResticArgumentBuilder
 from dests.services.restic import ResticRunner, ResticRepositoryService, ResticContentAnalyzer, ResticMaintenanceService
 
 logger = logging.getLogger(__name__)

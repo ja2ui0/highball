@@ -222,7 +222,7 @@ class ResticSSHService:
         timeout: int
     ) -> subprocess.CompletedProcess:
         """Execute restic command via SSH using container"""
-        from models.builders import ResticArgumentBuilder
+        from services.exec import ResticArgumentBuilder
         
         # Extract SSH configuration
         hostname = source_config['hostname']
