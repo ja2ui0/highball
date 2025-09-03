@@ -11,7 +11,7 @@ import os
 import json
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
-from services.management import JobManagementService
+from jobs.services.manage import JobManagementService
 from services.execution import ResticExecutionService, OperationType
 from services.shared import SSHCommandFactory
 

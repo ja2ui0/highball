@@ -1,9 +1,11 @@
 """
-Global Command Factories
-Centralized SSH and Container/Restic command building to eliminate duplication
+Shared Services
+Centralized SSH/container command building and cross-domain conflict management
 """
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Any
 from enum import Enum
+from pathlib import Path
+from pydantic import BaseModel
 import shlex
 
 
@@ -214,3 +216,77 @@ class ResticContainerFactory:
         """Wrap container command for SSH execution"""
         escaped_cmd = shlex.join(container_command)
         return ssh_factory.build_ssh_command(ssh_hostname, ssh_username, escaped_cmd)
+
+
+
+# =============================================================================
+# **CROSS-DOMAIN CONFLICT MANAGEMENT** - Resource conflict detection
+# =============================================================================
+
+class JobConflictManager:
+    """Conflict management functionality - ONLY handles resource conflict detection"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+        from jobs.services.manage import JobProcessTracker
+        self.process_tracker = JobProcessTracker()
+    
+    def get_job_resources(self, job_config: Dict[str, Any]) -> Dict[str, Set[str]]:
+        """Conflict concern: extract resource identifiers from job configuration"""
+        sources = set()
+        destinations = set()
+        
+        # Extract source resources
+        if job_config.get('source_type') == 'ssh':
+            source_config = job_config.get('source_config', {})
+            hostname = source_config.get('hostname')
+            if hostname:
+                sources.add(hostname.lower())
+        
+        # Extract destination resources  
+        dest_type = job_config.get('dest_type')
+        dest_config = job_config.get('dest_config', {})
+        
+        if dest_type == 'ssh':
+            hostname = dest_config.get('hostname')
+            if hostname:
+                destinations.add(hostname.lower())
+        elif dest_type == 'rsyncd':
+            hostname = dest_config.get('hostname')
+            if hostname:
+                destinations.add(hostname.lower())
+        elif dest_type == 'restic':
+            repo_uri = dest_config.get('repo_uri', '')
+            if repo_uri:
+                destinations.add(repo_uri)
+        
+        return {'sources': sources, 'destinations': destinations}
+    
+    def check_for_conflicts(self, job_name: str) -> List[str]:
+        """Conflict concern: detect if job conflicts with currently running jobs"""
+        # Get this job's config
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name)
+        if not job_config:
+            return []
+        
+        job_resources = self.get_job_resources(job_config)
+        running_jobs = self.process_tracker.get_running_jobs()
+        conflicts = []
+        
+        for running_job in running_jobs:
+            if running_job == job_name:
+                continue  # Skip self
+            
+            running_job_config = jobs.get(running_job)
+            if not running_job_config:
+                continue
+            
+            running_resources = self.get_job_resources(running_job_config)
+            
+            # Check for overlapping resources
+            if (job_resources['sources'] & running_resources['sources'] or
+                job_resources['destinations'] & running_resources['destinations']):
+                conflicts.append(running_job)
+        
+        return conflicts

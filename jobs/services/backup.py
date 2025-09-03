@@ -143,7 +143,7 @@ class BackupOrchestrationService:
     
     def __init__(self, backup_config):
         self.backup_config = backup_config
-        from services.management import JobManagementService
+        from jobs.services.manage import JobManagementService
         self.job_management = JobManagementService(backup_config)
     
     def run_backup_job(self, job_name: str, dry_run: bool = False) -> Dict[str, Any]:

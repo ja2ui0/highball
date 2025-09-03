@@ -116,7 +116,7 @@ class ScheduleLoader:
 
     def bootstrap_schedules(self, backup_config) -> int:
         """Loading concern: register all enabled jobs that have non-manual schedule"""
-        from services.management import JobManagementService
+        from jobs.services.manage import JobManagementService
         
         jobs = backup_config.config.get("backup_jobs", {}) or {}
         global_settings = backup_config.config.get("global_settings", {}) or {}

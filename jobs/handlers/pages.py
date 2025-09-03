@@ -59,7 +59,7 @@ class JobsHandler(BaseHandler):
         global_settings = self.backup_config.get_global_settings()
         
         # Get job status information
-        from services.management import JobManagementService
+        from jobs.services.manage import JobManagementService
         job_management = JobManagementService(self.backup_config)
         
         job_list = []
@@ -324,7 +324,7 @@ class JobsHandler(BaseHandler):
         job_config = jobs[job_name]
         
         # Get job status and logs
-        from services.management import JobManagementService
+        from jobs.services.manage import JobManagementService
         job_management = JobManagementService(self.backup_config)
         status_info = job_management.get_status(job_name)
         recent_logs = job_management.get_log_entries(job_name, max_lines=100)

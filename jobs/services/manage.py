@@ -228,92 +228,6 @@ class JobProcessTracker:
             print(f"WARNING: Could not cleanup stale job entries: {e}")
 
 
-# =============================================================================
-# **CONFLICT DETECTION CONCERN** - Resource conflict analysis and resolution
-# =============================================================================
-
-class JobConflictManager:
-    """Conflict management functionality - ONLY handles resource conflict detection"""
-    
-    def __init__(self, backup_config):
-        self.backup_config = backup_config
-        self.process_tracker = JobProcessTracker()
-    
-    def get_job_resources(self, job_config: Dict[str, Any]) -> Dict[str, Set[str]]:
-        """Conflict concern: extract resource identifiers from job configuration"""
-        sources = set()
-        destinations = set()
-        
-        # Extract source resources
-        if job_config.get('source_type') == 'ssh':
-            source_config = job_config.get('source_config', {})
-            hostname = source_config.get('hostname')
-            if hostname:
-                sources.add(hostname.lower())
-        
-        # Extract destination resources  
-        dest_type = job_config.get('dest_type')
-        dest_config = job_config.get('dest_config', {})
-        
-        if dest_type == 'ssh':
-            hostname = dest_config.get('hostname')
-            if hostname:
-                destinations.add(hostname.lower())
-        elif dest_type == 'rsyncd':
-            hostname = dest_config.get('hostname')
-            if hostname:
-                destinations.add(hostname.lower())
-        elif dest_type == 'restic':
-            repo_uri = dest_config.get('repo_uri', '')
-            if repo_uri:
-                destinations.add(repo_uri)
-        
-        return {'sources': sources, 'destinations': destinations}
-    
-    def check_for_conflicts(self, job_name: str) -> List[str]:
-        """Conflict concern: detect if job conflicts with currently running jobs"""
-        # Get this job's config
-        jobs = self.backup_config.config.get('backup_jobs', {})
-        job_config = jobs.get(job_name)
-        if not job_config:
-            return []
-        
-        job_resources = self.get_job_resources(job_config)
-        running_jobs = self.process_tracker.get_running_jobs()
-        conflicts = []
-        
-        for running_job in running_jobs:
-            if running_job == job_name:
-                continue  # Skip self
-            
-            running_job_config = jobs.get(running_job)
-            if not running_job_config:
-                continue
-            
-            running_resources = self.get_job_resources(running_job_config)
-            
-            # Check for overlapping resources
-            if (job_resources['sources'] & running_resources['sources'] or
-                job_resources['destinations'] & running_resources['destinations']):
-                conflicts.append(running_job)
-        
-        return conflicts
-    
-    def wait_for_conflicts_to_resolve(self, job_name: str, max_wait_seconds: int = 300) -> bool:
-        """Conflict concern: wait for conflicting jobs to complete"""
-        start_time = datetime.now()
-        
-        while True:
-            conflicts = self.check_for_conflicts(job_name)
-            if not conflicts:
-                return True  # No conflicts, can proceed
-            
-            elapsed = (datetime.now() - start_time).total_seconds()
-            if elapsed >= max_wait_seconds:
-                return False  # Timeout
-            
-            print(f"Job {job_name} waiting for conflicts to resolve: {conflicts}")
-            time.sleep(10)  # Wait 10 seconds before checking again
 
 
 # =============================================================================
@@ -327,6 +241,7 @@ class JobManagementService:
         self.backup_config = backup_config
         self.logger = JobLogger()
         self.process_tracker = JobProcessTracker()
+        from services.shared import JobConflictManager
         self.conflict_manager = JobConflictManager(backup_config) if backup_config else None
     
     # **LOGGING DELEGATION** - Pure delegation to logging concern
