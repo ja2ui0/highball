@@ -77,31 +77,10 @@ class CommandExecutionService:
         command: List[str],
         ssh_options: Optional[List[str]] = None
     ) -> ExecutionResult:
-        """Execution concern: run command on remote host via SSH"""
-        # Build SSH command
-        ssh_cmd = ['ssh']
-        
-        # Add SSH options
-        default_options = [
-            '-i', '/config/local/secrets/.ssh/id_highball',
-            '-o', 'ConnectTimeout=10',
-            '-o', 'BatchMode=yes',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null'
-        ]
-        ssh_cmd.extend(ssh_options or default_options)
-        
-        # Add target and command
-        ssh_cmd.append(f'{username}@{hostname}')
-        
-        # Convert command to shell string with proper quote handling
-        container_cmd_str = shlex.join(command)
-        # Allow shell evaluation of $(id -u):$(id -g) on remote host (like highball-main)
-        container_cmd_str = container_cmd_str.replace("'$(id -u):$(id -g)'", "$(id -u):$(id -g)")
-        
-        ssh_cmd.append(container_cmd_str)
-        
-        return self.execute_locally(ssh_cmd)
+        """Execution concern: delegate to centralized SSH execution service"""
+        from services.shared import SSHExecutionService
+        ssh_service = SSHExecutionService()
+        return ssh_service.execute_via_ssh(hostname, username, command)
     
     def execute_container_via_ssh(
         self,
@@ -110,8 +89,10 @@ class CommandExecutionService:
         container_command: List[str],
         ssh_options: Optional[List[str]] = None
     ) -> ExecutionResult:
-        """Execution concern: run container command on remote host via SSH"""
-        return self.execute_via_ssh(hostname, username, container_command, ssh_options)
+        """Execution concern: delegate to centralized SSH execution service"""
+        from services.shared import SSHExecutionService
+        ssh_service = SSHExecutionService()
+        return ssh_service.execute_container_via_ssh(hostname, username, container_command)
     
     def execute_with_progress_monitoring(
         self,
@@ -269,26 +250,10 @@ class ResticExecutionService:
             return self._execute_locally(dest_config, command_args, timeout)
     
     def _should_use_ssh(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]], operation_type: OperationType) -> bool:
-        """Determine if SSH execution should be used based on context"""
-        if not source_config:
-            return False
-        
-        # For same_as_origin repositories, always use SSH (repository is on origin host filesystem)
-        if dest_config.get('repo_type') == 'same_as_origin':
-            return True
-        
-        # UI operations execute locally from Highball container (for networked repos)
-        if operation_type in [OperationType.UI, OperationType.BROWSE, OperationType.INSPECT]:
-            return False
-            
-        # Source operations use SSH when source is SSH
-        has_ssh_config = bool(source_config.get('hostname') and source_config.get('username'))
-        
-        if operation_type in [OperationType.BACKUP, OperationType.RESTORE, OperationType.MAINTENANCE, OperationType.INIT]:
-            return has_ssh_config
-            
-        # General operations use SSH when available
-        return has_ssh_config
+        """Determine if SSH execution should be used based on context - delegate to shared service"""
+        from services.shared import ResticSSHService
+        restic_ssh = ResticSSHService()
+        return restic_ssh.should_use_ssh(dest_config, source_config, operation_type)
     
     def _execute_locally(
         self, 
@@ -321,350 +286,19 @@ class ResticExecutionService:
         source_config: Dict[str, Any], 
         timeout: int
     ) -> subprocess.CompletedProcess:
-        """Execute restic command via SSH using container"""
-        from models.builders import ResticArgumentBuilder
-        
-        # Extract SSH configuration
-        hostname = source_config['hostname']
-        username = source_config['username']
-        container_runtime = source_config.get('container_runtime', 'docker')
-        
-        # Build environment flags for container
-        env_flags = ResticArgumentBuilder.build_ssh_environment_flags(dest_config)
-        
-        # Build container command
-        repo_uri = dest_config.get('repo_uri', '')
-        container_cmd = [
-            container_runtime, 'run', '--rm', '--user', '$(id -u):$(id -g)'
-        ] + env_flags
-        
-        # Add volume mount for same_as_origin repositories (directory should exist from validation)  
-        if dest_config.get('repo_type') == 'same_as_origin':
-            # Mount the repository directory into container
-            container_cmd.extend(['-v', f'{repo_uri}:{repo_uri}'])
-        
-        # For ALL SSH operations, mount source paths (not just same_as_origin)
-        if source_config:
-            # For backup operations, mount source paths as read-only
-            if 'backup' in command_args:
-                source_paths = source_config.get('source_paths', [])
-                for path_config in source_paths:
-                    source_path = path_config['path']
-                    container_cmd.extend(['-v', f'{source_path}:{source_path}:ro'])
-            
-            # For restore operations, mount source paths as read-write
-            if 'restore' in command_args:
-                source_paths = source_config.get('source_paths', [])
-                for path_config in source_paths:
-                    source_path = path_config['path']
-                    container_cmd.extend(['-v', f'{source_path}:{source_path}'])
-        
-        container_cmd.extend([
-            'restic/restic:0.18.0',
-            '-r', repo_uri
-        ] + command_args)
-        
-        # DEBUG: Log the container command for same_as_origin
-        # Execute via SSH
-        return self.executor.execute_ssh_command(hostname, username, container_cmd)
+        """Execute restic command via SSH using container - delegate to shared service"""
+        from services.shared import ResticSSHService
+        restic_ssh = ResticSSHService()
+        return restic_ssh.execute_restic_via_ssh(dest_config, command_args, source_config, timeout)
 
 
 # =============================================================================
 # **SSH WORKFLOW SERVICE** - SSH key management and validation
 # =============================================================================
+# MOVED TO shared.py - import from there for compatibility
 
-class SSHWorkflowService:
-    """Service for SSH key management and connection validation workflows"""
-    
-    def push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow: push keys → validate connection → detect capabilities"""
-        progress_messages = []
-        
-        try:
-            # Step 1: Test initial connection
-            progress_messages.append("• Testing initial SSH connection...")
-            initial_test = self._test_initial_ssh_connection(hostname, username, password, use_password)
-            if not initial_test['success']:
-                progress_messages.append(f"✗ Initial connection failed: {initial_test.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            progress_messages.append("✓ Initial SSH connection successful")
-            
-            # Step 2: Check for existing key in authorized_keys
-            progress_messages.append("• Checking for existing Highball key in authorized_keys...")
-            key_check = self._check_highball_key_in_authorized_keys(hostname, username)
-            
-            # Step 3: Push key if needed
-            if not key_check['key_exists']:
-                progress_messages.append("• Highball key not found, installing...")
-                if not use_password:
-                    progress_messages.append("✗ Password required to install key")
-                    return {
-                        'success': False,
-                        'validation_message': '\n'.join(progress_messages)
-                    }
-                push_result = self._push_highball_key(hostname, username, password)
-                if not push_result['success']:
-                    progress_messages.append(f"✗ Key installation failed: {push_result.get('validation_message', 'Unknown error')}")
-                    return {
-                        'success': False,
-                        'validation_message': '\n'.join(progress_messages)
-                    }
-                progress_messages.append("✓ Highball key installed successfully")
-            else:
-                progress_messages.append("✓ Highball key already present in authorized_keys")
-            
-            # Step 4: Copy keypair to remote host
-            progress_messages.append("• Copying Highball keypair to remote host...")
-            copy_result = self._copy_keypair_to_remote(hostname, username)
-            if not copy_result['success']:
-                progress_messages.append(f"✗ Keypair copy failed: {copy_result.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            progress_messages.append("✓ Keypair copied successfully")
-            
-            # Step 5: Test final connection and detect capabilities
-            progress_messages.append("• Testing final connection and detecting capabilities...")
-            
-            # Create progress callback for detailed capability detection
-            def log_capability_progress(message):
-                progress_messages.append(message)
-            
-            final_test = self._test_connection_and_capabilities(hostname, username, log_capability_progress)
-            if not final_test['success']:
-                progress_messages.append(f"✗ Final connection test failed: {final_test.get('validation_message', 'Unknown error')}")
-                return {
-                    'success': False,
-                    'validation_message': '\n'.join(progress_messages)
-                }
-            
-            progress_messages.append("✓ All steps completed successfully!")
-            
-            return {
-                'success': True,
-                'validation_message': '\n'.join(progress_messages),
-                'rsync_available': final_test.get('rsync_available', False),
-                'container_runtime': final_test.get('container_runtime', None)
-            }
-            
-        except Exception as e:
-            progress_messages.append(f"✗ Workflow failed: {str(e)}")
-            return {
-                'success': False,
-                'validation_message': '\n'.join(progress_messages)
-            }
-
-    def _test_initial_ssh_connection(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Test initial SSH connection using password or existing key"""
-        import subprocess
-        
-        if use_password:
-            # Test connection with password using sshpass
-            cmd = [
-                'sshpass', '-p', password,
-                'ssh', '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                f'{username}@{hostname}',
-                'echo "INITIAL_SSH_OK"'
-            ]
-        else:
-            # Test connection with existing key
-            cmd = [
-                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-                '-o', 'ConnectTimeout=10',
-                '-o', 'BatchMode=yes',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                f'{username}@{hostname}',
-                'echo "INITIAL_SSH_OK"'
-            ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        
-        if result.returncode == 0 and 'INITIAL_SSH_OK' in result.stdout:
-            return {'success': True}
-        else:
-            return {
-                'success': False,
-                'validation_message': f'Initial SSH connection failed: {result.stderr.strip()}'
-            }
-
-    def _check_highball_key_in_authorized_keys(self, hostname: str, username: str) -> dict:
-        """Check if Highball public key exists in remote authorized_keys"""
-        import subprocess
-        
-        # Read our public key
-        with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
-            our_pubkey = f.read().strip()
-        
-        # Extract the key part (without comment)
-        key_parts = our_pubkey.split()
-        if len(key_parts) >= 2:
-            key_signature = key_parts[1]  # The actual key data
-        else:
-            return {'key_exists': False, 'validation_message': 'Invalid public key format'}
-        
-        # Check if key exists in remote authorized_keys
-        cmd = [
-            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-            '-o', 'ConnectTimeout=10',
-            '-o', 'BatchMode=yes',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
-            f'{username}@{hostname}',
-            f'grep -q "{key_signature}" ~/.ssh/authorized_keys 2>/dev/null && echo "KEY_EXISTS" || echo "KEY_NOT_FOUND"'
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        
-        if result.returncode == 0:
-            if 'KEY_EXISTS' in result.stdout:
-                return {'key_exists': True}
-            else:
-                return {'key_exists': False}
-        else:
-            # Fallback: assume key doesn't exist if we can't check
-            return {'key_exists': False, 'validation_message': 'Could not check authorized_keys'}
-
-    def _push_highball_key(self, hostname: str, username: str, password: str) -> dict:
-        """Push Highball public key to remote authorized_keys using ssh-copy-id"""
-        import subprocess
-        
-        cmd = [
-            'sshpass', '-p', password,
-            'ssh-copy-id',
-            '-i', '/config/local/secrets/.ssh/id_highball.pub',
-            '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
-            f'{username}@{hostname}'
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        
-        if result.returncode == 0:
-            return {'success': True}
-        else:
-            return {
-                'success': False,
-                'validation_message': f'Key installation failed: {result.stderr.strip()}'
-            }
-
-    def _copy_keypair_to_remote(self, hostname: str, username: str) -> dict:
-        """Copy Highball keypair to remote host ~/.ssh/ directory"""
-        import subprocess
-        from services.shared import SSHCommandFactory
-        
-        try:
-            # Read both keys
-            with open('/config/local/secrets/.ssh/id_highball', 'r') as f:
-                private_key = f.read()
-            with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
-                public_key = f.read()
-            
-            # Use SSHCommandFactory with subprocess.run (cleaner than SCP)
-            ssh_factory = SSHCommandFactory()
-            
-            # Copy private key using base64 for safe transfer
-            private_b64 = base64.b64encode(private_key.encode()).decode()
-            private_cmd = ssh_factory.build_ssh_command(
-                hostname, username,
-                f'echo "{private_b64}" | base64 -d > ~/.ssh/id_highball'
-            )
-            result = subprocess.run(private_cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'validation_message': f'Private key copy failed: {result.stderr.strip()}'
-                }
-            
-            # Copy public key using base64 for safe transfer  
-            public_b64 = base64.b64encode(public_key.encode()).decode()
-            public_cmd = ssh_factory.build_ssh_command(
-                hostname, username,
-                f'echo "{public_b64}" | base64 -d > ~/.ssh/id_highball.pub'
-            )
-            result = subprocess.run(public_cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'validation_message': f'Public key copy failed: {result.stderr.strip()}'
-                }
-            
-            # Set permissions
-            chmod_cmd = ssh_factory.build_ssh_command(
-                hostname, username,
-                'chmod 600 ~/.ssh/id_highball && chmod 644 ~/.ssh/id_highball.pub'
-            )
-            result = subprocess.run(chmod_cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode != 0:
-                return {
-                    'success': False,
-                    'validation_message': f'Permission setting failed: {result.stderr.strip()}'
-                }
-            
-            return {'success': True}
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'validation_message': f'Keypair copy failed: {str(e)}'
-            }
-
-    def _test_connection_and_capabilities(self, hostname: str, username: str, log_progress=None) -> dict:
-        """Test final connection and detect available capabilities"""
-        import subprocess
-        
-        if log_progress:
-            log_progress("Testing SSH connection with Highball keypair...")
-        
-        # Test SSH connection and detect capabilities
-        test_cmd = [
-            'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-            '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
-            f'{username}@{hostname}',
-            'echo "SSH_OK" && which rsync >/dev/null 2>&1 && echo "RSYNC_AVAILABLE" || echo "RSYNC_UNAVAILABLE" && which docker >/dev/null 2>&1 && echo "DOCKER_AVAILABLE" || which podman >/dev/null 2>&1 && echo "PODMAN_AVAILABLE" || echo "NO_CONTAINER_RUNTIME"'
-        ]
-        
-        result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=15)
-        
-        if result.returncode == 0 and 'SSH_OK' in result.stdout:
-            if log_progress:
-                log_progress("✓ SSH connection successful")
-            
-            # Parse capabilities
-            output = result.stdout
-            rsync_available = 'RSYNC_AVAILABLE' in output
-            container_runtime = None
-            
-            if 'DOCKER_AVAILABLE' in output:
-                container_runtime = 'docker'
-            elif 'PODMAN_AVAILABLE' in output:
-                container_runtime = 'podman'
-            
-            if log_progress:
-                log_progress(f"✓ Capabilities detected: rsync={rsync_available}, runtime={container_runtime}")
-            
-            return {
-                'success': True,
-                'rsync_available': rsync_available,
-                'container_runtime': container_runtime
-            }
-        else:
-            error_msg = f'SSH connection test failed: {result.stderr.strip()}'
-            if log_progress:
-                log_progress(f"✗ {error_msg}")
-            return {
-                'success': False,
-                'validation_message': error_msg
-            }
+# Compatibility import - actual implementation is in shared.py
+from services.shared import SSHWorkflowService
 
 
 # Legacy compatibility functions
