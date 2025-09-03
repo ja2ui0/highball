@@ -57,16 +57,6 @@ class TemplateService:
             # Automatically add theme CSS path to all templates
             kwargs['theme_css_path'] = self.get_theme_css_path()
             
-            # Handle job table rows if jobs data is present
-            if 'jobs' in kwargs:
-                jobs_html = self._build_job_rows(kwargs['jobs'])
-                kwargs['job_rows'] = jobs_html
-            
-            # Handle deleted job rows if deleted_jobs data is present  
-            if 'deleted_jobs' in kwargs:
-                deleted_html = self._build_deleted_job_rows(kwargs['deleted_jobs'])
-                kwargs['deleted_job_rows'] = deleted_html
-            
             # Handle config warning
             kwargs['config_warning'] = ''  # Empty for now
             
@@ -74,56 +64,6 @@ class TemplateService:
             
         except Exception as e:
             raise Exception(f"Template rendering failed for {template_name}: {str(e)}")
-    
-    def _build_job_rows(self, jobs):
-        """Build job table rows from job data"""
-        if not jobs:
-            return self.load_template('partials/empty_job_rows.html')
-        
-        rows = []
-        for job in jobs:
-            row_html = self.render_template('partials/job_row.html',
-                job_name=job['name'],
-                source_display=job['source_display'],
-                dest_display=job['dest_display'], 
-                status_class=job['status_class'],
-                status_text=job['status'],
-                schedule=job['schedule']
-            )
-            rows.append(row_html)
-        
-        return '\n'.join(rows)
-    
-    def _build_deleted_job_rows(self, deleted_jobs):
-        """Build deleted job table rows from deleted jobs data"""
-        if not deleted_jobs:
-            return self.load_template('partials/empty_deleted_rows.html')
-        
-        rows = []
-        for job_name, job_data in deleted_jobs.items():
-            deleted_at = job_data.get('deleted_at', 'Unknown')
-            source_path = self._extract_source_path_from_deleted_job(job_data)
-            
-            row_html = self.render_template('partials/deleted_job_row.html',
-                job_name=job_name,
-                source_path=source_path,
-                deleted_at=deleted_at
-            )
-            rows.append(row_html)
-        
-        return '\n'.join(rows)
-    
-    def _extract_source_path_from_deleted_job(self, job_data):
-        """Extract source path from deleted job data"""
-        if 'config' not in job_data:
-            return 'Unknown'
-        
-        source_config = job_data['config'].get('source_config', {})
-        source_paths = source_config.get('source_paths', [])
-        if source_paths:
-            return source_paths[0].get('path', 'Unknown')
-        else:
-            return source_config.get('path', 'Unknown')
     
     def render_validation_status(self, validation_type: str, result: Dict[str, Any]) -> str:
         """Template concern: render validation status using Jinja2 template"""

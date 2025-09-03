@@ -52,6 +52,63 @@ class JobsHandler(BaseHandler):
         from jobs.services.backup import BackupOrchestrationService
         self.backup_orchestration = BackupOrchestrationService(self.backup_config)
     
+    # =========================================================================
+    # JOB ROW BUILDING (moved from services/template.py)
+    # =========================================================================
+    
+    def _build_job_rows(self, jobs):
+        """Build job table rows from job data"""
+        if not jobs:
+            return self.template_service.load_template('partials/empty_job_rows.html')
+        
+        rows = []
+        for job in jobs:
+            row_html = self.template_service.render_template('partials/job_row.html',
+                job_name=job['name'],
+                source_display=job['source_display'],
+                dest_display=job['dest_display'], 
+                status_class=job['status_class'],
+                status_text=job['status'],
+                schedule=job['schedule']
+            )
+            rows.append(row_html)
+        
+        return '\n'.join(rows)
+    
+    def _build_deleted_job_rows(self, deleted_jobs):
+        """Build deleted job table rows from deleted jobs data"""
+        if not deleted_jobs:
+            return self.template_service.load_template('partials/empty_deleted_rows.html')
+        
+        rows = []
+        for job_name, job_config in deleted_jobs.items():
+            # Build source and destination displays same way as active jobs
+            source_display = self._build_source_display_with_type(job_config)
+            dest_display = self._build_dest_display_with_type(job_config)
+            
+            # Format deleted_at timestamp (break into date and time)
+            deleted_at_raw = job_config.get('deleted_at', 'Unknown')
+            if deleted_at_raw != 'Unknown' and ' ' in deleted_at_raw:
+                # Split "2025-08-20 14:30:45" into "2025-08-20\n14:30:45"
+                date_part, time_part = deleted_at_raw.split(' ', 1)
+                deleted_at = f"{date_part}\n{time_part}"
+            else:
+                deleted_at = deleted_at_raw
+            
+            row_html = self.template_service.render_template('partials/deleted_job_row.html',
+                job_name=job_name,
+                source_display=source_display,
+                dest_display=dest_display,
+                deleted_at=deleted_at
+            )
+            rows.append(row_html)
+        
+        return '\n'.join(rows)
+    
+    # =========================================================================
+    # PAGE HANDLERS
+    # =========================================================================
+    
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
         """Show main dashboard with job list"""
@@ -86,37 +143,13 @@ class JobsHandler(BaseHandler):
         # Sort jobs by name
         job_list.sort(key=lambda j: j['name'])
         
-        # Process deleted jobs into display format
+        # Build job and deleted job HTML using local methods (moved from template service)
+        job_rows = self._build_job_rows(job_list)
         deleted_jobs = self.backup_config.config.get('deleted_jobs', {})
-        deleted_job_rows = ""
-        
-        if deleted_jobs:
-            for job_name, job_config in deleted_jobs.items():
-                # Build source and destination displays same way as active jobs
-                source_display = self._build_source_display_with_type(job_config)
-                dest_display = self._build_dest_display_with_type(job_config)
-                
-                # Format deleted_at timestamp (break into date and time)
-                deleted_at_raw = job_config.get('deleted_at', 'Unknown')
-                if deleted_at_raw != 'Unknown' and ' ' in deleted_at_raw:
-                    # Split "2025-08-20 14:30:45" into "2025-08-20\n14:30:45"
-                    date_part, time_part = deleted_at_raw.split(' ', 1)
-                    deleted_at = f"{date_part}\n{time_part}"
-                else:
-                    deleted_at = deleted_at_raw
-                
-                # Render each deleted job row
-                row_html = self.template_service.render_template(
-                    'partials/deleted_job_row.html',
-                    job_name=job_name,
-                    source_display=source_display,
-                    dest_display=dest_display,
-                    deleted_at=deleted_at
-                )
-                deleted_job_rows += row_html
+        deleted_job_rows = self._build_deleted_job_rows(deleted_jobs)
         
         template_data = {
-            'jobs': job_list,
+            'job_rows': job_rows,
             'deleted_job_rows': deleted_job_rows,
             'global_settings': global_settings,
             'page_title': 'Dashboard'
