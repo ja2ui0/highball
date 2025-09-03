@@ -21,23 +21,6 @@ logger = logging.getLogger(__name__)
 # DATA CLASSES - Shared validation structures
 # =============================================================================
 
-class SSHConfig(BaseModel):
-    """SSH connection configuration with sensible defaults"""
-    connect_timeout: int = 5
-    batch_mode: bool = True
-    strict_host_checking: bool = False
-    known_hosts_file: str = "/dev/null"
-    timeout_seconds: int = 10
-    
-    def to_ssh_args(self) -> List[str]:
-        """Convert configuration to SSH command arguments"""
-        return [
-            '-i', '/config/local/secrets/.ssh/id_highball',
-            '-o', f'ConnectTimeout={self.connect_timeout}',
-            '-o', f'BatchMode={"yes" if self.batch_mode else "no"}',
-            '-o', f'StrictHostKeyChecking={"yes" if self.strict_host_checking else "no"}',
-            '-o', f'UserKnownHostsFile={self.known_hosts_file}'
-        ]
 
 class SSHConnectionDetails(BaseModel):
     """Parsed SSH connection information"""
@@ -116,8 +99,9 @@ class TestResult(BaseModel):
 class SSHValidator:
     """Validates SSH connectivity, permissions, and container runtime detection"""
     
-    def __init__(self):
-        self.config = SSHConfig()
+    def __init__(self, connect_timeout: int = 5, timeout_seconds: int = 10):
+        self.connect_timeout = connect_timeout
+        self.timeout_seconds = timeout_seconds
         self._validation_cache = {}
         self.cache_duration = 1800  # 30 minutes in seconds
     
@@ -228,8 +212,9 @@ class SSHValidator:
     def _test_ssh_connection(self, hostname: str, username: str) -> Dict[str, Any]:
         """Test basic SSH connectivity"""
         try:
-            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', 'echo "SSH_OK"']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
+            ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+            cmd = ssh_factory.build_ssh_command(hostname, username, 'echo "SSH_OK"')
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout_seconds)
             
             if result.returncode == 0 and 'SSH_OK' in result.stdout:
                 return TestResult(success=True).to_dict()
@@ -243,11 +228,9 @@ class SSHValidator:
     def _test_rsync_availability(self, hostname: str, username: str) -> Dict[str, Any]:
         """Test rsync availability and get version on remote host"""
         try:
-            cmd = ['ssh'] + self.config.to_ssh_args() + [
-                f'{username}@{hostname}',
-                'rsync --version 2>/dev/null | head -1 || echo "RSYNC_MISSING"'
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
+            ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+            cmd = ssh_factory.build_ssh_command(hostname, username, 'rsync --version 2>/dev/null | head -1 || echo "RSYNC_MISSING"')
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout_seconds)
             
             if result.returncode == 0:
                 output = result.stdout.strip()
@@ -267,12 +250,9 @@ class SSHValidator:
     def _test_container_runtime(self, hostname: str, username: str, runtime: str) -> Dict[str, Any]:
         """Test container runtime (podman/docker) availability and get version"""
         try:
-            cmd = ['ssh'] + self.config.to_ssh_args() + [
-                f'{username}@{hostname}',
-                f'{runtime} --version 2>/dev/null || echo "{runtime.upper()}_MISSING"'
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.config.timeout_seconds)
+            ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+            cmd = ssh_factory.build_ssh_command(hostname, username, f'{runtime} --version 2>/dev/null || echo "{runtime.upper()}_MISSING"')
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout_seconds)
             
             if result.returncode == 0:
                 output = result.stdout.strip()
@@ -308,8 +288,9 @@ class SSHValidator:
         """Test if remote path exists and is accessible for backup/restore operations"""
         try:
             # Test if path exists and is readable (for backup)
-            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', f'test -r "{path}"']
-            result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+            ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+            cmd = ssh_factory.build_ssh_command(hostname, username, f'test -r "{path}"')
+            result = subprocess.run(cmd, capture_output=True, timeout=self.timeout_seconds)
             
             if result.returncode == 0:
                 return TestResult(success=True).to_dict()
@@ -322,16 +303,18 @@ class SSHValidator:
     def _test_path_permissions(self, hostname: str, username: str, path: str) -> str:
         """Test path permissions (RO vs RWX)"""
         try:
+            ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+            
             # Test read access
-            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', f'test -r "{path}"']
-            read_result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+            cmd = ssh_factory.build_ssh_command(hostname, username, f'test -r "{path}"')
+            read_result = subprocess.run(cmd, capture_output=True, timeout=self.timeout_seconds)
             
             if read_result.returncode != 0:
                 return 'NO_ACCESS'
             
             # Test write access  
-            cmd = ['ssh'] + self.config.to_ssh_args() + [f'{username}@{hostname}', f'test -w "{path}"']
-            write_result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+            cmd = ssh_factory.build_ssh_command(hostname, username, f'test -w "{path}"')
+            write_result = subprocess.run(cmd, capture_output=True, timeout=self.timeout_seconds)
             
             return 'RWX' if write_result.returncode == 0 else 'RO'
             
@@ -367,10 +350,9 @@ class SSHValidator:
             
             if not path_existed_initially:
                 # Try to create the directory
-                cmd = ['ssh'] + self.config.to_ssh_args() + [
-                    f'{username}@{hostname}', f'mkdir -p "{repo_path}"'
-                ]
-                mkdir_result = subprocess.run(cmd, capture_output=True, timeout=self.config.timeout_seconds)
+                ssh_factory = SSHCommandFactory(connect_timeout=self.connect_timeout)
+                cmd = ssh_factory.build_ssh_command(hostname, username, f'mkdir -p "{repo_path}"')
+                mkdir_result = subprocess.run(cmd, capture_output=True, timeout=self.timeout_seconds)
                 
                 if mkdir_result.returncode != 0:
                     return {
@@ -508,9 +490,8 @@ class SourcePathValidator:
             ssh_validator = SSHValidator()
             
             # Test path existence
-            cmd = ['ssh'] + ssh_validator.config.to_ssh_args() + [
-                f'{username}@{hostname}', f'test -d "{path}"'
-            ]
+            ssh_factory = SSHCommandFactory(connect_timeout=ssh_validator.connect_timeout)
+            cmd = ssh_factory.build_ssh_command(hostname, username, f'test -d "{path}"')
             result = subprocess.run(cmd, capture_output=True, timeout=10)
             
             if result.returncode != 0:
