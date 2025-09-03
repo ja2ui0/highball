@@ -888,10 +888,10 @@ class ResticRunner:
         """Run backup using container on remote SSH host"""
         try:
             # Use existing container service for backup operations  
-            from services.binaries import ContainerService
+            from services.shared import ResticContainerFactory, MountStrategy
             from services.execution import ExecutionService
             
-            container_service = ContainerService()
+            container_factory = ResticContainerFactory()
             exec_service = ExecutionService()
             
             # Extract configuration
@@ -903,12 +903,14 @@ class ResticRunner:
             if dry_run and '--dry-run' not in backup_args:
                 backup_args = backup_args + ['--dry-run']
             
-            # Build container command using existing service
-            container_command = container_service.build_backup_container_command(
+            # Build container command using shared factory
+            container_command = container_factory.build_container_command(
+                command_type='backup',
                 repository_url=repository_url,
-                source_paths=source_paths,
+                args=backup_args,
                 environment_vars=environment_vars,
-                backup_args=backup_args
+                mount_strategy=MountStrategy.SOURCE_PATHS,
+                source_paths=source_paths
             )
             
             # Execute via SSH using existing execution service
