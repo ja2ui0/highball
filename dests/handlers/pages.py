@@ -286,6 +286,49 @@ class DestinationParser:
                     default_value = field_def.get('placeholder', '')
                     config[field_name] = safe_get_value(form_data, field_name, default_value)
 
+
+# =============================================================================
+# MAINTENANCE FORM PARSER
+# =============================================================================
+
+class MaintenanceParser:
+    """Parse maintenance configuration for Restic repositories"""
+    
+    @staticmethod
+    def parse_maintenance_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse maintenance configuration from form data"""
+        maintenance_mode = safe_get_value(form_data, 'restic_maintenance', 'auto')
+        
+        maintenance_config = {'restic_maintenance': maintenance_mode}
+        
+        # If user mode, include custom schedules and retention if provided
+        if maintenance_mode == 'user':
+            # Custom schedules
+            discard_schedule = safe_get_value(form_data, 'maintenance_discard_schedule')
+            if discard_schedule:
+                maintenance_config['maintenance_discard_schedule'] = discard_schedule
+                
+            check_schedule = safe_get_value(form_data, 'maintenance_check_schedule') 
+            if check_schedule:
+                maintenance_config['maintenance_check_schedule'] = check_schedule
+            
+            # Custom retention policy
+            retention_fields = ['keep_last', 'keep_hourly', 'keep_daily', 'keep_weekly', 'keep_monthly', 'keep_yearly']
+            retention_policy = {}
+            for field in retention_fields:
+                value = safe_get_value(form_data, field)
+                if value:
+                    try:
+                        retention_policy[field] = int(value)
+                    except ValueError:
+                        pass  # Skip invalid values
+            
+            if retention_policy:
+                maintenance_config['retention_policy'] = retention_policy
+        
+        return {'valid': True, 'maintenance_config': maintenance_config}
+
+
 def handle_page_errors(operation_name: str) -> Callable:
     """Decorator to handle common page operation errors consistently"""
     def decorator(func: Callable) -> Callable:

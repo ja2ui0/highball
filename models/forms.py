@@ -185,42 +185,7 @@ class NotificationParser:
 # MAINTENANCE CONFIGURATION PARSER
 # =============================================================================
 
-class MaintenanceParser:
-    """Parse maintenance configuration for Restic repositories"""
-    
-    @staticmethod
-    def parse_maintenance_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse maintenance configuration from form data"""
-        maintenance_mode = safe_get_value(form_data, 'restic_maintenance', 'auto')
-        
-        maintenance_config = {'restic_maintenance': maintenance_mode}
-        
-        # If user mode, include custom schedules and retention if provided
-        if maintenance_mode == 'user':
-            # Custom schedules
-            discard_schedule = safe_get_value(form_data, 'maintenance_discard_schedule')
-            if discard_schedule:
-                maintenance_config['maintenance_discard_schedule'] = discard_schedule
-                
-            check_schedule = safe_get_value(form_data, 'maintenance_check_schedule') 
-            if check_schedule:
-                maintenance_config['maintenance_check_schedule'] = check_schedule
-            
-            # Custom retention policy
-            retention_fields = ['keep_last', 'keep_hourly', 'keep_daily', 'keep_weekly', 'keep_monthly', 'keep_yearly']
-            retention_policy = {}
-            for field in retention_fields:
-                value = safe_get_value(form_data, field)
-                if value:
-                    try:
-                        retention_policy[field] = int(value)
-                    except ValueError:
-                        pass  # Skip invalid values
-            
-            if retention_policy:
-                maintenance_config['retention_policy'] = retention_policy
-        
-        return {'valid': True, 'maintenance_config': maintenance_config}
+# MAINTENANCE PARSER MOVED TO dests/handlers/pages.py
 
 # =============================================================================
 # UNIFIED JOB PARSER - Main entry point
@@ -270,6 +235,7 @@ class JobFormParser:
         # Parse maintenance configuration (only for Restic destinations)
         maintenance_config = None
         if dest_config.get('repo_type'):  # Restic destination
+            from dests.handlers.pages import MaintenanceParser
             maintenance_result = MaintenanceParser.parse_maintenance_config(form_data)
             if not maintenance_result['valid']:
                 return maintenance_result
@@ -370,6 +336,6 @@ job_parser = JobFormParser()
 source_parser = SourceParser()
 # destination_parser moved to dests/handlers/pages.py
 notification_parser = NotificationParser()
-maintenance_parser = MaintenanceParser()
+# maintenance_parser moved to dests/handlers/pages.py
 source_paths_parser = SourcePathsParser()
 # origin_parser moved to origins/handlers/pages.py
