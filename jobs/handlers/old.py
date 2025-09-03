@@ -261,3 +261,148 @@ class JobFormParser:
         dest_config['dest_type'] = dest_type
         
         return {'valid': True, 'config': dest_config}
+
+
+# =============================================================================
+# TEMPORARY ADMIN PREVIEW METHODS - Used during job form revamp transition
+# =============================================================================
+
+from fastapi import Request
+from fastapi.responses import HTMLResponse
+from services.template import TemplateService
+
+class AdminJobPreviewMethods:
+    """Temporary admin methods for job preview functionality during revamp"""
+    
+    def __init__(self):
+        self.template_service = TemplateService()
+    
+    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
+        """Extract single value from form data"""
+        values = form_data.get(field_name, [])
+        if isinstance(values, list):
+            return values[0] if values else default
+        return values if values else default
+    
+    async def preview_config_htmx(self, request) -> HTMLResponse:
+        """Generate and display job config preview - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        try:
+            if not form_data:
+                html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content="Error: No form data received")
+                return HTMLResponse(content=html_response)
+            
+            # Parse the form data using the existing parser
+            parser = JobFormParser()
+            result = parser.parse_job_form(form_data)
+            
+            if not result.get('valid', False):
+                error_msg = result.get('error', 'Unknown parsing error')
+                # Add some debug info to the error
+                restic_repo_type = safe_get_value(form_data, 'restic_repo_type')
+                dest_type = safe_get_value(form_data, 'dest_type')
+                
+                debug_error = f"Form Validation Error: {error_msg}\n\n"
+                debug_error += f"Debug Info:\n"
+                debug_error += f"- restic_repo_type extracted: '{restic_repo_type}'\n"
+                debug_error += f"- dest_type extracted: '{dest_type}'\n"
+                debug_error += f"- Form data keys: {list(form_data.keys())}\n"
+                
+                html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                       preview_content=debug_error)
+                return HTMLResponse(content=html_response)
+            
+            # Build the job config as it would appear in config.yaml
+            job_data = result.copy()
+            if 'valid' in job_data:
+                del job_data['valid']  # Remove the validation flag
+            
+            # Format as YAML for display
+            import yaml
+            yaml_content = yaml.dump({job_data.get('job_name', 'unnamed_job'): job_data}, 
+                                   default_flow_style=False, sort_keys=False)
+            
+            html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                   preview_content=yaml_content)
+            return HTMLResponse(content=html_response)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            html_response = self.template_service.render_template('partials/job_config_preview.html',
+                                                   preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.")
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    async def check_form_changes_htmx(self, request) -> HTMLResponse:
+        """Check if form has changes compared to original config - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        try:
+            import json
+            job_parser = JobFormParser()
+            
+            # Get original config from hidden field
+            original_config_str = self._get_form_value(form_data, 'original_job_config')
+            if not original_config_str:
+                # No original config means this is add mode, always enable
+                html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Create Job',
+                                                       enabled=True)
+                return HTMLResponse(content=html_response)
+            
+            # Parse current form data
+            current_result = job_parser.parse_job_form(form_data)
+            if not current_result['valid']:
+                # Form is invalid, disable button
+                html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=False)
+                return HTMLResponse(content=html_response)
+            
+            # Compare configs (normalize for comparison)
+            original_config = json.loads(original_config_str)
+            current_config = current_result.copy()
+            if 'valid' in current_config:
+                del current_config['valid']
+            
+            # Compare as JSON strings for deep equality
+            original_json = json.dumps(original_config, sort_keys=True)
+            current_json = json.dumps(current_config, sort_keys=True)
+            
+            has_changes = original_json != current_json
+            html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=has_changes)
+            
+        except Exception as e:
+            # On error, default to enabled
+            html_response = self.template_service.render_template('partials/submit_button.html',
+                                                       button_text='Commit Changes',
+                                                       enabled=True)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
