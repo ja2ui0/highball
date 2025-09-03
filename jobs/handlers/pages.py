@@ -211,7 +211,8 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
-        from services.data_services import JobFormDataBuilder, DestinationTypeService
+        from jobs.services.define import JobFormDataBuilder
+        from services.data_services import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         form_data = job_form_builder.build_empty_form_data()
@@ -234,7 +235,8 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, job_name: str) -> HTMLResponse:
         """Show edit job form"""
-        from services.data_services import JobFormDataBuilder, DestinationTypeService, JobFormTemplateBuilder
+        from jobs.services.define import JobFormDataBuilder, JobFormTemplateBuilder
+        from services.data_services import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         if not job_name:
@@ -293,7 +295,7 @@ class JobsHandler(BaseHandler):
 
     def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build notification form data structure (delegated to service)"""
-        from services.data_services import NotificationFormDataBuilder
+        from jobs.services.notify import NotificationFormDataBuilder
         builder = NotificationFormDataBuilder(self.backup_config)
         return builder.build_notification_context(existing_notifications)
         
