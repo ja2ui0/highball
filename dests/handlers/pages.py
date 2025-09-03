@@ -761,7 +761,7 @@ class DestinationsHandler(BaseHandler):
             else:
                 form_data[key] = [value]
         
-        from services.data_services import ResticRepositoryTypeService
+        from dests.services.restic import ResticRepositoryTypeService
         
         repo_service = ResticRepositoryTypeService()
         available_repository_types = repo_service.get_available_repository_types()

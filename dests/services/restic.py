@@ -1155,5 +1155,36 @@ class ResticAPIService:
         result = backup_service.initialize_repository(restic_result['config'])
         return JSONResponse(content=result)
 
+
+# =============================================================================
+# RESTIC REPOSITORY TYPE SERVICE - Repository type availability
+# =============================================================================
+
+class ResticRepositoryTypeService:
+    """Service for managing restic repository type availability and options"""
+    
+    def get_available_repository_types(self) -> List[Dict[str, Any]]:
+        """Get list of available restic repository types with their metadata"""
+        from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
+        
+        available_types = []
+        
+        for repo_type, schema in RESTIC_REPOSITORY_TYPE_SCHEMAS.items():
+            if self._is_repository_type_available(repo_type, schema):
+                available_types.append({
+                    'value': repo_type,
+                    'display_name': schema['display_name'],
+                    'description': schema['description']
+                })
+        
+        return available_types
+    
+    def _is_repository_type_available(self, repo_type: str, schema: Dict[str, Any]) -> bool:
+        """Check if a repository type is available"""
+        # All repository types are always available - no special requirements
+        return schema.get('always_available', True)
+
+
 # Export the services
 restic_service = ResticRepositoryService()
+restic_repository_type_service = ResticRepositoryTypeService()
