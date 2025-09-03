@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import shlex
 from pydantic import BaseModel, Field
+from services.shared import SSHCommandFactory
 
 # =============================================================================
 # RESPONSE MODELS
@@ -260,15 +261,14 @@ class RsyncService:
                 path = config.dest_config['path']
                 
                 # Test SSH connectivity and path writability
-                cmd = [
-                    'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-                    '-o', 'ConnectTimeout=10',
-                    '-o', 'BatchMode=yes',
-                    '-o', 'StrictHostKeyChecking=no',
-                    '-o', 'UserKnownHostsFile=/dev/null',
-                    f"{username}@{hostname}",
-                    f"test -w '{path}' && echo 'OK'"
-                ]
+                ssh_factory = SSHCommandFactory(connect_timeout=10)
+                port = config.dest_config.get('port')
+                cmd = ssh_factory.build_ssh_command(
+                    hostname=hostname,
+                    username=username,
+                    remote_command=f"test -w '{path}' && echo 'OK'",
+                    port=int(port) if port else None
+                )
                 
             elif config.is_rsyncd_dest:
                 hostname = config.dest_config['hostname']
@@ -379,24 +379,16 @@ class RsyncService:
                 error='Hostname, username, and path are required for rsync validation'
             ).to_dict()
         
-        # Test SSH connectivity and path writability (superior implementation from test_destination)
+        # Test SSH connectivity and path writability (using SSH factory)
         try:
-            cmd = [
-                'ssh', '-i', '/config/local/secrets/.ssh/id_highball',
-                '-o', 'ConnectTimeout=10',
-                '-o', 'BatchMode=yes',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
-            ]
-            
-            # Add port if not default
-            if port and port != '22':
-                cmd.extend(['-p', port])
-            
-            cmd.extend([
-                f"{username}@{hostname}",
-                f"test -w '{path}' && echo 'OK'"
-            ])
+            ssh_factory = SSHCommandFactory(connect_timeout=10)
+            port_num = int(port) if port and port != '22' else None
+            cmd = ssh_factory.build_ssh_command(
+                hostname=hostname,
+                username=username,
+                remote_command=f"test -w '{path}' && echo 'OK'",
+                port=port_num
+            )
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
