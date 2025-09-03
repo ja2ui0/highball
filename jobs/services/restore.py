@@ -398,7 +398,7 @@ class RestoreExecutionService:
         """Execute dry run restore and return results"""
         try:
             from dests.services.restic import ResticRunner
-            from services.execution import ExecutionService, ExecutionConfig, obfuscate_password_in_command
+            from services.execution import ExecutionService
             
             job_name = restore_config['job_name']
             
@@ -436,7 +436,7 @@ class RestoreExecutionService:
             
             # Log the dry run (obfuscate password)
             job_password = job_config.get('dest_config', {}).get('password', '')
-            safe_command = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
+            safe_command = CommandObfuscationService.obfuscate_password_in_command(exec_cmd_for_logging, job_password)
             self.job_management.log_execution(job_name, f"Dry run restore: {' '.join(safe_command)}")
             self.job_management.log_execution(job_name, f"Dry run result: {result.returncode}")
             if result.stdout:
@@ -445,7 +445,7 @@ class RestoreExecutionService:
                 self.job_management.log_execution(job_name, f"Dry run stderr: {result.stderr}")
             
             # Get safe command for API response
-            safe_command_for_api = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
+            safe_command_for_api = CommandObfuscationService.obfuscate_password_in_command(exec_cmd_for_logging, job_password)
             
             if result.returncode == 0:
                 return {
@@ -492,7 +492,7 @@ class RestoreExecutionService:
     def _execute_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]):
         """Execute restore operation in background with progress tracking"""
         from dests.services.restic import ResticRunner
-        from services.command_obfuscation import obfuscate_password_in_command
+        from services.shared import CommandObfuscationService
         
         job_name = restore_config['job_name']
         
@@ -529,7 +529,7 @@ class RestoreExecutionService:
             
             # Log restore start
             job_password = job_config.get('dest_config', {}).get('password', '')
-            safe_command = obfuscate_password_in_command(exec_cmd_for_logging, job_password)
+            safe_command = CommandObfuscationService.obfuscate_password_in_command(exec_cmd_for_logging, job_password)
             self.job_management.log_execution(job_name, f"Starting restore: {' '.join(safe_command)}")
             
             # Execute with progress tracking
