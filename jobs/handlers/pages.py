@@ -624,7 +624,7 @@ class JobsHandler(BaseHandler):
             return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
         
         try:
-            from services.execution import ExecutionService
+            from services.shared import ExecutionService
             executor = ExecutionService()
             
             # Test RX permissions (required for backup) + write test in one command
@@ -1276,7 +1276,7 @@ class JobsHandler(BaseHandler):
     def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
         """Execute restore operation - moved from operations handler"""
         # Import here to avoid circular dependencies
-        from services.execution import ResticExecutionService
+        from services.shared import ResticExecutionService
         
         job_config = restore_request['job_config']
         dest_config = job_config.get('dest_config', {})

@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from jobs.services.manage import JobManagementService
 from services.shared import OperationType
-from services.execution import ResticExecutionService
+from services.shared import ResticExecutionService
 from services.shared import SSHCommandFactory
 
 # =============================================================================
@@ -398,7 +398,7 @@ class RestoreExecutionService:
         """Execute dry run restore and return results"""
         try:
             from dests.services.restic import ResticRunner
-            from services.execution import ExecutionService
+            from services.shared import ExecutionService
             
             job_name = restore_config['job_name']
             
@@ -738,7 +738,7 @@ class SnapshotIntrospectionService:
     
     def __init__(self):
         from services.shared import OperationType
-        from services.execution import ExecutionService, ResticExecutionService
+        from services.shared import ExecutionService, ResticExecutionService
         self.executor = ExecutionService()
         self.restic_executor = ResticExecutionService()
         self.timeout = 30  # seconds for introspection commands

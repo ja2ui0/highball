@@ -16,7 +16,7 @@ from functools import wraps
 
 # Import dependencies
 from services.shared import OperationType
-from services.execution import ResticExecutionService
+from services.shared import ResticExecutionService
 from models.builders import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 
@@ -49,7 +49,7 @@ class ResticRepositoryService:
     
     def __init__(self):
         self.command_builder = ResticArgumentBuilder()
-        from services.execution import ResticExecutionService
+        from services.shared import ResticExecutionService
         self.restic_executor = ResticExecutionService()
     
     def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
@@ -890,7 +890,7 @@ class ResticRunner:
         try:
             # Use existing container service for backup operations  
             from services.shared import ResticContainerFactory, MountStrategy
-            from services.execution import ExecutionService
+            from services.shared import ExecutionService
             
             container_factory = ResticContainerFactory()
             exec_service = ExecutionService()
