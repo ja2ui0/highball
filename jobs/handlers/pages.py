@@ -50,9 +50,7 @@ class JobsHandler(BaseHandler):
         
         # Initialize service orchestrators (moved from operations handler)
         from jobs.services.backup import BackupOrchestrationService
-        from jobs.services.scheduler import JobSchedulingOrchestrationService
         self.backup_orchestration = BackupOrchestrationService(self.backup_config)
-        self.scheduling_orchestration = JobSchedulingOrchestrationService(self.backup_config)
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
@@ -1388,10 +1386,24 @@ class JobsHandler(BaseHandler):
         return JSONResponse(content=result)
     
     def schedule_job_direct(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Schedule a job for execution - moved from operations handler"""
+        """Schedule a job for execution - using functional SchedulingService"""
         from fastapi.responses import JSONResponse
-        result = self.scheduling_orchestration.schedule_job(form_data)
-        return JSONResponse(content=result)
+        from jobs.services.schedule import SchedulingService
+        
+        # Use the functional scheduling service that already exists
+        scheduler_service = SchedulingService()
+        
+        # Bootstrap all schedules (this will include the requested job if it's enabled and scheduled)
+        scheduled_count = scheduler_service.bootstrap_schedules(self.backup_config)
+        
+        job_name = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name'), list) else form_data.get('job_name', '')
+        
+        return JSONResponse(content={
+            'success': True,
+            'message': f'Scheduler refreshed. {scheduled_count} jobs scheduled total.',
+            'job_name': job_name,
+            'scheduled_count': scheduled_count
+        })
 
 # Global handler instance
 jobs_handler = JobsHandler()

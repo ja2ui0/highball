@@ -10,7 +10,7 @@ import subprocess
 import stat
 from typing import Dict, Any, Optional
 
-from jobs.services.scheduler import JobSchedulerHandler
+from jobs.services.schedule import JobSchedulerHandler
 from services.template import TemplateService
 from jobs.services.schedule import SchedulingService
 from services.data_services import JobFormDataBuilder

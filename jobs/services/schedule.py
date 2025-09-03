@@ -158,6 +158,38 @@ class ScheduleLoader:
 
 
 # =============================================================================
+# **DEBUG/ADMIN HANDLER** - APScheduler introspection
+# =============================================================================
+
+class JobSchedulerHandler:
+    """Debug handler for APScheduler internal job inspection"""
+    
+    def __init__(self, scheduler_service):
+        self.scheduler_service = scheduler_service
+
+    def list_jobs(self):
+        """List APScheduler internal scheduled jobs - DEBUG/ADMIN endpoint"""
+        from fastapi.responses import JSONResponse
+        
+        jobs = self.scheduler_service.scheduler_manager.scheduler.get_jobs()
+        job_list = []
+        for j in jobs:
+            next_run = j.next_run_time.isoformat() if j.next_run_time else None
+            job_list.append({
+                'id': j.id,
+                'name': j.name or '',
+                'trigger': str(j.trigger),
+                'next_run': next_run
+            })
+        
+        return JSONResponse(content={
+            'jobs': job_list,
+            'count': len(job_list),
+            'note': 'This shows APScheduler internal jobs. For backup job configs, use /api/highball/jobs'
+        })
+
+
+# =============================================================================
 # **UNIFIED SERVICE FACADE** - Orchestrates scheduler management and loading
 # =============================================================================
 
