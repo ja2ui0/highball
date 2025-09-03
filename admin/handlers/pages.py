@@ -545,7 +545,7 @@ class AdminHandler(BaseHandler):
                 return HTMLResponse(content=html_response)
             
             # Parse the form data using the existing parser
-            from models.forms import JobFormParser
+            from jobs.handlers.old import JobFormParser
             parser = JobFormParser()
             
             result = parser.parse_job_form(form_data)
@@ -568,7 +568,7 @@ class AdminHandler(BaseHandler):
                 return HTMLResponse(content=html_response)
             
             # Parse the form data using the existing parser  
-            from models.forms import JobFormParser
+            from jobs.handlers.old import JobFormParser
             parser = JobFormParser()
             
             result = parser.parse_job_form(form_data)
@@ -618,7 +618,8 @@ class AdminHandler(BaseHandler):
         # Business logic (preserve original implementation)
         try:
             import json
-            from models.forms import job_parser
+            from jobs.handlers.old import JobFormParser
+            job_parser = JobFormParser()
             
             # Get original config from hidden field
             original_config_str = self._get_form_value(form_data, 'original_job_config')
