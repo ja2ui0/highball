@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import logging
-from services.shared import SSHCommandFactory
+from services.ssh import SSHCommandFactory
 
 logger = logging.getLogger(__name__)
 

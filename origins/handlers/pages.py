@@ -519,7 +519,7 @@ class OriginsHandler(BaseHandler):
     def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
         """Complete workflow: push keys → validate connection → detect capabilities"""
         # Initialize SSH workflow service
-        from services.shared import SSHWorkflowService
+        from services.ssh import SSHWorkflowService
         ssh_service = SSHWorkflowService()
         # Delegate to SSH service - this is pure business logic
         return ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
