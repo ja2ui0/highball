@@ -12,7 +12,8 @@ import json
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from jobs.services.manage import JobManagementService
-from services.execution import ResticExecutionService, OperationType
+from services.shared import OperationType
+from services.execution import ResticExecutionService
 from services.shared import SSHCommandFactory
 
 # =============================================================================
@@ -736,7 +737,8 @@ class SnapshotIntrospectionService:
     """Snapshot introspection - ONLY handles discovery of snapshot contents and metadata"""
     
     def __init__(self):
-        from services.execution import ExecutionService, ResticExecutionService, OperationType
+        from services.shared import OperationType
+        from services.execution import ExecutionService, ResticExecutionService
         self.executor = ExecutionService()
         self.restic_executor = ResticExecutionService()
         self.timeout = 30  # seconds for introspection commands
@@ -751,7 +753,7 @@ class SnapshotIntrospectionService:
     ) -> List[str]:
         """Introspection concern: get original source paths that were backed up in a snapshot"""
         try:
-            from services.execution import OperationType
+            from services.shared import OperationType
             
             # Convert ssh_config to source_config format for ResticExecutionService
             source_config = None
@@ -791,7 +793,7 @@ class SnapshotIntrospectionService:
     ) -> Dict[str, Any]:
         """Introspection concern: get detailed metadata for a snapshot"""
         try:
-            from services.execution import OperationType
+            from services.shared import OperationType
             
             # Convert ssh_config to source_config format for ResticExecutionService
             source_config = None

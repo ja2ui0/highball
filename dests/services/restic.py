@@ -15,7 +15,8 @@ import tempfile
 from functools import wraps
 
 # Import dependencies
-from services.execution import OperationType, ResticExecutionService
+from services.shared import OperationType
+from services.execution import ResticExecutionService
 from models.builders import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 

@@ -1,16 +1,116 @@
 """
-Shared Services
-Centralized SSH/container command building and cross-domain conflict management
+Shared Operations Hub
+SSH orchestration, container operations, execution infrastructure, and cross-domain services
+All domain glue logic lives here - SSH is the backbone that orchestrates everything
 """
 from typing import Dict, List, Optional, Set, Any
 from enum import Enum
 from pathlib import Path
 from pydantic import BaseModel
 import shlex
+import subprocess
+import re
 
 
 # =============================================================================
-# **SSH COMMAND FACTORY** - Centralized SSH command building
+# ===                      EXECUTION INFRASTRUCTURE                        ===
+# =============================================================================
+
+class OperationType(Enum):
+    """Operation type enumeration for execution context determination"""
+    # UI operations (execute locally from Highball container)
+    UI = "ui"
+    BROWSE = "browse"
+    INSPECT = "inspect"
+    
+    # Source operations (execute via SSH when source is SSH)
+    BACKUP = "backup"
+    RESTORE = "restore"
+    MAINTENANCE = "maintenance"
+    INIT = "init"
+    
+    # Maintenance subtypes
+    DISCARD = "discard"  # forget+prune combined
+    CHECK = "check"      # repository check
+    
+    # Default
+    GENERAL = "general"
+
+
+class ExecutionConfig(BaseModel):
+    """Execution configuration parameters"""
+    timeout: int = 120
+    capture_output: bool = True
+    text: bool = True
+    shell: bool = False
+
+
+class ExecutionResult(BaseModel):
+    """Execution result data structure"""
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+    timeout_expired: bool = False
+
+
+class CommandObfuscationService:
+    """Command obfuscation - ONLY handles password masking for logging"""
+    
+    # Password patterns for different services
+    PASSWORD_PATTERNS = [
+        r'RESTIC_PASSWORD=([^\s]+)',
+        r'--password[=\s]+([^\s]+)',
+        r'-p\s+([^\s]+)',
+        r'password[=:\s]+([^\s\'\"]+)',
+        r'AWS_SECRET_ACCESS_KEY=([^\s]+)',
+        r'secret[=:\s]+([^\s\'\"]+)'
+    ]
+    
+    @classmethod
+    def obfuscate_password_in_command(cls, command: List[str], password: str = None) -> List[str]:
+        """Obfuscation concern: mask passwords in command arrays for safe logging"""
+        if not command:
+            return command
+        
+        obfuscated = []
+        for part in command:
+            obfuscated_part = part
+            
+            # If specific password provided, mask it
+            if password and password in part:
+                obfuscated_part = part.replace(password, '***')
+            
+            # Apply generic password patterns
+            for pattern in cls.PASSWORD_PATTERNS:
+                import re
+                obfuscated_part = re.sub(pattern, r'\1***', obfuscated_part, flags=re.IGNORECASE)
+            
+            obfuscated.append(obfuscated_part)
+        
+        return obfuscated
+    
+    @classmethod
+    def obfuscate_command_array(cls, command_array: List[str]) -> List[str]:
+        """Obfuscation concern: mask sensitive data in command arrays"""
+        return cls.obfuscate_password_in_command(command_array)
+    
+    @classmethod
+    def obfuscate_environment_vars(cls, env_vars: Dict[str, str]) -> Dict[str, str]:
+        """Obfuscation concern: mask sensitive environment variables"""
+        obfuscated = {}
+        sensitive_keys = {'RESTIC_PASSWORD', 'AWS_SECRET_ACCESS_KEY', 'PASSWORD', 'SECRET'}
+        
+        for key, value in env_vars.items():
+            if any(sensitive in key.upper() for sensitive in sensitive_keys):
+                obfuscated[key] = '***'
+            else:
+                obfuscated[key] = value
+        
+        return obfuscated
+
+
+# =============================================================================
+# ===                         SSH OPERATIONS                               ===
 # =============================================================================
 
 class SSHCommandFactory:
@@ -73,7 +173,7 @@ class SSHCommandFactory:
 
 
 # =============================================================================
-# **CONTAINER/RESTIC COMMAND FACTORY** - Centralized container command building  
+# ===                       CONTAINER OPERATIONS                           ===
 # =============================================================================
 
 class MountStrategy(Enum):
@@ -220,7 +320,7 @@ class ResticContainerFactory:
 
 
 # =============================================================================
-# **CROSS-DOMAIN CONFLICT MANAGEMENT** - Resource conflict detection
+# ===                    CROSS-DOMAIN SERVICES                             ===
 # =============================================================================
 
 class JobConflictManager:
