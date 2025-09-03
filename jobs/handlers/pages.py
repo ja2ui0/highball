@@ -299,7 +299,7 @@ class JobsHandler(BaseHandler):
         
     def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Build schedule form data structure (delegated to service)"""
-        from services.data_services import ScheduleFormDataBuilder
+        from jobs.services.schedule import ScheduleFormDataBuilder
         builder = ScheduleFormDataBuilder()
         return builder.build_schedule_context(job_config)
 

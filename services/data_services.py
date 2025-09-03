@@ -225,29 +225,6 @@ class JobFormDataBuilder:
         return configs
 
 
-class ScheduleFormDataBuilder:
-    """Service for building schedule form data structures"""
-    
-    def build_schedule_context(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Build schedule form data structure for job forms
-        
-        Args:
-            job_config: Job configuration dictionary (can be empty for add-job form)
-            
-        Returns:
-            Dict containing schedule form fields: schedule, enabled, respect_conflicts
-        """
-        schedule = job_config.get('schedule', 'daily')
-        enabled = job_config.get('enabled', True)
-        respect_conflicts = job_config.get('respect_conflicts', True)
-        
-        return {
-            'schedule': schedule,
-            'enabled': enabled,
-            'respect_conflicts': respect_conflicts
-        }
-
 
 class NotificationFormDataBuilder:
     """Service for building notification form data structures"""
