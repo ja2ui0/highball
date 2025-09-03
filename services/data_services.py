@@ -21,123 +21,6 @@ from services.execution import ExecutionService, OperationType
 # **SNAPSHOT INTROSPECTION CONCERN** - Discovery of paths and metadata from snapshots
 # =============================================================================
 
-class SnapshotIntrospectionService:
-    """Snapshot introspection - ONLY handles discovery of snapshot contents and metadata"""
-    
-    def __init__(self):
-        self.executor = ExecutionService()
-        from services.execution import ResticExecutionService
-        self.restic_executor = ResticExecutionService()
-        self.timeout = 30  # seconds for introspection commands
-    
-    def get_snapshot_source_paths(
-        self,
-        snapshot_id: str,
-        repository_url: str,
-        dest_config: Dict[str, Any],
-        ssh_config: Optional[Dict[str, str]] = None,
-        container_runtime: str = 'docker'
-    ) -> List[str]:
-        """Introspection concern: get original source paths that were backed up in a snapshot"""
-        try:
-            # Convert ssh_config to source_config format for ResticExecutionService
-            source_config = None
-            if ssh_config:
-                source_config = {
-                    'hostname': ssh_config['hostname'],
-                    'username': ssh_config['username'],
-                    'container_runtime': container_runtime
-                }
-            
-            # Execute using unified ResticExecutionService
-            result = self.restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=['ls', snapshot_id, '--long'],
-                source_config=source_config,
-                operation_type=OperationType.UI,
-                timeout=self.timeout
-            )
-            
-            if result.returncode == 0:
-                return self._parse_snapshot_paths(result.stdout)
-            else:
-                print(f"WARNING: Failed to introspect snapshot {snapshot_id}: {result.stderr}")
-                return []
-                
-        except Exception as e:
-            print(f"ERROR: Snapshot introspection failed for {snapshot_id}: {str(e)}")
-            return []
-    
-    def get_snapshot_metadata(
-        self,
-        snapshot_id: str,
-        repository_url: str,
-        dest_config: Dict[str, Any],
-        ssh_config: Optional[Dict[str, str]] = None,
-        container_runtime: str = 'docker'
-    ) -> Dict[str, Any]:
-        """Introspection concern: get detailed metadata for a snapshot"""
-        try:
-            # Convert ssh_config to source_config format for ResticExecutionService
-            source_config = None
-            if ssh_config:
-                source_config = {
-                    'hostname': ssh_config['hostname'],
-                    'username': ssh_config['username'],
-                    'container_runtime': container_runtime
-                }
-            
-            # Execute using unified ResticExecutionService
-            result = self.restic_executor.execute_restic_command(
-                dest_config=dest_config,
-                command_args=['snapshots', '--json', snapshot_id],
-                source_config=source_config,
-                operation_type=OperationType.UI,
-                timeout=self.timeout
-            )
-            
-            if result.returncode == 0:
-                import json
-                snapshots = json.loads(result.stdout)
-                if snapshots and len(snapshots) > 0:
-                    return snapshots[0]
-            
-            return {}
-            
-        except Exception as e:
-            print(f"ERROR: Snapshot metadata retrieval failed for {snapshot_id}: {str(e)}")
-            return {}
-    
-    
-    def _parse_snapshot_paths(self, ls_output: str) -> List[str]:
-        """Introspection concern: parse restic ls output to extract original source paths"""
-        paths = []
-        lines = ls_output.strip().split('\n')
-        
-        for line in lines:
-            if not line.strip():
-                continue
-            
-            # Parse restic ls --long output
-            # Format: permissions size date time path
-            parts = line.split()
-            if len(parts) >= 5:
-                # The path is the last part
-                path = ' '.join(parts[4:])
-                
-                # Only include top-level directories as source paths
-                if path and not path.startswith('.'):
-                    # Remove leading slash and extract top-level directory
-                    clean_path = path.lstrip('/')
-                    if '/' in clean_path:
-                        top_level = '/' + clean_path.split('/')[0]
-                    else:
-                        top_level = '/' + clean_path
-                    
-                    if top_level not in paths:
-                        paths.append(top_level)
-        
-        return sorted(paths)
 
 
 # =============================================================================
@@ -150,6 +33,7 @@ class DataService:
     def __init__(self):
         from jobs.services.define import JobFormDataBuilder
         self.form_builder = JobFormDataBuilder()
+        from jobs.services.restore import SnapshotIntrospectionService
         self.introspection = SnapshotIntrospectionService()
     
     # **FORM BUILDING DELEGATION** - Pure delegation to building concern
