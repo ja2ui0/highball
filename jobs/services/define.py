@@ -3,7 +3,7 @@ Job Definition Services
 Handles job configuration building and form data structures
 """
 from typing import Dict, List, Optional, Any
-from models.forms import JobFormData, SourceConfig, DestConfig, ResticConfig, NotificationConfig
+from jobs.handlers.old import JobFormData, SourceConfig, DestConfig, ResticConfig
 from origins.schema import SOURCE_PATH_SCHEMA
 
 
@@ -208,17 +208,17 @@ class JobFormDataBuilder:
         )
     
     @classmethod
-    def _build_notification_configs(cls, notifications: List[Dict[str, Any]]) -> List[NotificationConfig]:
+    def _build_notification_configs(cls, notifications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Building concern: build notification configurations"""
         configs = []
         for notification in notifications:
-            config = NotificationConfig(
-                provider_type=notification.get('provider', ''),
-                notify_on_success=notification.get('notify_on_success', False),
-                notify_on_failure=notification.get('notify_on_failure', True),
-                success_message=notification.get('success_message', ''),
-                failure_message=notification.get('failure_message', '')
-            )
+            config = {
+                'provider_type': notification.get('provider', ''),
+                'notify_on_success': notification.get('notify_on_success', False),
+                'notify_on_failure': notification.get('notify_on_failure', True),
+                'success_message': notification.get('success_message', ''),
+                'failure_message': notification.get('failure_message', '')
+            }
             configs.append(config)
         return configs
 
