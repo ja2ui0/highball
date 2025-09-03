@@ -47,6 +47,72 @@ class DestinationsHandler(BaseHandler):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
     
+    # =========================================================================
+    # DESTINATION VALIDATION RENDERING (moved from services/template.py)
+    # =========================================================================
+    
+    def render_ssh_dest_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render SSH destination validation status with path permissions details"""
+        details = []
+        
+        # SSH connection always appears first when present (success or failure)
+        if result.get('ssh_status') == 'OK':
+            details.append("SSH connection successful")
+            
+            # Path validation details (destination validation only)
+            if result.get('path_permissions'):
+                permissions = result['path_permissions']
+                if permissions == 'RWX':
+                    details.append(f"Path permissions: {permissions} (backup + restore capable)")
+                elif permissions == 'RO':
+                    details.append(f"Path permissions: {permissions} (backup only - no restore capability)")
+                else:
+                    details.append(f"Path permissions: {permissions}")
+        
+        return self._render_validation_status_template(result, details)
+    
+    def render_restic_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render Restic validation status (basic validation, no special details)"""
+        return self._render_validation_status_template(result, [])
+    
+    def render_origin_repo_path_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render origin repository path validation status (same as SSH dest)"""
+        # Same logic as ssh_dest - checking path on origin host for same-as-origin repos
+        return self.render_ssh_dest_validation_status(result)
+    
+    def _render_validation_status_template(self, result: Dict[str, Any], details: list) -> str:
+        """Helper method to render validation status template with consistent logic"""
+        # Determine status class and label
+        if result.get('valid', False):
+            status_class = 'success'
+            status_label = '[OK]'
+        else:
+            status_class = 'error'
+            status_label = '[ERROR]'
+        
+        # Build message from details or error
+        if details:
+            # Pass details as a list for proper formatting in template
+            message = None
+        else:
+            # Use appropriate message based on validation result
+            if result.get('valid', False):
+                message = result.get('message', 'Validation successful')
+            else:
+                message = result.get('error', 'Validation failed')
+            details = None
+        
+        # Use template service to render the result
+        return self.template_service.render_template('partials/validation_result.html', 
+                                       status_class=status_class,
+                                       status_label=status_label,
+                                       message=message,
+                                       details=details)
+    
+    # =========================================================================
+    # PAGE HANDLERS
+    # =========================================================================
+    
     @handle_page_errors("Show destinations")
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
@@ -802,8 +868,8 @@ class DestinationsHandler(BaseHandler):
         validation_service = ValidationService(self.backup_config)
         result = validation_service.ssh.validate_ssh_destination(hostname, username, path)
         
-        # View: delegate to template service
-        html_response = self.template_service.render_validation_status('ssh_dest', result)
+        # View: delegate to local validation method (moved from template service)
+        html_response = self.render_ssh_dest_validation_status(result)
         return HTMLResponse(content=html_response)
 
     async def validate_restic_htmx(self, request) -> HTMLResponse:
@@ -842,7 +908,7 @@ class DestinationsHandler(BaseHandler):
         for field in required_fields:
             if field in field_values and not field_values[field]:
                 display_name = schema.get('display_name', 'Restic')
-                html_response = self.template_service.render_validation_status('restic', {
+                html_response = self.render_restic_validation_status({
                     'valid': False, 'error': f'{display_name} destination missing {field}'
                 })
                 return HTMLResponse(content=html_response)
@@ -852,7 +918,7 @@ class DestinationsHandler(BaseHandler):
         uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
         
         if not uri_result.get('valid'):
-            html_response = self.template_service.render_validation_status('restic', {
+            html_response = self.render_restic_validation_status({
                 'valid': False, 'error': uri_result.get('error', 'Invalid repository configuration')
             })
             return HTMLResponse(content=html_response)
@@ -864,8 +930,8 @@ class DestinationsHandler(BaseHandler):
         validation_service = ValidationService(self.backup_config)
         result = validation_service.validate_restic_config(repo_type, repo_uri, password)
         
-        # View: delegate to template service
-        html_response = self.template_service.render_validation_status('restic', result)
+        # View: delegate to local validation method (moved from template service)
+        html_response = self.render_restic_validation_status(result)
         return HTMLResponse(content=html_response)
 
     async def validate_origin_repo_path_htmx(self, request) -> HTMLResponse:
@@ -891,7 +957,7 @@ class DestinationsHandler(BaseHandler):
             repo_path = get_form_value(form_data, 'origin_repo_path')
             if not repo_path or not repo_path.strip():
                 result = {'valid': False, 'error': 'Please enter a repository path'}
-                html_response = self.template_service.render_validation_status('origin_repo_path', result)
+                html_response = self.render_origin_repo_path_validation_status(result)
                 return HTMLResponse(content=html_response)
             
             # Extract SSH configuration (required for same_as_origin)
@@ -900,7 +966,7 @@ class DestinationsHandler(BaseHandler):
             
             if not hostname or not username:
                 result = {'valid': False, 'error': 'SSH configuration required for same-as-origin repositories'}
-                html_response = self.template_service.render_validation_status('origin_repo_path', result)
+                html_response = self.render_origin_repo_path_validation_status(result)
                 return HTMLResponse(content=html_response)
             
             # Business logic: delegate to validation service
@@ -908,13 +974,13 @@ class DestinationsHandler(BaseHandler):
             validation_service = ValidationService(self.backup_config)
             result = validation_service.ssh.validate_ssh_repo_path_with_creation(hostname, username, repo_path)
             
-            # View: delegate to template service
-            html_response = self.template_service.render_validation_status('origin_repo_path', result)
+            # View: delegate to local validation method (moved from template service)
+            html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
             
         except Exception as e:
             result = {'valid': False, 'error': f'Validation failed: {str(e)}'}
-            html_response = self.template_service.render_validation_status('origin_repo_path', result)
+            html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
 
     async def initialize_restic_repo_htmx(self, request) -> JSONResponse:

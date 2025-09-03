@@ -53,6 +53,43 @@ class JobsHandler(BaseHandler):
         self.backup_orchestration = BackupOrchestrationService(self.backup_config)
     
     # =========================================================================
+    # VALIDATION RENDERING (moved from services/template.py)
+    # =========================================================================
+    
+    def render_source_path_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render source path validation status (basic validation, no special SSH details)"""
+        return self._render_validation_status_template(result, [])
+    
+    def _render_validation_status_template(self, result: Dict[str, Any], details: List[str]) -> str:
+        """Render validation status using template with consistent formatting"""
+        # Determine status class and label
+        if result.get('valid', False):
+            status_class = 'success'
+            status_label = '[OK]'
+        else:
+            status_class = 'error'
+            status_label = '[ERROR]'
+        
+        # Build message from details or error
+        if details:
+            # Pass details as a list for proper formatting in template
+            message = None
+        else:
+            # Use appropriate message based on validation result
+            if result.get('valid', False):
+                message = result.get('message', 'Validation successful')
+            else:
+                message = result.get('error', 'Validation failed')
+            details = None
+        
+        # Use Jinja2 template to render the result
+        return self.template_service.render_template('partials/validation_result.html', 
+                                   status_class=status_class,
+                                   status_label=status_label,
+                                   message=message,
+                                   details=details)
+    
+    # =========================================================================
     # JOB ROW BUILDING (moved from services/template.py)
     # =========================================================================
     
@@ -627,7 +664,7 @@ class JobsHandler(BaseHandler):
             
             if not path or not path.strip():
                 result = {'valid': False, 'error': 'Please enter a path'}
-                html_response = self.template_service.render_validation_status('source_path', result)
+                html_response = self.render_source_path_validation_status(result)
                 return HTMLResponse(content=html_response)
             
             # Extract source configuration
@@ -643,12 +680,12 @@ class JobsHandler(BaseHandler):
             else:
                 result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
             
-            html_response = self.template_service.render_validation_status('source_path', result)
+            html_response = self.render_source_path_validation_status(result)
             return HTMLResponse(content=html_response)
             
         except Exception as e:
             result = {'valid': False, 'error': f'Validation error: {str(e)}'}
-            html_response = self.template_service.render_validation_status('source_path', result)
+            html_response = self.render_source_path_validation_status(result)
             return HTMLResponse(content=html_response)
 
     def _check_ssh_path(self, hostname: str, username: str, path: str) -> Dict[str, Any]:

@@ -99,6 +99,67 @@ class OriginsHandler(BaseHandler):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
     
+    # =========================================================================
+    # SSH SOURCE VALIDATION RENDERING (moved from services/template.py)
+    # =========================================================================
+    
+    def render_ssh_source_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render SSH source validation status with rsync and container engine details"""
+        details = []
+        
+        # SSH connection always appears first when present (success or failure)
+        if result.get('ssh_status') == 'OK':
+            details.append("SSH connection successful")
+            
+            # Show rsync status with version (source validation only)
+            rsync_status = result.get('rsync_status', '')
+            if rsync_status and rsync_status != 'Not found':
+                details.append(f"Rsync: {rsync_status}")
+            elif rsync_status == 'Not found':
+                details.append("Rsync: Not found")
+            
+            # Show container engine (source validation only)
+            podman_status = result.get('podman_status', '')
+            docker_status = result.get('docker_status', '')
+            
+            if podman_status and podman_status != 'Not found':
+                details.append(f"Container Engine: {podman_status}")
+            elif docker_status and docker_status != 'Not found':
+                details.append(f"Container Engine: {docker_status}")
+            else:
+                details.append("Container Engine: Not found")
+        
+        # Determine status class and label
+        if result.get('valid', False):
+            status_class = 'success'
+            status_label = '[OK]'
+        else:
+            status_class = 'error'
+            status_label = '[ERROR]'
+        
+        # Build message from details or error
+        if details:
+            # Pass details as a list for proper formatting in template
+            message = None
+        else:
+            # Use appropriate message based on validation result
+            if result.get('valid', False):
+                message = result.get('message', 'Validation successful')
+            else:
+                message = result.get('error', 'Validation failed')
+            details = None
+        
+        # Use template service to render the result
+        return self.template_service.render_template('partials/validation_result.html', 
+                                       status_class=status_class,
+                                       status_label=status_label,
+                                       message=message,
+                                       details=details)
+    
+    # =========================================================================
+    # PAGE HANDLERS
+    # =========================================================================
+    
     @handle_page_errors("Show SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
         """Show SSH origins management page"""
@@ -608,8 +669,8 @@ class OriginsHandler(BaseHandler):
         validation_service = ValidationService(backup_config)
         result = validation_service.ssh.validate_ssh_source(source_config)
         
-        # Render validation status using template service
-        html_response = self.template_service.render_validation_status('ssh_source', result)
+        # Render validation status using local method (moved from template service)
+        html_response = self.render_ssh_source_validation_status(result)
         return HTMLResponse(content=html_response)
 
     async def render_source_fields_htmx(self, request) -> HTMLResponse:

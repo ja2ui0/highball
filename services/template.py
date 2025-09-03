@@ -3,7 +3,6 @@ Template rendering service
 Handles loading and rendering HTML templates with Jinja2 support
 """
 import os
-import html
 from typing import Dict, Any, Optional
 from jinja2 import Environment, FileSystemLoader
 class TemplateService:
@@ -65,76 +64,6 @@ class TemplateService:
         except Exception as e:
             raise Exception(f"Template rendering failed for {template_name}: {str(e)}")
     
-    def render_validation_status(self, validation_type: str, result: Dict[str, Any]) -> str:
-        """Template concern: render validation status using Jinja2 template"""
-        # Build details list with SSH connection always first
-        details = []
-        
-        # SSH connection always appears first when present (success or failure)
-        if result.get('ssh_status') == 'OK':
-            details.append("SSH connection successful")
-        
-        # Only add type-specific details if SSH connection succeeded
-        if result.get('ssh_status') == 'OK':
-            if validation_type == 'ssh_source':
-                # Show rsync status with version (source validation only)
-                rsync_status = result.get('rsync_status', '')
-                if rsync_status and rsync_status != 'Not found':
-                    details.append(f"Rsync: {rsync_status}")
-                elif rsync_status == 'Not found':
-                    details.append("Rsync: Not found")
-                
-                # Show container engine (source validation only)
-                podman_status = result.get('podman_status', '')
-                docker_status = result.get('docker_status', '')
-                
-                if podman_status and podman_status != 'Not found':
-                    details.append(f"Container Engine: {podman_status}")
-                elif docker_status and docker_status != 'Not found':
-                    details.append(f"Container Engine: {docker_status}")
-                else:
-                    details.append("Container Engine: Not found")
-            
-            elif validation_type == 'ssh_dest':
-                # Path validation details (destination validation only)
-                if result.get('path_permissions'):
-                    permissions = result['path_permissions']
-                    if permissions == 'RWX':
-                        details.append(f"Path permissions: {permissions} (backup + restore capable)")
-                    elif permissions == 'RO':
-                        details.append(f"Path permissions: {permissions} (backup only - no restore capability)")
-                    else:
-                        details.append(f"Path permissions: {permissions}")
-                # Removed redundant path_status - the main error message already indicates path issues
-        
-        # Determine status class and label
-        if result.get('valid', False):
-            status_class = 'success'
-            status_label = '[OK]'
-        else:
-            status_class = 'error'
-            status_label = '[ERROR]'
-        
-        # Build message from details or error
-        if details:
-            # Pass details as a list for proper formatting in template
-            message = None
-        else:
-            # Use appropriate message based on validation result
-            if result.get('valid', False):
-                message = result.get('message', 'Validation successful')
-            else:
-                message = result.get('error', 'Validation failed')
-            details = None
-        
-        # Use Jinja2 template to render the result
-        return self.render_template('partials/validation_result.html', 
-                                   status_class=status_class,
-                                   status_label=status_label,
-                                   message=message,
-                                   details=details)
-    
-    
     def _error_template(self, template_name, template_path):
         """Return error template when template not found"""
         available_templates = "Unknown"
@@ -153,6 +82,3 @@ class TemplateService:
         </html>
         """
     
-    # REMOVED: All HTTP response methods moved to handlers
-    # Template service is now pure template rendering only
-    # HTTP concerns belong in handler layer, not template service
