@@ -12,14 +12,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-# =============================================================================
-# **FORM DATA STRUCTURES** - Configuration dataclasses for form handling
-# =============================================================================
-
-# TRANSIENT DATA STRUCTURES MOVED TO jobs/handlers/old.py
-# Will be deleted after job form rebuild to use dropdown selection
-
 # =============================================================================
 # UTILITY FUNCTIONS - Common form parsing helpers
 # =============================================================================
@@ -45,61 +37,7 @@ def parse_lines(text: str) -> List[str]:
 # SOURCE CONFIGURATION PARSERS
 # =============================================================================
 
-class SourceParser:
-    """Parse source configurations (SSH, local)"""
-    
-    @staticmethod
-    def parse_ssh_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse SSH source configuration"""
-        hostname = safe_get_value(form_data, 'hostname')
-        username = safe_get_value(form_data, 'username')
-        
-        if not hostname:
-            return {'valid': False, 'error': 'SSH hostname is required'}
-        if not username:
-            return {'valid': False, 'error': 'SSH username is required'}
-        
-        config = {
-            'hostname': hostname.strip(),
-            'username': username.strip()
-        }
-        
-        # Include container runtime if detected during validation
-        container_runtime = safe_get_value(form_data, 'container_runtime')
-        if container_runtime:
-            config['container_runtime'] = container_runtime
-        
-        return {'valid': True, 'config': config}
-    
-    @staticmethod
-    def parse_local_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse local source configuration"""
-        # Local sources need minimal configuration
-        return {'valid': True, 'config': {}}
-
-# =============================================================================
-# DESTINATION CONFIGURATION PARSERS  
-# =============================================================================
-
-# DESTINATION PARSER MOVED TO dests/handlers/pages.py
-
-# =============================================================================
-# SOURCE PATHS PARSER
-# =============================================================================
-
-# SOURCE PATHS PARSER MOVED TO jobs/handlers/pages.py
-
-# =============================================================================
-# NOTIFICATION CONFIGURATION PARSER
-# =============================================================================
-
-# NOTIFICATION PARSER MOVED TO jobs/handlers/pages.py
-
-# =============================================================================
-# MAINTENANCE CONFIGURATION PARSER
-# =============================================================================
-
-# MAINTENANCE PARSER MOVED TO dests/handlers/pages.py
+# SOURCE PARSER MOVED TO jobs/handlers/old.py
 
 # =============================================================================
 # UNIFIED JOB PARSER - Main entry point
@@ -189,6 +127,7 @@ class JobFormParser:
             return {'valid': False, 'error': f'Unknown source type: {source_type}'}
         
         # Parse using type-specific parser (following naming convention)
+        from jobs.handlers.old import SourceParser
         parser_method_name = f'parse_{source_type}_source'
         if hasattr(SourceParser, parser_method_name):
             parser_method = getattr(SourceParser, parser_method_name)
@@ -241,7 +180,6 @@ class JobFormParser:
         
         return {'valid': True, 'config': dest_config}
 
-# SSH ORIGIN PARSER MOVED TO origins/handlers/pages.py
 
 # =============================================================================
 # EXPORTS - Clean interface
@@ -249,9 +187,4 @@ class JobFormParser:
 
 # Create instances for easy import
 job_parser = JobFormParser()
-source_parser = SourceParser()
-# destination_parser moved to dests/handlers/pages.py
-# notification_parser moved to jobs/handlers/pages.py
-# maintenance_parser moved to dests/handlers/pages.py
-# source_paths_parser moved to jobs/handlers/pages.py
-# origin_parser moved to origins/handlers/pages.py
+# source_parser moved to jobs/handlers/old.py

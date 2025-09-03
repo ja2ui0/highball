@@ -11,6 +11,7 @@ DELETE THIS FILE once the new job form using dropdown selection is complete.
 
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
+from models.forms import safe_get_value
 
 
 # =============================================================================
@@ -85,3 +86,40 @@ class JobFormData(BaseModel):
     respect_conflicts: bool = True
     restic_maintenance: str = "auto"
     notifications: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+# =============================================================================
+# TEMPORARY PARSERS - Used during job form revamp transition  
+# =============================================================================
+
+class SourceParser:
+    """Parse source configurations (SSH, local) - temporary location during revamp"""
+    
+    @staticmethod
+    def parse_ssh_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse SSH source configuration"""
+        hostname = safe_get_value(form_data, 'hostname')
+        username = safe_get_value(form_data, 'username')
+        
+        if not hostname:
+            return {'valid': False, 'error': 'SSH hostname is required'}
+        if not username:
+            return {'valid': False, 'error': 'SSH username is required'}
+        
+        config = {
+            'hostname': hostname.strip(),
+            'username': username.strip()
+        }
+        
+        # Include container runtime if detected during validation
+        container_runtime = safe_get_value(form_data, 'container_runtime')
+        if container_runtime:
+            config['container_runtime'] = container_runtime
+        
+        return {'valid': True, 'config': config}
+    
+    @staticmethod
+    def parse_local_source(form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse local source configuration"""
+        # Local sources need minimal configuration
+        return {'valid': True, 'config': {}}
