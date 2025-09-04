@@ -727,6 +727,65 @@ class RestoreService:
     def suggest_resolution(self, error_message: str) -> str:
         """Suggest resolution steps based on error category"""
         return self.error_parser.suggest_resolution(error_message)
+    
+    def execute_restore_sync(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute synchronous restore operation for handler delegation"""
+        job_config = restore_request['job_config']
+        dest_config = job_config.get('dest_config', {})
+        
+        # Determine target path based on target type
+        if restore_request['target_type'] == 'source':
+            # Restore to original source location
+            source_paths = job_config.get('source_config', {}).get('paths', [])
+            if not source_paths:
+                return {'success': False, 'error': 'No source paths defined for restore'}
+            
+            # For same-as-origin restores, use container root since paths match mounts
+            if dest_config.get('repo_type') == 'same_as_origin':
+                target_path = '/'
+            else:
+                target_path = source_paths[0]['path']  # Use first source path
+        else:
+            # Safe restore to /tmp/highball-restore
+            target_path = '/tmp/highball-restore'
+        
+        # Build restore arguments
+        restore_args = [
+            'restore', restore_request['snapshot_id'],
+            '--target', target_path
+        ]
+        
+        # Add include patterns if specified
+        if 'include_patterns' in restore_request:
+            for pattern in restore_request['include_patterns']:
+                restore_args.extend(['--include', pattern])
+        
+        if restore_request['dry_run']:
+            restore_args.append('--dry-run')
+        
+        restore_args.extend(['--verbose'])
+        
+        # Execute restore command using unified ResticExecutionService
+        result = self.execution_service.restic_executor.execute_restic_command(
+            dest_config=dest_config,
+            command_args=restore_args,
+            source_config=job_config.get('source_config'),
+            operation_type='restore'
+        )
+        
+        if result['success']:
+            return {
+                'success': True,
+                'message': f'Restore completed successfully to {target_path}',
+                'target_path': target_path,
+                'output': result.get('output', '')
+            }
+        else:
+            return {
+                'success': False,
+                'error': result.get('error', 'Unknown restore error'),
+                'output': result.get('output', '')
+            }
 
 
 # =============================================================================

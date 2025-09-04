@@ -1373,68 +1373,10 @@ class JobsHandler(BaseHandler):
         return JSONResponse(content=result)
 
     def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute restore operation - moved from operations handler"""
-        # Import here to avoid circular dependencies
-        from services.exec import ResticExecutionService
-        
-        job_config = restore_request['job_config']
-        dest_config = job_config.get('dest_config', {})
-        
-        # Determine target path based on target type
-        if restore_request['target_type'] == 'source':
-            # Restore to original source location
-            source_paths = job_config.get('source_config', {}).get('paths', [])
-            if not source_paths:
-                return {'success': False, 'error': 'No source paths defined for restore'}
-            
-            # For same-as-origin restores, use container root since paths match mounts
-            if dest_config.get('repo_type') == 'same_as_origin':
-                target_path = '/'
-            else:
-                target_path = source_paths[0]['path']  # Use first source path
-        else:
-            # Safe restore to /tmp/highball-restore
-            target_path = '/tmp/highball-restore'
-        
-        # Build restore arguments
-        restore_args = [
-            'restore', restore_request['snapshot_id'],
-            '--target', target_path
-        ]
-        
-        # Add include patterns if specified
-        if 'include_patterns' in restore_request:
-            for pattern in restore_request['include_patterns']:
-                restore_args.extend(['--include', pattern])
-        
-        if restore_request['dry_run']:
-            restore_args.append('--dry-run')
-        
-        restore_args.extend(['--verbose'])
-        
-        # Execute restore command using unified ResticExecutionService
-        restic_executor = ResticExecutionService()
-        
-        result = restic_executor.execute_restic_command(
-            dest_config=dest_config,
-            command_args=restore_args,
-            source_config=job_config.get('source_config'),
-            operation_type='restore'
-        )
-        
-        if result['success']:
-            return {
-                'success': True,
-                'message': f'Restore completed successfully to {target_path}',
-                'target_path': target_path,
-                'output': result.get('output', '')
-            }
-        else:
-            return {
-                'success': False,
-                'error': result.get('error', 'Unknown restore error'),
-                'output': result.get('output', '')
-            }
+        """Execute restore operation - delegate to RestoreService"""
+        from jobs.services.restore import RestoreService
+        restore_service = RestoreService()
+        return restore_service.execute_restore_sync(restore_request)
 
     @handle_page_errors("Schedule job")
     async def schedule_job_htmx(self, request) -> JSONResponse:
