@@ -171,3 +171,4 @@ Claude code auto-appends after this line.
 - **Action**: Convert rsync SSH calls to use `SSHCommandFactory` from `services/ssh.py`
 
 ---
+- move @handle_page_errors to shared/

@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
 from jobs.handlers.pages import jobs_handler
+from jobs.handlers.htmx import htmx_handlers
 from admin.handlers.pages import admin_handler
 
 # Services
@@ -341,11 +342,11 @@ async def validate_source_path_endpoint(request: Request):
 
 @app.post("/jobs/add-source-path")
 async def add_source_path_endpoint(request: Request):
-    return await jobs_handler.add_source_path_htmx(request)
+    return await htmx_handlers.add_source_path_htmx(request)
 
 @app.post("/jobs/remove-source-path")
 async def remove_source_path_endpoint(request: Request):
-    return await jobs_handler.remove_source_path_htmx(request)
+    return await htmx_handlers.remove_source_path_htmx(request)
 
 @app.post("/jobs/notification-providers")
 async def notification_providers_endpoint(request: Request):
