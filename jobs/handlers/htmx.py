@@ -183,6 +183,41 @@ class HTMXHandlers:
     # (Methods will be added here incrementally)
     
     # =========================================================================
+    # JOB EXECUTION HTMX HANDLERS
+    # =========================================================================
+    
+    @handle_page_errors("Run backup")
+    async def run_backup_htmx(self, request) -> JSONResponse:
+        """Run backup job with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        form = await request.form()
+        job_name = form.get('job_name', '')
+        
+        # Call direct business logic (moved from operations handler)
+        return self.run_backup_job_direct(job_name, False)
+
+    @handle_page_errors("Dry run backup")
+    async def dry_run_backup_htmx(self, request) -> JSONResponse:
+        """Dry run backup job with form parsing - pure switchboard compliance"""
+        from fastapi.responses import JSONResponse
+        
+        form = await request.form()
+        job_name = form.get('job_name', '')
+        
+        # Call direct business logic (moved from operations handler)  
+        return self.run_backup_job_direct(job_name, True)
+    
+    def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
+        """Execute backup job with full orchestration - moved from operations handler"""
+        from fastapi.responses import JSONResponse
+        
+        # Need to get backup orchestration from pages handler for now
+        from jobs.handlers.pages import jobs_handler
+        result = jobs_handler.backup_orchestration.run_backup_job(job_name, dry_run)
+        return JSONResponse(content=result)
+    
+    # =========================================================================
     # NOTIFICATION HTMX HANDLERS
     # =========================================================================
     

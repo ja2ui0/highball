@@ -1197,27 +1197,6 @@ class JobsHandler(BaseHandler):
         # Call direct business logic (moved from operations handler)
         return self.schedule_job_direct(form_data)
 
-    @handle_page_errors("Run backup")
-    async def run_backup_htmx(self, request) -> JSONResponse:
-        """Run backup job with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
-        form = await request.form()
-        job_name = form.get('job_name', '')
-        
-        # Call direct business logic (moved from operations handler)
-        return self.run_backup_job_direct(job_name, False)
-
-    @handle_page_errors("Dry run backup")
-    async def dry_run_backup_htmx(self, request) -> JSONResponse:
-        """Dry run backup job with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
-        form = await request.form()
-        job_name = form.get('job_name', '')
-        
-        # Call direct business logic (moved from operations handler)
-        return self.run_backup_job_direct(job_name, True)
     
     # =============================================================================
     # DIRECT ORCHESTRATION METHODS (moved from operations handler)

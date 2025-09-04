@@ -172,11 +172,11 @@ async def validate_source_paths(request: Request):
 
 @app.post("/jobs/run-backup")
 async def run_backup(request: Request):
-    return await jobs_handler.run_backup_htmx(request)
+    return await htmx_handlers.run_backup_htmx(request)
 
 @app.post("/jobs/dry-run-backup")
 async def dry_run_backup(request: Request):
-    return await jobs_handler.dry_run_backup_htmx(request)
+    return await htmx_handlers.dry_run_backup_htmx(request)
 
 @app.post("/jobs/schedule")
 async def schedule_job(request: Request):
