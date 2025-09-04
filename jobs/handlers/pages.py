@@ -1093,37 +1093,6 @@ class JobsHandler(BaseHandler):
             'entries': entries
         })
 
-    @handle_page_errors("Save backup job")
-    async def save_backup_job_htmx(self, request) -> JSONResponse:
-        """Save backup job with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
-        form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic
-        return self.save_backup_job(form_data)
-
-    @handle_page_errors("Validate source paths")
-    async def validate_source_paths_htmx(self, request) -> JSONResponse:
-        """Validate source paths with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
-        form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic
-        return self.validate_source_paths(form_data)
-
-    @handle_page_errors("Process restore request")
-    async def process_restore_request_htmx(self, request) -> JSONResponse:
-        """Process restore request with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
-        form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic (moved from operations handler)
-        return self.process_restore_request(form_data)
 
     @handle_page_errors("Process restore")
     def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
@@ -1185,17 +1154,6 @@ class JobsHandler(BaseHandler):
         restore_service = RestoreService()
         return restore_service.execute_restore_sync(restore_request)
 
-    @handle_page_errors("Schedule job")
-    async def schedule_job_htmx(self, request) -> JSONResponse:
-        """Schedule job with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
-        form_data = await parse_htmx_form(request)
-        
-        # Call direct business logic (moved from operations handler)
-        return self.schedule_job_direct(form_data)
 
     
     # =============================================================================

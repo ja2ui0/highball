@@ -174,7 +174,49 @@ class HTMXHandlers:
     # JOB CRUD HTMX HANDLERS  
     # =========================================================================
     
-    # (Methods will be added here incrementally)
+    @handle_page_errors("Save backup job")
+    async def save_backup_job_htmx(self, request) -> JSONResponse:
+        """Save backup job with form parsing - pure switchboard compliance"""
+        from jobs.handlers.htmx import parse_htmx_form
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Call existing business logic via pages handler
+        from jobs.handlers.pages import jobs_handler
+        return jobs_handler.save_backup_job(form_data)
+
+    @handle_page_errors("Validate source paths")
+    async def validate_source_paths_htmx(self, request) -> JSONResponse:
+        """Validate source paths with form parsing - pure switchboard compliance"""
+        from jobs.handlers.htmx import parse_htmx_form
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Call existing business logic via pages handler
+        from jobs.handlers.pages import jobs_handler
+        return jobs_handler.validate_source_paths(form_data)
+
+    @handle_page_errors("Process restore request")
+    async def process_restore_request_htmx(self, request) -> JSONResponse:
+        """Process restore request with form parsing - pure switchboard compliance"""
+        from jobs.handlers.htmx import parse_htmx_form
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Call existing business logic via pages handler  
+        from jobs.handlers.pages import jobs_handler
+        return jobs_handler.process_restore_request(form_data)
+
+    @handle_page_errors("Schedule job")
+    async def schedule_job_htmx(self, request) -> JSONResponse:
+        """Schedule job with form parsing - pure switchboard compliance"""
+        from jobs.handlers.htmx import parse_htmx_form
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Call existing business logic via pages handler
+        from jobs.handlers.pages import jobs_handler
+        return jobs_handler.schedule_job_direct(form_data)
     
     # =========================================================================
     # RESTORE OPERATION HTMX HANDLERS

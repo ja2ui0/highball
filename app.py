@@ -148,7 +148,7 @@ async def destination_type_fields(request: Request):
 
 @app.post("/jobs/save")
 async def save_job(request: Request):
-    return await jobs_handler.save_backup_job_htmx(request)
+    return await htmx_handlers.save_backup_job_htmx(request)
 
 @app.get("/jobs/delete")
 async def delete_job(name: str = Query("")):
@@ -164,7 +164,7 @@ async def restore_job(name: str = Query("")):
 
 @app.post("/jobs/validate-source-paths")
 async def validate_source_paths(request: Request):
-    return await jobs_handler.validate_source_paths_htmx(request)
+    return await htmx_handlers.validate_source_paths_htmx(request)
 
 # =============================================================================
 # JOBS - EXECUTION
@@ -180,11 +180,11 @@ async def dry_run_backup(request: Request):
 
 @app.post("/jobs/schedule")
 async def schedule_job(request: Request):
-    return await jobs_handler.schedule_job_htmx(request)
+    return await htmx_handlers.schedule_job_htmx(request)
 
 @app.post("/jobs/restore-execute")
 async def process_restore_request(request: Request):
-    return await jobs_handler.process_restore_request_htmx(request)
+    return await htmx_handlers.process_restore_request_htmx(request)
 
 @app.post("/jobs/check-restore-overwrites")
 async def check_restore_overwrites(request: Request):
