@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 # Domain Handlers - Pure Switchboard Pattern
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
-from jobs.handlers.pages import jobs_handler
-from jobs.handlers.htmx import htmx_handlers
+from jobs.handlers.pages import jobs_handler as job_pages
+from jobs.handlers.htmx import htmx_handlers as job_htmx
 from admin.handlers.pages import admin_handler
 
 # Services
@@ -48,15 +48,15 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
 async def show_dashboard():
-    return jobs_handler.show_dashboard()
+    return job_pages.show_dashboard()
 
 @app.get("/jobs/add", response_class=HTMLResponse)
 async def show_add_job_form():
-    return jobs_handler.show_add_job_form()
+    return job_pages.show_add_job_form()
 
 @app.get("/jobs/edit", response_class=HTMLResponse)
 async def show_edit_job_form(name: str = Query("")):
-    return jobs_handler.show_edit_job_form(name)
+    return job_pages.show_edit_job_form(name)
 
 @app.get("/config", response_class=HTMLResponse)
 async def show_config_manager():
@@ -72,7 +72,7 @@ async def show_dev_logs(type: str = Query("app")):
 
 @app.get("/inspect", response_class=HTMLResponse)
 async def show_job_inspect(name: str = Query("")):
-    return jobs_handler.show_job_inspect(name)
+    return job_pages.show_job_inspect(name)
 
 # =============================================================================
 # SSH ORIGINS
@@ -148,23 +148,23 @@ async def destination_type_fields(request: Request):
 
 @app.post("/jobs/save")
 async def save_job(request: Request):
-    return await htmx_handlers.save_backup_job_htmx(request)
+    return await job_htmx.save_backup_job_htmx(request)
 
 @app.get("/jobs/delete")
 async def delete_job(name: str = Query("")):
-    return jobs_handler.delete_backup_job(name)
+    return job_pages.delete_backup_job(name)
 
 @app.get("/jobs/purge")
 async def purge_job(name: str = Query("")):
-    return jobs_handler.purge_backup_job(name)
+    return job_pages.purge_backup_job(name)
 
 @app.get("/jobs/restore")
 async def restore_job(name: str = Query("")):
-    return jobs_handler.restore_backup_job(name)
+    return job_pages.restore_backup_job(name)
 
 @app.post("/jobs/validate-source-paths")
 async def validate_source_paths(request: Request):
-    return await htmx_handlers.validate_source_paths_htmx(request)
+    return await job_htmx.validate_source_paths_htmx(request)
 
 # =============================================================================
 # JOBS - EXECUTION
@@ -172,23 +172,23 @@ async def validate_source_paths(request: Request):
 
 @app.post("/jobs/run-backup")
 async def run_backup(request: Request):
-    return await htmx_handlers.run_backup_htmx(request)
+    return await job_htmx.run_backup_htmx(request)
 
 @app.post("/jobs/dry-run-backup")
 async def dry_run_backup(request: Request):
-    return await htmx_handlers.dry_run_backup_htmx(request)
+    return await job_htmx.dry_run_backup_htmx(request)
 
 @app.post("/jobs/schedule")
 async def schedule_job(request: Request):
-    return await htmx_handlers.schedule_job_htmx(request)
+    return await job_htmx.schedule_job_htmx(request)
 
 @app.post("/jobs/restore-execute")
 async def process_restore_request(request: Request):
-    return await htmx_handlers.process_restore_request_htmx(request)
+    return await job_htmx.process_restore_request_htmx(request)
 
 @app.post("/jobs/check-restore-overwrites")
 async def check_restore_overwrites(request: Request):
-    return await htmx_handlers.check_restore_overwrites_htmx(request)
+    return await job_htmx.check_restore_overwrites_htmx(request)
 
 # =============================================================================
 # REPOSITORY OPERATIONS
@@ -196,7 +196,7 @@ async def check_restore_overwrites(request: Request):
 
 @app.get("/check-repository-availability")
 async def check_repository_availability(job: str = Query("")):
-    return htmx_handlers.check_repository_availability_htmx(job)
+    return job_htmx.check_repository_availability_htmx(job)
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
@@ -312,7 +312,7 @@ async def init_repository(job: str = Query("")):
 
 @app.get("/filesystem-browse")
 async def browse_filesystem(path: str = Query("/")):
-    return jobs_handler.browse_filesystem(path)
+    return job_pages.browse_filesystem(path)
 
 @app.get("/jobs")
 async def list_jobs():
@@ -338,43 +338,43 @@ async def preview_ssh_config_endpoint(request: Request):
 # Jobs HTMX endpoints
 @app.post("/jobs/validate-source-path")
 async def validate_source_path_endpoint(request: Request):
-    return await htmx_handlers.validate_source_path_htmx(request)
+    return await job_htmx.validate_source_path_htmx(request)
 
 @app.post("/jobs/add-source-path")
 async def add_source_path_endpoint(request: Request):
-    return await htmx_handlers.add_source_path_htmx(request)
+    return await job_htmx.add_source_path_htmx(request)
 
 @app.post("/jobs/remove-source-path")
 async def remove_source_path_endpoint(request: Request):
-    return await htmx_handlers.remove_source_path_htmx(request)
+    return await job_htmx.remove_source_path_htmx(request)
 
 @app.post("/jobs/notification-providers")
 async def notification_providers_endpoint(request: Request):
-    return await htmx_handlers.render_notification_providers_htmx(request)
+    return await job_htmx.render_notification_providers_htmx(request)
 
 @app.post("/jobs/add-notification-provider")
 async def add_notification_provider_endpoint(request: Request):
-    return await htmx_handlers.add_notification_provider_htmx(request)
+    return await job_htmx.add_notification_provider_htmx(request)
 
 @app.post("/jobs/remove-notification-provider")
 async def remove_notification_provider_endpoint(request: Request):
-    return await htmx_handlers.remove_notification_provider_htmx(request)
+    return await job_htmx.remove_notification_provider_htmx(request)
 
 @app.post("/jobs/toggle-success-message")
 async def toggle_success_message_endpoint(request: Request):
-    return await htmx_handlers.toggle_success_message_htmx(request)
+    return await job_htmx.toggle_success_message_htmx(request)
 
 @app.post("/jobs/toggle-failure-message")
 async def toggle_failure_message_endpoint(request: Request):
-    return await htmx_handlers.toggle_failure_message_htmx(request)
+    return await job_htmx.toggle_failure_message_htmx(request)
 
 @app.post("/jobs/restore-target-change")
 async def handle_restore_target_change(request: Request):
-    return await htmx_handlers.handle_restore_target_change_htmx(request)
+    return await job_htmx.handle_restore_target_change_htmx(request)
 
 @app.post("/jobs/restore-dry-run-change")
 async def handle_restore_dry_run_change(request: Request):
-    return await htmx_handlers.handle_restore_dry_run_change_htmx(request)
+    return await job_htmx.handle_restore_dry_run_change_htmx(request)
 
 # Destinations HTMX endpoints
 @app.post("/destinations/dest-fields")
