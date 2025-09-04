@@ -409,6 +409,29 @@ class HTMXHandlers:
         result = jobs_handler.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
+    @handle_page_errors("Check repository availability")
+    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository availability check"""
+        
+        if not job_name:
+            html_response = self.template_service.render_template('partials/error_message.html',
+                                                               error_message='Job name is required')
+            return HTMLResponse(content=html_response)
+        
+        # Delegate to jobs_handler for repository operations
+        from jobs.handlers.pages import jobs_handler
+        
+        # Get and validate job configuration
+        jobs = jobs_handler.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            html_response = self.template_service.render_template('partials/error_message.html',
+                                                               error_message=f"Job '{job_name}' not found")
+            return HTMLResponse(content=html_response)
+        
+        job_config = jobs[job_name]
+        # Perform repository availability check and return response
+        return jobs_handler._check_and_respond_repository_status_html(job_name, job_config)
+    
     # =========================================================================
     # NOTIFICATION HTMX HANDLERS
     # =========================================================================

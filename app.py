@@ -196,7 +196,7 @@ async def check_restore_overwrites(request: Request):
 
 @app.get("/check-repository-availability")
 async def check_repository_availability(job: str = Query("")):
-    return jobs_handler.check_repository_availability_htmx(job)
+    return htmx_handlers.check_repository_availability_htmx(job)
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):

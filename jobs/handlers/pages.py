@@ -670,25 +670,6 @@ class JobsHandler(BaseHandler):
         
         return validation_results
     
-    @handle_page_errors("Repository check")
-    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository availability check"""
-        
-        if not job_name:
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Job name is required'
-            })
-        
-        # Get and validate job configuration
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            return self._render_html('partials/error_message.html', {
-                'error_message': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        # Perform repository availability check and return response
-        return self._check_and_respond_repository_status_html(job_name, job_config)
     
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""
