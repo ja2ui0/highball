@@ -49,11 +49,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def show_dashboard():
     return jobs_handler.show_dashboard()
 
-@app.get("/add-job", response_class=HTMLResponse)
+@app.get("/jobs/add", response_class=HTMLResponse)
 async def show_add_job_form():
     return jobs_handler.show_add_job_form()
 
-@app.get("/edit-job", response_class=HTMLResponse)
+@app.get("/jobs/edit", response_class=HTMLResponse)
 async def show_edit_job_form(name: str = Query("")):
     return jobs_handler.show_edit_job_form(name)
 
@@ -145,23 +145,23 @@ async def destination_type_fields(request: Request):
 # JOBS - CRUD OPERATIONS
 # =============================================================================
 
-@app.post("/save-job")
+@app.post("/jobs/save")
 async def save_job(request: Request):
     return await jobs_handler.save_backup_job_htmx(request)
 
-@app.get("/delete-job")
+@app.get("/jobs/delete")
 async def delete_job(name: str = Query("")):
     return jobs_handler.delete_backup_job(name)
 
-@app.get("/purge-job")
+@app.get("/jobs/purge")
 async def purge_job(name: str = Query("")):
     return jobs_handler.purge_backup_job(name)
 
-@app.get("/restore-job")
+@app.get("/jobs/restore")
 async def restore_job(name: str = Query("")):
     return jobs_handler.restore_backup_job(name)
 
-@app.post("/validate-source-paths")
+@app.post("/jobs/validate-source-paths")
 async def validate_source_paths(request: Request):
     return await jobs_handler.validate_source_paths_htmx(request)
 
@@ -169,19 +169,19 @@ async def validate_source_paths(request: Request):
 # JOBS - EXECUTION
 # =============================================================================
 
-@app.post("/run-backup")
+@app.post("/jobs/run-backup")
 async def run_backup(request: Request):
     return await jobs_handler.run_backup_htmx(request)
 
-@app.post("/dry-run-backup")
+@app.post("/jobs/dry-run-backup")
 async def dry_run_backup(request: Request):
     return await jobs_handler.dry_run_backup_htmx(request)
 
-@app.post("/schedule-job")
+@app.post("/jobs/schedule")
 async def schedule_job(request: Request):
     return await jobs_handler.schedule_job_htmx(request)
 
-@app.post("/restore")
+@app.post("/jobs/restore-execute")
 async def process_restore_request(request: Request):
     return await jobs_handler.process_restore_request_htmx(request)
 

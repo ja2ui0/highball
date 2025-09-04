@@ -7,9 +7,9 @@
     <td><a href="/inspect?name={{ job_name }}" class="button">Inspect</a></td>
     <td>
         <div class="action-buttons">
-            <a href="/edit-job?name={{ job_name }}" class="button">Edit</a>
-            <a href="/run-backup?name={{ job_name }}" class="button">Run</a>
-            <button hx-get="/delete-job" 
+            <a href="/jobs/edit?name={{ job_name }}" class="button">Edit</a>
+            <a href="/jobs/run-backup?name={{ job_name }}" class="button">Run</a>
+            <button hx-get="/jobs/delete" 
                     hx-vals='{"name": "{{ job_name }}"}'
                     hx-confirm="Are you sure you want to delete job '{{ job_name }}'? It will be moved to deleted jobs and can be restored later."
                     hx-on::after-request="window.location.reload()"

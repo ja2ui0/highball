@@ -13,7 +13,7 @@
         
         <h1>{{ form_title }}</h1>
         
-        <form method="post" action="/save-job" enctype="multipart/form-data">
+        <form method="post" action="/jobs/save" enctype="multipart/form-data">
             {{ hidden_fields | safe }}
             
             {% include 'partials/job_identity_section.html' %}

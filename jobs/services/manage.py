@@ -412,3 +412,87 @@ class SystemLoggingService:
         except Exception as e:
             logger.error(f"Get logs error: {e}")
             return [f'Error retrieving logs: {str(e)}']
+
+
+# =============================================================================
+# **JOB OPERATIONS CONCERN** - Job CRUD operations and lifecycle management
+# =============================================================================
+
+def handle_operations_errors(operation_name: str):
+    """Decorator to handle job operation errors consistently"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"{operation_name} operation error: {e}")
+                return {
+                    'success': False,
+                    'error': f'{operation_name} operation failed: {str(e)}'
+                }
+        return wrapper
+    return decorator
+
+
+class JobOperationsService:
+    """Service for job CRUD operations and lifecycle management"""
+    
+    def __init__(self, backup_config):
+        self.backup_config = backup_config
+    
+    @handle_operations_errors("Save job")
+    def save_job(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Save job configuration to persistent storage"""
+        if not job_name:
+            return {'success': False, 'error': 'Job name is required'}
+        
+        if not job_config:
+            return {'success': False, 'error': 'Job configuration is required'}
+        
+        success = self.backup_config.save_job(job_name, job_config)
+        
+        if success:
+            return {'success': True, 'message': f"Job '{job_name}' saved successfully"}
+        else:
+            return {'success': False, 'error': 'Failed to save job configuration'}
+    
+    @handle_operations_errors("Delete job")
+    def delete_job(self, job_name: str) -> Dict[str, Any]:
+        """Move job to deleted jobs (soft delete)"""
+        if not job_name:
+            return {'success': False, 'error': 'Job name is required'}
+        
+        success = self.backup_config.delete_backup_job(job_name)
+        
+        if success:
+            return {'success': True, 'message': f"Job '{job_name}' deleted successfully"}
+        else:
+            return {'success': False, 'error': f"Failed to delete job '{job_name}'"}
+    
+    @handle_operations_errors("Purge job")
+    def purge_job(self, job_name: str) -> Dict[str, Any]:
+        """Permanently remove job from deleted jobs (hard delete)"""
+        if not job_name:
+            return {'success': False, 'error': 'Job name is required'}
+        
+        success = self.backup_config.purge_job(job_name)
+        
+        if success:
+            return {'success': True, 'message': f"Job '{job_name}' permanently purged"}
+        else:
+            return {'success': False, 'error': f"Failed to purge job '{job_name}'"}
+    
+    @handle_operations_errors("Restore job")
+    def restore_job(self, job_name: str) -> Dict[str, Any]:
+        """Restore job from deleted jobs back to active jobs"""
+        if not job_name:
+            return {'success': False, 'error': 'Job name is required'}
+        
+        success = self.backup_config.restore_deleted_job(job_name)
+        
+        if success:
+            return {'success': True, 'message': f"Job '{job_name}' restored successfully"}
+        else:
+            return {'success': False, 'error': f"Failed to restore job '{job_name}'"}

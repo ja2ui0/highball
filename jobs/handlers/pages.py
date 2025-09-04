@@ -148,8 +148,10 @@ class JobsHandler(BaseHandler):
         # Initialize service orchestrators (moved from operations handler)
         from jobs.services.backup import BackupOrchestrationService
         from jobs.services.validate import ValidationService
+        from jobs.services.manage import JobOperationsService
         self.backup_orchestration = BackupOrchestrationService(self.backup_config)
         self.validation_service = ValidationService(self.backup_config)
+        self.job_operations = JobOperationsService(self.backup_config)
     
     # =========================================================================
     # VALIDATION RENDERING (moved from services/template.py)
@@ -534,7 +536,8 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Save job")
     def save_backup_job(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save backup job from form submission"""
-        from models.forms import job_parser
+        from jobs.handlers.old import JobFormParser
+        job_parser = JobFormParser()
         
         # Parse job form data using unified parser
         job_result = job_parser.parse_job_form(form_data)
@@ -549,15 +552,15 @@ class JobsHandler(BaseHandler):
         job_name = job_result['job_name']
         job_config = self._build_job_config_from_result(job_result)
         
-        # Save to config
-        success = self.backup_config.save_job(job_name, job_config)
+        # Save via service
+        result = self.job_operations.save_job(job_name, job_config)
         
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': 'Failed to save job configuration'
+                'error': result['error']
             }, status_code=500)
 
     @handle_page_errors("Delete job")
@@ -570,14 +573,14 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        success = self.backup_config.delete_backup_job(job_name)
+        result = self.job_operations.delete_job(job_name)
         
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to delete job '{job_name}'"
+                'error': result['error']
             }, status_code=500)
 
     @handle_page_errors("Purge job")
@@ -590,14 +593,14 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        success = self.backup_config.purge_job(job_name)
+        result = self.job_operations.purge_job(job_name)
         
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to purge job '{job_name}'"
+                'error': result['error']
             }, status_code=500)
 
     @handle_page_errors("Restore job")
@@ -610,14 +613,14 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        success = self.backup_config.restore_deleted_job(job_name)
+        result = self.job_operations.restore_job(job_name)
         
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to restore job '{job_name}'"
+                'error': result['error']
             }, status_code=500)
 
     @handle_page_errors("Path validation")
