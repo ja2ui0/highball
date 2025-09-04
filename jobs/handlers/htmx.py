@@ -186,7 +186,37 @@ class HTMXHandlers:
     # NOTIFICATION HTMX HANDLERS
     # =========================================================================
     
-    # (Methods will be added here incrementally)
+    @handle_page_errors("Toggle success message")
+    async def toggle_success_message_htmx(self, request) -> HTMLResponse:
+        """Toggle success message field visibility for job notification configuration"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Check if checkbox is checked
+        enabled = 'notify_on_success[]' in form_data
+        success_message = get_form_value(form_data, 'notification_success_messages[]')
+        
+        html_response = self.template_service.render_template('partials/notification_success_message.html',
+                                                            enabled=enabled,
+                                                            success_message=success_message)
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Toggle failure message")
+    async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
+        """Toggle failure message field visibility for job notification configuration"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Check if checkbox is checked
+        enabled = 'notify_on_failure[]' in form_data
+        failure_message = get_form_value(form_data, 'notification_failure_messages[]')
+        
+        html_response = self.template_service.render_template('partials/notification_failure_message.html',
+                                                            enabled=enabled,
+                                                            failure_message=failure_message)
+        return HTMLResponse(content=html_response)
 
 
 # =============================================================================

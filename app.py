@@ -362,11 +362,11 @@ async def remove_notification_provider_endpoint(request: Request):
 
 @app.post("/jobs/toggle-success-message")
 async def toggle_success_message_endpoint(request: Request):
-    return await jobs_handler.toggle_success_message_htmx(request)
+    return await htmx_handlers.toggle_success_message_htmx(request)
 
 @app.post("/jobs/toggle-failure-message")
 async def toggle_failure_message_endpoint(request: Request):
-    return await jobs_handler.toggle_failure_message_htmx(request)
+    return await htmx_handlers.toggle_failure_message_htmx(request)
 
 @app.post("/jobs/restore-target-change")
 async def handle_restore_target_change(request: Request):
