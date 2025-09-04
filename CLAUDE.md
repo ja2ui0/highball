@@ -40,7 +40,7 @@ Web backup orchestration with scheduling, monitoring, notification. Providers: *
 5. Rsync patterns
 
 ---
-## Architecture — MVC Refactor
+## Architecture
 
 - **app.py = switchboard only** (pure routes, zero logic).
 - **Domains (pillars)**:
@@ -126,11 +126,6 @@ config.py          # CRUD for config/
 -  ResponseUtils used everywhere
 
 ---
-## TODO
-
-@LOCAL/MVC.md
-
----
 ## Conventions
 
 @CONTRIBUTING.md
@@ -152,22 +147,26 @@ Claude code auto-appends after this line.
 
 ## TECHNICAL DEBT PUNCHLIST
 
-### 1. Form Parsing Standardization
+### Consolidate Shared Infra
+- move models/forms.py into services/templates.py and give it a better name
+- move services/ to shared/ so it has relaxed requirements
+
+### Form Parsing Standardization
 - **Issue**: 4 different `_get_form_value()` implementations across domain handlers
 - **Action**: Create standardized form parsing helper in `BaseHandler` class
 - **Files**: admin/handlers/pages.py, jobs/handlers/pages.py, dests/handlers/pages.py, origins/handlers/pages.py
 
-### 2. GET/POST Route Deduplication  
+### GET/POST Route Deduplication  
 - **Issue**: Duplicate GET/POST routes for same operations (e.g. `/unlock-repository`)
 - **Action**: Use `@app.api_route("/path", methods=["GET", "POST"])` pattern
 - **Priority**: Medium
 
-### 3. Restore Service Consolidation
+### Restore Service Consolidation
 - **Issue**: Two restore implementations - async (`jobs/services/restore.py`) vs sync (`jobs/handlers/pages.py`)
 - **Action**: Research which is actively used, merge functionality into single service
 - **Priority**: Medium-High
 
-### 4. Remaining SSH Consolidation
+### Remaining SSH Consolidation
 - **Issue**: `dests/services/rsync.py` still uses manual SSH commands instead of `SSHCommandFactory`
 - **Action**: Convert rsync SSH calls to use `SSHCommandFactory` from `services/ssh.py`
 
