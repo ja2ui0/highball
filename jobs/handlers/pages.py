@@ -740,6 +740,7 @@ class JobsHandler(BaseHandler):
                 'error_message': error_message or 'Unknown error'
             })
 
+    @handle_page_errors("Validate source path")
     async def validate_source_path_htmx(self, request) -> HTMLResponse:
         """Validate source path with robust permission checking for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -758,39 +759,34 @@ class JobsHandler(BaseHandler):
             value_list = form_data.get(key, [default])
             return value_list[0] if value_list else default
         
-        try:
-            # Extract path from array format
-            path_array = form_data.get('source_path[]', [])
-            path_index = int(get_form_value(form_data, 'path_index', '0'))
-            path = path_array[path_index] if path_index < len(path_array) else ''
-            
-            if not path or not path.strip():
-                result = {'valid': False, 'error': 'Please enter a path'}
-                html_response = self.render_source_path_validation_status(result)
-                return HTMLResponse(content=html_response)
-            
-            # Extract source configuration
-            source_type = get_form_value(form_data, 'source_type')
-            hostname = get_form_value(form_data, 'hostname')
-            username = get_form_value(form_data, 'username')
-            
-            # Validate based on source type (robust handling from working version)
-            if source_type == 'ssh':
-                result = self.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
-            elif source_type == 'local':
-                result = self.validation_service.validate_source_path_for_backup_local(path)
-            else:
-                result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
-            
+        # Extract path from array format
+        path_array = form_data.get('source_path[]', [])
+        path_index = int(get_form_value(form_data, 'path_index', '0'))
+        path = path_array[path_index] if path_index < len(path_array) else ''
+        
+        if not path or not path.strip():
+            result = {'valid': False, 'error': 'Please enter a path'}
             html_response = self.render_source_path_validation_status(result)
             return HTMLResponse(content=html_response)
-            
-        except Exception as e:
-            result = {'valid': False, 'error': f'Validation error: {str(e)}'}
-            html_response = self.render_source_path_validation_status(result)
-            return HTMLResponse(content=html_response)
+        
+        # Extract source configuration
+        source_type = get_form_value(form_data, 'source_type')
+        hostname = get_form_value(form_data, 'hostname')
+        username = get_form_value(form_data, 'username')
+        
+        # Validate based on source type (robust handling from working version)
+        if source_type == 'ssh':
+            result = self.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
+        elif source_type == 'local':
+            result = self.validation_service.validate_source_path_for_backup_local(path)
+        else:
+            result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
+        
+        html_response = self.render_source_path_validation_status(result)
+        return HTMLResponse(content=html_response)
 
 
+    @handle_page_errors("Add source path")
     async def add_source_path_htmx(self, request) -> HTMLResponse:
         """Add a new source path entry for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -827,6 +823,7 @@ class JobsHandler(BaseHandler):
                                                            source_path_schema=SOURCE_PATH_SCHEMA)
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Remove source path")
     async def remove_source_path_htmx(self, request) -> HTMLResponse:
         """Remove a source path entry - returns empty response for HTMX DELETE"""
         # Since we're using hx-delete and hx-swap="outerHTML", 
@@ -834,6 +831,7 @@ class JobsHandler(BaseHandler):
         # We just need to return an empty response.
         return HTMLResponse(content="")
 
+    @handle_page_errors("Check restore overwrites")
     async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
         """Check restore overwrites for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -880,6 +878,7 @@ class JobsHandler(BaseHandler):
             'dry_run': False
         })
 
+    @handle_page_errors("Render notification providers")
     async def render_notification_providers_htmx(self, request) -> HTMLResponse:
         """Render notification providers section for job configuration HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -960,6 +959,7 @@ class JobsHandler(BaseHandler):
         return self.template_service.render_template('partials/provider_selection_dropdown.html',
                                                    available_options=available_options)
 
+    @handle_page_errors("Add notification provider")
     async def add_notification_provider_htmx(self, request) -> HTMLResponse:
         """Add a new notification provider to job configuration for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1020,6 +1020,7 @@ class JobsHandler(BaseHandler):
             return [providers] if providers else []
         return [p for p in providers if p]  # Filter out empty strings
 
+    @handle_page_errors("Remove notification provider")
     async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
         """Remove a notification provider from job configuration for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1063,6 +1064,7 @@ class JobsHandler(BaseHandler):
                                                             updated_selection_html=updated_selection)
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Toggle success message")
     async def toggle_success_message_htmx(self, request) -> HTMLResponse:
         """Toggle success message field visibility for job notification configuration"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1090,6 +1092,7 @@ class JobsHandler(BaseHandler):
                                                             success_message=success_message)
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Toggle failure message")
     async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
         """Toggle failure message field visibility for job notification configuration"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1126,6 +1129,7 @@ class JobsHandler(BaseHandler):
         value_list = form_data.get(key, [default])
         return value_list[0] if value_list else default
 
+    @handle_page_errors("Handle restore target change")
     async def handle_restore_target_change_htmx(self, request) -> HTMLResponse:
         """Handle restore target change and check overwrites - HTMX handler"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1173,6 +1177,7 @@ class JobsHandler(BaseHandler):
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Handle restore dry run change")
     async def handle_restore_dry_run_change_htmx(self, request) -> HTMLResponse:
         """Handle dry run toggle and update warning - HTMX handler"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1217,70 +1222,50 @@ class JobsHandler(BaseHandler):
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Browse filesystem")
     def browse_filesystem(self, path: str = '/') -> JSONResponse:
         """Browse local filesystem for path selection - moved from handlers/api.py"""
-        try:
-            try:
-                path_obj = Path(path)
-                if not path_obj.exists():
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Path does not exist: {path}'
-                    })
-                
-                if not path_obj.is_dir():
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Path is not a directory: {path}'
-                    })
-                
-                # List directory contents
-                entries = []
-                try:
-                    for item in path_obj.iterdir():
-                        if item.is_dir():
-                            entries.append({
-                                'name': item.name,
-                                'path': str(item),
-                                'type': 'directory'
-                            })
-                        elif item.is_file():
-                            entries.append({
-                                'name': item.name,
-                                'path': str(item),
-                                'type': 'file',
-                                'size': item.stat().st_size
-                            })
-                    
-                    # Sort: directories first, then files
-                    entries.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
-                    
-                except PermissionError:
-                    return JSONResponse(content={
-                        'success': False,
-                        'error': f'Permission denied: {path}'
-                    })
-                
-                return JSONResponse(content={
-                    'success': True,
-                    'path': str(path_obj),
-                    'parent': str(path_obj.parent) if path_obj.parent != path_obj else None,
-                    'entries': entries
-                })
-                
-            except Exception as e:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f'Filesystem error: {str(e)}'
-                })
-            
-        except Exception as e:
-            logger.error(f"Filesystem browse error: {e}")
+        path_obj = Path(path)
+        if not path_obj.exists():
             return JSONResponse(content={
                 'success': False,
-                'error': f'Browse failed: {str(e)}'
+                'error': f'Path does not exist: {path}'
             })
+        
+        if not path_obj.is_dir():
+            return JSONResponse(content={
+                'success': False,
+                'error': f'Path is not a directory: {path}'
+            })
+        
+        # List directory contents
+        entries = []
+        for item in path_obj.iterdir():
+            if item.is_dir():
+                entries.append({
+                    'name': item.name,
+                    'path': str(item),
+                    'type': 'directory'
+                })
+            elif item.is_file():
+                entries.append({
+                    'name': item.name,
+                    'path': str(item),
+                    'type': 'file',
+                    'size': item.stat().st_size
+                })
+        
+        # Sort: directories first, then files
+        entries.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
+        
+        return JSONResponse(content={
+            'success': True,
+            'path': str(path_obj),
+            'parent': str(path_obj.parent) if path_obj.parent != path_obj else None,
+            'entries': entries
+        })
 
+    @handle_page_errors("Save backup job")
     async def save_backup_job_htmx(self, request) -> JSONResponse:
         """Save backup job with form parsing - pure switchboard compliance"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1297,6 +1282,7 @@ class JobsHandler(BaseHandler):
         # Call existing business logic
         return self.save_backup_job(form_data)
 
+    @handle_page_errors("Validate source paths")
     async def validate_source_paths_htmx(self, request) -> JSONResponse:
         """Validate source paths with form parsing - pure switchboard compliance"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1313,6 +1299,7 @@ class JobsHandler(BaseHandler):
         # Call existing business logic
         return self.validate_source_paths(form_data)
 
+    @handle_page_errors("Process restore request")
     async def process_restore_request_htmx(self, request) -> JSONResponse:
         """Process restore request with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
@@ -1331,66 +1318,59 @@ class JobsHandler(BaseHandler):
         # Call existing business logic (moved from operations handler)
         return self.process_restore_request(form_data)
 
+    @handle_page_errors("Process restore")
     def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Process restore request from form - moved from operations handler"""
-        try:
-            job_name = form_data.get('job_name', [''])[0]
-            snapshot_id = form_data.get('snapshot_id', [''])[0]
-            target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
-            dry_run = 'dry_run' in form_data
-            
-            if not job_name:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Job name is required'
-                })
-            
-            if not snapshot_id:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Snapshot ID is required'
-                })
-            
-            jobs = self.backup_config.get_backup_jobs()
-            if job_name not in jobs:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f"Job '{job_name}' not found"
-                })
-            
-            job_config = jobs[job_name]
-            
-            # Only support Restic restores for now
-            if job_config.get('dest_type') != 'restic':
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Restore only supported for Restic repositories'
-                })
-            
-            # Build restore request
-            restore_request = {
-                'job_name': job_name,
-                'job_config': job_config,
-                'snapshot_id': snapshot_id,
-                'target_type': target_type,
-                'dry_run': dry_run
-            }
-            
-            # Add include patterns if specified
-            include_patterns = form_data.get('include_patterns', [''])
-            if include_patterns[0]:
-                restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
-            
-            # Execute restore (using operations handler implementation)
-            result = self._execute_restore(restore_request)
-            return JSONResponse(content=result)
-                
-        except Exception as e:
-            logger.error(f"Restore request error: {e}")
+        job_name = form_data.get('job_name', [''])[0]
+        snapshot_id = form_data.get('snapshot_id', [''])[0]
+        target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
+        dry_run = 'dry_run' in form_data
+        
+        if not job_name:
             return JSONResponse(content={
                 'success': False,
-                'error': f'Restore error: {str(e)}'
+                'error': 'Job name is required'
             })
+        
+        if not snapshot_id:
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Snapshot ID is required'
+            })
+        
+        jobs = self.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return JSONResponse(content={
+                'success': False,
+                'error': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        
+        # Only support Restic restores for now
+        if job_config.get('dest_type') != 'restic':
+            return JSONResponse(content={
+                'success': False,
+                'error': 'Restore only supported for Restic repositories'
+            })
+        
+        # Build restore request
+        restore_request = {
+            'job_name': job_name,
+            'job_config': job_config,
+            'snapshot_id': snapshot_id,
+            'target_type': target_type,
+            'dry_run': dry_run
+        }
+        
+        # Add include patterns if specified
+        include_patterns = form_data.get('include_patterns', [''])
+        if include_patterns[0]:
+            restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
+        
+        # Execute restore (using operations handler implementation)
+        result = self._execute_restore(restore_request)
+        return JSONResponse(content=result)
 
     def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
         """Execute restore operation - moved from operations handler"""
@@ -1456,6 +1436,7 @@ class JobsHandler(BaseHandler):
                 'output': result.get('output', '')
             }
 
+    @handle_page_errors("Schedule job")
     async def schedule_job_htmx(self, request) -> JSONResponse:
         """Schedule job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
@@ -1474,6 +1455,7 @@ class JobsHandler(BaseHandler):
         # Call direct business logic (moved from operations handler)
         return self.schedule_job_direct(form_data)
 
+    @handle_page_errors("Run backup")
     async def run_backup_htmx(self, request) -> JSONResponse:
         """Run backup job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
@@ -1485,6 +1467,7 @@ class JobsHandler(BaseHandler):
         # Call direct business logic (moved from operations handler)
         return self.run_backup_job_direct(job_name, False)
 
+    @handle_page_errors("Dry run backup")
     async def dry_run_backup_htmx(self, request) -> JSONResponse:
         """Dry run backup job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
@@ -1500,12 +1483,14 @@ class JobsHandler(BaseHandler):
     # DIRECT ORCHESTRATION METHODS (moved from operations handler)
     # =============================================================================
     
+    @handle_page_errors("Run backup direct")
     def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration - moved from operations handler"""
         from fastapi.responses import JSONResponse
         result = self.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
+    @handle_page_errors("Schedule job direct")
     def schedule_job_direct(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Schedule a job for execution - using functional SchedulingService"""
         from fastapi.responses import JSONResponse
