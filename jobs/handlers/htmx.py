@@ -1,12 +1,36 @@
 """
-HTMX Utilities for Jobs Handlers
+HTMX Handlers and Utilities for Jobs Domain
 
-Standardizes repetitive form parsing patterns used across ~16 HTMX handler methods.
-Reduces code duplication and improves maintainability.
+Contains all HTMX endpoint handlers and form parsing utilities.
+Handlers are organized by functional area for easy navigation.
 """
 
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Callable
+from functools import wraps
 from fastapi import Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from services.template import TemplateService
+from config import BackupConfig
+
+
+# =============================================================================
+# DECORATORS
+# =============================================================================
+
+def handle_page_errors(operation_name: str) -> Callable:
+    """Error handling decorator for HTMX handlers"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print(f"Error in {operation_name}: {str(e)}")
+                # Return error HTML for HTMX requests
+                error_html = f'<div class="error">Error in {operation_name}: {str(e)}</div>'
+                return HTMLResponse(content=error_html, status_code=500)
+        return wrapper
+    return decorator
 
 
 class HTMXFormParser:
@@ -91,3 +115,83 @@ async def parse_htmx_form(request: Request) -> Dict[str, Any]:
 def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> str:
     """Get single form value - convenience function"""
     return HTMXFormParser.get_form_value(form_data, key, default)
+
+
+# =============================================================================
+# HTMX HANDLERS CLASS
+# =============================================================================
+
+class HTMXHandlers:
+    """HTMX endpoint handlers for jobs domain"""
+    
+    def __init__(self):
+        self.template_service = TemplateService()
+        self.backup_config = BackupConfig()
+    
+    def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
+        """Render HTML template with data"""
+        html_content = self.template_service.render_template(template_path, data)
+        return HTMLResponse(content=html_content)
+
+    # =========================================================================
+    # SOURCE PATH VALIDATION HTMX HANDLERS
+    # =========================================================================
+    
+    @handle_page_errors("Add source path")
+    async def add_source_path_htmx(self, request) -> HTMLResponse:
+        """Add a new source path entry for HTMX forms"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        from origins.schema import SOURCE_PATH_SCHEMA
+        
+        # Get path count from JavaScript via hx-vals
+        path_count = int(get_form_value(form_data, 'path_count', '0'))
+        new_path_index = path_count  # Next sequential index
+        
+        # Create new empty path data
+        path_data = {'path': '', 'includes': [], 'excludes': []}
+        source_paths = ['', '']  # Always show remove button for new paths
+        
+        # Return just the new path entry wrapped in its container
+        html_response = self.template_service.render_template('partials/source_path_entry_container.html',
+                                                           path_index=new_path_index,
+                                                           path_data=path_data,
+                                                           source_paths=source_paths,
+                                                           source_path_schema=SOURCE_PATH_SCHEMA)
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Remove source path")
+    async def remove_source_path_htmx(self, request) -> HTMLResponse:
+        """Remove a source path entry - returns empty response for HTMX DELETE"""
+        # Since we're using hx-delete and hx-swap="outerHTML", 
+        # the target element will be removed automatically.
+        # We just need to return an empty response.
+        return HTMLResponse(content="")
+    
+    # =========================================================================
+    # JOB CRUD HTMX HANDLERS  
+    # =========================================================================
+    
+    # (Methods will be added here incrementally)
+    
+    # =========================================================================
+    # RESTORE OPERATION HTMX HANDLERS
+    # =========================================================================
+    
+    # (Methods will be added here incrementally)
+    
+    # =========================================================================
+    # NOTIFICATION HTMX HANDLERS
+    # =========================================================================
+    
+    # (Methods will be added here incrementally)
+
+
+# =============================================================================
+# INSTANCE
+# =============================================================================
+
+# Singleton instance for use by routers
+htmx_handlers = HTMXHandlers()

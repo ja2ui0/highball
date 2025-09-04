@@ -774,38 +774,6 @@ class JobsHandler(BaseHandler):
         return HTMLResponse(content=html_response)
 
 
-    @handle_page_errors("Add source path")
-    async def add_source_path_htmx(self, request) -> HTMLResponse:
-        """Add a new source path entry for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
-        
-        form_data = await parse_htmx_form(request)
-        
-        from origins.schema import SOURCE_PATH_SCHEMA
-        
-        # Get path count from JavaScript via hx-vals
-        path_count = int(get_form_value(form_data, 'path_count', '0'))
-        new_path_index = path_count  # Next sequential index
-        
-        # Create new empty path data
-        path_data = {'path': '', 'includes': [], 'excludes': []}
-        source_paths = ['', '']  # Always show remove button for new paths
-        
-        # Return just the new path entry wrapped in its container
-        html_response = self.template_service.render_template('partials/source_path_entry_container.html',
-                                                           path_index=new_path_index,
-                                                           path_data=path_data,
-                                                           source_paths=source_paths,
-                                                           source_path_schema=SOURCE_PATH_SCHEMA)
-        return HTMLResponse(content=html_response)
-
-    @handle_page_errors("Remove source path")
-    async def remove_source_path_htmx(self, request) -> HTMLResponse:
-        """Remove a source path entry - returns empty response for HTMX DELETE"""
-        # Since we're using hx-delete and hx-swap="outerHTML", 
-        # the target element will be removed automatically.
-        # We just need to return an empty response.
-        return HTMLResponse(content="")
 
     @handle_page_errors("Check restore overwrites")
     async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
