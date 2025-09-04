@@ -18,6 +18,25 @@ from services.ssh import SSHCommandFactory
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# VALIDATION ERROR HANDLING DECORATOR
+# =============================================================================
+
+def handle_validation_errors(operation_name: str):
+    """Decorator to handle validation operation errors consistently"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"{operation_name} validation error: {e}")
+                return {
+                    'valid': False,
+                    'error': f'{operation_name} validation failed: {str(e)}'
+                }
+        return wrapper
+    return decorator
+
+# =============================================================================
 # DATA CLASSES - Shared validation structures
 # =============================================================================
 
@@ -452,6 +471,7 @@ class ResticValidator:
 
 class SourcePathValidator:
     """Validates source paths for backup operations"""
+    # TODO: CONSOLIDATE with validate_source_path_for_backup_* methods below and eliminate duplication
     
     def validate_local_path(self, path: str) -> Dict[str, Any]:
         """Validate local filesystem path"""
@@ -736,6 +756,54 @@ class ValidationService:
         """Validate complete backup job configuration"""
         result = self.job.validate_backup_job(job_config)
         return result.to_dict()
+    
+    @handle_validation_errors("SSH path")
+    def validate_source_path_for_backup_ssh(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
+        """Check SSH path permissions with robust RX/RWX analysis for backup capability"""
+        if not hostname or not username:
+            return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
+        
+        from services.exec import ExecutionService
+        executor = ExecutionService()
+        
+        # Test RX permissions (required for backup) + write test in one command
+        test_cmd = f'[ -d "{path}" ] && [ -r "{path}" ] && [ -x "{path}" ] && echo "RX_OK" && ([ -w "{path}" ] && echo "W_OK" || echo "W_FAIL") || echo "RX_FAIL"'
+        result = executor.execute_ssh_command(hostname, username, ['bash', '-c', test_cmd])
+        
+        if result.returncode != 0:
+            return {'valid': False, 'error': f'SSH connection failed: {result.stderr}'}
+        
+        output = result.stdout.strip()
+        
+        if 'RX_OK' not in output:
+            return {'valid': False, 'error': f'Path not accessible (missing read/execute permissions or does not exist)'}
+        
+        has_write = 'W_OK' in output
+        if has_write:
+            return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+        else:
+            return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
+    
+    @handle_validation_errors("Local path")
+    def validate_source_path_for_backup_local(self, path: str) -> Dict[str, Any]:
+        """Check local path permissions with robust RX/RWX analysis for backup capability"""
+        import os
+        
+        if not os.path.exists(path):
+            return {'valid': False, 'error': 'Path does not exist'}
+        
+        if not os.path.isdir(path):
+            return {'valid': False, 'error': 'Path is not a directory'}
+        
+        # Check RX permissions
+        if not (os.access(path, os.R_OK) and os.access(path, os.X_OK)):
+            return {'valid': False, 'error': 'Missing read/execute permissions'}
+        
+        has_write = os.access(path, os.W_OK)
+        if has_write:
+            return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
+        else:
+            return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
 
 # Export the unified service as the main interface
 validation_service = ValidationService()

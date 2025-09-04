@@ -147,7 +147,9 @@ class JobsHandler(BaseHandler):
         
         # Initialize service orchestrators (moved from operations handler)
         from jobs.services.backup import BackupOrchestrationService
+        from jobs.services.validate import ValidationService
         self.backup_orchestration = BackupOrchestrationService(self.backup_config)
+        self.validation_service = ValidationService(self.backup_config)
     
     # =========================================================================
     # VALIDATION RENDERING (moved from services/template.py)
@@ -771,9 +773,9 @@ class JobsHandler(BaseHandler):
             
             # Validate based on source type (robust handling from working version)
             if source_type == 'ssh':
-                result = self._check_ssh_path(hostname, username, path)
+                result = self.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
             elif source_type == 'local':
-                result = self._check_local_path(path)
+                result = self.validation_service.validate_source_path_for_backup_local(path)
             else:
                 result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
             
@@ -785,59 +787,6 @@ class JobsHandler(BaseHandler):
             html_response = self.render_source_path_validation_status(result)
             return HTMLResponse(content=html_response)
 
-    def _check_ssh_path(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
-        """Check SSH path permissions with robust RX/RWX analysis (from working version)"""
-        if not hostname or not username:
-            return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
-        
-        try:
-            from services.exec import ExecutionService
-            executor = ExecutionService()
-            
-            # Test RX permissions (required for backup) + write test in one command
-            test_cmd = f'[ -d "{path}" ] && [ -r "{path}" ] && [ -x "{path}" ] && echo "RX_OK" && ([ -w "{path}" ] && echo "W_OK" || echo "W_FAIL") || echo "RX_FAIL"'
-            result = executor.execute_ssh_command(hostname, username, ['bash', '-c', test_cmd])
-            
-            if result.returncode != 0:
-                return {'valid': False, 'error': f'SSH connection failed: {result.stderr}'}
-            
-            output = result.stdout.strip()
-            
-            if 'RX_OK' not in output:
-                return {'valid': False, 'error': f'Path not accessible (missing read/execute permissions or does not exist)'}
-            
-            has_write = 'W_OK' in output
-            if has_write:
-                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
-            else:
-                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
-            
-        except Exception as e:
-            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
-    
-    def _check_local_path(self, path: str) -> Dict[str, Any]:
-        """Check local path permissions with robust RX/RWX analysis (from working version)"""
-        try:
-            import os
-            
-            if not os.path.exists(path):
-                return {'valid': False, 'error': 'Path does not exist'}
-            
-            if not os.path.isdir(path):
-                return {'valid': False, 'error': 'Path is not a directory'}
-            
-            # Check RX permissions
-            if not (os.access(path, os.R_OK) and os.access(path, os.X_OK)):
-                return {'valid': False, 'error': 'Missing read/execute permissions'}
-            
-            has_write = os.access(path, os.W_OK)
-            if has_write:
-                return {'valid': True, 'message': 'Path is RWX (backup + restore capable)'}
-            else:
-                return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
-            
-        except Exception as e:
-            return {'valid': False, 'error': f'Permission check failed: {str(e)}'}
 
     async def add_source_path_htmx(self, request) -> HTMLResponse:
         """Add a new source path entry for HTMX forms"""
