@@ -188,7 +188,7 @@ async def process_restore_request(request: Request):
 
 @app.post("/jobs/check-restore-overwrites")
 async def check_restore_overwrites(request: Request):
-    return await jobs_handler.check_restore_overwrites_htmx(request)
+    return await htmx_handlers.check_restore_overwrites_htmx(request)
 
 # =============================================================================
 # REPOSITORY OPERATIONS
