@@ -338,7 +338,7 @@ async def preview_ssh_config_endpoint(request: Request):
 # Jobs HTMX endpoints
 @app.post("/jobs/validate-source-path")
 async def validate_source_path_endpoint(request: Request):
-    return await jobs_handler.validate_source_path_htmx(request)
+    return await htmx_handlers.validate_source_path_htmx(request)
 
 @app.post("/jobs/add-source-path")
 async def add_source_path_endpoint(request: Request):
@@ -350,15 +350,15 @@ async def remove_source_path_endpoint(request: Request):
 
 @app.post("/jobs/notification-providers")
 async def notification_providers_endpoint(request: Request):
-    return await jobs_handler.render_notification_providers_htmx(request)
+    return await htmx_handlers.render_notification_providers_htmx(request)
 
 @app.post("/jobs/add-notification-provider")
 async def add_notification_provider_endpoint(request: Request):
-    return await jobs_handler.add_notification_provider_htmx(request)
+    return await htmx_handlers.add_notification_provider_htmx(request)
 
 @app.post("/jobs/remove-notification-provider")
 async def remove_notification_provider_endpoint(request: Request):
-    return await jobs_handler.remove_notification_provider_htmx(request)
+    return await htmx_handlers.remove_notification_provider_htmx(request)
 
 @app.post("/jobs/toggle-success-message")
 async def toggle_success_message_endpoint(request: Request):

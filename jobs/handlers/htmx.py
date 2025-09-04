@@ -137,6 +137,41 @@ class HTMXHandlers:
     # SOURCE PATH VALIDATION HTMX HANDLERS
     # =========================================================================
     
+    @handle_page_errors("Validate source path")
+    async def validate_source_path_htmx(self, request) -> HTMLResponse:
+        """Validate source path with robust permission checking for HTMX forms"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Extract path from array format
+        path_array = form_data.get('source_path[]', [])
+        path_index = int(get_form_value(form_data, 'path_index', '0'))
+        path = path_array[path_index] if path_index < len(path_array) else ''
+        
+        if not path or not path.strip():
+            result = {'valid': False, 'error': 'Please enter a path'}
+            from jobs.handlers.pages import jobs_handler
+            html_response = jobs_handler.render_source_path_validation_status(result)
+            return HTMLResponse(content=html_response)
+        
+        # Extract source configuration
+        source_type = get_form_value(form_data, 'source_type')
+        hostname = get_form_value(form_data, 'hostname')
+        username = get_form_value(form_data, 'username')
+        
+        # Validate based on source type (robust handling from working version)
+        from jobs.handlers.pages import jobs_handler
+        if source_type == 'ssh':
+            result = jobs_handler.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
+        elif source_type == 'local':
+            result = jobs_handler.validation_service.validate_source_path_for_backup_local(path)
+        else:
+            result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
+        
+        html_response = jobs_handler.render_source_path_validation_status(result)
+        return HTMLResponse(content=html_response)
+
     @handle_page_errors("Add source path")
     async def add_source_path_htmx(self, request) -> HTMLResponse:
         """Add a new source path entry for HTMX forms"""
@@ -408,6 +443,113 @@ class HTMXHandlers:
         html_response = self.template_service.render_template('partials/notification_failure_message.html',
                                                             enabled=enabled,
                                                             failure_message=failure_message)
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Render notification providers")
+    async def render_notification_providers_htmx(self, request) -> HTMLResponse:
+        """Render notification providers section for job configuration HTMX forms"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        # Delegate to jobs_handler helper methods
+        from jobs.handlers.pages import jobs_handler
+        
+        # Get available providers from global config
+        available_providers = jobs_handler._get_enabled_global_providers()
+        existing_notifications = []  # Parse from form if editing
+        
+        # Build provider configurations
+        provider_html = ""
+        for i, provider in enumerate(existing_notifications):
+            provider_html += jobs_handler._render_notification_provider(provider, i)
+        
+        # Build provider selection dropdown
+        jobs_handler.configured_providers = []  # Initialize for rendering
+        selection_html = jobs_handler._render_provider_selection(available_providers)
+        
+        html_response = self.template_service.render_template('partials/notification_providers_section.html',
+                                                            provider_html=provider_html,
+                                                            selection_html=selection_html)
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Add notification provider")
+    async def add_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Add a new notification provider to job configuration for HTMX forms"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        provider_name = get_form_value(form_data, 'provider')
+        if not provider_name:
+            html_response = self.template_service.render_template('partials/error_message.html',
+                                                               message="Invalid provider selection")
+            return HTMLResponse(content=html_response)
+        
+        # Delegate to jobs_handler for complex provider operations
+        from jobs.handlers.pages import jobs_handler
+        
+        # Generate unique ID
+        import time
+        timestamp = int(time.time() * 1000)
+        provider_id = f"notification_{provider_name}_{timestamp}"
+        
+        new_provider_html = jobs_handler._render_notification_provider({
+            'provider': provider_name,
+            'notify_on_success': False,
+            'notify_on_failure': True,  # Default to True for failures
+            'notify_on_maintenance_failure': False,
+            'success_message': '',
+            'failure_message': ''
+        }, timestamp, provider_id)
+        
+        # Get currently configured providers from form data
+        current_providers = jobs_handler._get_form_providers(form_data)
+        current_providers.append(provider_name)
+        
+        # Update dropdown with remaining providers
+        available_providers = jobs_handler._get_enabled_global_providers()
+        jobs_handler.configured_providers = current_providers  # Update state
+        updated_selection = jobs_handler._render_provider_selection(available_providers)
+        
+        html_response = self.template_service.render_template('partials/notification_provider_added_response.html',
+                                                            new_provider_html=new_provider_html,
+                                                            updated_selection_html=updated_selection)
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Remove notification provider")
+    async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
+        """Remove a notification provider from job configuration for HTMX forms"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+        
+        provider_id = get_form_value(form_data, 'provider_id')
+        
+        # Delegate to jobs_handler for provider operations
+        from jobs.handlers.pages import jobs_handler
+        
+        # Extract provider name from ID (format: notification_{provider}_{timestamp})
+        provider_name = None
+        if provider_id and '_' in provider_id:
+            parts = provider_id.split('_')
+            if len(parts) >= 2:
+                provider_name = parts[1]
+        
+        # Get current providers from form and remove this one
+        current_providers = jobs_handler._get_form_providers(form_data)
+        if provider_name and provider_name in current_providers:
+            current_providers.remove(provider_name)
+        
+        # Update state and render dropdown
+        jobs_handler.configured_providers = current_providers
+        available_providers = jobs_handler._get_enabled_global_providers()
+        updated_selection = jobs_handler._render_provider_selection(available_providers)
+        
+        # Return response that removes provider config and updates dropdown
+        html_response = self.template_service.render_template('partials/notification_provider_removed_response.html',
+                                                            provider_id=provider_id,
+                                                            updated_selection_html=updated_selection)
         return HTMLResponse(content=html_response)
 
 
