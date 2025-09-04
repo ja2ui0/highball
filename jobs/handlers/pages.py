@@ -743,21 +743,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Validate source path")
     async def validate_source_path_htmx(self, request) -> HTMLResponse:
         """Validate source path with robust permission checking for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         # Extract path from array format
         path_array = form_data.get('source_path[]', [])
@@ -789,21 +777,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Add source path")
     async def add_source_path_htmx(self, request) -> HTMLResponse:
         """Add a new source path entry for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         from origins.schema import SOURCE_PATH_SCHEMA
         
@@ -834,21 +810,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Check restore overwrites")
     async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
         """Check restore overwrites for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         # HTTP concern: extract parameters
         job_name = get_form_value(form_data, 'job_name')
@@ -881,16 +845,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Render notification providers")
     async def render_notification_providers_htmx(self, request) -> HTMLResponse:
         """Render notification providers section for job configuration HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
         
         # Get available providers from global config
         available_providers = self._get_enabled_global_providers()
@@ -962,21 +919,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Add notification provider")
     async def add_notification_provider_htmx(self, request) -> HTMLResponse:
         """Add a new notification provider to job configuration for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         provider_name = get_form_value(form_data, 'provider')
         if not provider_name:
@@ -1023,21 +968,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Remove notification provider")
     async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
         """Remove a notification provider from job configuration for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         provider_id = get_form_value(form_data, 'provider_id')
         
@@ -1067,21 +1000,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Toggle success message")
     async def toggle_success_message_htmx(self, request) -> HTMLResponse:
         """Toggle success message field visibility for job notification configuration"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         # Check if checkbox is checked
         enabled = 'notify_on_success[]' in form_data
@@ -1095,21 +1016,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Toggle failure message")
     async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
         """Toggle failure message field visibility for job notification configuration"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value, get_form_value
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        form_data = await parse_htmx_form(request)
         
         # Check if checkbox is checked
         enabled = 'notify_on_failure[]' in form_data
@@ -1124,30 +1033,19 @@ class JobsHandler(BaseHandler):
     # RESTORE OPERATIONS - Extracted from mega-dispatcher
     # =============================================================================
 
-    def _get_form_value(self, form_data: Dict[str, Any], key: str, default: str = '') -> str:
-        """HTTP concern: extract single value from form data"""
-        value_list = form_data.get(key, [default])
-        return value_list[0] if value_list else default
 
     @handle_page_errors("Handle restore target change")
     async def handle_restore_target_change_htmx(self, request) -> HTMLResponse:
         """Handle restore target change and check overwrites - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
 
         # Business logic (preserve original implementation)
         # HTTP concern: extract parameters
-        job_name = self._get_form_value(form_data, 'job_name')
-        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
+        job_name = get_form_value(form_data, 'job_name')
+        restore_target = get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = get_form_value(form_data, 'dry_run') == 'on'
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
@@ -1180,22 +1078,15 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Handle restore dry run change")
     async def handle_restore_dry_run_change_htmx(self, request) -> HTMLResponse:
         """Handle dry run toggle and update warning - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
 
         # Business logic (preserve original implementation)
         # HTTP concern: extract parameters  
-        job_name = self._get_form_value(form_data, 'job_name')
-        restore_target = self._get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = self._get_form_value(form_data, 'dry_run') == 'on'
+        job_name = get_form_value(form_data, 'job_name')
+        restore_target = get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = get_form_value(form_data, 'dry_run') == 'on'
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
@@ -1268,16 +1159,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Save backup job")
     async def save_backup_job_htmx(self, request) -> JSONResponse:
         """Save backup job with form parsing - pure switchboard compliance"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
         
         # Call existing business logic
         return self.save_backup_job(form_data)
@@ -1285,16 +1169,9 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Validate source paths")
     async def validate_source_paths_htmx(self, request) -> JSONResponse:
         """Validate source paths with form parsing - pure switchboard compliance"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
         
         # Call existing business logic
         return self.validate_source_paths(form_data)
@@ -1304,16 +1181,9 @@ class JobsHandler(BaseHandler):
         """Process restore request with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
         
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
         
         # Call existing business logic (moved from operations handler)
         return self.process_restore_request(form_data)
@@ -1383,16 +1253,9 @@ class JobsHandler(BaseHandler):
         """Schedule job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
         
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
         
         # Call direct business logic (moved from operations handler)
         return self.schedule_job_direct(form_data)
@@ -1402,7 +1265,6 @@ class JobsHandler(BaseHandler):
         """Run backup job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
         
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
         form = await request.form()
         job_name = form.get('job_name', '')
         
@@ -1414,7 +1276,6 @@ class JobsHandler(BaseHandler):
         """Dry run backup job with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
         
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
         form = await request.form()
         job_name = form.get('job_name', '')
         
