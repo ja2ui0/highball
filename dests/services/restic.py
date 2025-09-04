@@ -670,7 +670,7 @@ class ResticRepositoryService:
         
         # Build basic repository URI from form data (simplified version)
         try:
-            from models.forms import DestinationParser
+            from dests.handlers.pages import DestinationParser
             uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
             
             if not uri_result.get('valid'):
@@ -1148,7 +1148,8 @@ class ResticAPIService:
         """Initialize Restic repository from form data"""
         from fastapi.responses import JSONResponse
         
-        from models.forms import destination_parser
+        from dests.handlers.pages import DestinationParser
+        destination_parser = DestinationParser()
         restic_result = destination_parser.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
