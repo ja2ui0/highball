@@ -222,7 +222,87 @@ class HTMXHandlers:
     # RESTORE OPERATION HTMX HANDLERS
     # =========================================================================
     
-    # (Methods will be added here incrementally)
+    @handle_page_errors("Handle restore target change")
+    async def handle_restore_target_change_htmx(self, request) -> HTMLResponse:
+        """Handle restore target change and check overwrites - HTMX handler"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+
+        # Business logic (preserve original implementation)
+        # HTTP concern: extract parameters
+        job_name = get_form_value(form_data, 'job_name')
+        restore_target = get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = get_form_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+        
+        # Business logic concern: check for overwrites using restore service
+        from jobs.services.restore import RestoreService
+        restore_service = RestoreService()
+        
+        # Get job config for source details
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+        
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+        
+        # Template concern: use template service to render partial
+        template_vars = {
+            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
+            'RESTORE_TARGET': restore_target,
+            'DRY_RUN': 'true' if dry_run else 'false',
+            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        }
+        
+        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+
+    @handle_page_errors("Handle restore dry run change")
+    async def handle_restore_dry_run_change_htmx(self, request) -> HTMLResponse:
+        """Handle dry run toggle and update warning - HTMX handler"""
+        from jobs.handlers.htmx import parse_htmx_form, get_form_value
+        
+        form_data = await parse_htmx_form(request)
+
+        # Business logic (preserve original implementation)
+        # HTTP concern: extract parameters  
+        job_name = get_form_value(form_data, 'job_name')
+        restore_target = get_form_value(form_data, 'restore_target', 'highball')
+        dry_run = get_form_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+        
+        # Business logic concern: check for overwrites using restore service
+        from jobs.services.restore import RestoreService
+        restore_service = RestoreService()
+        
+        # Get job config for source details  
+        jobs = self.backup_config.config.get('backup_jobs', {})
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+        
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+        
+        # Template concern: use template service to render partial
+        template_vars = {
+            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
+            'RESTORE_TARGET': restore_target,
+            'DRY_RUN': 'true' if dry_run else 'false',
+            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        }
+        
+        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
+
+        # Return HTMLResponse wrapper  
+        return HTMLResponse(content=html_response)
     
     # =========================================================================
     # JOB EXECUTION HTMX HANDLERS

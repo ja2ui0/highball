@@ -370,11 +370,11 @@ async def toggle_failure_message_endpoint(request: Request):
 
 @app.post("/jobs/restore-target-change")
 async def handle_restore_target_change(request: Request):
-    return await jobs_handler.handle_restore_target_change_htmx(request)
+    return await htmx_handlers.handle_restore_target_change_htmx(request)
 
 @app.post("/jobs/restore-dry-run-change")
 async def handle_restore_dry_run_change(request: Request):
-    return await jobs_handler.handle_restore_dry_run_change_htmx(request)
+    return await htmx_handlers.handle_restore_dry_run_change_htmx(request)
 
 # Destinations HTMX endpoints
 @app.post("/destinations/dest-fields")
