@@ -384,19 +384,19 @@ async def render_dest_fields_endpoint(request: Request):
 
 @app.post("/destinations/restic-fields")
 async def render_restic_fields_endpoint(request: Request):
-    return await destinations_handler.render_restic_fields_htmx(request)
+    return await destinations_htmx.render_restic_fields_htmx(request)
 
 @app.post("/destinations/validate-ssh-dest")
 async def validate_ssh_dest_endpoint(request: Request):
-    return await destinations_handler.validate_ssh_dest_htmx(request)
+    return await destinations_htmx.validate_ssh_dest_htmx(request)
 
 @app.post("/destinations/validate-restic")
 async def validate_restic_endpoint(request: Request):
-    return await destinations_handler.validate_restic_htmx(request)
+    return await destinations_htmx.validate_restic_htmx(request)
 
 @app.post("/destinations/validate-origin-repo-path")
 async def validate_origin_repo_path_endpoint(request: Request):
-    return await destinations_handler.validate_origin_repo_path_htmx(request)
+    return await destinations_htmx.validate_origin_repo_path_htmx(request)
 
 @app.post("/dests/init-restic-repository")
 async def init_restic_repository(request: Request):
