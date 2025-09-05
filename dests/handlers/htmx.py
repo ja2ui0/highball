@@ -521,6 +521,77 @@ class HTMXHandlers:
                 'error_message': result.get('error', 'Unlock failed')
             })
 
+    # =========================================================================
+    # **UTILITIES** - Batch 5
+    # =========================================================================
+    
+    @handle_page_errors("Generate restic URI preview")
+    async def generate_restic_uri_preview_htmx(self, request) -> HTMLResponse:
+        """Generate real-time URI preview for repository configuration - HTMX handler"""
+        # Parse form data using FastAPI (moved FROM app.py TO handler)
+        form = await request.form()
+        form_data = {}
+        for key, value in form.items():
+            if key in form_data:
+                if not isinstance(form_data[key], list):
+                    form_data[key] = [form_data[key]]
+                form_data[key].append(value)
+            else:
+                form_data[key] = [value]
+
+        # Business logic (preserve original implementation)
+        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+        repo_type = self.destinations_handler._get_form_value(form_data, 'restic_repo_type') or self.destinations_handler._get_form_value(form_data, 'repo_type')
+        
+        if not repo_type:
+            html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html',
+                                                               uri='Select repository type to see URI preview')
+        else:
+            # Use existing URI builder from forms module
+            # DestinationParser is now local to this module
+            from dests.handlers.pages import DestinationParser
+            uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+            
+            if uri_result.get('valid'):
+                # Mask password in display
+                uri = uri_result['uri']
+                if ':' in uri and '@' in uri:
+                    # Replace password with *** for display
+                    parts = uri.split('@')
+                    if len(parts) == 2:
+                        auth_part = parts[0]
+                        if ':' in auth_part:
+                            scheme_and_user = auth_part.rsplit(':', 1)[0]
+                            uri = f"{scheme_and_user}:***@{parts[1]}"
+                
+                html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html', uri=uri)
+            else:
+                html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html',
+                                                                   uri=uri_result.get('error', 'Invalid configuration'))
+
+        # Return HTMLResponse wrapper
+        return HTMLResponse(content=html_response)
+    
+    @handle_page_errors("Repository check")
+    def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository availability check"""
+        
+        if not job_name:
+            return self.destinations_handler._render_html('partials/error_message.html', {
+                'error_message': 'Job name is required'
+            })
+        
+        # Get and validate job configuration
+        jobs = self.destinations_handler.backup_config.get_backup_jobs()
+        if job_name not in jobs:
+            return self.destinations_handler._render_html('partials/error_message.html', {
+                'error_message': f"Job '{job_name}' not found"
+            })
+        
+        job_config = jobs[job_name]
+        # Perform repository availability check and return response
+        return self.destinations_handler._check_and_respond_repository_status_html(job_name, job_config)
+
 
 # Export handler instance
 destinations_htmx = HTMXHandlers()

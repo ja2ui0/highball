@@ -420,7 +420,7 @@ async def render_restic_repo_fields(request: Request):
 
 @app.post("/dests/restic-uri-preview")
 async def generate_restic_uri_preview(request: Request):
-    return await destinations_handler.generate_restic_uri_preview_htmx(request)
+    return await destinations_htmx.generate_restic_uri_preview_htmx(request)
 
 # =============================================================================
 # CORS & STATIC FILES
