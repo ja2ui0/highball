@@ -363,6 +363,10 @@ class DestinationsHandler(BaseHandler):
     def __init__(self):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        
+        # Import and create destination operations service
+        from dests.services.manage import create_destination_operations_service
+        self.dest_operations = create_destination_operations_service(self.backup_config)
     
     # =========================================================================
     # DESTINATION VALIDATION RENDERING (moved from services/template.py)
@@ -433,7 +437,7 @@ class DestinationsHandler(BaseHandler):
     @handle_page_errors("Show destinations")
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
-        destinations = self.backup_config.get_destinations()
+        destinations = self.dest_operations.get_destinations()
         global_settings = self.backup_config.get_global_settings()
         
         # Build destination display list
@@ -683,22 +687,17 @@ class DestinationsHandler(BaseHandler):
     def delete_destination(self, dest_name: str) -> JSONResponse:
         """Delete destination"""
         
-        if not dest_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination name is required'
-            }, status_code=400)
+        # Delegate to service
+        result = self.dest_operations.delete_destination(dest_name)
         
-        # Delete destination
-        success = self.backup_config.delete_destination(dest_name)
-        
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
         else:
+            status_code = 400 if 'required' in result.get('error', '') else 500
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to delete destination '{dest_name}'"
-            }, status_code=500)
+                'error': result['error']
+            }, status_code=status_code)
 
     async def add_destination_htmx(self, request) -> JSONResponse:
         """Add destination with form parsing - pure switchboard compliance"""
@@ -732,8 +731,7 @@ class DestinationsHandler(BaseHandler):
             }, status_code=400)
         
         # Check if destination already exists
-        existing_destinations = self.backup_config.get_destinations()
-        if dest_name in existing_destinations:
+        if self.dest_operations.destination_exists(dest_name):
             return JSONResponse(content={
                 'success': False,
                 'error': f'Destination "{dest_name}" already exists'
@@ -812,15 +810,15 @@ class DestinationsHandler(BaseHandler):
         dest_config['uri'] = self._build_destination_uri(flat_data)
         
         # Save destination
-        success = self.backup_config.save_destination(dest_name, dest_config)
+        result = self.dest_operations.save_destination(dest_name, dest_config)
         
-        if success:
+        if result['success']:
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url='/dests', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to save destination '{dest_name}'"
+                'error': result['error']
             }, status_code=500)
 
     def _get_default_port(self, dest_type: str) -> int:
@@ -889,7 +887,7 @@ class DestinationsHandler(BaseHandler):
             }, status_code=400)
         
         # Get existing destination config to preserve type-specific settings
-        existing_dest = self.backup_config.get_destination(dest_name)
+        existing_dest = self.dest_operations.get_destination(dest_name)
         if not existing_dest:
             return JSONResponse(content={
                 'success': False,
@@ -909,14 +907,14 @@ class DestinationsHandler(BaseHandler):
         updated_config['uri'] = self._build_destination_uri(flat_data)
         
         # Save updated destination
-        success = self.backup_config.save_destination(dest_name, updated_config)
+        result = self.dest_operations.save_destination(dest_name, updated_config)
         
-        if success:
+        if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to update destination '{dest_name}'"
+                'error': result['error']
             }, status_code=500)
 
     @handle_page_errors("Validate destination")
