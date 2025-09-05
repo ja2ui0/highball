@@ -408,7 +408,7 @@ class DestinationsHandler(BaseHandler):
     def _render_validation_status_template(self, result: Dict[str, Any], details: list) -> str:
         """Helper method to render validation status template with consistent logic"""
         # Determine status class and label
-        if result.get('valid', False):
+        if result.get('success', False):
             status_class = 'success'
             status_label = '[OK]'
         else:
@@ -421,10 +421,10 @@ class DestinationsHandler(BaseHandler):
             message = None
         else:
             # Use appropriate message based on validation result
-            if result.get('valid', False):
+            if result.get('success', False):
                 message = result.get('message', 'Validation successful')
             else:
-                message = result.get('error', 'Validation failed')
+                message = result.get('error', result.get('message', 'Validation failed'))
             details = None
         
         # Use template service to render the result
@@ -1132,10 +1132,10 @@ class DestinationsHandler(BaseHandler):
         username = get_form_value(form_data, 'dest_username')
         path = get_form_value(form_data, 'dest_path')
         
-        # Business logic: delegate to validation service
-        from jobs.services.validate import ValidationService
-        validation_service = ValidationService(self.backup_config)
-        result = validation_service.ssh.validate_ssh_destination(hostname, username, path)
+        # Business logic: delegate to proper destination validation service
+        from dests.services.rsync import rsync_service
+        form_data = {'hostname': hostname, 'username': username, 'path': path}
+        result = rsync_service.validate_rsync_destination(form_data)
         
         # View: delegate to local validation method (moved from template service)
         html_response = self.render_ssh_dest_validation_status(result)
@@ -1178,7 +1178,7 @@ class DestinationsHandler(BaseHandler):
             if field in field_values and not field_values[field]:
                 display_name = schema.get('display_name', 'Restic')
                 html_response = self.render_restic_validation_status({
-                    'valid': False, 'error': f'{display_name} destination missing {field}'
+                    'success': False, 'error': f'{display_name} destination missing {field}'
                 })
                 return HTMLResponse(content=html_response)
         
@@ -1188,16 +1188,16 @@ class DestinationsHandler(BaseHandler):
         
         if not uri_result.get('valid'):
             html_response = self.render_restic_validation_status({
-                'valid': False, 'error': uri_result.get('error', 'Invalid repository configuration')
+                'success': False, 'error': uri_result.get('error', 'Invalid repository configuration')
             })
             return HTMLResponse(content=html_response)
         
         repo_uri = uri_result['uri']
         
-        # Business logic: delegate to validation service
-        from jobs.services.validate import ValidationService
-        validation_service = ValidationService(self.backup_config)
-        result = validation_service.validate_restic_config(repo_type, repo_uri, password)
+        # Business logic: delegate to proper destination validation service
+        from dests.services.restic import restic_service
+        form_data = {'repo_type': repo_type, 'repo_uri': repo_uri, 'restic_password': password}
+        result = restic_service.validate_restic_destination(form_data)
         
         # View: delegate to local validation method (moved from template service)
         html_response = self.render_restic_validation_status(result)
@@ -1225,7 +1225,7 @@ class DestinationsHandler(BaseHandler):
             # Extract repository path
             repo_path = get_form_value(form_data, 'origin_repo_path')
             if not repo_path or not repo_path.strip():
-                result = {'valid': False, 'error': 'Please enter a repository path'}
+                result = {'success': False, 'error': 'Please enter a repository path'}
                 html_response = self.render_origin_repo_path_validation_status(result)
                 return HTMLResponse(content=html_response)
             
@@ -1234,21 +1234,21 @@ class DestinationsHandler(BaseHandler):
             username = get_form_value(form_data, 'username')
             
             if not hostname or not username:
-                result = {'valid': False, 'error': 'SSH configuration required for same-as-origin repositories'}
+                result = {'success': False, 'error': 'SSH configuration required for same-as-origin repositories'}
                 html_response = self.render_origin_repo_path_validation_status(result)
                 return HTMLResponse(content=html_response)
             
-            # Business logic: delegate to validation service
-            from jobs.services.validate import ValidationService
-            validation_service = ValidationService(self.backup_config)
-            result = validation_service.ssh.validate_ssh_repo_path_with_creation(hostname, username, repo_path)
+            # Business logic: delegate to proper destination validation service
+            from dests.services.rsync import rsync_service
+            form_data = {'hostname': hostname, 'username': username, 'path': repo_path}
+            result = rsync_service.validate_rsync_destination(form_data)
             
             # View: delegate to local validation method (moved from template service)
             html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
             
         except Exception as e:
-            result = {'valid': False, 'error': f'Validation failed: {str(e)}'}
+            result = {'success': False, 'error': f'Validation failed: {str(e)}'}
             html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
 
