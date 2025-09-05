@@ -367,6 +367,10 @@ class DestinationsHandler(BaseHandler):
         # Import and create destination operations service
         from dests.services.manage import create_destination_operations_service
         self.dest_operations = create_destination_operations_service(self.backup_config)
+        
+        # Import network discovery service
+        from dests.services.rsync import network_discovery_service
+        self.network_discovery = network_discovery_service
     
     # =========================================================================
     # DESTINATION VALIDATION RENDERING (moved from services/template.py)
@@ -1004,73 +1008,23 @@ class DestinationsHandler(BaseHandler):
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, network_range: str) -> JSONResponse:
         """Scan network for rsyncd services"""
-        # TODO: Move core nmap scanning logic to dests/services/rsyncd.py for proper SoC
-        import subprocess
         
-        try:
-            # Use nmap to scan for rsyncd (port 873)
-            cmd = ['nmap', '-p', '873', '--open', network_range]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            servers = []
-            total_checked = 0
-            if result.returncode == 0:
-                lines = result.stdout.split('\n')
-                current_host = None
-                
-                for line in lines:
-                    line = line.strip()
-                    if 'Nmap scan report for' in line:
-                        current_host = line.split('for ')[-1]
-                        total_checked += 1
-                    elif '873/tcp open' in line and current_host:
-                        # For each found server, try to get module list
-                        modules = self._get_rsync_modules(current_host)
-                        servers.append({
-                            'ip': current_host,
-                            'modules': modules
-                        })
-            
+        # Delegate to service
+        result = self.network_discovery.scan_network_for_rsyncd(network_range)
+        
+        if result['success']:
             return JSONResponse(content={
-                'network_range': network_range,
-                'total_checked': total_checked,
-                'found_servers': len(servers),
-                'servers': servers
+                'network_range': result['network_range'],
+                'total_checked': result['total_checked'],
+                'found_servers': result['found_servers'],
+                'servers': result['servers']
             })
-            
-        except subprocess.TimeoutExpired:
+        else:
+            status_code = 408 if 'timed out' in result.get('error', '') else 500
             return JSONResponse(content={
-                'error': f'Network scan timed out for range: {network_range}'
-            }, status_code=408)
-        except Exception as e:
-            return JSONResponse(content={
-                'error': f'Scan failed: {str(e)}'
-            }, status_code=500)
+                'error': result['error']
+            }, status_code=status_code)
 
-    def _get_rsync_modules(self, host: str) -> List[Dict[str, str]]:
-        """Get available rsync modules from a host"""
-        import subprocess
-        try:
-            cmd = ['rsync', f'{host}::']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            modules = []
-            if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    line = line.strip()
-                    if line and not line.startswith('@'):
-                        # Parse module line: "module_name   Description"
-                        parts = line.split(None, 1)
-                        if parts:
-                            module = {'path': parts[0]}
-                            if len(parts) > 1:
-                                module['description'] = parts[1]
-                            modules.append(module)
-            
-            return modules
-        except:
-            # If we can't get modules, just return basic info
-            return [{'path': 'rsync', 'description': 'Rsync service available'}]
 
     async def render_dest_fields_htmx(self, request) -> HTMLResponse:
         """Render destination-specific fields based on destination type for HTMX forms"""

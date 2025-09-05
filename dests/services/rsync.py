@@ -414,5 +414,86 @@ class RsyncService:
                 error=f'Rsync validation error: {str(e)}'
             ).to_dict()
 
-# Export the service
+# =============================================================================
+# **NETWORK DISCOVERY SERVICE** - nmap scanning and rsync module detection
+# =============================================================================
+
+class NetworkDiscoveryService:
+    """Service for network discovery of rsyncd services"""
+    
+    def scan_network_for_rsyncd(self, network_range: str) -> Dict[str, Any]:
+        """Scan network for rsyncd services"""
+        import subprocess
+        
+        try:
+            # Use nmap to scan for rsyncd (port 873)
+            cmd = ['nmap', '-p', '873', '--open', network_range]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            servers = []
+            total_checked = 0
+            if result.returncode == 0:
+                lines = result.stdout.split('\n')
+                current_host = None
+                
+                for line in lines:
+                    line = line.strip()
+                    if 'Nmap scan report for' in line:
+                        current_host = line.split('for ')[-1]
+                        total_checked += 1
+                    elif '873/tcp open' in line and current_host:
+                        # For each found server, try to get module list
+                        modules = self.get_rsync_modules(current_host)
+                        servers.append({
+                            'ip': current_host,
+                            'modules': modules
+                        })
+            
+            return {
+                'success': True,
+                'network_range': network_range,
+                'total_checked': total_checked,
+                'found_servers': len(servers),
+                'servers': servers
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': f'Network scan timed out for range: {network_range}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Scan failed: {str(e)}'
+            }
+
+    def get_rsync_modules(self, host: str) -> List[Dict[str, str]]:
+        """Get available rsync modules from a host"""
+        import subprocess
+        try:
+            cmd = ['rsync', f'{host}::']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            modules = []
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('@'):
+                        # Parse module line: "module_name   Description"
+                        parts = line.split(None, 1)
+                        if parts:
+                            module = {'path': parts[0]}
+                            if len(parts) > 1:
+                                module['description'] = parts[1]
+                            modules.append(module)
+            
+            return modules
+        except:
+            # If we can't get modules, just return basic info
+            return [{'path': 'rsync', 'description': 'Rsync service available'}]
+
+
+# Export the services
 rsync_service = RsyncService()
+network_discovery_service = NetworkDiscoveryService()
