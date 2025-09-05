@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 # Domain Handlers - Pure Switchboard Pattern
 from origins.handlers.pages import origins_handler
 from dests.handlers.pages import destinations_handler
+from dests.handlers.htmx import destinations_htmx
 from jobs.handlers.pages import jobs_handler as job_pages
 from jobs.handlers.htmx import htmx_handlers as job_htmx
 from admin.handlers.pages import admin_handler
@@ -124,11 +125,11 @@ async def show_destinations():
 
 @app.post("/dests/add")
 async def add_destination(request: Request):
-    return await destinations_handler.add_destination_htmx(request)
+    return await destinations_htmx.add_destination_htmx(request)
 
 @app.post("/dests/save")
 async def save_destination(request: Request):
-    return await destinations_handler.save_destination_htmx(request)
+    return await destinations_htmx.save_destination_htmx(request)
 
 @app.post("/dests/delete")
 async def delete_destination(name: str = Query("")):
@@ -136,7 +137,7 @@ async def delete_destination(name: str = Query("")):
 
 @app.post("/dests/validate")
 async def validate_destination(request: Request):
-    return await destinations_handler.validate_destination_htmx(request)
+    return await destinations_htmx.validate_destination_htmx(request)
 
 @app.post("/htmx/destination-type-fields")
 async def destination_type_fields(request: Request):

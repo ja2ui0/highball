@@ -700,13 +700,6 @@ class DestinationsHandler(BaseHandler):
                 'error': result['error']
             }, status_code=status_code)
 
-    async def add_destination_htmx(self, request) -> JSONResponse:
-        """Add destination with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.add_destination(form_data)
 
     def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new destination"""
@@ -866,14 +859,6 @@ class DestinationsHandler(BaseHandler):
         else:
             return f"Error: {uri_result.get('error', 'URI generation failed')}"
 
-    @handle_page_errors("Save destination")
-    async def save_destination_htmx(self, request) -> JSONResponse:
-        """Save destination with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.save_destination(form_data)
 
     def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save destination changes"""
@@ -918,14 +903,6 @@ class DestinationsHandler(BaseHandler):
                 'error': result['error']
             }, status_code=500)
 
-    @handle_page_errors("Validate destination")
-    async def validate_destination_htmx(self, request) -> HTMLResponse:
-        """Validate destination with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.validate_destination(form_data)
 
     def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Validate destination configuration"""
