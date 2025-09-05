@@ -552,92 +552,8 @@ class DestinationsHandler(BaseHandler):
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
 
-    async def render_maintenance_fields_htmx(self, request) -> HTMLResponse:
-        """Render maintenance configuration fields based on selected mode - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
 
-        # Business logic (preserve original implementation)
-        maintenance_mode = self._get_form_value(form_data, 'restic_maintenance', 'auto')
-        
-        from dests.schema import MAINTENANCE_MODE_SCHEMAS
-        
-        # Extract current field values from form data or use defaults
-        field_values = {}
-        if maintenance_mode == 'user':
-            schema = MAINTENANCE_MODE_SCHEMAS.get('user', {})
-            for field in schema.get('fields', []):
-                field_values[field['name']] = self._get_form_value(form_data, field['name'], field.get('default', ''))
-        
-        html_response = self.template_service.render_template('partials/maintenance_mode_dynamic.html',
-                                                           maintenance_mode=maintenance_mode,
-                                                           maintenance_schemas=MAINTENANCE_MODE_SCHEMAS,
-                                                           field_values=field_values)
 
-        # Return HTMLResponse wrapper
-        return HTMLResponse(content=html_response)
-
-    async def render_rsyncd_fields_htmx(self, request) -> HTMLResponse:
-        """Render rsyncd-specific fields based on current state - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
-
-        # Business logic (preserve original implementation)
-        rsyncd_hostname = self._get_form_value(form_data, 'rsyncd_hostname')
-        rsyncd_share = self._get_form_value(form_data, 'rsyncd_share')
-        
-        html_response = self.template_service.render_template('partials/dest_rsyncd_fields.html',
-                                                           rsyncd_hostname=rsyncd_hostname,
-                                                           rsyncd_share=rsyncd_share)
-
-        # Return HTMLResponse wrapper
-        return HTMLResponse(content=html_response)
-
-    async def render_restic_repo_fields_htmx(self, request) -> HTMLResponse:
-        """Render Restic repository type fields using schema-driven templates - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
-
-        # Business logic (preserve original implementation)
-        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
-        repo_type = self._get_form_value(form_data, 'restic_repo_type') or self._get_form_value(form_data, 'repo_type')
-        
-        if not repo_type:
-            html_response = ''  # No fields for unselected type
-        else:
-            from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
-            
-            html_response = self.template_service.render_template('partials/restic_repo_fields_dynamic.html',
-                                                               repo_type=repo_type,
-                                                               repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
-                                                               field_values={})
-
-        # Return HTMLResponse wrapper
-        return HTMLResponse(content=html_response)
 
     async def generate_restic_uri_preview_htmx(self, request) -> HTMLResponse:
         """Generate real-time URI preview for repository configuration - HTMX handler"""
@@ -955,15 +871,6 @@ class DestinationsHandler(BaseHandler):
         
         return self._render_html('partials/destination_validation_result.html', template_context)
 
-    @handle_page_errors("Destination type fields")
-    async def destination_type_fields_htmx(self, request) -> HTMLResponse:
-        """Load destination type fields with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.destination_type_fields(form_data)
-
     def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Load destination type-specific fields (HTMX partial)"""
         dest_type = self._get_form_value(form_data, 'dest_type', '')
@@ -999,59 +906,6 @@ class DestinationsHandler(BaseHandler):
                 'error': result['error']
             }, status_code=status_code)
 
-
-    @handle_page_errors("Destination fields rendering")
-    async def render_dest_fields_htmx(self, request) -> HTMLResponse:
-        """Render destination-specific fields based on destination type for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
-        
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
-        
-        dest_type = form_data.get('dest_type', [''])[0]
-        
-        # Schema-driven destination field rendering
-        from dests.schema import DESTINATION_TYPE_SCHEMAS
-        
-        if dest_type not in DESTINATION_TYPE_SCHEMAS:
-            html_response = self.template_service.render_template('partials/info_message.html',
-                                                               message='Select a destination type to configure')
-            return HTMLResponse(content=html_response)
-        
-        # Special handling for restic (has complex sub-types)
-        if dest_type == 'restic':
-            return await self.render_restic_fields_htmx(request)
-        
-        schema = DESTINATION_TYPE_SCHEMAS[dest_type]
-        
-        # Check if this destination type has fields requiring a template
-        if schema.get('fields'):
-            template_name = f'partials/dest_{dest_type}_fields.html'
-            
-            # Extract field values using schema field definitions
-            template_values = {}
-            for field_name, field_config in schema['fields'].items():
-                # Use the form field name directly (already mapped in schema)
-                template_values[field_name] = get_form_value(form_data, field_name)
-            
-            html_response = self.template_service.render_template(template_name, **template_values)
-            return HTMLResponse(content=html_response)
-        else:
-            # No fields defined in schema
-            html_response = self.template_service.render_template('partials/info_message.html',
-                                                               message=f'{schema["display_name"]} destination - configuration needed')
-            return HTMLResponse(content=html_response)
 
     async def render_restic_fields_htmx(self, request) -> HTMLResponse:
         """Render Restic repository configuration fields for HTMX forms"""

@@ -141,7 +141,7 @@ async def validate_destination(request: Request):
 
 @app.post("/htmx/destination-type-fields")
 async def destination_type_fields(request: Request):
-    return await destinations_handler.destination_type_fields_htmx(request)
+    return await destinations_htmx.destination_type_fields_htmx(request)
 
 # =============================================================================
 # JOBS - CRUD OPERATIONS
@@ -380,7 +380,7 @@ async def handle_restore_dry_run_change(request: Request):
 # Destinations HTMX endpoints
 @app.post("/destinations/dest-fields")
 async def render_dest_fields_endpoint(request: Request):
-    return await destinations_handler.render_dest_fields_htmx(request)
+    return await destinations_htmx.render_dest_fields_htmx(request)
 
 @app.post("/destinations/restic-fields")
 async def render_restic_fields_endpoint(request: Request):
@@ -404,19 +404,19 @@ async def init_restic_repository(request: Request):
 
 @app.post("/dests/maintenance-fields")
 async def render_maintenance_fields(request: Request):
-    return await destinations_handler.render_maintenance_fields_htmx(request)
+    return await destinations_htmx.render_maintenance_fields_htmx(request)
 
 @app.post("/dests/rsyncd-fields")
 async def render_rsyncd_fields(request: Request):
-    return await destinations_handler.render_rsyncd_fields_htmx(request)
+    return await destinations_htmx.render_rsyncd_fields_htmx(request)
 
 @app.post("/dests/maintenance-toggle")
 async def render_maintenance_toggle(request: Request):
-    return await destinations_handler.render_maintenance_fields_htmx(request)
+    return await destinations_htmx.render_maintenance_fields_htmx(request)
 
 @app.post("/dests/restic-repo-fields")
 async def render_restic_repo_fields(request: Request):
-    return await destinations_handler.render_restic_repo_fields_htmx(request)
+    return await destinations_htmx.render_restic_repo_fields_htmx(request)
 
 @app.post("/dests/restic-uri-preview")
 async def generate_restic_uri_preview(request: Request):

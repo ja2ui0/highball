@@ -170,5 +170,12 @@ Claude code auto-appends after this line.
 - **Issue**: `dests/services/rsync.py` still uses manual SSH commands instead of `SSHCommandFactory`
 - **Action**: Convert rsync SSH calls to use `SSHCommandFactory` from `services/ssh.py`
 
+### Jobs Domain CRUD Pattern Retrofit (Post-Destinations)
+- **Issue**: `jobs/handlers/pages.py` still does direct config read operations, violating "handlers are for data in motion" principle
+- **Action**: After destinations domain SOC refactor is complete, retrofit jobs domain to move ALL CRUD operations (read AND write) to services
+- **Pattern**: Jobs handlers should become pure HTTP orchestration like destinations handlers
+- **Services**: Enhance `JobOperationsService` to handle all config reads, not just writes
+
 ---
 - move @handle_page_errors to shared/
+- migrate READ operations for config from handler to services (jobs domain) - write ops already there.
