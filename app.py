@@ -201,15 +201,15 @@ async def check_repository_availability(job: str = Query("")):
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
-    return destinations_handler.unlock_repository_htmx(job)
+    return destinations_htmx.unlock_repository_htmx(job)
 
 @app.post("/unlock-repository")
 async def unlock_repository_post(request: Request):
-    return await destinations_handler.unlock_repository_post_htmx(request)
+    return await destinations_htmx.unlock_repository_post_htmx(request)
 
 @app.post("/initialize-restic-repo")
 async def initialize_restic_repo(request: Request):
-    return await destinations_handler.initialize_restic_repo_htmx(request)
+    return await destinations_htmx.initialize_restic_repo_htmx(request)
 
 # =============================================================================
 # ADMIN - CONFIG MANAGEMENT
@@ -400,7 +400,7 @@ async def validate_origin_repo_path_endpoint(request: Request):
 
 @app.post("/dests/init-restic-repository")
 async def init_restic_repository(request: Request):
-    return await destinations_handler.init_restic_repository_htmx(request)
+    return await destinations_htmx.init_restic_repository_htmx(request)
 
 @app.post("/dests/maintenance-fields")
 async def render_maintenance_fields(request: Request):

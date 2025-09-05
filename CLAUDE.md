@@ -179,3 +179,10 @@ Claude code auto-appends after this line.
 ---
 - move @handle_page_errors to shared/
 - migrate READ operations for config from handler to services (jobs domain) - write ops already there.
+**Something smells funny here**
+ 1. initialize_restic_repo_htmx - Working (returns Internal Server Error as expected for invalid job)
+ 2. init_restic_repository_htmx - Working (returns proper validation error for missing repo_type)
+ 3. unlock_repository_post_htmx - Working (returns empty error message as expected for non-existent job)
+ 4. unlock_repository_htmx (GET) - Working (returns empty error message as expected for non-existent job)
+...why are there duplicate init/unlock methods and why is Internal Server Error ok?
+

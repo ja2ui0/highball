@@ -518,39 +518,6 @@ class DestinationsHandler(BaseHandler):
                                                    status_label=status_label,
                                                    message=html.escape(message))
 
-    async def init_restic_repository_htmx(self, request) -> HTMLResponse:
-        """Initialize Restic repository - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
-
-        # Business logic (preserve original implementation)
-        # Parse Restic config from unified parser
-        # DestinationParser is now local to this module
-        restic_result = DestinationParser.parse_restic_destination(form_data)
-        
-        if not restic_result['valid']:
-            html_response = self._render_validation_result("error", restic_result['error'])
-        else:
-            # Direct repository initialization
-            from services.restic_repository_service import ResticRepositoryService
-            repo_service = ResticRepositoryService()
-            result = repo_service.initialize_repository(restic_result['config'])
-            
-            if result['success']:
-                html_response = self._render_validation_result("success", "Repository initialized successfully")
-            else:
-                html_response = self._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
-
-        # Return HTMLResponse wrapper
-        return HTMLResponse(content=html_response)
 
 
 
@@ -911,84 +878,8 @@ class DestinationsHandler(BaseHandler):
 
 
 
-    @handle_page_errors("Repository initialization")
-    async def initialize_restic_repo_htmx(self, request) -> JSONResponse:
-        """Initialize Restic repository with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
-        
-        # Call existing restic API service
-        from admin.services.init import services
-        return services.restic_api.initialize_restic_repo(form_data)
 
-    @handle_page_errors("Repository unlock")
-    async def unlock_repository_post_htmx(self, request) -> HTMLResponse:
-        """HTMX endpoint for repository unlock (POST) - pure switchboard compliance"""
-        # Parse form data (though there might not be any)
-        form = await request.form()
-        
-        # Extract job name from query params for POST
-        url_parts = str(request.url).split('?')
-        if len(url_parts) > 1:
-            from urllib.parse import parse_qs
-            params = parse_qs(url_parts[1])
-            job_name = params.get('job', [''])[0]
-        else:
-            job_name = ''
-        
-        # Call existing business logic
-        return self.unlock_repository_htmx(job_name)
 
-    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository unlock - business logic calls destinations service"""
-        
-        if not job_name:
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Job name is required'
-            })
-            
-        # Get and validate job configuration
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            return self._render_html('partials/error_message.html', {
-                'error_message': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        dest_type = job_config.get('dest_type')
-        
-        if dest_type != 'restic':
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Unlock is only supported for restic repositories'
-            })
-        
-        # Execute restic unlock command via destinations service
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
-        from dests.services.restic import restic_service
-        result = restic_service.unlock_repository(dest_config, source_config)
-        
-        if result.get('success'):
-            # Unlock successful - automatically retry availability check
-            return self.check_repository_availability_htmx(job_name)
-        else:
-            # Unlock failed - show error
-            return self._render_html('partials/repository_error.html', {
-                'job_name': job_name,
-                'error_type': 'unlock_failed',
-                'error_message': result.get('error', 'Unlock failed')
-            })
 
     @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
