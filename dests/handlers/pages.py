@@ -540,17 +540,14 @@ class DestinationsHandler(BaseHandler):
             html_response = self._render_validation_result("error", restic_result['error'])
         else:
             # Direct repository initialization
-            try:
-                from services.restic_repository_service import ResticRepositoryService
-                repo_service = ResticRepositoryService()
-                result = repo_service.initialize_repository(restic_result['config'])
-                
-                if result['success']:
-                    html_response = self._render_validation_result("success", "Repository initialized successfully")
-                else:
-                    html_response = self._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
-            except Exception as e:
-                html_response = self._render_validation_result("error", f"Initialization error: {str(e)}")
+            from services.restic_repository_service import ResticRepositoryService
+            repo_service = ResticRepositoryService()
+            result = repo_service.initialize_repository(restic_result['config'])
+            
+            if result['success']:
+                html_response = self._render_validation_result("success", "Repository initialized successfully")
+            else:
+                html_response = self._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
 
         # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
@@ -1026,6 +1023,7 @@ class DestinationsHandler(BaseHandler):
             }, status_code=status_code)
 
 
+    @handle_page_errors("Destination fields rendering")
     async def render_dest_fields_htmx(self, request) -> HTMLResponse:
         """Render destination-specific fields based on destination type for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1063,20 +1061,15 @@ class DestinationsHandler(BaseHandler):
         # Check if this destination type has fields requiring a template
         if schema.get('fields'):
             template_name = f'partials/dest_{dest_type}_fields.html'
-            try:
-                # Extract field values using schema field definitions
-                template_values = {}
-                for field_name, field_config in schema['fields'].items():
-                    # Use the form field name directly (already mapped in schema)
-                    template_values[field_name] = get_form_value(form_data, field_name)
-                
-                html_response = self.template_service.render_template(template_name, **template_values)
-                return HTMLResponse(content=html_response)
-            except Exception:
-                # Template doesn't exist or failed to render
-                html_response = self.template_service.render_template('partials/info_message.html',
-                                                                   message=f'{schema["display_name"]} destination configuration')
-                return HTMLResponse(content=html_response)
+            
+            # Extract field values using schema field definitions
+            template_values = {}
+            for field_name, field_config in schema['fields'].items():
+                # Use the form field name directly (already mapped in schema)
+                template_values[field_name] = get_form_value(form_data, field_name)
+            
+            html_response = self.template_service.render_template(template_name, **template_values)
+            return HTMLResponse(content=html_response)
         else:
             # No fields defined in schema
             html_response = self.template_service.render_template('partials/info_message.html',
@@ -1203,6 +1196,7 @@ class DestinationsHandler(BaseHandler):
         html_response = self.render_restic_validation_status(result)
         return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Origin repository path validation")
     async def validate_origin_repo_path_htmx(self, request) -> HTMLResponse:
         """Validate same-as-origin repository path with RWX requirements for HTMX forms"""
         # Parse form data using FastAPI (moved FROM app.py TO handler)
@@ -1221,37 +1215,32 @@ class DestinationsHandler(BaseHandler):
             value_list = form_data.get(key, [default])
             return value_list[0] if value_list else default
         
-        try:
-            # Extract repository path
-            repo_path = get_form_value(form_data, 'origin_repo_path')
-            if not repo_path or not repo_path.strip():
-                result = {'success': False, 'error': 'Please enter a repository path'}
-                html_response = self.render_origin_repo_path_validation_status(result)
-                return HTMLResponse(content=html_response)
-            
-            # Extract SSH configuration (required for same_as_origin)
-            hostname = get_form_value(form_data, 'hostname')
-            username = get_form_value(form_data, 'username')
-            
-            if not hostname or not username:
-                result = {'success': False, 'error': 'SSH configuration required for same-as-origin repositories'}
-                html_response = self.render_origin_repo_path_validation_status(result)
-                return HTMLResponse(content=html_response)
-            
-            # Business logic: delegate to proper destination validation service
-            from dests.services.rsync import rsync_service
-            form_data = {'hostname': hostname, 'username': username, 'path': repo_path}
-            result = rsync_service.validate_rsync_destination(form_data)
-            
-            # View: delegate to local validation method (moved from template service)
+        # Extract repository path
+        repo_path = get_form_value(form_data, 'origin_repo_path')
+        if not repo_path or not repo_path.strip():
+            result = {'success': False, 'error': 'Please enter a repository path'}
             html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
-            
-        except Exception as e:
-            result = {'success': False, 'error': f'Validation failed: {str(e)}'}
+        
+        # Extract SSH configuration (required for same_as_origin)
+        hostname = get_form_value(form_data, 'hostname')
+        username = get_form_value(form_data, 'username')
+        
+        if not hostname or not username:
+            result = {'success': False, 'error': 'SSH configuration required for same-as-origin repositories'}
             html_response = self.render_origin_repo_path_validation_status(result)
             return HTMLResponse(content=html_response)
+        
+        # Business logic: delegate to proper destination validation service
+        from dests.services.rsync import rsync_service
+        form_data = {'hostname': hostname, 'username': username, 'path': repo_path}
+        result = rsync_service.validate_rsync_destination(form_data)
+        
+        # View: delegate to local validation method (moved from template service)
+        html_response = self.render_origin_repo_path_validation_status(result)
+        return HTMLResponse(content=html_response)
 
+    @handle_page_errors("Repository initialization")
     async def initialize_restic_repo_htmx(self, request) -> JSONResponse:
         """Initialize Restic repository with form parsing - pure switchboard compliance"""
         from fastapi.responses import JSONResponse
