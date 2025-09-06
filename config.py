@@ -732,9 +732,12 @@ class BackupConfig:
         import shutil
         import io
         
-        # Ensure friendly_name is quoted if it contains spaces
+        # Ensure friendly_name is quoted if it contains spaces (but not already quoted)
         if 'friendly_name' in clean_config and ' ' in clean_config['friendly_name']:
-            clean_config['friendly_name'] = f'"{clean_config["friendly_name"]}"'
+            friendly_name = clean_config['friendly_name']
+            # Only add quotes if not already quoted
+            if not (friendly_name.startswith('"') and friendly_name.endswith('"')):
+                clean_config['friendly_name'] = f'"{friendly_name}"'
         
         if preview_mode:
             # Preview mode: return YAML content without writing to disk

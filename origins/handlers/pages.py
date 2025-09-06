@@ -353,9 +353,6 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("Save SSH origin")
     def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save SSH origin changes"""
-        # origin_parser is now local to this module
-        
-        
         # Parse origin form data (no password required for save operations)
         origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
@@ -368,20 +365,15 @@ class OriginsHandler(BaseHandler):
         origin_name = origin_config['origin_name']
         original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
         
-        # Handle renaming if the origin name changed
-        if original_origin_name and original_origin_name != origin_name:
-            # Delete the old file
-            self.origin_service.delete_origin(original_origin_name)
+        # Delegate business logic to origin service
+        result = self.origin_service.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
         
-        # Save origin with detected capabilities (overwrites existing or creates new)
-        success = self.origin_service.save_origin(origin_name, origin_config)
-        
-        if success:
+        if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to save origin '{origin_name}'"
+                'error': result['error']
             }, status_code=500)
 
     def _get_form_value(self, form_data: Dict[str, Any], key: str, default: Any = None) -> Any:

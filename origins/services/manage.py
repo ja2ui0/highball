@@ -48,3 +48,25 @@ class OriginOperationsService:
         """Check if origin already exists"""
         existing_origins = self.get_origins()
         return origin_name in existing_origins
+    
+    def save_origin_with_rename_handling(self, origin_name: str, origin_config: Dict[str, Any], original_origin_name: str = '') -> Dict[str, Any]:
+        """Save origin with rename logic - handles old file deletion if name changed"""
+        
+        # Handle renaming if the origin name changed
+        if original_origin_name and original_origin_name != origin_name:
+            # Delete the old file
+            self.delete_origin(original_origin_name)
+        
+        # Save origin with detected capabilities (overwrites existing or creates new)
+        success = self.save_origin(origin_name, origin_config)
+        
+        if success:
+            return {
+                'success': True,
+                'origin_name': origin_name
+            }
+        else:
+            return {
+                'success': False,
+                'error': f"Failed to save origin '{origin_name}'"
+            }
