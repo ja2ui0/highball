@@ -76,39 +76,39 @@ async def show_job_inspect(name: str = Query("")):
     return job_pages.show_job_inspect(name)
 
 # =============================================================================
-# SSH ORIGINS
+# ORIGINS
 # =============================================================================
 
-@app.get("/ssh", response_class=HTMLResponse)
-async def show_ssh_origins():
+@app.get("/origins", response_class=HTMLResponse)
+async def show_origins():
     return origins_handler.show_ssh_origins()
 
-@app.post("/ssh/add")
-async def add_ssh_origin(request: Request):
+@app.post("/origins/add")
+async def add_origin(request: Request):
     return await origins_handler.add_ssh_origin_htmx(request)
 
-@app.post("/ssh/save")
-async def save_ssh_origin(request: Request):
+@app.post("/origins/save")
+async def save_origin(request: Request):
     return await origins_handler.save_ssh_origin_htmx(request)
 
-@app.get("/ssh/edit/{origin_name}")
-async def edit_ssh_origin(origin_name: str):
+@app.get("/origins/edit/{origin_name}")
+async def edit_origin(origin_name: str):
     return origins_handler.edit_ssh_origin(origin_name)
 
-@app.delete("/ssh/{origin_name}")
-async def delete_ssh_origin(origin_name: str):
+@app.delete("/origins/{origin_name}")
+async def delete_origin(origin_name: str):
     return origins_handler.delete_ssh_origin(origin_name)
 
-@app.post("/ssh/validate")
-async def validate_ssh_origin(request: Request):
+@app.post("/origins/validate")
+async def validate_origin(request: Request):
     return await origins_handler.validate_ssh_origin_htmx(request)
 
-@app.get("/ssh/progress/{session_id}")
-async def get_ssh_progress(session_id: str):
+@app.get("/origins/progress/{session_id}")
+async def get_origin_progress(session_id: str):
     return origins_handler.get_ssh_progress(session_id)
 
-@app.get("/ssh/stream/{session_id}")
-async def stream_ssh_progress(session_id: str, request: Request):
+@app.get("/origins/stream/{session_id}")
+async def stream_origin_progress(session_id: str, request: Request):
     return await origins_handler.stream_ssh_progress(session_id, request)
 
 @app.post("/htmx/toggle-auth-method")
@@ -287,9 +287,6 @@ async def toggle_password_visibility(request: Request):
 async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
     return destinations_handler.scan_network_for_rsyncd(range)
 
-@app.get("/validate-ssh")
-async def validate_ssh_source(source: str = Query("")):
-    return origins_handler.validate_ssh_source(source)
 
 @app.get("/restic-repo-info")
 async def get_repository_info(job: str = Query("")):

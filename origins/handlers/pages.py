@@ -276,7 +276,7 @@ class OriginsHandler(BaseHandler):
         success = self.origin_service.delete_origin(origin_name)
         
         if success:
-            return RedirectResponse(url='/ssh', status_code=302)
+            return RedirectResponse(url='/origins', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
@@ -319,7 +319,7 @@ class OriginsHandler(BaseHandler):
         success = self.origin_service.save_origin(origin_name, origin_config)
         
         if success:
-            return RedirectResponse(url='/ssh', status_code=302)
+            return RedirectResponse(url='/origins', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
@@ -377,7 +377,7 @@ class OriginsHandler(BaseHandler):
         success = self.origin_service.save_origin(origin_name, origin_config)
         
         if success:
-            return RedirectResponse(url='/ssh', status_code=302)
+            return RedirectResponse(url='/origins', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,

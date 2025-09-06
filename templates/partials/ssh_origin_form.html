@@ -1,7 +1,7 @@
 <div class="section-container">
     <h2 class="section-header">{% if edit_mode %}Edit SSH Origin{% else %}Add SSH Origin{% endif %}</h2>
     
-    <form method="post" action="{% if edit_mode %}/ssh/save{% else %}/ssh/add{% endif %}" enctype="multipart/form-data" id="ssh-origin-form">
+    <form method="post" action="{% if edit_mode %}/origins/save{% else %}/origins/add{% endif %}" enctype="multipart/form-data" id="ssh-origin-form">
         {% if edit_mode %}
         <input type="hidden" name="original_origin_name" value="{{ origin_name | default('') }}">
         {% endif %}
@@ -79,7 +79,7 @@
         
         <div class="form-group">
             <button type="button" 
-                    hx-post="/ssh/validate" 
+                    hx-post="/origins/validate" 
                     hx-target="#validation-result"
                     hx-include="closest form"
                     class="button button-warning">Validate Origin</button>

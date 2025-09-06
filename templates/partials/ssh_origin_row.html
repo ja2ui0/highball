@@ -5,11 +5,11 @@
     <td>{{ origin.capabilities }}</td>
     <td>
         <div class="action-buttons">
-            <button hx-get="/ssh/edit/{{ origin.name }}" 
+            <button hx-get="/origins/edit/{{ origin.name }}" 
                     hx-target="#ssh-origin-form-container"
                     hx-swap="innerHTML"
                     class="button">Edit</button>
-            <button hx-delete="/ssh/{{ origin.name }}" 
+            <button hx-delete="/origins/{{ origin.name }}" 
                     hx-confirm="Are you sure you want to delete SSH origin '{{ origin.friendly_name }}'? This action cannot be undone."
                     hx-on::after-request="window.location.reload()"
                     class="button button-danger">Delete</button>

@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <nav class="nav">
             <img src="/favicon.ico" alt="Highball" class="nav-logo">
             <a href="/">Highball</a>
-	    <a href="/ssh">Origins</a>
+	    <a href="/origins">Origins</a>
 	    <a href="/dests">Destinations</a>
             <a href="/jobs/add">Add Job</a>
             <a href="/config">Config</a>
