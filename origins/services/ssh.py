@@ -213,6 +213,51 @@ class OriginSSHService:
         
         threading.Thread(target=run_workflow, daemon=True).start()
 
+    def read_session_progress(self, session_id: str) -> Dict[str, Any]:
+        """Read validation session progress and completion status"""
+        import json
+        import os
+        
+        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+        
+        if not os.path.exists(session_file):
+            return {
+                'exists': False,
+                'progress': [],
+                'completed': False,
+                'result': None,
+                'edit_mode': False
+            }
+        
+        try:
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+            
+            return {
+                'exists': True,
+                'progress': session_data.get('progress', []),
+                'completed': session_data.get('completed', False),
+                'result': session_data.get('result'),
+                'edit_mode': session_data.get('edit_mode', False)
+            }
+        except (json.JSONDecodeError, IOError):
+            return {
+                'exists': False,
+                'progress': [],
+                'completed': False,
+                'result': None,
+                'edit_mode': False
+            }
+    
+    def cleanup_session(self, session_id: str) -> None:
+        """Clean up validation session file"""
+        import os
+        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+        try:
+            os.remove(session_file)
+        except OSError:
+            pass
+
     def get_highball_public_key(self) -> str:
         """Read Highball public key content"""
         try:
