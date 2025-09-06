@@ -294,9 +294,6 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("Add SSH origin")
     def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new SSH origin"""
-        # origin_parser is now local to this module
-        
-        
         # Parse origin form data (no password required for save operations)
         origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
@@ -308,23 +305,16 @@ class OriginsHandler(BaseHandler):
         origin_config = origin_result['origin_config']
         origin_name = origin_config['origin_name']
         
-        # Check if origin already exists
-        if self.origin_service.origin_exists(origin_name):
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Origin "{origin_name}" already exists'
-            }, status_code=400)
+        # Delegate business logic to origin service
+        result = self.origin_service.add_new_origin(origin_name, origin_config)
         
-        # Save origin with capabilities from form parser (including any detected values)
-        success = self.origin_service.save_origin(origin_name, origin_config)
-        
-        if success:
+        if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
         else:
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to save origin '{origin_name}'"
-            }, status_code=500)
+                'error': result['error']
+            }, status_code=400)
 
     async def save_ssh_origin_htmx(self, request) -> JSONResponse:
         """Save SSH origin with form parsing - pure switchboard compliance"""

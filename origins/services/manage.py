@@ -70,3 +70,27 @@ class OriginOperationsService:
                 'success': False,
                 'error': f"Failed to save origin '{origin_name}'"
             }
+    
+    def add_new_origin(self, origin_name: str, origin_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Add new origin with duplicate name validation"""
+        
+        # Check if origin already exists
+        if self.origin_exists(origin_name):
+            return {
+                'success': False,
+                'error': f'Origin "{origin_name}" already exists'
+            }
+        
+        # Save origin with capabilities from form parser (including any detected values)
+        success = self.save_origin(origin_name, origin_config)
+        
+        if success:
+            return {
+                'success': True,
+                'origin_name': origin_name
+            }
+        else:
+            return {
+                'success': False,
+                'error': f"Failed to save origin '{origin_name}'"
+            }
