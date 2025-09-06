@@ -12,9 +12,9 @@ import json
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from jobs.services.manage import JobManagementService
-from services.exec import OperationType
-from services.exec import ResticExecutionService
-from services.ssh import SSHCommandFactory
+from shared.services.exec import OperationType
+from shared.services.exec import ResticExecutionService
+from shared.services.ssh import SSHCommandFactory
 
 # =============================================================================
 # RESPONSE MODELS
@@ -398,7 +398,7 @@ class RestoreExecutionService:
         """Execute dry run restore and return results"""
         try:
             from dests.services.restic import ResticRunner
-            from services.exec import ExecutionService
+            from shared.services.exec import ExecutionService
             
             job_name = restore_config['job_name']
             
@@ -492,7 +492,7 @@ class RestoreExecutionService:
     def _execute_background_restore(self, job_config: Dict[str, Any], restore_config: Dict[str, Any]):
         """Execute restore operation in background with progress tracking"""
         from dests.services.restic import ResticRunner
-        from services.exec import CommandObfuscationService
+        from shared.services.exec import CommandObfuscationService
         
         job_name = restore_config['job_name']
         
@@ -796,8 +796,8 @@ class SnapshotIntrospectionService:
     """Snapshot introspection - ONLY handles discovery of snapshot contents and metadata"""
     
     def __init__(self):
-        from services.exec import OperationType
-        from services.exec import ExecutionService, ResticExecutionService
+        from shared.services.exec import OperationType
+        from shared.services.exec import ExecutionService, ResticExecutionService
         self.executor = ExecutionService()
         self.restic_executor = ResticExecutionService()
         self.timeout = 30  # seconds for introspection commands
@@ -812,7 +812,7 @@ class SnapshotIntrospectionService:
     ) -> List[str]:
         """Introspection concern: get original source paths that were backed up in a snapshot"""
         try:
-            from services.exec import OperationType
+            from shared.services.exec import OperationType
             
             # Convert ssh_config to source_config format for ResticExecutionService
             source_config = None
@@ -852,7 +852,7 @@ class SnapshotIntrospectionService:
     ) -> Dict[str, Any]:
         """Introspection concern: get detailed metadata for a snapshot"""
         try:
-            from services.exec import OperationType
+            from shared.services.exec import OperationType
             
             # Convert ssh_config to source_config format for ResticExecutionService
             source_config = None

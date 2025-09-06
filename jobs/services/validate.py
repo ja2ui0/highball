@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import logging
-from services.ssh import SSHCommandFactory
+from shared.services.ssh import SSHCommandFactory
 
 logger = logging.getLogger(__name__)
 
@@ -763,7 +763,7 @@ class ValidationService:
         if not hostname or not username:
             return {'valid': False, 'error': 'SSH hostname and username required for remote path validation'}
         
-        from services.exec import ExecutionService
+        from shared.services.exec import ExecutionService
         executor = ExecutionService()
         
         # Test RX permissions (required for backup) + write test in one command

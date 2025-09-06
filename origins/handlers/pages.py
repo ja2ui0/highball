@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from dataclasses import dataclass
 import asyncio
 
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 from config import BackupConfig
 from models.forms import safe_get_value
 from origins.services.manage import OriginOperationsService

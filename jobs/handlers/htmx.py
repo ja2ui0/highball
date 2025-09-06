@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Union, Callable
 from functools import wraps
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 from config import BackupConfig
 
 

@@ -269,7 +269,7 @@ class JobFormParser:
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 
 class AdminJobPreviewMethods:
     """Temporary admin methods for job preview functionality during revamp"""

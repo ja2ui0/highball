@@ -8,8 +8,8 @@ import json
 import os
 from typing import Dict, Any
 
-from services.template import TemplateService
-from services.ssh import SSHWorkflowService
+from shared.handlers.templating import TemplateService
+from shared.services.ssh import SSHWorkflowService
 
 logger = logging.getLogger(__name__)
 

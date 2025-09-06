@@ -429,7 +429,7 @@ class HTMXHandlers:
             html_response = self.destinations_handler._render_validation_result("error", restic_result['error'])
         else:
             # Direct repository initialization
-            from services.restic_repository_service import ResticRepositoryService
+            from dests.services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
             result = repo_service.initialize_repository(restic_result['config'])
             

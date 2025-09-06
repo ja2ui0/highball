@@ -17,11 +17,11 @@ import tempfile
 from functools import wraps
 import shlex
 from pydantic import BaseModel, Field
-from services.exec import OperationType
+from shared.services.exec import OperationType
 
 # Import extracted modules
 from origins.schema import SOURCE_PATH_SCHEMA
-from services.exec import ResticArgumentBuilder
+from shared.services.exec import ResticArgumentBuilder
 from dests.services.restic import ResticRunner, ResticRepositoryService, ResticContentAnalyzer, ResticMaintenanceService
 
 logger = logging.getLogger(__name__)

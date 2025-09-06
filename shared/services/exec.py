@@ -164,7 +164,7 @@ class CommandExecutionService:
         ssh_options: Optional[List[str]] = None
     ) -> ExecutionResult:
         """Execution concern: delegate to centralized SSH execution service"""
-        from services.ssh import SSHExecutionService
+        from shared.services.ssh import SSHExecutionService
         ssh_service = SSHExecutionService()
         return ssh_service.execute_via_ssh(hostname, username, command)
     
@@ -176,7 +176,7 @@ class CommandExecutionService:
         ssh_options: Optional[List[str]] = None
     ) -> ExecutionResult:
         """Execution concern: delegate to centralized SSH execution service"""
-        from services.ssh import SSHExecutionService
+        from shared.services.ssh import SSHExecutionService
         ssh_service = SSHExecutionService()
         return ssh_service.execute_container_via_ssh(hostname, username, container_command)
     
@@ -471,7 +471,7 @@ class ResticExecutionService:
     
     def _should_use_ssh(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]], operation_type: OperationType) -> bool:
         """Determine if SSH execution should be used based on context - delegate to shared service"""
-        from services.ssh import ResticSSHService
+        from shared.services.ssh import ResticSSHService
         restic_ssh = ResticSSHService()
         return restic_ssh.should_use_ssh(dest_config, source_config, operation_type)
     
@@ -506,6 +506,6 @@ class ResticExecutionService:
         timeout: int
     ) -> subprocess.CompletedProcess:
         """Execute restic command via SSH using container - delegate to shared service"""
-        from services.ssh import ResticSSHService
+        from shared.services.ssh import ResticSSHService
         restic_ssh = ResticSSHService()
         return restic_ssh.execute_restic_via_ssh(dest_config, command_args, source_config, timeout)

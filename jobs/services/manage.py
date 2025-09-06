@@ -241,7 +241,7 @@ class JobManagementService:
         self.backup_config = backup_config
         self.logger = JobLogger()
         self.process_tracker = JobProcessTracker()
-        from services.ssh import JobConflictManager
+        from shared.services.ssh import JobConflictManager
         self.conflict_manager = JobConflictManager(backup_config) if backup_config else None
     
     # **LOGGING DELEGATION** - Pure delegation to logging concern

@@ -12,7 +12,7 @@ import tempfile
 import os
 
 # Import execution infrastructure from new location
-from services.exec import OperationType, ExecutionResult, CommandObfuscationService
+from shared.services.exec import OperationType, ExecutionResult, CommandObfuscationService
 
 
 # =============================================================================
@@ -222,7 +222,7 @@ class ResticSSHService:
         timeout: int
     ) -> subprocess.CompletedProcess:
         """Execute restic command via SSH using container"""
-        from services.exec import ResticArgumentBuilder
+        from shared.services.exec import ResticArgumentBuilder
         
         # Extract SSH configuration
         hostname = source_config['hostname']

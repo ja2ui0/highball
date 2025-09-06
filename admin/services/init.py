@@ -11,7 +11,7 @@ import stat
 from typing import Dict, Any, Optional
 
 from jobs.services.schedule import JobSchedulerHandler
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 from jobs.services.schedule import SchedulingService
 from jobs.services.define import JobFormDataBuilder
 from config import BackupConfig

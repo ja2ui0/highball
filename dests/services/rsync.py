@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import shlex
 from pydantic import BaseModel, Field
-from services.ssh import SSHCommandFactory
+from shared.services.ssh import SSHCommandFactory
 
 # =============================================================================
 # RESPONSE MODELS

@@ -16,7 +16,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Import services
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)

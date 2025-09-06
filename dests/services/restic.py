@@ -15,9 +15,9 @@ import tempfile
 from functools import wraps
 
 # Import dependencies
-from services.exec import OperationType
-from services.exec import ResticExecutionService
-from services.exec import ResticArgumentBuilder
+from shared.services.exec import OperationType
+from shared.services.exec import ResticExecutionService
+from shared.services.exec import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class ResticRepositoryService:
     
     def __init__(self):
         self.command_builder = ResticArgumentBuilder()
-        from services.exec import ResticExecutionService
+        from shared.services.exec import ResticExecutionService
         self.restic_executor = ResticExecutionService()
     
     def _validate_required_fields(self, dest_config: Dict[str, Any]) -> None:
@@ -889,8 +889,8 @@ class ResticRunner:
         """Run backup using container on remote SSH host"""
         try:
             # Use existing container service for backup operations  
-            from services.ssh import ResticContainerFactory, MountStrategy
-            from services.exec import ExecutionService
+            from shared.services.ssh import ResticContainerFactory, MountStrategy
+            from shared.services.exec import ExecutionService
             
             container_factory = ResticContainerFactory()
             exec_service = ExecutionService()

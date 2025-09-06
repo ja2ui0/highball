@@ -8,7 +8,7 @@ from typing import Dict, Any, Callable, List
 from pathlib import Path
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from services.template import TemplateService
+from shared.handlers.templating import TemplateService
 from config import BackupConfig
 from models.forms import safe_get_value, safe_get_list, parse_lines
 
