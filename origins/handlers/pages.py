@@ -14,6 +14,8 @@ import asyncio
 from services.template import TemplateService
 from config import BackupConfig
 from models.forms import safe_get_value
+from origins.services.manage import OriginOperationsService
+from origins.services.ssh import OriginSSHService
 
 logger = logging.getLogger(__name__)
 
@@ -180,63 +182,12 @@ class OriginsHandler(BaseHandler):
     def __init__(self):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        self.origin_service = OriginOperationsService(self.backup_config)
+        self.ssh_service = OriginSSHService()
     
     # =========================================================================
-    # SSH SOURCE VALIDATION RENDERING (moved from services/template.py)
+    # SSH SOURCE VALIDATION RENDERING - moved to origins.services.ssh
     # =========================================================================
-    
-    def render_ssh_source_validation_status(self, result: Dict[str, Any]) -> str:
-        """Render SSH source validation status with rsync and container engine details"""
-        details = []
-        
-        # SSH connection always appears first when present (success or failure)
-        if result.get('ssh_status') == 'OK':
-            details.append("SSH connection successful")
-            
-            # Show rsync status with version (source validation only)
-            rsync_status = result.get('rsync_status', '')
-            if rsync_status and rsync_status != 'Not found':
-                details.append(f"Rsync: {rsync_status}")
-            elif rsync_status == 'Not found':
-                details.append("Rsync: Not found")
-            
-            # Show container engine (source validation only)
-            podman_status = result.get('podman_status', '')
-            docker_status = result.get('docker_status', '')
-            
-            if podman_status and podman_status != 'Not found':
-                details.append(f"Container Engine: {podman_status}")
-            elif docker_status and docker_status != 'Not found':
-                details.append(f"Container Engine: {docker_status}")
-            else:
-                details.append("Container Engine: Not found")
-        
-        # Determine status class and label
-        if result.get('valid', False):
-            status_class = 'success'
-            status_label = '[OK]'
-        else:
-            status_class = 'error'
-            status_label = '[ERROR]'
-        
-        # Build message from details or error
-        if details:
-            # Pass details as a list for proper formatting in template
-            message = None
-        else:
-            # Use appropriate message based on validation result
-            if result.get('valid', False):
-                message = result.get('message', 'Validation successful')
-            else:
-                message = result.get('error', 'Validation failed')
-            details = None
-        
-        # Use template service to render the result
-        return self.template_service.render_template('partials/validation_result.html', 
-                                       status_class=status_class,
-                                       status_label=status_label,
-                                       message=message,
-                                       details=details)
     
     # =========================================================================
     # PAGE HANDLERS
@@ -245,7 +196,7 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("Show SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
         """Show SSH origins management page"""
-        origins = self.backup_config.get_ssh_origins()
+        origins = self.origin_service.get_origins()
         global_settings = self.backup_config.get_global_settings()
         
         # Build origin display list
@@ -290,7 +241,7 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("Edit SSH origin")
     def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
         """Load SSH origin for editing"""
-        origin_config = self.backup_config.get_ssh_origin(origin_name)
+        origin_config = self.origin_service.get_origin(origin_name)
         
         if not origin_config:
             # Return empty form if origin not found
@@ -322,7 +273,7 @@ class OriginsHandler(BaseHandler):
                 'error': 'Origin name is required'
             }, status_code=400)
         
-        success = self.backup_config.delete_origin(origin_name)
+        success = self.origin_service.delete_origin(origin_name)
         
         if success:
             return RedirectResponse(url='/ssh', status_code=302)
@@ -358,15 +309,14 @@ class OriginsHandler(BaseHandler):
         origin_name = origin_config['origin_name']
         
         # Check if origin already exists
-        existing_origins = self.backup_config.get_ssh_origins()
-        if origin_name in existing_origins:
+        if self.origin_service.origin_exists(origin_name):
             return JSONResponse(content={
                 'success': False,
                 'error': f'Origin "{origin_name}" already exists'
             }, status_code=400)
         
         # Save origin with capabilities from form parser (including any detected values)
-        success = self.backup_config.save_origin(origin_name, origin_config)
+        success = self.origin_service.save_origin(origin_name, origin_config)
         
         if success:
             return RedirectResponse(url='/ssh', status_code=302)
@@ -421,10 +371,10 @@ class OriginsHandler(BaseHandler):
         # Handle renaming if the origin name changed
         if original_origin_name and original_origin_name != origin_name:
             # Delete the old file
-            self.backup_config.delete_origin(original_origin_name)
+            self.origin_service.delete_origin(original_origin_name)
         
         # Save origin with detected capabilities (overwrites existing or creates new)
-        success = self.backup_config.save_origin(origin_name, origin_config)
+        success = self.origin_service.save_origin(origin_name, origin_config)
         
         if success:
             return RedirectResponse(url='/ssh', status_code=302)
@@ -511,7 +461,7 @@ class OriginsHandler(BaseHandler):
         # Start background workflow
         def run_workflow():
             try:
-                result = self._push_keys_and_validate_workflow_with_session(session_id, hostname, username, password, use_password)
+                result = self.ssh_service.push_keys_and_validate_with_session(session_id, hostname, username, password, use_password)
                 # Update session with completion
                 session_data['completed'] = True
                 session_data['result'] = result
@@ -659,44 +609,7 @@ class OriginsHandler(BaseHandler):
             "Connection": "keep-alive",
         })
     
-    def _push_keys_and_validate_workflow(self, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow: push keys → validate connection → detect capabilities"""
-        # Initialize SSH workflow service
-        from services.ssh import SSHWorkflowService
-        ssh_service = SSHWorkflowService()
-        # Delegate to SSH service - this is pure business logic
-        return ssh_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
     
-    def _push_keys_and_validate_workflow_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow with session progress tracking using persistent storage"""
-        import json
-        import os
-        
-        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
-        
-        # Get the result from the SSH service
-        result = self._push_keys_and_validate_workflow(hostname, username, password, use_password)
-        
-        # Update session progress with service result
-        if os.path.exists(session_file):
-            try:
-                with open(session_file, 'r') as f:
-                    session_data = json.load(f)
-                
-                # Split the service's validation message into progress steps
-                if result.get('validation_message'):
-                    progress_lines = result['validation_message'].split('\n')
-                    session_data['progress'] = progress_lines
-                else:
-                    session_data['progress'].append('• SSH validation completed')
-                
-                # Save updated progress
-                with open(session_file, 'w') as f:
-                    json.dump(session_data, f)
-            except (json.JSONDecodeError, IOError):
-                pass  # Ignore session update errors
-        
-        return result
     
     @handle_page_errors("Toggle SSH auth method")
     def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> JSONResponse:
@@ -712,18 +625,11 @@ class OriginsHandler(BaseHandler):
             template = 'partials/ssh_auth_user.html'
             # Read Highball public key for display
             template_context = {
-                'highball_public_key': self._get_highball_public_key()
+                'highball_public_key': self.ssh_service.get_highball_public_key()
             }
         
         return self._render_html(template, template_context)
     
-    def _get_highball_public_key(self) -> str:
-        """Read Highball public key content"""
-        try:
-            with open('/config/local/secrets/.ssh/id_highball.pub', 'r') as f:
-                return f.read().strip()
-        except Exception as e:
-            return f"Error reading public key: {str(e)}"
 
     async def validate_ssh_source_htmx(self, request) -> HTMLResponse:
         """Validate SSH source configuration for HTMX forms"""
@@ -751,8 +657,8 @@ class OriginsHandler(BaseHandler):
         validation_service = ValidationService(backup_config)
         result = validation_service.ssh.validate_ssh_source(source_config)
         
-        # Render validation status using local method (moved from template service)
-        html_response = self.render_ssh_source_validation_status(result)
+        # Render validation status using SSH service
+        html_response = self.ssh_service.render_validation_status(result)
         return HTMLResponse(content=html_response)
 
     async def render_source_fields_htmx(self, request) -> HTMLResponse:
@@ -853,7 +759,7 @@ class OriginsHandler(BaseHandler):
             origin_name = origin_config['origin_name']
             
             # Generate YAML using the same code path as config.py save operation
-            yaml_content = self.backup_config.preview_origin_yaml(origin_name, origin_config)
+            yaml_content = self.origin_service.preview_origin_yaml(origin_name, origin_config)
             
             html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                preview_content=yaml_content,
