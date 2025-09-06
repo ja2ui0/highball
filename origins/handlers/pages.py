@@ -397,12 +397,6 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("SSH origin validation")
     def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Push keys and validate SSH origin configuration with persistent session tracking"""
-        # origin_parser is now local to this module
-        import uuid
-        import threading
-        import json
-        import os
-        
         # Parse origin form data (no password required for save operations)
         origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
@@ -411,67 +405,28 @@ class OriginsHandler(BaseHandler):
         origin_config = origin_result['origin_config']
         edit_mode = 'original_origin_name' in form_data and form_data['original_origin_name']
         
-        # Extract connection details
+        # Extract connection details (HTTP form parsing - presentation concern)
         hostname = origin_config['ssh_hostname']
         username = origin_config['ssh_username']  
         password = form_data.get('ssh_password', '')
         ssh_highball = form_data.get('ssh_highball') == 'on'
         
-        # Require password when Highball checkbox is checked
-        if ssh_highball and not password:
+        try:
+            # Delegate business logic to service
+            session_id = self.ssh_service.create_validation_session(hostname, username, password, ssh_highball, edit_mode)
+            
+            # Return initial progress template
+            return self._render_html('partials/ssh_validation_progress.html', {
+                'session_id': session_id,
+                'initial_message': "Starting SSH validation workflow..."
+            })
+        except ValueError as e:
+            # Handle business validation errors
             return self._render_html('partials/ssh_validation_result.html', {
                 'success': False,
                 'edit_mode': edit_mode,
-                'validation_message': 'Password is required when "Auto-populate keys using Highball" is checked.'
+                'validation_message': str(e)
             })
-        
-        use_password = ssh_highball and password
-        
-        # Generate session ID and create persistent session file
-        session_id = str(uuid.uuid4())
-        session_dir = '/tmp/ssh_validation_sessions'
-        os.makedirs(session_dir, exist_ok=True)
-        session_file = f"{session_dir}/{session_id}.json"
-        
-        # Initialize session data
-        session_data = {
-            'progress': ['• Starting SSH validation workflow...'],
-            'completed': False,
-            'success': None,
-            'result': None,
-            'edit_mode': edit_mode
-        }
-        
-        with open(session_file, 'w') as f:
-            json.dump(session_data, f)
-        
-        # Start background workflow
-        def run_workflow():
-            try:
-                result = self.ssh_service.push_keys_and_validate_with_session(session_id, hostname, username, password, use_password)
-                # Update session with completion
-                session_data['completed'] = True
-                session_data['result'] = result
-                with open(session_file, 'w') as f:
-                    json.dump(session_data, f)
-            except Exception as e:
-                # Handle workflow errors
-                error_result = {
-                    'success': False,
-                    'validation_message': f'Validation failed: {str(e)}'
-                }
-                session_data['completed'] = True
-                session_data['result'] = error_result
-                with open(session_file, 'w') as f:
-                    json.dump(session_data, f)
-        
-        threading.Thread(target=run_workflow, daemon=True).start()
-        
-        # Return initial progress template
-        return self._render_html('partials/ssh_validation_progress.html', {
-            'session_id': session_id,
-            'initial_message': "Starting SSH validation workflow..."
-        })
     
     @handle_page_errors("SSH progress polling")
     def get_ssh_progress(self, session_id: str) -> HTMLResponse:

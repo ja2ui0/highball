@@ -82,12 +82,12 @@ class OriginSSHService:
         # Delegate to shared SSH workflow service
         return self.ssh_workflow_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
     
-    def push_keys_and_validate_with_session(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
-        """Complete workflow with session progress tracking using persistent storage"""
+    def run_validation_workflow(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> dict:
+        """Complete validation workflow with session progress tracking"""
         session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
         
-        # Get the result from the SSH workflow service
-        result = self.push_keys_and_validate_workflow(hostname, username, password, use_password)
+        # Get the result from the SSH workflow service (handles both push_keys AND validate)
+        result = self.ssh_workflow_service.push_keys_and_validate_workflow(hostname, username, password, use_password)
         
         # Update session progress with service result
         if os.path.exists(session_file):
@@ -100,7 +100,7 @@ class OriginSSHService:
                     progress_lines = result['validation_message'].split('\n')
                     session_data['progress'] = progress_lines
                 else:
-                    session_data['progress'].append('" SSH validation completed')
+                    session_data['progress'].append('• SSH validation completed')
                 
                 # Save updated progress
                 with open(session_file, 'w') as f:
@@ -144,6 +144,74 @@ class OriginSSHService:
                     'highball_public_key': self.get_highball_public_key()
                 }
             }
+
+    def create_validation_session(self, hostname: str, username: str, password: str, ssh_highball: bool, edit_mode: bool) -> str:
+        """Create and initialize a validation session, return session ID"""
+        import uuid
+        import json
+        import os
+        
+        # Business validation rules
+        if ssh_highball and not password:
+            raise ValueError('Password is required when "Auto-populate keys using Highball" is checked.')
+        
+        # Generate session ID and create persistent session file
+        session_id = str(uuid.uuid4())
+        session_dir = '/tmp/ssh_validation_sessions'
+        os.makedirs(session_dir, exist_ok=True)
+        session_file = f"{session_dir}/{session_id}.json"
+        
+        # Initialize session data
+        session_data = {
+            'progress': ['• Starting SSH validation workflow...'],
+            'completed': False,
+            'success': None,
+            'result': None,
+            'edit_mode': edit_mode
+        }
+        
+        with open(session_file, 'w') as f:
+            json.dump(session_data, f)
+        
+        # Start background workflow
+        self.start_validation_workflow(session_id, hostname, username, password, ssh_highball and password)
+        
+        return session_id
+
+    def start_validation_workflow(self, session_id: str, hostname: str, username: str, password: str, use_password: bool) -> None:
+        """Start background validation workflow in separate thread"""
+        import threading
+        import json
+        
+        def run_workflow():
+            session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
+            try:
+                # Run the actual validation work
+                result = self.run_validation_workflow(session_id, hostname, username, password, use_password)
+                # Update session with completion
+                with open(session_file, 'r') as f:
+                    session_data = json.load(f)
+                session_data['completed'] = True
+                session_data['result'] = result
+                with open(session_file, 'w') as f:
+                    json.dump(session_data, f)
+            except Exception as e:
+                # Handle workflow errors
+                error_result = {
+                    'success': False,
+                    'validation_message': f'Validation failed: {str(e)}'
+                }
+                try:
+                    with open(session_file, 'r') as f:
+                        session_data = json.load(f)
+                    session_data['completed'] = True
+                    session_data['result'] = error_result
+                    with open(session_file, 'w') as f:
+                        json.dump(session_data, f)
+                except:
+                    pass  # Ignore session update errors
+        
+        threading.Thread(target=run_workflow, daemon=True).start()
 
     def get_highball_public_key(self) -> str:
         """Read Highball public key content"""
