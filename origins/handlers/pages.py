@@ -602,20 +602,8 @@ class OriginsHandler(BaseHandler):
     def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Toggle between Highball and user SSH authentication methods"""
         ssh_highball = 'ssh_highball' in form_data
-        
-        if ssh_highball:
-            # Checkbox checked: show password field for automatic key installation
-            template = 'partials/ssh_auth_highball.html'
-            template_context = {}
-        else:
-            # Checkbox unchecked: show manual key copy instructions
-            template = 'partials/ssh_auth_user.html'
-            # Read Highball public key for display
-            template_context = {
-                'highball_public_key': self.ssh_service.get_highball_public_key()
-            }
-        
-        return self._render_html(template, template_context)
+        template_data = self.ssh_service.get_auth_method_template_data(ssh_highball)
+        return self._render_html(template_data['template'], template_data['context'])
     
 
     async def validate_ssh_source_htmx(self, request) -> HTMLResponse:

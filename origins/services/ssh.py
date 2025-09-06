@@ -128,6 +128,23 @@ class OriginSSHService:
         result = validation_service.validate_ssh_source(ssh_config)
         return result
 
+    def get_auth_method_template_data(self, use_highball_auth: bool) -> Dict[str, Any]:
+        """Get template name and context data for SSH auth method toggle"""
+        if use_highball_auth:
+            # Checkbox checked: show password field for automatic key installation
+            return {
+                'template': 'partials/ssh_auth_highball.html',
+                'context': {}
+            }
+        else:
+            # Checkbox unchecked: show manual key copy instructions
+            return {
+                'template': 'partials/ssh_auth_user.html',
+                'context': {
+                    'highball_public_key': self.get_highball_public_key()
+                }
+            }
+
     def get_highball_public_key(self) -> str:
         """Read Highball public key content"""
         try:
