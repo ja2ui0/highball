@@ -266,22 +266,17 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("Delete SSH origin")
     def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
         """Delete SSH origin"""
+        # Delegate business logic to origin service
+        result = self.origin_service.delete_origin_with_validation(origin_name)
         
-        if not origin_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Origin name is required'
-            }, status_code=400)
-        
-        success = self.origin_service.delete_origin(origin_name)
-        
-        if success:
+        if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
         else:
+            status_code = 400 if result['error'] == 'Origin name is required' else 500
             return JSONResponse(content={
                 'success': False,
-                'error': f"Failed to delete origin '{origin_name}'"
-            }, status_code=500)
+                'error': result['error']
+            }, status_code=status_code)
 
     async def add_ssh_origin_htmx(self, request) -> JSONResponse:
         """Add SSH origin with form parsing - pure switchboard compliance"""

@@ -94,3 +94,25 @@ class OriginOperationsService:
                 'success': False,
                 'error': f"Failed to save origin '{origin_name}'"
             }
+    
+    def delete_origin_with_validation(self, origin_name: str) -> Dict[str, Any]:
+        """Delete origin with input validation and error handling"""
+        
+        if not origin_name:
+            return {
+                'success': False,
+                'error': 'Origin name is required'
+            }
+        
+        success = self.delete_origin(origin_name)
+        
+        if success:
+            return {
+                'success': True,
+                'origin_name': origin_name
+            }
+        else:
+            return {
+                'success': False,
+                'error': f"Failed to delete origin '{origin_name}'"
+            }
