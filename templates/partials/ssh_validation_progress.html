@@ -1,6 +1,6 @@
 <div class="alert alert-info" id="ssh-validation-container"
      hx-ext="sse" 
-     sse-connect="/ssh/stream/{{ session_id }}"
+     sse-connect="/origins/stream/{{ session_id }}"
      sse-swap="progress,success,error">
     <strong>🔄 SSH Validation in Progress...</strong><br>
     <div class="code-container" id="ssh-progress-log">{{ initial_message }}</div>

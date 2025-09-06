@@ -391,20 +391,7 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("SSH source validation")
     def validate_ssh_source(self, source: str) -> JSONResponse:
         """Validate SSH source configuration"""
-        # Parse source string (format: username@hostname)
-        if '@' not in source:
-            return JSONResponse(content={
-                'valid': False,
-                'error': 'Invalid source format. Expected: username@hostname'
-            })
-        
-        username, hostname = source.split('@', 1)
-        ssh_config = {'username': username, 'hostname': hostname}
-        
-        # Use unified validation service
-        from jobs.services.validate import ValidationService
-        validation_service = ValidationService()
-        result = validation_service.validate_ssh_source(ssh_config)
+        result = self.ssh_service.validate_origin_string(source)
         return JSONResponse(content=result)
 
     @handle_page_errors("SSH origin validation")

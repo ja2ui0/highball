@@ -110,6 +110,24 @@ class OriginSSHService:
         
         return result
     
+    def validate_origin_string(self, origin_string: str) -> Dict[str, Any]:
+        """Validate SSH origin configuration from username@hostname string"""
+        # Parse origin string (format: username@hostname)
+        if '@' not in origin_string:
+            return {
+                'valid': False,
+                'error': 'Invalid format. Expected: username@hostname'
+            }
+        
+        username, hostname = origin_string.split('@', 1)
+        ssh_config = {'username': username, 'hostname': hostname}
+        
+        # Use unified validation service
+        from jobs.services.validate import ValidationService
+        validation_service = ValidationService()
+        result = validation_service.validate_ssh_source(ssh_config)
+        return result
+
     def get_highball_public_key(self) -> str:
         """Read Highball public key content"""
         try:
