@@ -408,24 +408,13 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("SSH progress polling")
     def get_ssh_progress(self, session_id: str) -> HTMLResponse:
         """Get current SSH validation progress for a session using persistent storage"""
-        import json
-        import os
+        # Get session progress from service
+        session_data = self.ssh_service.read_session_progress(session_id)
         
-        session_file = f"/tmp/ssh_validation_sessions/{session_id}.json"
-        
-        if not os.path.exists(session_file):
+        if not session_data['exists']:
             return self._render_html('partials/ssh_validation_expired.html', {
                 'success': False,
                 'validation_message': "Session not found or expired"
-            })
-        
-        try:
-            with open(session_file, 'r') as f:
-                session_data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return self._render_html('partials/ssh_validation_expired.html', {
-                'success': False,
-                'validation_message': "Session data corrupted"
             })
         
         progress_text = '\n'.join(session_data['progress'])
