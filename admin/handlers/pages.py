@@ -18,23 +18,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 # Import services
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
+from shared.handlers.base import BaseHandler
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)
 
 
-class BaseHandler:
-    """Base class for handlers with shared rendering helpers"""
-    
-    def _render_html(self, template: str, context: dict) -> HTMLResponse:
-        """Helper to render template and return HTMLResponse"""
-        html = self.template_service.render_template(template, **context)
-        return HTMLResponse(content=html)
-    
-    def _render_error(self, template: str, context: dict, status: int = 400) -> HTMLResponse:
-        """Helper to render error template and return HTMLResponse with status"""
-        html = self.template_service.render_template(template, **context)
-        return HTMLResponse(content=html, status_code=status)
 
 class AdminHandler(BaseHandler):
     """Handle system administration and configuration"""

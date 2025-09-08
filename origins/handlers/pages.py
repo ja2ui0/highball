@@ -13,6 +13,7 @@ import asyncio
 
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
+from shared.handlers.base import BaseHandler
 from config import BackupConfig
 from models.forms import safe_get_value
 from origins.services.manage import OriginOperationsService
@@ -150,18 +151,6 @@ def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> st
     return value_list[0] if value_list else default
 
 
-class BaseHandler:
-    """Base class for handlers with shared rendering helpers"""
-    
-    def _render_html(self, template: str, context: dict) -> HTMLResponse:
-        """Helper to render template and return HTMLResponse"""
-        html = self.template_service.render_template(template, **context)
-        return HTMLResponse(content=html)
-    
-    def _render_error(self, template: str, context: dict, status: int = 400) -> HTMLResponse:
-        """Helper to render error template and return HTMLResponse with status"""
-        html = self.template_service.render_template(template, **context)
-        return HTMLResponse(content=html, status_code=status)
 
 class OriginsHandler(BaseHandler):
     """Handle SSH origins management and validation"""
