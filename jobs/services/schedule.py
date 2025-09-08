@@ -169,24 +169,28 @@ class JobSchedulerHandler:
 
     def list_jobs(self):
         """List APScheduler internal scheduled jobs - DEBUG/ADMIN endpoint"""
-        from fastapi.responses import JSONResponse
+        from shared.handlers.errors import handle_service_errors
         
-        jobs = self.scheduler_service.scheduler_manager.scheduler.get_jobs()
-        job_list = []
-        for j in jobs:
-            next_run = j.next_run_time.isoformat() if j.next_run_time else None
-            job_list.append({
-                'id': j.id,
-                'name': j.name or '',
-                'trigger': str(j.trigger),
-                'next_run': next_run
-            })
+        @handle_service_errors("List scheduler jobs")
+        def _list_jobs():
+            jobs = self.scheduler_service.scheduler_manager.scheduler.get_jobs()
+            job_list = []
+            for j in jobs:
+                next_run = j.next_run_time.isoformat() if j.next_run_time else None
+                job_list.append({
+                    'id': j.id,
+                    'name': j.name or '',
+                    'trigger': str(j.trigger),
+                    'next_run': next_run
+                })
+            
+            return {
+                'jobs': job_list,
+                'count': len(job_list),
+                'note': 'This shows APScheduler internal jobs. For backup job configs, use /api/highball/jobs'
+            }
         
-        return JSONResponse(content={
-            'jobs': job_list,
-            'count': len(job_list),
-            'note': 'This shows APScheduler internal jobs. For backup job configs, use /api/highball/jobs'
-        })
+        return _list_jobs()
 
 
 # =============================================================================

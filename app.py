@@ -315,7 +315,7 @@ async def browse_filesystem(path: str = Query("/")):
 
 @app.get("/jobs")
 async def list_jobs():
-    return services.handlers['job_scheduler'].list_jobs()
+    return job_pages.list_scheduler_jobs()
 
 # =============================================================================
 # HTMX PARTIALS (Domain-specific AJAX endpoints)

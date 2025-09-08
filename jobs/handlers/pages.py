@@ -907,5 +907,14 @@ class JobsHandler(BaseHandler):
             'scheduled_count': scheduled_count
         })
 
+    @handle_page_errors("List scheduler jobs")
+    def list_scheduler_jobs(self) -> JSONResponse:
+        """List APScheduler internal jobs - DEBUG/ADMIN endpoint"""
+        from jobs.services.schedule import JobSchedulerHandler, SchedulingService
+        scheduler_service = SchedulingService()
+        job_scheduler = JobSchedulerHandler(scheduler_service)
+        result = job_scheduler.list_jobs()
+        return JSONResponse(content=result)
+
 # Global handler instance
 jobs_handler = JobsHandler()
