@@ -482,3 +482,8 @@ class JobOperationsService:
             return {'success': True, 'message': f"Job '{job_name}' restored successfully"}
         else:
             return {'success': False, 'error': f"Failed to restore job '{job_name}'"}
+    
+    @handle_service_errors("Serialize job config")
+    def serialize_job_config(self, job_config: Dict[str, Any]) -> str:
+        """Serialize job configuration to JSON string for change detection"""
+        return json.dumps(job_config, sort_keys=True)

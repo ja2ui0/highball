@@ -407,8 +407,7 @@ class JobsHandler(BaseHandler):
         form_data['form_has_changes'] = False  # Initially no changes
         
         # Store original config for change detection (as JSON string)
-        import json
-        form_data['original_job_config'] = json.dumps(job_config, sort_keys=True)
+        form_data['original_job_config'] = self.job_operations.serialize_job_config(job_config)
         
         # Add available destination types (could be context-aware based on source)
         source_config = job_config.get('source_config', {})
