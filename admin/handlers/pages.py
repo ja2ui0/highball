@@ -575,7 +575,8 @@ class AdminHandler(BaseHandler):
         from admin.services.notifications import NotificationTestService
         from config import BackupConfig
         notification_service = NotificationTestService(BackupConfig())
-        return notification_service.test_telegram_notification(test_message)
+        result = notification_service.test_telegram_notification(test_message)
+        return JSONResponse(content=result)
 
     async def test_email_notification_htmx(self, request) -> JSONResponse:
         """Test email notification with form parsing - pure switchboard compliance"""
@@ -587,7 +588,8 @@ class AdminHandler(BaseHandler):
         from admin.services.notifications import NotificationTestService
         from config import BackupConfig
         notification_service = NotificationTestService(BackupConfig())
-        return notification_service.test_email_notification(test_message)
+        result = notification_service.test_email_notification(test_message)
+        return JSONResponse(content=result)
 
 # Global handler instance
 admin_handler = AdminHandler()

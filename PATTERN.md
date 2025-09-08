@@ -1,53 +1,74 @@
-# Layering Fix Pattern
+# FastAPI Layering Violation Fix Pattern
 
-## Context
-The `.refactor/refactor.sh --claude-one` script identifies web-stack imports in domain services that violate layering rules.
+## Detection
+Use `.refactor/refactor.sh --claude-one` to identify web-stack imports in domain services (*/services).
 
-## Problem Pattern
-Services containing `from fastapi.responses import JSONResponse` and returning `JSONResponse` objects mix web concerns with business logic.
+## Core Problem
+Services containing `from fastapi.responses import JSONResponse` mix web concerns with business logic.
 
-## Solution Pattern
+## Fix Pattern (Always Apply All Steps)
 
-### 1. Fix the Service Method
-- Remove `from fastapi.responses import JSONResponse` import
+### 1. Fix Service Method
+- Remove `from fastapi.responses import JSONResponse` import  
 - Add `@handle_service_errors("Operation name")` decorator
-- Return plain data structures (dicts with success/error keys)
-- Fix any broken method calls (e.g. `analyze_content` -> `analyze_repository_content`)
-- Ensure service class has all required dependencies in constructor
+- Return plain data structures instead of `JSONResponse(content=result)`
+- Fix any broken method calls revealed by the change
 
-### 2. Create Handler Method
-- Add method to appropriate domain `handlers/pages.py`
-- Use `@handle_page_errors("Operation name")` decorator  
-- Import domain service: `from domain.services.module import service_name`
-- Call service method and wrap result: `return JSONResponse(content=result)`
+### 2. Update Handler Method
+- If handler exists: Wrap service result with `return JSONResponse(content=result)`
+- If no handler exists: Create handler method in appropriate `domain/handlers/pages.py`
+- Use `@handle_page_errors("Operation name")` decorator
 
-### 3. Update App Routing
-- Change app.py route from calling service directly to calling handler
-- Pattern: `return domain_handler.method_name(params)` instead of `return services.api.method_name(params)`
+### 3. Update App Routing (if needed)
+- Change app.py route from `services.method()` to `domain_handler.method()`
 
-### 4. Export Service Instance
-- Add service export at bottom of service file with required config
-- Pattern: `service_name = ServiceClass(required_config)`
+### 4. Test End-to-End
+- Rebuild with `./rr` then test with `curl`
+- Verify proper error handling (missing params, invalid data)
+- Don't commit until endpoint works correctly
 
-## Example
+## Service Import Anti-Patterns
+
+**❌ NEVER do this (circular dependency):**
 ```python
-# Service (domain/services/module.py)
-@handle_service_errors("Get info")
-def get_info(self, param):
-    # business logic
-    return {'success': True, 'data': result}
-
-# Handler (domain/handlers/pages.py) 
-@handle_page_errors("Get info")
-def get_info(self, param):
-    from domain.services.module import service_instance
-    result = service_instance.get_info(param)
-    return JSONResponse(content=result)
-
-# App routing (app.py)
-return domain_handler.get_info(param)
+from app import services  # Creates circular imports
 ```
 
-## Remaining Work
-- 4 more methods in `dests/services/restic.py` need same fix
-- Run `.refactor/refactor.sh --claude-one` to find remaining violations
+**❌ NEVER do this (broken import):**
+```python  
+from admin.services.init import services  # services not exported
+```
+
+**✅ ALWAYS do this (direct domain import):**
+```python
+from domain.services.module import service_instance
+# or create instance: service = ServiceClass(config)
+```
+
+## Common Issues & Fixes
+
+**Static Method Call Error:**
+```python
+# ❌ Wrong: Creating instance of class with static methods
+parser = DestinationParser()
+result = parser.parse_restic_destination(data)
+
+# ✅ Correct: Call static method directly  
+result = DestinationParser.parse_restic_destination(data)
+```
+
+**Method Not Found Error:**
+- Search for correct method name: `grep -rn "method_name" /path/to/services/`
+- Check method exists in correct service class
+- Example: `backup_service.initialize_repository()` → `ResticRepositoryService().initialize_repository()`
+
+**Form Data Structure:**
+- Keep resilient array structure in handlers (works with `safe_get_value()`)
+- Don't change form parsing to "fix" validation errors
+- Arrays are more resilient for future extensibility
+
+## Testing Pattern
+```bash
+./rr                    # Rebuild (wait for success)
+curl -s "http://localhost:8087/endpoint"  # Test separately
+```
