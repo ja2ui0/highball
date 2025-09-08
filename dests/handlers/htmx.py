@@ -294,7 +294,7 @@ class HTMXHandlers:
         # Build URI from individual repository fields using existing URI builder
         # DestinationParser is now local to this module
         from dests.handlers.pages import DestinationParser
-        uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+        uri_result = self.destinations_handler.dest_operations._build_restic_uri(repo_type, form_data)
         
         if not uri_result.get('valid'):
             html_response = self.destinations_handler.render_restic_validation_status({
@@ -406,7 +406,7 @@ class HTMXHandlers:
         # Parse Restic config from unified parser
         # DestinationParser is now local to this module
         from dests.handlers.pages import DestinationParser
-        restic_result = DestinationParser.parse_restic_destination(form_data)
+        restic_result = self.destinations_handler.dest_operations.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
             html_response = self.destinations_handler._render_validation_result("error", restic_result['error'])
@@ -531,10 +531,8 @@ class HTMXHandlers:
             html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html',
                                                                uri='Select repository type to see URI preview')
         else:
-            # Use existing URI builder from forms module
-            # DestinationParser is now local to this module
-            from dests.handlers.pages import DestinationParser
-            uri_result = DestinationParser._build_restic_uri(repo_type, form_data)
+            # Use existing URI builder from service
+            uri_result = self.destinations_handler.dest_operations._build_restic_uri(repo_type, form_data)
             
             if uri_result.get('valid'):
                 # Mask password in display
