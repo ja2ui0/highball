@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import asyncio
 
 from shared.handlers.templating import TemplateService
+from shared.handlers.errors import handle_page_errors
 from config import BackupConfig
 from models.forms import safe_get_value
 from origins.services.manage import OriginOperationsService
@@ -148,20 +149,6 @@ def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> st
     value_list = form_data.get(key, [default])
     return value_list[0] if value_list else default
 
-def handle_page_errors(operation_name: str) -> Callable:
-    """Decorator to handle common page operation errors consistently"""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-            try:
-                return func(self, *args, **kwargs)
-            except Exception as e:
-                logger.error(f"{operation_name} error: {e}")
-                return JSONResponse(content={
-                    'success': False,
-                    'error': str(e)
-                }, status_code=500)
-        return wrapper
-    return decorator
 
 class BaseHandler:
     """Base class for handlers with shared rendering helpers"""

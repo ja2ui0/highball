@@ -9,26 +9,9 @@ from typing import Dict, Any, Callable
 from functools import wraps
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from shared.handlers.errors import handle_page_errors
 
 
-# =============================================================================
-# **ERROR HANDLING DECORATOR**
-# =============================================================================
-
-def handle_page_errors(operation_name: str) -> Callable:
-    """Error handling decorator for HTMX handlers"""
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                print(f"Error in {operation_name}: {str(e)}")
-                # Return error HTML for HTMX requests
-                error_html = f'<div class="error">Error in {operation_name}: {str(e)}</div>'
-                return HTMLResponse(content=error_html, status_code=500)
-        return wrapper
-    return decorator
 
 
 # =============================================================================

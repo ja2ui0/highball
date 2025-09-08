@@ -14,27 +14,11 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import logging
 from shared.services.ssh import SSHCommandFactory
+from shared.handlers.errors import handle_service_errors
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# VALIDATION ERROR HANDLING DECORATOR
-# =============================================================================
-
-def handle_validation_errors(operation_name: str):
-    """Decorator to handle validation operation errors consistently"""
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                logger.error(f"{operation_name} validation error: {e}")
-                return {
-                    'valid': False,
-                    'error': f'{operation_name} validation failed: {str(e)}'
-                }
-        return wrapper
-    return decorator
+# Using shared error decorator - handle_service_errors imported above
 
 # =============================================================================
 # DATA CLASSES - Shared validation structures
@@ -757,7 +741,7 @@ class ValidationService:
         result = self.job.validate_backup_job(job_config)
         return result.to_dict()
     
-    @handle_validation_errors("SSH path")
+    @handle_service_errors("SSH path validation")
     def validate_source_path_for_backup_ssh(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
         """Check SSH path permissions with robust RX/RWX analysis for backup capability"""
         if not hostname or not username:
@@ -784,7 +768,7 @@ class ValidationService:
         else:
             return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
     
-    @handle_validation_errors("Local path")
+    @handle_service_errors("Local path validation")
     def validate_source_path_for_backup_local(self, path: str) -> Dict[str, Any]:
         """Check local path permissions with robust RX/RWX analysis for backup capability"""
         import os

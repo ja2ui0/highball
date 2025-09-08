@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from shared.handlers.templating import TemplateService
+from shared.handlers.errors import handle_page_errors
 from config import BackupConfig
 from models.forms import safe_get_value, safe_get_list, parse_lines
 
@@ -110,20 +111,6 @@ class NotificationParser:
         
         return {'valid': True, 'notifications': notifications}
 
-def handle_page_errors(operation_name: str) -> Callable:
-    """Decorator to handle common page operation errors consistently"""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-            try:
-                return func(self, *args, **kwargs)
-            except Exception as e:
-                logger.error(f"{operation_name} error: {e}")
-                return JSONResponse(content={
-                    'success': False,
-                    'error': str(e)
-                }, status_code=500)
-        return wrapper
-    return decorator
 
 class BaseHandler:
     """Base class for handlers with shared rendering helpers"""

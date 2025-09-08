@@ -19,25 +19,11 @@ from shared.services.exec import OperationType
 from shared.services.exec import ResticExecutionService
 from shared.services.exec import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
+from shared.handlers.errors import handle_service_errors
 
 logger = logging.getLogger(__name__)
 
-# Import the error handling decorator
-def handle_restic_service_errors(operation_name: str) -> Callable:
-    """Decorator to handle common restic service operation errors consistently"""
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-            try:
-                return func(self, *args, **kwargs)
-            except Exception as e:
-                logger.error(f"Restic {operation_name} error: {e}")
-                return {
-                    'success': False,
-                    'error': f'{operation_name} failed: {str(e)}'
-                }
-        return wrapper
-    return decorator
+# Using shared error decorator - handle_service_errors imported above
 
 
 # =============================================================================
@@ -65,7 +51,7 @@ class ResticRepositoryService:
         
         # If we reach here, all validation passed
     
-    @handle_restic_service_errors("repository access test")
+    @handle_service_errors("repository access test")
     def test_repository_access(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Test repository access and get status information"""
         dest_config = job_config.get('dest_config', {})
@@ -124,7 +110,7 @@ class ResticRepositoryService:
                     'error': f'Repository access failed: {result.stderr}'
                 }
     
-    @handle_restic_service_errors("repository initialization")
+    @handle_service_errors("repository initialization")
     def initialize_repository(self, dest_config: Dict[str, Any], source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Initialize a new Restic repository"""
         self._validate_required_fields(dest_config)
@@ -182,7 +168,7 @@ class ResticRepositoryService:
                 'error': f'Backup execution failed: {str(e)}'
             }
     
-    @handle_restic_service_errors("snapshot listing")
+    @handle_service_errors("snapshot listing")
     def list_snapshots(self, dest_config: Dict[str, Any], filters: Dict[str, Any] = None, source_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """List repository snapshots with optional filtering"""
         self._validate_required_fields(dest_config)
@@ -248,7 +234,7 @@ class ResticRepositoryService:
                 'error': f'Failed to list snapshots: {result.stderr}'
             }
     
-    @handle_restic_service_errors("SSH snapshot listing")
+    @handle_service_errors("SSH snapshot listing")
     def list_snapshots_with_ssh(self, dest_config: Dict[str, Any], source_config: Dict[str, Any], filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """List snapshots with SSH execution support (like working code)"""
         self._validate_required_fields(dest_config)
@@ -429,7 +415,7 @@ class ResticRepositoryService:
                 'error': f'SSH execution failed: {str(e)}'
             }
     
-    @handle_restic_service_errors("snapshot statistics")
+    @handle_service_errors("snapshot statistics")
     def get_snapshot_statistics(self, dest_config: Dict[str, Any], snapshot_id: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get detailed statistics for a specific snapshot"""
         self._validate_required_fields(dest_config)
@@ -465,7 +451,7 @@ class ResticRepositoryService:
                 'error': f'Stats command failed: {result.stderr}'
             }
     
-    @handle_restic_service_errors("repository unlock")
+    @handle_service_errors("repository unlock")
     def unlock_repository(self, dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Unlock a restic repository"""
         self._validate_required_fields(dest_config)
@@ -557,7 +543,7 @@ class ResticRepositoryService:
                 'error': f'SSH unlock failed: {str(e)}'
             }
     
-    @handle_restic_service_errors("snapshot directory browsing")
+    @handle_service_errors("snapshot directory browsing")
     def browse_snapshot_directory(self, dest_config: Dict[str, Any], snapshot_id: str, path: str, source_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Browse directory contents in a specific snapshot"""
         self._validate_required_fields(dest_config)
@@ -1008,7 +994,7 @@ class ResticMaintenanceService:
             if not dest_config.get(field):
                 raise ValueError(f'{schema.get("display_name", "Restic")} repository missing {field}')
     
-    @handle_restic_service_errors("maintenance operation")
+    @handle_service_errors("maintenance operation")
     def run_maintenance_operation(self, dest_config: Dict[str, Any], operation: str, 
                                 config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Run maintenance operation on repository"""

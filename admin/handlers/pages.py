@@ -17,24 +17,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Import services
 from shared.handlers.templating import TemplateService
+from shared.handlers.errors import handle_page_errors
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)
 
-def handle_page_errors(operation_name: str) -> Callable:
-    """Decorator to handle common page operation errors consistently"""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-            try:
-                return func(self, *args, **kwargs)
-            except Exception as e:
-                logger.error(f"{operation_name} error: {e}")
-                return JSONResponse(content={
-                    'success': False,
-                    'error': str(e)
-                }, status_code=500)
-        return wrapper
-    return decorator
 
 class BaseHandler:
     """Base class for handlers with shared rendering helpers"""
