@@ -1063,13 +1063,12 @@ class ResticAPIService:
         analysis_result = self.content_analyzer.analyze_repository_content(dest_config, job_name)
         return analysis_result
     
+    @handle_service_errors("List snapshots")
     def list_snapshots(self, job_name: str):
         """List snapshots for a job"""
-        from fastapi.responses import JSONResponse
-        
         job_config, error = self._validate_job(job_name)
         if error:
-            return JSONResponse(content=error)
+            return error
         
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
@@ -1077,25 +1076,24 @@ class ResticAPIService:
         
         from jobs.services.backup import backup_service
         result = backup_service.list_snapshots(dest_config, filters, source_config)
-        return JSONResponse(content=result)
+        return result
     
+    @handle_service_errors("Get snapshot stats")
     def get_snapshot_stats(self, job_name: str, snapshot_id: str):
         """Get statistics for a specific snapshot"""
-        from fastapi.responses import JSONResponse
-        
         if not snapshot_id:
-            return JSONResponse(content={'success': False, 'error': 'Snapshot ID is required'})
+            return {'success': False, 'error': 'Snapshot ID is required'}
         
         job_config, error = self._validate_job(job_name)
         if error:
-            return JSONResponse(content=error)
+            return error
         
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
         from jobs.services.backup import backup_service
         result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
-        return JSONResponse(content=result)
+        return result
     
     def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/'):
         """Browse directory contents in a snapshot"""

@@ -295,11 +295,11 @@ async def get_repository_info(job: str = Query("")):
 
 @app.get("/restic-snapshots")
 async def list_snapshots(job: str = Query("")):
-    return services.restic_api.list_snapshots(job)
+    return destinations_handler.list_snapshots(job)
 
 @app.get("/restic-snapshot-stats")
 async def get_snapshot_stats(job: str = Query(""), snapshot: str = Query("")):
-    return services.restic_api.get_snapshot_stats(job, snapshot)
+    return destinations_handler.get_snapshot_stats(job, snapshot)
 
 @app.get("/restic-browse")
 async def browse_directory(job: str = Query(""), snapshot: str = Query(""), path: str = Query("/")):

@@ -875,5 +875,17 @@ class DestinationsHandler(BaseHandler):
         # Service already returns the correct structure, just wrap in JSONResponse
         return JSONResponse(content=result)
 
+    @handle_page_errors("List snapshots")
+    def list_snapshots(self, job_name: str) -> JSONResponse:
+        from dests.services.restic import restic_api_service
+        result = restic_api_service.list_snapshots(job_name)
+        return JSONResponse(content=result)
+
+    @handle_page_errors("Get snapshot stats")
+    def get_snapshot_stats(self, job_name: str, snapshot_id: str) -> JSONResponse:
+        from dests.services.restic import restic_api_service
+        result = restic_api_service.get_snapshot_stats(job_name, snapshot_id)
+        return JSONResponse(content=result)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()
