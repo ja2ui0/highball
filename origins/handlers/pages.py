@@ -254,46 +254,6 @@ class OriginsHandler(BaseHandler):
                 'error': result['error']
             }, status_code=status_code)
 
-    async def add_ssh_origin_htmx(self, request) -> JSONResponse:
-        """Add SSH origin with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.add_ssh_origin(form_data)
-
-    @handle_page_errors("Add SSH origin")
-    def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new SSH origin"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        
-        # Delegate business logic to origin service
-        result = self.origin_service.add_new_origin(origin_name, origin_config)
-        
-        if result['success']:
-            return RedirectResponse(url='/origins', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=400)
-
-    async def save_ssh_origin_htmx(self, request) -> JSONResponse:
-        """Save SSH origin with form parsing - pure switchboard compliance"""
-        # Parse form data using dict() approach (matches current app.py pattern)
-        form_data = dict(await request.form())
-        
-        # Call existing business logic
-        return self.save_ssh_origin(form_data)
 
     async def validate_ssh_origin_htmx(self, request) -> JSONResponse:
         """Validate SSH origin with form parsing - pure switchboard compliance"""
@@ -311,31 +271,6 @@ class OriginsHandler(BaseHandler):
         # Call existing business logic
         return self.toggle_ssh_auth_method(form_data)
 
-    @handle_page_errors("Save SSH origin")
-    def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save SSH origin changes"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
-        
-        # Delegate business logic to origin service
-        result = self.origin_service.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
-        
-        if result['success']:
-            return RedirectResponse(url='/origins', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=500)
 
     def _get_form_value(self, form_data: Dict[str, Any], key: str, default: Any = None) -> Any:
         """Helper to get form value with default"""

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 # Domain Handlers - Pure Switchboard Pattern
 from origins.handlers.pages import origins_handler
+from origins.handlers.htmx import origins_htmx
 from dests.handlers.pages import destinations_handler
 from dests.handlers.htmx import destinations_htmx
 from jobs.handlers.pages import jobs_handler as job_pages
@@ -85,11 +86,11 @@ async def show_origins():
 
 @app.post("/origins/add")
 async def add_origin(request: Request):
-    return await origins_handler.add_ssh_origin_htmx(request)
+    return await origins_htmx.add_ssh_origin_htmx(request)
 
 @app.post("/origins/save")
 async def save_origin(request: Request):
-    return await origins_handler.save_ssh_origin_htmx(request)
+    return await origins_htmx.save_ssh_origin_htmx(request)
 
 @app.get("/origins/edit/{origin_name}")
 async def edit_origin(origin_name: str):
