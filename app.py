@@ -291,7 +291,7 @@ async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
 
 @app.get("/restic-repo-info")
 async def get_repository_info(job: str = Query("")):
-    return services.restic_api.get_repository_info(job)
+    return destinations_handler.get_repository_info(job)
 
 @app.get("/restic-snapshots")
 async def list_snapshots(job: str = Query("")):

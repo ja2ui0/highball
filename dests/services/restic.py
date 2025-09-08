@@ -1038,6 +1038,7 @@ class ResticAPIService:
     def __init__(self, backup_config):
         self.backup_config = backup_config
         self.restic_service = ResticRepositoryService()
+        self.content_analyzer = ResticContentAnalyzer()
     
     def _validate_job(self, job_name: str):
         """Common job validation logic"""
@@ -1050,18 +1051,17 @@ class ResticAPIService:
         
         return jobs[job_name], None
     
+    @handle_service_errors("Get repository info")
     def get_repository_info(self, job_name: str):
-        """Get Restic repository information"""
-        from fastapi.responses import JSONResponse
-        
+        """Get Restic repository information - returns plain data"""
         job_config, error = self._validate_job(job_name)
         if error:
-            return JSONResponse(content=error)
+            return error
         
         dest_config = job_config.get('dest_config', {})
-        from jobs.services.backup import backup_service
-        analysis_result = backup_service.analyze_content(dest_config, job_name)
-        return JSONResponse(content=analysis_result)
+        # Use the correct method on the content analyzer
+        analysis_result = self.content_analyzer.analyze_repository_content(dest_config, job_name)
+        return analysis_result
     
     def list_snapshots(self, job_name: str):
         """List snapshots for a job"""
@@ -1178,3 +1178,8 @@ class ResticRepositoryTypeService:
 # Export the services
 restic_service = ResticRepositoryService()
 restic_repository_type_service = ResticRepositoryTypeService()
+
+# Export API service - requires BackupConfig
+from config import BackupConfig
+_backup_config = BackupConfig()
+restic_api_service = ResticAPIService(_backup_config)

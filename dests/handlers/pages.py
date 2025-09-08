@@ -864,5 +864,16 @@ class DestinationsHandler(BaseHandler):
                 'error_message': error_message or 'Unknown error'
             })
 
+    @handle_page_errors("Get repository info")
+    def get_repository_info(self, job_name: str) -> JSONResponse:
+        """Get repository information with proper response formatting"""
+        from dests.services.restic import restic_api_service
+        
+        # Call service (returns plain data with success/error structure)
+        result = restic_api_service.get_repository_info(job_name)
+        
+        # Service already returns the correct structure, just wrap in JSONResponse
+        return JSONResponse(content=result)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()
