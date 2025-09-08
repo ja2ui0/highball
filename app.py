@@ -426,7 +426,7 @@ async def generate_restic_uri_preview(request: Request):
 
 @app.options("/api/{path:path}")
 async def handle_options(path: str):
-    return services.handle_options()
+    return admin_handler.handle_options()
 
 @app.get("/favicon.ico")
 async def favicon():

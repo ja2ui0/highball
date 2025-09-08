@@ -591,5 +591,17 @@ class AdminHandler(BaseHandler):
         result = notification_service.test_email_notification(test_message)
         return JSONResponse(content=result)
 
+    @handle_page_errors("Handle CORS options")
+    def handle_options(self) -> JSONResponse:
+        """Handle CORS preflight requests for API endpoints"""
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            }
+        )
+
 # Global handler instance
 admin_handler = AdminHandler()
