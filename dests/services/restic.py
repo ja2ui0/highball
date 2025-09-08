@@ -1126,20 +1126,18 @@ class ResticAPIService:
         result = backup_service.initialize_repository(dest_config, source_config)
         return result
     
+    @handle_service_errors("Initialize restic repo")
     def initialize_restic_repo(self, form_data: Dict[str, Any]):
         """Initialize Restic repository from form data"""
-        from fastapi.responses import JSONResponse
-        
         from dests.handlers.pages import DestinationParser
-        destination_parser = DestinationParser()
-        restic_result = destination_parser.parse_restic_destination(form_data)
+        restic_result = DestinationParser.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
-            return JSONResponse(content={'success': False, 'error': restic_result['error']})
+            return {'success': False, 'error': restic_result['error']}
         
-        from jobs.services.backup import backup_service
-        result = backup_service.initialize_repository(restic_result['config'])
-        return JSONResponse(content=result)
+        repository_service = ResticRepositoryService()
+        result = repository_service.initialize_repository(restic_result['config'])
+        return result
 
 
 # =============================================================================

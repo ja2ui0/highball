@@ -440,9 +440,10 @@ class HTMXHandlers:
             else:
                 form_data[key] = [value]
         
-        # Call existing restic API service
-        from admin.services.init import services
-        return services.restic_api.initialize_restic_repo(form_data)
+        # Call existing restic API service (now returns plain data, not JSONResponse)
+        from dests.services.restic import restic_api_service
+        result = restic_api_service.initialize_restic_repo(form_data)
+        return JSONResponse(content=result)
     
     @handle_page_errors("Repository unlock")
     async def unlock_repository_post_htmx(self, request) -> HTMLResponse:
