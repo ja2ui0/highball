@@ -23,84 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# ORIGIN FORM PARSER
+# FORM PARSING MOVED TO origins/services/manage.py
 # =============================================================================
-
-class OriginParser:
-    """Parse SSH origin configurations"""
-    
-    @staticmethod
-    def parse_origin_form(form_data: Dict[str, Any], require_password: bool = True) -> Dict[str, Any]:
-        """Parse SSH origin form data"""
-        origin_name = safe_get_value(form_data, 'origin_name').strip()
-        if not origin_name:
-            return {'valid': False, 'error': 'Origin name is required'}
-        
-        # Validate origin name is a valid slug (matches filename requirements)
-        import re
-        if not re.match(r'^[a-zA-Z0-9_-]+$', origin_name):
-            return {'valid': False, 'error': 'Origin name must contain only letters, numbers, underscores, and hyphens'}
-        
-        friendly_name = safe_get_value(form_data, 'friendly_name').strip()
-        if not friendly_name:
-            return {'valid': False, 'error': 'Friendly name is required'}
-        
-        ssh_hostname = safe_get_value(form_data, 'ssh_hostname').strip()
-        if not ssh_hostname:
-            return {'valid': False, 'error': 'SSH hostname is required'}
-        
-        ssh_username = safe_get_value(form_data, 'ssh_username').strip()
-        if not ssh_username:
-            return {'valid': False, 'error': 'SSH username is required'}
-        
-        # Parse authentication method
-        ssh_highball = safe_get_value(form_data, 'ssh_highball') == 'on'
-        
-        # Parse optional fields with defaults
-        ssh_port = safe_get_value(form_data, 'ssh_port', '22')
-        ssh_timeout = safe_get_value(form_data, 'ssh_timeout', '5')
-        
-        try:
-            ssh_port = int(ssh_port)
-            ssh_timeout = int(ssh_timeout)
-        except ValueError:
-            return {'valid': False, 'error': 'SSH port and timeout must be numbers'}
-        
-        # Note: Auth validation removed - no BYOK fields to validate anymore
-        
-        # Build origin configuration
-        # Parse detected capabilities from validation (if present)
-        detected_rsync = safe_get_value(form_data, 'detected_rsync_available', 'false')
-        detected_runtime = safe_get_value(form_data, 'detected_container_runtime', '')
-        
-        
-        origin_config = {
-            'origin_name': origin_name,
-            'friendly_name': friendly_name,
-            'ssh_hostname': ssh_hostname,
-            'ssh_port': ssh_port,
-            'ssh_timeout': ssh_timeout,
-            'ssh_username': ssh_username,
-            'ssh_highball': True,  # Always true - Highball-only system
-            'rsync_available': detected_rsync.lower() == 'true',
-            'container_runtime': detected_runtime if detected_runtime else None
-        }
-        
-        # Add authentication-specific fields
-        if ssh_highball:
-            # Highball key mode - password only required for validation, not for save operations
-            ssh_password = safe_get_value(form_data, 'ssh_password')
-            if require_password and not ssh_password:
-                return {'valid': False, 'error': 'SSH password is required for Highball key installation'}
-            if ssh_password:
-                origin_config['ssh_password'] = ssh_password  # Transient
-        # Note: When ssh_highball is False, user has existing keys and no additional input is required
-        
-        return {'valid': True, 'origin_config': origin_config}
-
-
-# Create parser instance for easy access
-origin_parser = OriginParser()
 
 @dataclass
 class HtmxFormData:
@@ -258,7 +182,7 @@ class OriginsHandler(BaseHandler):
     def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new SSH origin"""
         # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
+        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -283,7 +207,7 @@ class OriginsHandler(BaseHandler):
     def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save SSH origin changes"""
         # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
+        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -319,7 +243,7 @@ class OriginsHandler(BaseHandler):
     def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Push keys and validate SSH origin configuration with persistent session tracking"""
         # Parse origin form data (no password required for save operations)
-        origin_result = origin_parser.parse_origin_form(form_data, require_password=False)
+        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content=origin_result)
         

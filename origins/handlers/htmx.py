@@ -36,9 +36,6 @@ class HTMXHandlers(BaseHandler):
         self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
         
-        # Import parser from pages module
-        from origins.handlers.pages import origin_parser
-        self.origin_parser = origin_parser
 
     # =========================================================================
     # FORM SUBMISSION HANDLERS
@@ -223,7 +220,7 @@ class HTMXHandlers(BaseHandler):
             
             # Parse form data using the same parser as save operations
             # origin_parser is now local to this module
-            origin_result = self.origin_parser.parse_origin_form(form_data, require_password=False)
+            origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
             if not origin_result['valid']:
                 html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                    preview_content=f"# Error: {origin_result['error']}",
