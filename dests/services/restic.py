@@ -1095,38 +1095,36 @@ class ResticAPIService:
         result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
         return result
     
+    @handle_service_errors("Browse directory")
     def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/'):
         """Browse directory contents in a snapshot"""
-        from fastapi.responses import JSONResponse
-        
         if not snapshot_id:
-            return JSONResponse(content={'success': False, 'error': 'Snapshot ID is required'})
+            return {'success': False, 'error': 'Snapshot ID is required'}
         
         job_config, error = self._validate_job(job_name)
         if error:
-            return JSONResponse(content=error)
+            return error
         
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
         from jobs.services.backup import backup_service
         result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
-        return JSONResponse(content=result)
+        return result
     
+    @handle_service_errors("Initialize repository")
     def init_repository(self, job_name: str):
         """Initialize Restic repository for a job"""
-        from fastapi.responses import JSONResponse
-        
         job_config, error = self._validate_job(job_name)
         if error:
-            return JSONResponse(content=error)
+            return error
         
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
         from jobs.services.backup import backup_service
         result = backup_service.initialize_repository(dest_config, source_config)
-        return JSONResponse(content=result)
+        return result
     
     def initialize_restic_repo(self, form_data: Dict[str, Any]):
         """Initialize Restic repository from form data"""

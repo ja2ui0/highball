@@ -887,5 +887,17 @@ class DestinationsHandler(BaseHandler):
         result = restic_api_service.get_snapshot_stats(job_name, snapshot_id)
         return JSONResponse(content=result)
 
+    @handle_page_errors("Browse directory")
+    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/') -> JSONResponse:
+        from dests.services.restic import restic_api_service
+        result = restic_api_service.browse_directory(job_name, snapshot_id, path)
+        return JSONResponse(content=result)
+
+    @handle_page_errors("Initialize repository")
+    def init_repository(self, job_name: str) -> JSONResponse:
+        from dests.services.restic import restic_api_service
+        result = restic_api_service.init_repository(job_name)
+        return JSONResponse(content=result)
+
 # Global handler instance
 destinations_handler = DestinationsHandler()

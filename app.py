@@ -303,11 +303,11 @@ async def get_snapshot_stats(job: str = Query(""), snapshot: str = Query("")):
 
 @app.get("/restic-browse")
 async def browse_directory(job: str = Query(""), snapshot: str = Query(""), path: str = Query("/")):
-    return services.restic_api.browse_directory(job, snapshot, path)
+    return destinations_handler.browse_directory(job, snapshot, path)
 
 @app.get("/restic-init")
 async def init_repository(job: str = Query("")):
-    return services.restic_api.init_repository(job)
+    return destinations_handler.init_repository(job)
 
 @app.get("/filesystem-browse")
 async def browse_filesystem(path: str = Query("/")):
