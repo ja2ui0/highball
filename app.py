@@ -102,7 +102,7 @@ async def delete_origin(origin_name: str):
 
 @app.post("/origins/validate")
 async def validate_origin(request: Request):
-    return await origins_handler.validate_ssh_origin_htmx(request)
+    return await origins_htmx.validate_ssh_origin_htmx(request)
 
 @app.get("/origins/progress/{session_id}")
 async def get_origin_progress(session_id: str):
@@ -114,7 +114,7 @@ async def stream_origin_progress(session_id: str, request: Request):
 
 @app.post("/htmx/toggle-auth-method")
 async def toggle_ssh_auth_method(request: Request):
-    return await origins_handler.toggle_ssh_auth_method_htmx(request)
+    return await origins_htmx.toggle_ssh_auth_method_htmx(request)
 
 # =============================================================================
 # DESTINATIONS
@@ -324,15 +324,15 @@ async def list_jobs():
 # Origins HTMX endpoints
 @app.post("/origins/validate-ssh-source")
 async def validate_ssh_source_endpoint(request: Request):
-    return await origins_handler.validate_ssh_source_htmx(request)
+    return await origins_htmx.validate_ssh_source_htmx(request)
 
 @app.post("/origins/source-fields")
 async def render_source_fields_endpoint(request: Request):
-    return await origins_handler.render_source_fields_htmx(request)
+    return await origins_htmx.render_source_fields_htmx(request)
 
 @app.post("/origins/preview-ssh-config")
 async def preview_ssh_config_endpoint(request: Request):
-    return await origins_handler.preview_ssh_config_htmx(request)
+    return await origins_htmx.preview_ssh_config_htmx(request)
 
 # Jobs HTMX endpoints
 @app.post("/jobs/validate-source-path")
