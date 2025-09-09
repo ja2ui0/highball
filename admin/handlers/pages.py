@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from admin.services.init import HighballServices
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class AdminHandler(BaseHandler):
     def __init__(self):
         self.backup_config = BackupConfig()
         self.template_service = TemplateService(self.backup_config)
+        self.admin_services = HighballServices()
     
     def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
         """Helper to get form value with default"""
@@ -41,17 +43,8 @@ class AdminHandler(BaseHandler):
         return value if isinstance(value, str) else default
 
     def _get_available_themes(self):
-        """Get list of available theme files from static/themes directory"""
-        themes_dir = Path('static/themes')
-        if not themes_dir.exists():
-            return ['dark', 'light']  # Fallback themes
-        
-        themes = []
-        for theme_file in themes_dir.glob('*.css'):
-            theme_name = theme_file.stem
-            themes.append(theme_name)
-        
-        return sorted(themes)
+        """Get list of available theme files - delegate to admin service"""
+        return self.admin_services.get_available_themes()
 
     @handle_page_errors("Config manager")
     def show_config_manager(self) -> HTMLResponse:

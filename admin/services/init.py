@@ -8,12 +8,14 @@ Manages SSH keypair setup, scheduler bootstrapping, and handler initialization.
 import os
 import subprocess
 import stat
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Optional, List
 
 from jobs.services.schedule import JobSchedulerHandler
 from shared.handlers.templating import TemplateService
 from jobs.services.schedule import SchedulingService
 from jobs.services.define import JobFormDataBuilder
+from shared.handlers.errors import handle_service_errors
 from config import BackupConfig
 
 
@@ -110,4 +112,18 @@ class HighballServices:
             with open(known_hosts_path, 'w') as f:
                 f.write("# SSH known hosts for Highball\n")
             os.chmod(known_hosts_path, 0o644)
+    
+    @handle_service_errors("Get available themes")
+    def get_available_themes(self) -> List[str]:
+        """Get list of available theme files from static/themes directory"""
+        themes_dir = Path('static/themes')
+        if not themes_dir.exists():
+            return ['dark', 'light']  # Fallback themes
+        
+        themes = []
+        for theme_file in themes_dir.glob('*.css'):
+            theme_name = theme_file.stem
+            themes.append(theme_name)
+        
+        return sorted(themes)
     
