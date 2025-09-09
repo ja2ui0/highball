@@ -9,12 +9,14 @@ import select
 import sys
 import os
 import json
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from jobs.services.manage import JobManagementService
 from shared.services.exec import OperationType
 from shared.services.exec import ResticExecutionService
 from shared.services.ssh import SSHCommandFactory
+from shared.handlers.errors import handle_service_errors
 
 # =============================================================================
 # RESPONSE MODELS
@@ -786,6 +788,49 @@ class RestoreService:
                 'error': result.get('error', 'Unknown restore error'),
                 'output': result.get('output', '')
             }
+    
+    @handle_service_errors("Browse filesystem")
+    def browse_filesystem_path(self, path: str = '/') -> Dict[str, Any]:
+        """Browse local filesystem for path selection - filesystem operations moved from handler"""
+        path_obj = Path(path)
+        if not path_obj.exists():
+            return {
+                'success': False,
+                'error': f'Path does not exist: {path}'
+            }
+        
+        if not path_obj.is_dir():
+            return {
+                'success': False,
+                'error': f'Path is not a directory: {path}'
+            }
+        
+        # List directory contents
+        entries = []
+        for item in path_obj.iterdir():
+            if item.is_dir():
+                entries.append({
+                    'name': item.name,
+                    'path': str(item),
+                    'type': 'directory'
+                })
+            elif item.is_file():
+                entries.append({
+                    'name': item.name,
+                    'path': str(item),
+                    'type': 'file',
+                    'size': item.stat().st_size
+                })
+        
+        # Sort: directories first, then files
+        entries.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
+        
+        return {
+            'success': True,
+            'path': str(path_obj),
+            'parent': str(path_obj.parent) if path_obj.parent != path_obj else None,
+            'entries': entries
+        }
 
 
 # =============================================================================
