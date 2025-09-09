@@ -87,11 +87,7 @@ class AdminHandler(BaseHandler):
     def show_raw_editor(self) -> HTMLResponse:
         """Show raw YAML configuration editor"""
         config_path = self.backup_config.config_file
-        raw_config = ""
-        
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                raw_config = f.read()
+        raw_config = self.admin_services.read_raw_config(config_path)
         
         template_data = {
             'raw_config': raw_config,

@@ -597,8 +597,14 @@ class BackupConfig:
             return False
     
     def get_global_settings(self):
-        """Get global settings"""
-        return self.config.get('global_settings', {})
+        """Get global settings with default structure"""
+        settings = self.config.get('global_settings', {})
+        
+        # Ensure notification key exists with empty dict as default
+        if 'notification' not in settings:
+            settings['notification'] = {}
+            
+        return settings
     
     def update_global_settings(self, settings):
         """Update global settings"""

@@ -127,3 +127,12 @@ class HighballServices:
         
         return sorted(themes)
     
+    @handle_service_errors("Read raw config")
+    def read_raw_config(self, config_path: str) -> str:
+        """Read raw configuration file content"""
+        if not os.path.exists(config_path):
+            return ""
+        
+        with open(config_path, 'r') as f:
+            return f.read()
+    
