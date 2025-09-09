@@ -359,7 +359,7 @@ class JobsHandler(BaseHandler):
     def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
         from jobs.services.define import JobFormDataBuilder
-        from dests.services.types import DestinationTypeService
+        from dests.services.select import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         form_data = job_form_builder.build_empty_form_data()
@@ -383,7 +383,7 @@ class JobsHandler(BaseHandler):
     def show_edit_job_form(self, job_name: str) -> HTMLResponse:
         """Show edit job form"""
         from jobs.services.define import JobFormDataBuilder, JobFormTemplateBuilder
-        from dests.services.types import DestinationTypeService
+        from dests.services.select import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         if not job_name:

@@ -20,13 +20,6 @@ logger = logging.getLogger(__name__)
 # DESTINATION FORM PARSER
 # =============================================================================
 
-# =============================================================================
-# FORM PARSING MOVED TO dests/services/manage.py
-# =============================================================================
-
-
-
-
 class DestinationsHandler(BaseHandler):
     """Handle destinations management and validation"""
     
@@ -43,7 +36,7 @@ class DestinationsHandler(BaseHandler):
         self.network_discovery = network_discovery_service
     
     # =========================================================================
-    # DESTINATION VALIDATION RENDERING (moved from services/template.py)
+    # DESTINATION VALIDATION RENDERING
     # =========================================================================
     
     def render_ssh_dest_validation_status(self, result: Dict[str, Any]) -> str:
@@ -157,7 +150,7 @@ class DestinationsHandler(BaseHandler):
         return self._render_html('pages/destinations.html', template_data)
 
     # =============================================================================
-    # DESTINATION FIELD RENDERING AND OPERATIONS - Extracted from mega-dispatcher
+    # DESTINATION FIELD RENDERING AND OPERATIONS
     # =============================================================================
 
     def _get_form_value(self, form_data: Dict[str, Any], key: str, default: str = '') -> str:
@@ -187,11 +180,6 @@ class DestinationsHandler(BaseHandler):
                                                    status_class=status_class,
                                                    status_label=status_label,
                                                    message=html.escape(message))
-
-
-
-
-
 
     @handle_page_errors("Delete destination")
     def delete_destination(self, dest_name: str) -> JSONResponse:
@@ -368,7 +356,6 @@ class DestinationsHandler(BaseHandler):
         else:
             return f"Error: {uri_result.get('error', 'URI generation failed')}"
 
-
     def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save destination changes"""
         
@@ -498,15 +485,6 @@ class DestinationsHandler(BaseHandler):
             return JSONResponse(content={
                 'error': result['error']
             }, status_code=status_code)
-
-
-
-
-
-
-
-
-
 
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""

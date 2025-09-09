@@ -11,9 +11,6 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.errors import handle_page_errors
 
-
-
-
 # =============================================================================
 # **HTMX HANDLERS CLASS**
 # =============================================================================
@@ -27,7 +24,7 @@ class HTMXHandlers:
         self.destinations_handler = DestinationsHandler()
     
     # =========================================================================
-    # **FORM PARSING WRAPPERS** - Batch 1
+    # **FORM PARSING WRAPPERS**
     # =========================================================================
     
     @handle_page_errors("Add destination")
@@ -58,7 +55,7 @@ class HTMXHandlers:
         return self.destinations_handler.validate_destination(form_data)
 
     # =========================================================================
-    # **FIELD RENDERING** - Batch 2
+    # **FIELD RENDERING**
     # =========================================================================
     
     @handle_page_errors("Render maintenance fields")
@@ -213,7 +210,7 @@ class HTMXHandlers:
             return HTMLResponse(content=html_response)
 
     # =========================================================================
-    # **VALIDATION** - Batch 3
+    # **VALIDATION**
     # =========================================================================
     
     @handle_page_errors("Validate SSH destination")
@@ -385,7 +382,7 @@ class HTMXHandlers:
         return HTMLResponse(content=html_response)
 
     # =========================================================================
-    # **REPOSITORY OPERATIONS** - Batch 4
+    # **REPOSITORY OPERATIONS**
     # =========================================================================
     
     @handle_page_errors("Initialize restic repository")
@@ -506,7 +503,7 @@ class HTMXHandlers:
             })
 
     # =========================================================================
-    # **UTILITIES** - Batch 5
+    # **UTILITIES**
     # =========================================================================
     
     @handle_page_errors("Generate restic URI preview")

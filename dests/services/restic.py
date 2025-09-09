@@ -1,7 +1,6 @@
 """
 Restic Service Module
 Contains all Restic-specific service classes for repository operations, content analysis, and maintenance
-Extracted from models/backup.py
 """
 
 import subprocess
