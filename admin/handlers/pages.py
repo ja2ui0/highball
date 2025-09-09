@@ -273,8 +273,8 @@ class AdminHandler(BaseHandler):
         # Notification settings
         self._build_notification_preview(global_settings, form_data)
         
-        # Convert to YAML for display
-        preview_yaml = yaml.dump(preview_config, default_flow_style=False, indent=2)
+        # Convert to YAML for display using admin service
+        preview_yaml = self.admin_services.generate_config_yaml(preview_config)
         
         # Render preview partial
         return self._render_html('partials/config_preview.html', {

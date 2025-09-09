@@ -155,3 +155,8 @@ class HighballServices:
         
         return {'success': True}
     
+    @handle_service_errors("Generate config YAML")
+    def generate_config_yaml(self, config_dict: Dict[str, Any]) -> str:
+        """Convert configuration dictionary to YAML format for display"""
+        return yaml.dump(config_dict, default_flow_style=False, indent=2)
+    
