@@ -167,33 +167,20 @@ class AdminHandler(BaseHandler):
 
     @handle_page_errors("Save raw config")
     def save_raw_config(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save raw YAML configuration"""
-        try:
-            raw_config = form_data.get('raw_config', [''])[0]
-            
-            # Validate YAML syntax
-            try:
-                yaml.safe_load(raw_config)
-            except yaml.YAMLError as e:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': f'Invalid YAML syntax: {str(e)}'
-                }, status_code=400)
-            
-            # Save to file
-            config_path = self.backup_config.config_file
-            with open(config_path, 'w') as f:
-                f.write(raw_config)
-            
-            # Reload configuration
-            self.backup_config.reload_config()
-            
-            return RedirectResponse(url='/config', status_code=302)
-        except Exception as e:
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Configuration save failed: {str(e)}'
-            }, status_code=500)
+        """Save raw YAML configuration - delegate to admin service"""
+        raw_config = form_data.get('raw_config', [''])[0]
+        config_path = self.backup_config.config_file
+        
+        # Delegate validation and saving to service
+        result = self.admin_services.save_raw_config(raw_config, config_path)
+        
+        if not result['success']:
+            return JSONResponse(content=result, status_code=400)
+        
+        # Reload configuration after successful save
+        self.backup_config.reload_config()
+        
+        return RedirectResponse(url='/config', status_code=302)
 
     @handle_page_errors("Save config")
     def save_structured_config(self, form_data: Dict[str, Any]) -> JSONResponse:

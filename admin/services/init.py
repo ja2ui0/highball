@@ -8,6 +8,7 @@ Manages SSH keypair setup, scheduler bootstrapping, and handler initialization.
 import os
 import subprocess
 import stat
+import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -135,4 +136,22 @@ class HighballServices:
         
         with open(config_path, 'r') as f:
             return f.read()
+    
+    @handle_service_errors("Save raw config")
+    def save_raw_config(self, raw_config: str, config_path: str) -> Dict[str, Any]:
+        """Validate and save raw YAML configuration"""
+        # Validate YAML syntax
+        try:
+            yaml.safe_load(raw_config)
+        except yaml.YAMLError as e:
+            return {
+                'success': False,
+                'error': f'Invalid YAML syntax: {str(e)}'
+            }
+        
+        # Save to file
+        with open(config_path, 'w') as f:
+            f.write(raw_config)
+        
+        return {'success': True}
     
