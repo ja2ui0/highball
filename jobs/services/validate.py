@@ -713,8 +713,10 @@ class ValidationService:
         return self.restic.validate_restic_repository_access(restic_config)
     
     def validate_ssh_source(self, source_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate SSH source configuration"""
-        return self.ssh.validate_ssh_source(source_config)
+        """Validate SSH source configuration - delegate to origins domain"""
+        from origins.services.ssh import OriginSSHService
+        ssh_service = OriginSSHService()
+        return ssh_service.validate_ssh_source(source_config)
     
     def validate_source_path_with_ssh(self, hostname: str, username: str, path: str) -> Dict[str, Any]:
         """Validation concern: validate source path with optional SSH details"""

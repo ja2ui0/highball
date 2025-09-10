@@ -28,8 +28,6 @@ class OriginSSHService:
         self.template_service = TemplateService()
         self.ssh_workflow_service = SSHWorkflowService()
         self.ssh_factory = SSHCommandFactory()
-        self._validation_cache = {}
-        self.cache_duration = 1800  # 30 minutes
     
     def render_validation_status(self, result: Dict[str, Any]) -> str:
         """Render SSH source validation status with rsync and container engine details"""
@@ -126,19 +124,11 @@ class OriginSSHService:
         if not hostname or not username:
             return {'valid': False, 'error': 'Hostname and username are required'}
         
-        # Check cache first
-        cache_key = f"ssh:{username}@{hostname}"
-        cached_result = self._get_cached_result(cache_key)
-        if cached_result:
-            return cached_result
-        
         try:
             # Test basic SSH connectivity
             ssh_test = self._test_ssh_connection(hostname, username)
             if not ssh_test['success']:
-                result = {'valid': False, 'error': ssh_test['error']}
-                self._cache_result(cache_key, result)
-                return result
+                return {'valid': False, 'error': ssh_test['error']}
             
             # Test rsync availability and get version
             rsync_test = self._test_rsync_availability(hostname, username)
@@ -164,14 +154,11 @@ class OriginSSHService:
                 'tested_at': datetime.now().isoformat()
             }
             
-            self._cache_result(cache_key, result)
             return result
             
         except Exception as e:
             logger.error(f"SSH validation error for {hostname}: {e}")
-            result = {'valid': False, 'error': f'SSH validation failed: {str(e)}'}
-            self._cache_result(cache_key, result)
-            return result
+            return {'valid': False, 'error': f'SSH validation failed: {str(e)}'}
 
     def _test_ssh_connection(self, hostname: str, username: str) -> Dict[str, Any]:
         """Test basic SSH connectivity"""
@@ -232,23 +219,6 @@ class OriginSSHService:
         except Exception as e:
             return {'success': False, 'error': f'Test error: {str(e)}'}
 
-    def _get_cached_result(self, cache_key: str) -> Dict[str, Any]:
-        """Get cached validation result if still valid"""
-        if cache_key in self._validation_cache:
-            cached_entry = self._validation_cache[cache_key]
-            cache_age = datetime.now().timestamp() - cached_entry['timestamp']
-            if cache_age < self.cache_duration:
-                return cached_entry['result']
-            else:
-                del self._validation_cache[cache_key]
-        return None
-
-    def _cache_result(self, cache_key: str, result: Dict[str, Any]) -> None:
-        """Cache validation result with timestamp"""
-        self._validation_cache[cache_key] = {
-            'result': result,
-            'timestamp': datetime.now().timestamp()
-        }
     
     def validate_origin_string(self, origin_string: str) -> Dict[str, Any]:
         """Validate SSH origin configuration from username@hostname string"""
