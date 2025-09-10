@@ -21,6 +21,7 @@ from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
+from admin.services.notifications import NotificationTestService
 from admin.schema import PROVIDER_FIELD_SCHEMAS
 from config import BackupConfig
 
@@ -521,7 +522,6 @@ class AdminHandler(BaseHandler):
 
     async def save_raw_config_htmx(self, request) -> JSONResponse:
         """Save raw YAML configuration with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
         
         # Parse form data using FastAPI (moved FROM app.py TO handler)
         form = await request.form()
@@ -544,8 +544,6 @@ class AdminHandler(BaseHandler):
         test_message = form.get('test_message', 'Test notification from Highball')
         
         # Call existing business logic (notification test service)
-        from admin.services.notifications import NotificationTestService
-        from config import BackupConfig
         notification_service = NotificationTestService(BackupConfig())
         result = notification_service.test_telegram_notification(test_message)
         return JSONResponse(content=result)
@@ -557,8 +555,6 @@ class AdminHandler(BaseHandler):
         test_message = form.get('test_message', 'Test notification from Highball')
         
         # Call existing business logic (notification test service)
-        from admin.services.notifications import NotificationTestService
-        from config import BackupConfig
         notification_service = NotificationTestService(BackupConfig())
         result = notification_service.test_email_notification(test_message)
         return JSONResponse(content=result)

@@ -231,3 +231,4 @@ Claude code auto-appends after this line.
 3. unlock_repository_post_htmx - Working (returns empty error message as expected for non-existent job)
 4. unlock_repository_htmx (GET) - Working (returns empty error message as expected for non-existent job)  
     ...why are there duplicate init/unlock methods and why is Internal Server Error ok?
+- dests/services/kinds.py is deprecated within its domain - only imported by jobs/ and needs to be removed when jobs/ is refactored.

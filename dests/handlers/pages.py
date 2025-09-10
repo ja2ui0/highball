@@ -16,6 +16,7 @@ from models.forms import safe_get_value, safe_get_list
 from dests.services.manage import create_destination_operations_service
 from dests.services.rsync import network_discovery_service, rsync_service
 from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service
+from dests.schema import DESTINATION_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -112,13 +113,9 @@ class DestinationsHandler(BaseHandler):
         # Build destination display list
         dest_list = []
         for dest_name, dest_config in destinations.items():
-            # Determine destination type display
+            # Determine destination type display from schema
             dest_type = dest_config.get('type', 'Unknown')
-            type_display = {
-                'rsync': 'Rsync (SSH)',
-                'rsyncd': 'Rsync Daemon', 
-                'restic': 'Restic Repository'
-            }.get(dest_type, dest_type)
+            type_display = DESTINATION_TYPE_SCHEMAS.get(dest_type, {}).get('display_name', dest_type)
             
             # Connection info display from nested structure
             hostname = dest_config.get('hostname', 'unknown')
