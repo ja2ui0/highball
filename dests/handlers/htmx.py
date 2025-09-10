@@ -10,6 +10,9 @@ from functools import wraps
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.errors import handle_page_errors
+from dests.handlers.pages import DestinationsHandler
+from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
+from dests.services.rsync import rsync_service
 
 # =============================================================================
 # **HTMX HANDLERS CLASS**
@@ -19,8 +22,7 @@ class HTMXHandlers:
     """HTMX endpoint handlers for destinations domain"""
     
     def __init__(self):
-        # Import destinations handler for delegation
-        from dests.handlers.pages import DestinationsHandler
+        # Initialize destinations handler for delegation
         self.destinations_handler = DestinationsHandler()
     
     # =========================================================================
@@ -74,8 +76,6 @@ class HTMXHandlers:
 
         # Business logic (preserve original implementation)
         maintenance_mode = self.destinations_handler._get_form_value(form_data, 'restic_maintenance', 'auto')
-        
-        from dests.schema import MAINTENANCE_MODE_SCHEMAS
         
         # Extract current field values from form data or use defaults
         field_values = {}
@@ -138,8 +138,6 @@ class HTMXHandlers:
         if not repo_type:
             html_response = ''  # No fields for unselected type
         else:
-            from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
-            
             html_response = self.destinations_handler.template_service.render_template('partials/restic_repo_fields_dynamic.html',
                                                                repo_type=repo_type,
                                                                repo_schemas=RESTIC_REPOSITORY_TYPE_SCHEMAS,
@@ -179,8 +177,6 @@ class HTMXHandlers:
         dest_type = form_data.get('dest_type', [''])[0]
         
         # Schema-driven destination field rendering
-        from dests.schema import DESTINATION_TYPE_SCHEMAS
-        
         if dest_type not in DESTINATION_TYPE_SCHEMAS:
             html_response = self.destinations_handler.template_service.render_template('partials/info_message.html',
                                                                message='Select a destination type to configure')
@@ -238,7 +234,6 @@ class HTMXHandlers:
         path = get_form_value(form_data, 'dest_path')
         
         # Business logic: delegate to proper destination validation service
-        from dests.services.rsync import rsync_service
         form_data = {'hostname': hostname, 'username': username, 'path': path}
         result = rsync_service.validate_rsync_destination(form_data)
         

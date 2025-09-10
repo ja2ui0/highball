@@ -6,6 +6,7 @@ Handlers contain their complete business logic and will be refactored to delegat
 """
 
 import logging
+import traceback
 from typing import Dict, Any
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -18,6 +19,7 @@ from models.forms import safe_get_value
 from origins.services.manage import OriginOperationsService
 from origins.services.ssh import OriginSSHService
 from origins.handlers.pages import origins_handler
+from origins.schema import SOURCE_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +141,6 @@ class HTMXHandlers(BaseHandler):
         source_type = form_data.get('source_type', [''])[0]
         
         # Schema-driven source field rendering
-        from origins.schema import SOURCE_TYPE_SCHEMAS
-        
         if source_type not in SOURCE_TYPE_SCHEMAS:
             html_response = self.template_service.render_template('partials/info_message.html',
                                                                message='Select a source type to configure')
@@ -190,8 +190,6 @@ class HTMXHandlers(BaseHandler):
             return value_list[0] if value_list else default
         
         try:
-            import yaml
-            
             if not form_data:
                 html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                    preview_content="Error: No form data received",
@@ -233,7 +231,6 @@ class HTMXHandlers(BaseHandler):
             return HTMLResponse(content=html_response)
             
         except Exception as e:
-            import traceback
             traceback.print_exc()
             html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                preview_content=f"Error generating preview: {str(e)}\n\nCheck server logs for details.",

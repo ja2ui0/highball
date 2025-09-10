@@ -4,6 +4,7 @@ SSH host management, origin configuration, and capability validation
 """
 
 import logging
+import time
 from functools import wraps
 from typing import Dict, Any, Callable
 from fastapi import Request
@@ -305,8 +306,6 @@ class OriginsHandler(BaseHandler):
     @handle_page_errors("SSH progress streaming")
     async def stream_ssh_progress(self, session_id: str, request: Request) -> StreamingResponse:
         """Stream SSH validation progress using Server-Sent Events"""
-        import time
-        
         async def event_generator():
             last_progress_count = 0
             max_wait_time = 60  # Maximum wait time in seconds
