@@ -10,9 +10,10 @@ from functools import wraps
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.errors import handle_page_errors
-from dests.handlers.pages import DestinationsHandler
+from dests.handlers.pages import DestinationsHandler, DestinationParser
 from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
 from dests.services.rsync import rsync_service
+from dests.services.restic import restic_service, ResticRepositoryTypeService
 
 # =============================================================================
 # **HTMX HANDLERS CLASS**
@@ -265,7 +266,6 @@ class HTMXHandlers:
         password = get_form_value(form_data, 'restic_password')
         
         # Schema-driven validation for required fields
-        from dests.schema import DESTINATION_TYPE_SCHEMAS
         schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
         required_fields = schema.get('required_fields', [])
         
@@ -284,8 +284,6 @@ class HTMXHandlers:
                 return HTMLResponse(content=html_response)
         
         # Build URI from individual repository fields using existing URI builder
-        # DestinationParser is now local to this module
-        from dests.handlers.pages import DestinationParser
         uri_result = self.destinations_handler.dest_operations._build_restic_uri(repo_type, form_data)
         
         if not uri_result.get('valid'):
@@ -297,7 +295,6 @@ class HTMXHandlers:
         repo_uri = uri_result['uri']
         
         # Business logic: delegate to proper destination validation service
-        from dests.services.restic import restic_service
         form_data = {'repo_type': repo_type, 'repo_uri': repo_uri, 'restic_password': password}
         result = restic_service.validate_restic_destination(form_data)
         
@@ -341,7 +338,6 @@ class HTMXHandlers:
             return HTMLResponse(content=html_response)
         
         # Business logic: delegate to proper destination validation service
-        from dests.services.rsync import rsync_service
         form_data = {'hostname': hostname, 'username': username, 'path': repo_path}
         result = rsync_service.validate_rsync_destination(form_data)
         
@@ -362,8 +358,6 @@ class HTMXHandlers:
                 form_data[key].append(value)
             else:
                 form_data[key] = [value]
-        
-        from dests.services.restic import ResticRepositoryTypeService
         
         repo_service = ResticRepositoryTypeService()
         available_repository_types = repo_service.get_available_repository_types()
