@@ -7,13 +7,14 @@ Handlers parse form data and delegate to destinations_handler for business logic
 
 from typing import Dict, Any, Callable
 from functools import wraps
+from urllib.parse import parse_qs
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.errors import handle_page_errors
-from dests.handlers.pages import DestinationsHandler, DestinationParser
+from dests.handlers.pages import DestinationsHandler
 from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
 from dests.services.rsync import rsync_service
-from dests.services.restic import restic_service, ResticRepositoryTypeService
+from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service
 
 # =============================================================================
 # **HTMX HANDLERS CLASS**
@@ -390,15 +391,12 @@ class HTMXHandlers:
 
         # Business logic (preserve original implementation)
         # Parse Restic config from unified parser
-        # DestinationParser is now local to this module
-        from dests.handlers.pages import DestinationParser
         restic_result = self.destinations_handler.dest_operations.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
             html_response = self.destinations_handler._render_validation_result("error", restic_result['error'])
         else:
             # Direct repository initialization
-            from dests.services.restic import ResticRepositoryService
             repo_service = ResticRepositoryService()
             result = repo_service.initialize_repository(restic_result['config'])
             
@@ -413,8 +411,6 @@ class HTMXHandlers:
     @handle_page_errors("Initialize restic repo")
     async def initialize_restic_repo_htmx(self, request) -> JSONResponse:
         """Initialize Restic repository with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
         # Parse form data using FastAPI (moved FROM app.py TO handler)
         form = await request.form()
         form_data = {}
@@ -427,7 +423,6 @@ class HTMXHandlers:
                 form_data[key] = [value]
         
         # Call existing restic API service (now returns plain data, not JSONResponse)
-        from dests.services.restic import restic_api_service
         result = restic_api_service.initialize_restic_repo(form_data)
         return JSONResponse(content=result)
     
@@ -440,7 +435,6 @@ class HTMXHandlers:
         # Extract job name from query params for POST
         url_parts = str(request.url).split('?')
         if len(url_parts) > 1:
-            from urllib.parse import parse_qs
             params = parse_qs(url_parts[1])
             job_name = params.get('job', [''])[0]
         else:
