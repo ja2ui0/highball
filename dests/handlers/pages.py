@@ -3,6 +3,7 @@ Destinations Page Handlers
 Repository management, destination configuration, and validation
 """
 
+import html
 import logging
 from typing import Dict, Any, Callable, List
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -13,7 +14,8 @@ from shared.handlers.base import BaseHandler
 from config import BackupConfig
 from models.forms import safe_get_value, safe_get_list
 from dests.services.manage import create_destination_operations_service
-from dests.services.rsync import network_discovery_service
+from dests.services.rsync import network_discovery_service, rsync_service
+from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +164,6 @@ class DestinationsHandler(BaseHandler):
 
     def _render_validation_result(self, status: str, message: str) -> str:
         """Render validation result with consistent styling"""
-        import html
         
         status_class = {
             'success': 'success',
@@ -304,7 +305,6 @@ class DestinationsHandler(BaseHandler):
         result = self.dest_operations.save_destination(dest_name, dest_config)
         
         if result['success']:
-            from fastapi.responses import RedirectResponse
             return RedirectResponse(url='/dests', status_code=302)
         else:
             return JSONResponse(content={
@@ -414,7 +414,6 @@ class DestinationsHandler(BaseHandler):
             # Test basic connectivity based on destination type using atomic services
             if dest_type == 'rsync':
                 # Use superior rsync validation from atomic service (SSH + path writability)
-                from dests.services.rsync import rsync_service
                 result = rsync_service.validate_rsync_destination(form_data)
                 template_context = {
                     'success': result['success'],
@@ -422,7 +421,6 @@ class DestinationsHandler(BaseHandler):
                 }
             elif dest_type == 'rsyncd':
                 # Use superior rsyncd validation from atomic service
-                from dests.services.rsync import rsync_service
                 result = rsync_service.validate_rsyncd_destination(form_data)
                 template_context = {
                     'success': result['success'],
@@ -430,7 +428,6 @@ class DestinationsHandler(BaseHandler):
                 }
             elif dest_type == 'restic':
                 # Use superior restic validation from atomic service (real repository connectivity)
-                from dests.services.restic import restic_service
                 result = restic_service.validate_restic_destination(form_data)
                 template_context = {
                     'success': result['success'],
@@ -509,7 +506,6 @@ class DestinationsHandler(BaseHandler):
                 'error_message': 'Repository URI not configured'
             })
             
-        from dests.services.restic import restic_service
         check_success, check_message = restic_service._quick_repository_check(repo_uri, dest_config)
         
         if check_success:
@@ -539,7 +535,6 @@ class DestinationsHandler(BaseHandler):
     @handle_page_errors("Get repository info")
     def get_repository_info(self, job_name: str) -> JSONResponse:
         """Get repository information with proper response formatting"""
-        from dests.services.restic import restic_api_service
         
         # Call service (returns plain data with success/error structure)
         result = restic_api_service.get_repository_info(job_name)
@@ -549,25 +544,21 @@ class DestinationsHandler(BaseHandler):
 
     @handle_page_errors("List snapshots")
     def list_snapshots(self, job_name: str) -> JSONResponse:
-        from dests.services.restic import restic_api_service
         result = restic_api_service.list_snapshots(job_name)
         return JSONResponse(content=result)
 
     @handle_page_errors("Get snapshot stats")
     def get_snapshot_stats(self, job_name: str, snapshot_id: str) -> JSONResponse:
-        from dests.services.restic import restic_api_service
         result = restic_api_service.get_snapshot_stats(job_name, snapshot_id)
         return JSONResponse(content=result)
 
     @handle_page_errors("Browse directory")
     def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/') -> JSONResponse:
-        from dests.services.restic import restic_api_service
         result = restic_api_service.browse_directory(job_name, snapshot_id, path)
         return JSONResponse(content=result)
 
     @handle_page_errors("Initialize repository")
     def init_repository(self, job_name: str) -> JSONResponse:
-        from dests.services.restic import restic_api_service
         result = restic_api_service.init_repository(job_name)
         return JSONResponse(content=result)
 

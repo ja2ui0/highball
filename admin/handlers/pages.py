@@ -3,6 +3,7 @@ Admin Page Handlers
 System configuration, settings management, and debugging
 """
 
+import html
 import json
 import yaml
 import os
@@ -20,6 +21,7 @@ from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
+from admin.schema import PROVIDER_FIELD_SCHEMAS
 from config import BackupConfig
 
 logger = logging.getLogger(__name__)
@@ -49,7 +51,6 @@ class AdminHandler(BaseHandler):
     @handle_page_errors("Config manager")
     def show_config_manager(self) -> HTMLResponse:
         """Show configuration management page"""
-        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         global_settings = self.backup_config.get_global_settings()
         
@@ -115,7 +116,6 @@ class AdminHandler(BaseHandler):
 
     def _update_notification_settings(self, global_settings: dict, form_data: Dict[str, Any]):
         """Update notification settings in global_settings from form data"""
-        from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         notification_config = global_settings.setdefault('notification', {})
         
@@ -228,7 +228,6 @@ class AdminHandler(BaseHandler):
         notification_config = global_settings.setdefault('notification', {})
         
         # Process each provider's configuration
-        from admin.schema import PROVIDER_FIELD_SCHEMAS
         for provider_name, provider_schema in PROVIDER_FIELD_SCHEMAS.items():
             # Only process if provider fields are present in form
             if any(f"{provider_name}_{field['name']}" in form_data for field in provider_schema.get('fields', [])):
@@ -288,7 +287,6 @@ class AdminHandler(BaseHandler):
 
     def _render_error(self, message):
         """Render error message"""
-        import html
         return self.template_service.render_template('partials/error_message.html',
                                                    message=html.escape(message))
 
