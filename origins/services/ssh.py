@@ -6,10 +6,14 @@ SSH-specific workflows, validations, and key management for origins domain
 import logging
 import json
 import os
+import subprocess
 from typing import Dict, Any
+from datetime import datetime
 
 from shared.handlers.templating import TemplateService
 from shared.services.ssh import SSHWorkflowService
+from shared.services.ssh import SSHCommandFactory
+from shared.handlers.errors import handle_service_errors
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +27,9 @@ class OriginSSHService:
     def __init__(self):
         self.template_service = TemplateService()
         self.ssh_workflow_service = SSHWorkflowService()
+        self.ssh_factory = SSHCommandFactory()
+        self._validation_cache = {}
+        self.cache_duration = 1800  # 30 minutes
     
     def render_validation_status(self, result: Dict[str, Any]) -> str:
         """Render SSH source validation status with rsync and container engine details"""
@@ -109,6 +116,139 @@ class OriginSSHService:
                 pass  # Ignore session update errors
         
         return result
+
+    @handle_service_errors("Validate SSH source")
+    def validate_ssh_source(self, source_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate SSH source configuration with capability detection"""
+        hostname = source_config.get('hostname', '')
+        username = source_config.get('username', '')
+        
+        if not hostname or not username:
+            return {'valid': False, 'error': 'Hostname and username are required'}
+        
+        # Check cache first
+        cache_key = f"ssh:{username}@{hostname}"
+        cached_result = self._get_cached_result(cache_key)
+        if cached_result:
+            return cached_result
+        
+        try:
+            # Test basic SSH connectivity
+            ssh_test = self._test_ssh_connection(hostname, username)
+            if not ssh_test['success']:
+                result = {'valid': False, 'error': ssh_test['error']}
+                self._cache_result(cache_key, result)
+                return result
+            
+            # Test rsync availability and get version
+            rsync_test = self._test_rsync_availability(hostname, username)
+            
+            # Test container runtimes and get versions
+            podman_test = self._test_container_runtime(hostname, username, 'podman')
+            docker_test = self._test_container_runtime(hostname, username, 'docker')
+            
+            # Determine preferred container runtime
+            container_runtime = None
+            if podman_test['success']:
+                container_runtime = 'podman'
+            elif docker_test['success']:
+                container_runtime = 'docker'
+            
+            result = {
+                'valid': True,
+                'ssh_status': 'OK',
+                'rsync_status': rsync_test.get('version', 'Available') if rsync_test['success'] else rsync_test.get('error', 'Not found'),
+                'podman_status': podman_test.get('version', 'Available') if podman_test['success'] else podman_test.get('error', 'Not found'), 
+                'docker_status': docker_test.get('version', 'Available') if docker_test['success'] else docker_test.get('error', 'Not found'),
+                'container_runtime': container_runtime,
+                'tested_at': datetime.now().isoformat()
+            }
+            
+            self._cache_result(cache_key, result)
+            return result
+            
+        except Exception as e:
+            logger.error(f"SSH validation error for {hostname}: {e}")
+            result = {'valid': False, 'error': f'SSH validation failed: {str(e)}'}
+            self._cache_result(cache_key, result)
+            return result
+
+    def _test_ssh_connection(self, hostname: str, username: str) -> Dict[str, Any]:
+        """Test basic SSH connectivity"""
+        try:
+            cmd = self.ssh_factory.build_ssh_command(
+                hostname, username, 
+                'echo "SSH_OK"',
+                connect_timeout=10
+            )
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0 and 'SSH_OK' in result.stdout:
+                return {'success': True}
+            else:
+                return {'success': False, 'error': f'SSH connection failed: {result.stderr.strip()}'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'SSH test failed: {str(e)}'}
+
+    def _test_rsync_availability(self, hostname: str, username: str) -> Dict[str, Any]:
+        """Test rsync availability and get version on remote host"""
+        try:
+            cmd = self.ssh_factory.build_ssh_command(
+                hostname, username,
+                'rsync --version 2>&1 | head -1',
+                connect_timeout=10
+            )
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0 and 'rsync' in result.stdout.lower():
+                version_line = result.stdout.strip().split('\n')[0]
+                return {'success': True, 'version': version_line}
+            else:
+                return {'success': False, 'error': 'Not found'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'Test error: {str(e)}'}
+
+    def _test_container_runtime(self, hostname: str, username: str, runtime: str) -> Dict[str, Any]:
+        """Test container runtime (podman/docker) availability and get version"""
+        try:
+            cmd = self.ssh_factory.build_ssh_command(
+                hostname, username,
+                f'{runtime} --version 2>&1',
+                connect_timeout=10
+            )
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0 and runtime in result.stdout.lower():
+                version_line = result.stdout.strip().split('\n')[0]
+                return {'success': True, 'version': version_line}
+            else:
+                return {'success': False, 'error': 'Not found'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'Test error: {str(e)}'}
+
+    def _get_cached_result(self, cache_key: str) -> Dict[str, Any]:
+        """Get cached validation result if still valid"""
+        if cache_key in self._validation_cache:
+            cached_entry = self._validation_cache[cache_key]
+            cache_age = datetime.now().timestamp() - cached_entry['timestamp']
+            if cache_age < self.cache_duration:
+                return cached_entry['result']
+            else:
+                del self._validation_cache[cache_key]
+        return None
+
+    def _cache_result(self, cache_key: str, result: Dict[str, Any]) -> None:
+        """Cache validation result with timestamp"""
+        self._validation_cache[cache_key] = {
+            'result': result,
+            'timestamp': datetime.now().timestamp()
+        }
     
     def validate_origin_string(self, origin_string: str) -> Dict[str, Any]:
         """Validate SSH origin configuration from username@hostname string"""

@@ -15,6 +15,9 @@ from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from config import BackupConfig
 from models.forms import safe_get_value
+from origins.services.manage import OriginOperationsService
+from origins.services.ssh import OriginSSHService
+from origins.handlers.pages import origins_handler
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +33,7 @@ class HTMXHandlers(BaseHandler):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
         
-        # Import services
-        from origins.services.manage import OriginOperationsService
-        from origins.services.ssh import OriginSSHService
+        # Initialize services
         self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
         
@@ -46,8 +47,7 @@ class HTMXHandlers(BaseHandler):
         # Parse form data using dict() approach (matches current app.py pattern)
         form_data = dict(await request.form())
         
-        # Import pages handler to delegate business logic
-        from origins.handlers.pages import origins_handler
+        # Delegate business logic to pages handler
         return origins_handler.add_ssh_origin(form_data)
 
     async def save_ssh_origin_htmx(self, request) -> JSONResponse:
@@ -55,8 +55,7 @@ class HTMXHandlers(BaseHandler):
         # Parse form data using dict() approach (matches current app.py pattern)
         form_data = dict(await request.form())
         
-        # Import pages handler to delegate business logic
-        from origins.handlers.pages import origins_handler
+        # Delegate business logic to pages handler
         return origins_handler.save_ssh_origin(form_data)
 
     def _get_form_value(self, form_data: Dict[str, Any], key: str, default: Any = None) -> Any:
@@ -72,8 +71,7 @@ class HTMXHandlers(BaseHandler):
         # Parse form data using dict() approach (matches current app.py pattern)
         form_data = dict(await request.form())
         
-        # Import pages handler to delegate business logic
-        from origins.handlers.pages import origins_handler
+        # Delegate business logic to pages handler
         return origins_handler.validate_ssh_origin(form_data)
 
     async def toggle_ssh_auth_method_htmx(self, request) -> HTMLResponse:
@@ -81,8 +79,7 @@ class HTMXHandlers(BaseHandler):
         # Parse form data using dict() approach (matches current app.py pattern)
         form_data = dict(await request.form())
         
-        # Import pages handler to delegate business logic
-        from origins.handlers.pages import origins_handler
+        # Delegate business logic to pages handler
         return origins_handler.toggle_ssh_auth_method(form_data)
 
     # =========================================================================
@@ -114,11 +111,8 @@ class HTMXHandlers(BaseHandler):
         # Build source config
         source_config = {'hostname': hostname, 'username': username}
         
-        # Use validation service for business logic
-        from jobs.services.validate import ValidationService
-        backup_config = BackupConfig()
-        validation_service = ValidationService(backup_config)
-        result = validation_service.ssh.validate_ssh_source(source_config)
+        # Use origins SSH service for validation
+        result = self.ssh_service.validate_ssh_source(source_config)
         
         # Render validation status using SSH service
         html_response = self.ssh_service.render_validation_status(result)
