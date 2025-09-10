@@ -12,6 +12,8 @@ from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from config import BackupConfig
 from models.forms import safe_get_value, safe_get_list
+from dests.services.manage import create_destination_operations_service
+from dests.services.rsync import network_discovery_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +29,10 @@ class DestinationsHandler(BaseHandler):
         self.template_service = TemplateService()
         self.backup_config = BackupConfig()
         
-        # Import and create destination operations service
-        from dests.services.manage import create_destination_operations_service
+        # Create destination operations service
         self.dest_operations = create_destination_operations_service(self.backup_config)
         
-        # Import network discovery service
-        from dests.services.rsync import network_discovery_service
+        # Initialize network discovery service
         self.network_discovery = network_discovery_service
     
     # =========================================================================

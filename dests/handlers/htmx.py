@@ -471,7 +471,6 @@ class HTMXHandlers:
         dest_config = job_config.get('dest_config', {})
         source_config = job_config.get('source_config', {})
         
-        from dests.services.restic import restic_service
         result = restic_service.unlock_repository(dest_config, source_config)
         
         if result.get('success'):
