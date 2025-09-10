@@ -211,8 +211,8 @@ class AdminHandler(BaseHandler):
             # Notification settings
             self._update_notification_settings(global_settings, form_data)
             
-            # Save configuration
-            self.backup_config.save_config()
+            # Save only global settings to local.yaml (not domain configs)
+            self.backup_config.update_global_settings(global_settings)
             
             # Redirect back to config page
             return RedirectResponse(url='/config', status_code=302)
@@ -474,18 +474,6 @@ class AdminHandler(BaseHandler):
     # CONFIG PREVIEW AND FORM PROCESSING - Admin pillar methods
     # =============================================================================
 
-    async def preview_config_htmx(self, request) -> HTMLResponse:
-        """Generate and display job config preview - HTMX handler"""
-        from jobs.handlers.old import AdminJobPreviewMethods
-        preview_methods = AdminJobPreviewMethods()
-        return await preview_methods.preview_config_htmx(request)
-
-    async def check_form_changes_htmx(self, request) -> HTMLResponse:
-        """Check if form has changes compared to original config - HTMX handler"""
-        from jobs.handlers.old import AdminJobPreviewMethods
-        preview_methods = AdminJobPreviewMethods()
-        return await preview_methods.check_form_changes_htmx(request)
-
     async def preview_config_changes_htmx(self, request) -> HTMLResponse:
         """Preview configuration changes with form parsing - pure switchboard compliance"""
         
@@ -500,12 +488,22 @@ class AdminHandler(BaseHandler):
             else:
                 form_data[key] = [value]
         
-        # Call existing business logic
-        return self.preview_config_changes(form_data)
+        # Call admin service for config preview
+        result = self.admin_services.preview_config_changes(form_data, self.backup_config)
+        
+        if result['success']:
+            html_response = self.template_service.render_template('partials/config_preview.html',
+                                                               success=True,
+                                                               preview_yaml=result['preview_content'])
+        else:
+            html_response = self.template_service.render_template('partials/config_preview.html',
+                                                               success=False,
+                                                               error_message=result.get('error', 'Unknown error'))
+        
+        return HTMLResponse(content=html_response)
 
     async def save_structured_config_htmx(self, request) -> JSONResponse:
         """Save structured configuration with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
         
         # Parse form data using FastAPI (moved FROM app.py TO handler)
         form = await request.form()

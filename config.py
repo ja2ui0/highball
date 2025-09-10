@@ -66,7 +66,8 @@ class BackupConfig:
                     secrets = dotenv_values(secrets_file)
                     settings = self._merge_secrets(settings, secrets)
                 
-                return settings
+                # Return only the global_settings section from local.yaml
+                return settings.get('global_settings', {})
                 
             except Exception as e:
                 print(f"Warning: Error loading global settings: {str(e)}")
@@ -607,11 +608,32 @@ class BackupConfig:
         return settings
     
     def update_global_settings(self, settings):
-        """Update global settings"""
+        """Update global settings and save only global settings to local.yaml"""
         if 'global_settings' not in self.config:
             self.config['global_settings'] = {}
         self.config['global_settings'].update(settings)
-        self.save_config()
+        self._save_global_settings_only()
+    
+    def _save_global_settings_only(self):
+        """Save only global settings to local.yaml (not domain configs)"""
+        # Load existing local.yaml to preserve any manual edits
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as f:
+                local_yaml = yaml.safe_load(f) or {}
+        else:
+            local_yaml = {}
+        
+        # Update only the global_settings section
+        local_yaml['global_settings'] = self.config.get('global_settings', {})
+        
+        # Ensure directory exists
+        config_dir = os.path.dirname(self.config_file)
+        if config_dir and not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        
+        # Save only global settings to local.yaml
+        with open(self.config_file, 'w') as f:
+            yaml.dump(local_yaml, f, default_flow_style=False, indent=2)
     
     def purge_job(self, job_name):
         """Permanently delete a job from deleted/ directories (irreversible)"""

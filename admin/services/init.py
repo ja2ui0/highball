@@ -158,3 +158,53 @@ class HighballServices:
         """Convert configuration dictionary to YAML format for display"""
         return yaml.dump(config_dict, default_flow_style=False, indent=2)
     
+    @handle_service_errors("Preview config changes")
+    def preview_config_changes(self, form_data: Dict[str, Any], backup_config: BackupConfig) -> Dict[str, Any]:
+        """Generate preview of configuration changes from form data"""
+        # Load raw YAML from config/local/local.yaml only (not concatenated config)
+        import os
+        config_file = backup_config.config_file
+        
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                raw_local_config = yaml.safe_load(f) or {}
+        else:
+            raw_local_config = {}
+        
+        # Start with existing global_settings structure
+        preview_global_settings = raw_local_config.get('global_settings', {}).copy()
+        
+        # Apply form changes to the global_settings structure (matching admin form logic)
+        for key, value in form_data.items():
+            if isinstance(value, list) and len(value) > 0:
+                form_value = value[0]
+            else:
+                form_value = value
+            
+            # Map form fields to global_settings structure
+            if key == 'scheduler_timezone':
+                preview_global_settings['scheduler_timezone'] = form_value
+            elif key == 'theme':
+                preview_global_settings['theme'] = form_value
+            elif key == 'enable_conflict_avoidance':
+                preview_global_settings['enable_conflict_avoidance'] = (form_value == 'on')
+            elif key == 'conflict_check_interval':
+                preview_global_settings['conflict_check_interval'] = int(form_value) if form_value.isdigit() else 300
+            elif key == 'delay_notification_threshold':
+                preview_global_settings['delay_notification_threshold'] = int(form_value) if form_value.isdigit() else 300
+            elif key in ['hourly_default', 'daily_default', 'weekly_default', 'monthly_default']:
+                # Map to default_schedule_times structure
+                schedule_type = key.replace('_default', '')
+                if 'default_schedule_times' not in preview_global_settings:
+                    preview_global_settings['default_schedule_times'] = {}
+                preview_global_settings['default_schedule_times'][schedule_type] = form_value
+        
+        # Generate YAML preview showing only the global_settings structure
+        preview_structure = {'global_settings': preview_global_settings}
+        yaml_content = self.generate_config_yaml(preview_structure)
+        
+        return {
+            'success': True,
+            'preview_content': yaml_content
+        }
+    

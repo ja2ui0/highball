@@ -228,13 +228,6 @@ async def save_config(request: Request):
 async def save_raw_config(request: Request):
     return await admin_handler.save_raw_config_htmx(request)
 
-@app.post("/admin/check-form-changes")
-async def check_form_changes(request: Request):
-    return await admin_handler.check_form_changes_htmx(request)
-
-@app.post("/admin/preview-config")
-async def preview_config(request: Request):
-    return await admin_handler.preview_config_htmx(request)
 
 # =============================================================================
 # ADMIN - NOTIFICATIONS
