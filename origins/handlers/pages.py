@@ -98,7 +98,7 @@ class OriginsHandler(BaseHandler):
     def show_ssh_origins(self) -> HTMLResponse:
         """Show SSH origins management page"""
         origins = self.origin_service.get_origins()
-        global_settings = self.backup_config.get_global_settings()
+        global_settings = self.origin_service.get_global_settings()
         
         # Build origin display list
         origin_list = []

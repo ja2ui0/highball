@@ -21,6 +21,14 @@ class OriginOperationsService:
     def __init__(self, backup_config):
         self.backup_config = backup_config
     
+    # =========================================================================
+    # CONFIG ACCESS METHODS - handlers should use these instead of direct access
+    # =========================================================================
+    
+    def get_global_settings(self) -> Dict[str, Any]:
+        """Get global settings - handlers should call this instead of backup_config.get_global_settings()"""
+        return self.backup_config.get_global_settings()
+    
     def parse_origin_form(self, form_data: Dict[str, Any], require_password: bool = True) -> Dict[str, Any]:
         """Parse and validate SSH origin form data"""
         origin_name = safe_get_value(form_data, 'origin_name').strip()

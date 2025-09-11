@@ -26,6 +26,14 @@ class HTMXHandlers:
     def __init__(self):
         # Initialize destinations handler for delegation
         self.destinations_handler = DestinationsHandler()
+        
+        # Direct config access to avoid cross-handler config access
+        from config import BackupConfig
+        self.backup_config = BackupConfig()
+        
+        # Initialize destination service for proper config access
+        from dests.services.manage import create_destination_operations_service
+        self.dest_operations = create_destination_operations_service(self.backup_config)
     
     # =========================================================================
     # **FORM PARSING WRAPPERS**
@@ -453,7 +461,7 @@ class HTMXHandlers:
             })
             
         # Get and validate job configuration
-        jobs = self.destinations_handler.backup_config.get_backup_jobs()
+        jobs = self.dest_operations.get_backup_jobs()
         if job_name not in jobs:
             return self.destinations_handler._render_html('partials/error_message.html', {
                 'error_message': f"Job '{job_name}' not found"
@@ -543,7 +551,7 @@ class HTMXHandlers:
             })
         
         # Get and validate job configuration
-        jobs = self.destinations_handler.backup_config.get_backup_jobs()
+        jobs = self.dest_operations.get_backup_jobs()
         if job_name not in jobs:
             return self.destinations_handler._render_html('partials/error_message.html', {
                 'error_message': f"Job '{job_name}' not found"

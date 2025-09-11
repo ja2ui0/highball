@@ -36,6 +36,10 @@ class AdminHandler(BaseHandler):
         self.backup_config = BackupConfig()
         self._init_template_service(self.backup_config)
         self.admin_services = HighballServices()
+        
+        # Initialize admin operations service for config access
+        from admin.services.manage import AdminOperationsService
+        self.admin_operations = AdminOperationsService(self.backup_config)
     
 
     def _get_available_themes(self):
@@ -46,7 +50,7 @@ class AdminHandler(BaseHandler):
     def show_config_manager(self) -> HTMLResponse:
         """Show configuration management page"""
         
-        global_settings = self.backup_config.get_global_settings()
+        global_settings = self.admin_operations.get_global_settings()
         
         # Extract individual field values for template population
         default_schedule_times = global_settings.get('default_schedule_times', {})
@@ -81,7 +85,7 @@ class AdminHandler(BaseHandler):
     @handle_page_errors("Raw editor")
     def show_raw_editor(self) -> HTMLResponse:
         """Show raw YAML configuration editor"""
-        config_path = self.backup_config.config_file
+        config_path = self.admin_operations.get_config_file_path()
         raw_config = self.admin_services.read_raw_config(config_path)
         
         template_data = {
@@ -163,7 +167,7 @@ class AdminHandler(BaseHandler):
     def save_raw_config(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save raw YAML configuration - delegate to admin service"""
         raw_config = form_data.get('raw_config', [''])[0]
-        config_path = self.backup_config.config_file
+        config_path = self.admin_operations.get_config_file_path()
         
         # Delegate validation and saving to service
         result = self.admin_services.save_raw_config(raw_config, config_path)
@@ -172,7 +176,7 @@ class AdminHandler(BaseHandler):
             return JSONResponse(content=result, status_code=400)
         
         # Reload configuration after successful save
-        self.backup_config.reload_config()
+        self.admin_operations.reload_config()
         
         return RedirectResponse(url='/config', status_code=302)
 
@@ -181,7 +185,7 @@ class AdminHandler(BaseHandler):
         """Save structured configuration from form"""
         try:
             # Get current configuration and update global settings
-            global_settings = self.backup_config.config.setdefault('global_settings', {})
+            global_settings = self.admin_operations.get_or_create_global_settings()
             
             # Update basic settings
             global_settings['scheduler_timezone'] = self._get_form_value(form_data, 'scheduler_timezone', 'UTC')
@@ -206,7 +210,7 @@ class AdminHandler(BaseHandler):
             self._update_notification_settings(global_settings, form_data)
             
             # Save only global settings to local.yaml (not domain configs)
-            self.backup_config.update_global_settings(global_settings)
+            self.admin_operations.update_global_settings(global_settings)
             
             # Redirect back to config page
             return RedirectResponse(url='/config', status_code=302)

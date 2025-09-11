@@ -111,6 +111,10 @@ class HTMXHandlers(BaseHandler):
     def __init__(self):
         self.backup_config = BackupConfig()
         self._init_template_service()
+        
+        # Initialize services for config access
+        from jobs.services.manage import JobOperationsService
+        self.job_operations = JobOperationsService(self.backup_config)
     
     def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
         """Render HTML template with data"""
@@ -260,7 +264,7 @@ class HTMXHandlers(BaseHandler):
         restore_service = RestoreService()
         
         # Get job config for source details
-        jobs = self.backup_config.config.get('backup_jobs', {})
+        jobs = self.job_operations.get_backup_jobs()
         job_config = jobs.get(job_name, {})
         source_config = job_config.get('source_config', {})
         source_type = job_config.get('source_type', 'local')
@@ -301,7 +305,7 @@ class HTMXHandlers(BaseHandler):
         restore_service = RestoreService()
         
         # Get job config for source details  
-        jobs = self.backup_config.config.get('backup_jobs', {})
+        jobs = self.job_operations.get_backup_jobs()
         job_config = jobs.get(job_name, {})
         source_config = job_config.get('source_config', {})
         source_type = job_config.get('source_type', 'local')
@@ -341,7 +345,7 @@ class HTMXHandlers(BaseHandler):
         restore_service = RestoreService()
         
         # Get job config for source details
-        jobs = self.backup_config.config.get('backup_jobs', {})
+        jobs = self.job_operations.get_backup_jobs()
         job_config = jobs.get(job_name, {})
         source_config = job_config.get('source_config', {})
         source_type = job_config.get('source_type', 'local')
@@ -406,7 +410,7 @@ class HTMXHandlers(BaseHandler):
         from jobs.handlers.pages import jobs_handler
         
         # Get and validate job configuration
-        jobs = jobs_handler.backup_config.get_backup_jobs()
+        jobs = self.job_operations.get_backup_jobs()
         if job_name not in jobs:
             html_response = self.template_service.render_template('partials/error_message.html',
                                                                error_message=f"Job '{job_name}' not found")

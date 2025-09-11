@@ -428,6 +428,22 @@ class JobOperationsService:
     def __init__(self, backup_config):
         self.backup_config = backup_config
     
+    # =========================================================================
+    # CONFIG ACCESS METHODS - handlers should use these instead of direct access
+    # =========================================================================
+    
+    def get_backup_jobs(self) -> Dict[str, Any]:
+        """Get all backup jobs - handlers should call this instead of backup_config.get_backup_jobs()"""
+        return self.backup_config.get_backup_jobs()
+    
+    def get_global_settings(self) -> Dict[str, Any]:
+        """Get global settings - handlers should call this instead of backup_config.get_global_settings()"""
+        return self.backup_config.get_global_settings()
+    
+    def get_deleted_jobs(self) -> Dict[str, Any]:
+        """Get deleted jobs - handlers should call this instead of backup_config.config.get('deleted_jobs')"""
+        return self.backup_config.config.get('deleted_jobs', {})
+    
     @handle_service_errors("Save job")
     def save_job(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Save job configuration to persistent storage"""

@@ -108,7 +108,7 @@ class DestinationsHandler(BaseHandler):
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
         destinations = self.dest_operations.get_destinations()
-        global_settings = self.backup_config.get_global_settings()
+        global_settings = self.dest_operations.get_global_settings()
         
         # Build destination display list
         dest_list = []

@@ -226,8 +226,8 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
         """Show main dashboard with job list"""
-        jobs = self.backup_config.get_backup_jobs()
-        global_settings = self.backup_config.get_global_settings()
+        jobs = self.job_operations.get_backup_jobs()
+        global_settings = self.job_operations.get_global_settings()
         
         # Get job status information
         from jobs.services.manage import JobManagementService
@@ -259,7 +259,7 @@ class JobsHandler(BaseHandler):
         
         # Build job and deleted job HTML using local methods (moved from template service)
         job_rows = self._build_job_rows(job_list)
-        deleted_jobs = self.backup_config.config.get('deleted_jobs', {})
+        deleted_jobs = self.job_operations.get_deleted_jobs()
         deleted_job_rows = self._build_deleted_job_rows(deleted_jobs)
         
         template_data = {
@@ -392,7 +392,7 @@ class JobsHandler(BaseHandler):
                 'page_title': "Error"
             }, 400)
         
-        jobs = self.backup_config.get_backup_jobs()
+        jobs = self.job_operations.get_backup_jobs()
         if job_name not in jobs:
             return self._render_error('partials/error_page.html', {
                 'error_message': f"Job '{job_name}' not found", 
@@ -460,7 +460,7 @@ class JobsHandler(BaseHandler):
                 'page_title': "Error"
             }, 400)
         
-        jobs = self.backup_config.get_backup_jobs()
+        jobs = self.job_operations.get_backup_jobs()
         if job_name not in jobs:
             return self._render_error('partials/error_page.html', {
                 'error_message': f"Job '{job_name}' not found", 
@@ -703,7 +703,7 @@ class JobsHandler(BaseHandler):
 
     def _get_enabled_global_providers(self):
         """Get list of globally enabled notification providers"""
-        global_settings = self.backup_config.get_global_settings()
+        global_settings = self.job_operations.get_global_settings()
         notification_config = global_settings.get('notification', {})
         
         enabled_providers = []
@@ -797,7 +797,7 @@ class JobsHandler(BaseHandler):
                 'error': 'Snapshot ID is required'
             })
         
-        jobs = self.backup_config.get_backup_jobs()
+        jobs = self.job_operations.get_backup_jobs()
         if job_name not in jobs:
             return JSONResponse(content={
                 'success': False,
