@@ -14,7 +14,7 @@ from shared.handlers.errors import handle_page_errors
 from dests.handlers.pages import DestinationsHandler
 from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
 from dests.services.rsync import rsync_service
-from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service
+from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service, unlock_repository_for_job
 
 # =============================================================================
 # **HTMX HANDLERS CLASS**
@@ -222,135 +222,39 @@ class HTMXHandlers:
     @handle_page_errors("Validate SSH destination")
     async def validate_ssh_dest_htmx(self, request) -> HTMLResponse:
         """Validate SSH destination configuration for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        # Parse form data using dict() approach (matches current pattern)
+        form_data = dict(await request.form())
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        # Delegate business logic to service
+        result = self.dest_operations.validate_ssh_destination_from_form(form_data)
         
-        # Extract parameters from request
-        hostname = get_form_value(form_data, 'dest_hostname')
-        username = get_form_value(form_data, 'dest_username')
-        path = get_form_value(form_data, 'dest_path')
-        
-        # Business logic: delegate to proper destination validation service
-        form_data = {'hostname': hostname, 'username': username, 'path': path}
-        result = rsync_service.validate_rsync_destination(form_data)
-        
-        # View: delegate to local validation method (moved from template service)
+        # Handler renders appropriate template based on service result
         html_response = self.destinations_handler.render_ssh_dest_validation_status(result)
         return HTMLResponse(content=html_response)
     
     @handle_page_errors("Validate restic")
     async def validate_restic_htmx(self, request) -> HTMLResponse:
         """Validate Restic repository configuration for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        # Parse form data using dict() approach (matches current pattern)
+        form_data = dict(await request.form())
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        # Delegate business logic to service
+        result = self.dest_operations.validate_restic_destination_from_form(form_data)
         
-        # Extract parameters from request using correct field names
-        repo_type = get_form_value(form_data, 'restic_repo_type') or get_form_value(form_data, 'repo_type')
-        password = get_form_value(form_data, 'restic_password')
-        
-        # Schema-driven validation for required fields
-        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
-        required_fields = schema.get('required_fields', [])
-        
-        # Map form fields to config keys
-        field_values = {
-            'repo_type': repo_type,
-            'password': password
-        }
-        
-        for field in required_fields:
-            if field in field_values and not field_values[field]:
-                display_name = schema.get('display_name', 'Restic')
-                html_response = self.destinations_handler.render_restic_validation_status({
-                    'success': False, 'error': f'{display_name} destination missing {field}'
-                })
-                return HTMLResponse(content=html_response)
-        
-        # Build URI from individual repository fields using existing URI builder
-        uri_result = self.destinations_handler.dest_operations._build_restic_uri(repo_type, form_data)
-        
-        if not uri_result.get('valid'):
-            html_response = self.destinations_handler.render_restic_validation_status({
-                'success': False, 'error': uri_result.get('error', 'Invalid repository configuration')
-            })
-            return HTMLResponse(content=html_response)
-        
-        repo_uri = uri_result['uri']
-        
-        # Business logic: delegate to proper destination validation service
-        form_data = {'repo_type': repo_type, 'repo_uri': repo_uri, 'restic_password': password}
-        result = restic_service.validate_restic_destination(form_data)
-        
-        # View: delegate to local validation method (moved from template service)
+        # Handler renders appropriate template based on service result
         html_response = self.destinations_handler.render_restic_validation_status(result)
         return HTMLResponse(content=html_response)
     
     @handle_page_errors("Validate origin repo path")
     async def validate_origin_repo_path_htmx(self, request) -> HTMLResponse:
         """Validate same-as-origin repository path with RWX requirements for HTMX forms"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        # Parse form data using dict() approach (matches current pattern)
+        form_data = dict(await request.form())
         
-        def get_form_value(form_data, key, default=''):
-            """Extract single value from form data (works with FastAPI form parsing)"""
-            value_list = form_data.get(key, [default])
-            return value_list[0] if value_list else default
+        # Delegate business logic to service
+        result = self.dest_operations.validate_origin_repo_path_from_form(form_data)
         
-        # Extract repository path
-        repo_path = get_form_value(form_data, 'origin_repo_path')
-        if not repo_path or not repo_path.strip():
-            result = {'success': False, 'error': 'Please enter a repository path'}
-            html_response = self.destinations_handler.render_origin_repo_path_validation_status(result)
-            return HTMLResponse(content=html_response)
-        
-        # Extract SSH configuration (required for same_as_origin)
-        hostname = get_form_value(form_data, 'hostname')
-        username = get_form_value(form_data, 'username')
-        
-        if not hostname or not username:
-            result = {'success': False, 'error': 'SSH configuration required for same-as-origin repositories'}
-            html_response = self.destinations_handler.render_origin_repo_path_validation_status(result)
-            return HTMLResponse(content=html_response)
-        
-        # Business logic: delegate to proper destination validation service
-        form_data = {'hostname': hostname, 'username': username, 'path': repo_path}
-        result = rsync_service.validate_rsync_destination(form_data)
-        
-        # View: delegate to local validation method (moved from template service)
+        # Handler renders appropriate template based on service result
         html_response = self.destinations_handler.render_origin_repo_path_validation_status(result)
         return HTMLResponse(content=html_response)
     
@@ -386,25 +290,16 @@ class HTMXHandlers:
     @handle_page_errors("Initialize restic repository")
     async def init_restic_repository_htmx(self, request) -> HTMLResponse:
         """Initialize Restic repository - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        # Parse form data using dict() approach (matches current pattern)
+        form_data = dict(await request.form())
 
-        # Business logic (preserve original implementation)
-        # Parse Restic config from unified parser
-        restic_result = self.destinations_handler.dest_operations.parse_restic_destination(form_data)
+        # Delegate business logic to service
+        restic_result = self.dest_operations.parse_restic_destination_from_form(form_data)
         
         if not restic_result['valid']:
             html_response = self.destinations_handler._render_validation_result("error", restic_result['error'])
         else:
-            # Direct repository initialization
+            # Direct repository initialization using service
             repo_service = ResticRepositoryService()
             result = repo_service.initialize_repository(restic_result['config'])
             
@@ -413,7 +308,6 @@ class HTMXHandlers:
             else:
                 html_response = self.destinations_handler._render_validation_result("error", f"Initialization failed: {result.get('error', 'Unknown error')}")
 
-        # Return HTMLResponse wrapper
         return HTMLResponse(content=html_response)
     
     @handle_page_errors("Initialize restic repo")
@@ -455,37 +349,14 @@ class HTMXHandlers:
     def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
         """HTMX endpoint for repository unlock - business logic calls destinations service"""
         
-        if not job_name:
-            return self.destinations_handler._render_html('partials/error_message.html', {
-                'error_message': 'Job name is required'
-            })
-            
-        # Get and validate job configuration
-        jobs = self.dest_operations.get_backup_jobs()
-        if job_name not in jobs:
-            return self.destinations_handler._render_html('partials/error_message.html', {
-                'error_message': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        dest_type = job_config.get('dest_type')
-        
-        if dest_type != 'restic':
-            return self.destinations_handler._render_html('partials/error_message.html', {
-                'error_message': 'Unlock is only supported for restic repositories'
-            })
-        
-        # Execute restic unlock command via destinations service
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
-        result = restic_service.unlock_repository(dest_config, source_config)
+        # Delegate business logic to service
+        result = unlock_repository_for_job(job_name, self.backup_config)
         
         if result.get('success'):
             # Unlock successful - automatically retry availability check
-            return self.destinations_handler.check_repository_availability_htmx(job_name)
+            return self.destinations_handler._check_and_respond_repository_status_html(job_name, {})
         else:
-            # Unlock failed - show error
+            # Unlock failed - show appropriate error template
             return self.destinations_handler._render_html('partials/repository_error.html', {
                 'job_name': job_name,
                 'error_type': 'unlock_failed',
@@ -499,67 +370,22 @@ class HTMXHandlers:
     @handle_page_errors("Generate restic URI preview")
     async def generate_restic_uri_preview_htmx(self, request) -> HTMLResponse:
         """Generate real-time URI preview for repository configuration - HTMX handler"""
-        # Parse form data using FastAPI (moved FROM app.py TO handler)
-        form = await request.form()
-        form_data = {}
-        for key, value in form.items():
-            if key in form_data:
-                if not isinstance(form_data[key], list):
-                    form_data[key] = [form_data[key]]
-                form_data[key].append(value)
-            else:
-                form_data[key] = [value]
+        # Parse form data using dict() approach (matches current pattern)
+        form_data = dict(await request.form())
 
-        # Business logic (preserve original implementation)
-        # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
-        repo_type = self.destinations_handler._get_form_value(form_data, 'restic_repo_type') or self.destinations_handler._get_form_value(form_data, 'repo_type')
+        # Delegate business logic to service
+        result = self.dest_operations.generate_uri_preview('restic', form_data)
         
-        if not repo_type:
-            html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html',
-                                                               uri='Select repository type to see URI preview')
-        else:
-            # Use existing URI builder from service
-            uri_result = self.destinations_handler.dest_operations._build_restic_uri(repo_type, form_data)
-            
-            if uri_result.get('valid'):
-                # Mask password in display
-                uri = uri_result['uri']
-                if ':' in uri and '@' in uri:
-                    # Replace password with *** for display
-                    parts = uri.split('@')
-                    if len(parts) == 2:
-                        auth_part = parts[0]
-                        if ':' in auth_part:
-                            scheme_and_user = auth_part.rsplit(':', 1)[0]
-                            uri = f"{scheme_and_user}:***@{parts[1]}"
-                
-                html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html', uri=uri)
-            else:
-                html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html',
-                                                                   uri=uri_result.get('error', 'Invalid configuration'))
-
-        # Return HTMLResponse wrapper
+        # Handler renders template with service result
+        html_response = self.destinations_handler.template_service.render_template('partials/uri_preview.html', uri=result['uri'])
         return HTMLResponse(content=html_response)
     
     @handle_page_errors("Repository check")
     def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
         """HTMX endpoint for repository availability check"""
         
-        if not job_name:
-            return self.destinations_handler._render_html('partials/error_message.html', {
-                'error_message': 'Job name is required'
-            })
-        
-        # Get and validate job configuration
-        jobs = self.dest_operations.get_backup_jobs()
-        if job_name not in jobs:
-            return self.destinations_handler._render_html('partials/error_message.html', {
-                'error_message': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        # Perform repository availability check and return response
-        return self.destinations_handler._check_and_respond_repository_status_html(job_name, job_config)
+        # Delegate to existing method that now uses services internally
+        return self.destinations_handler._check_and_respond_repository_status_html(job_name, {})
 
 
 # Export handler instance

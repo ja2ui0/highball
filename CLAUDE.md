@@ -233,3 +233,6 @@ Claude code auto-appends after this line.
     ...why are there duplicate init/unlock methods and why is Internal Server Error ok?
 - dests/services/kinds.py is deprecated within its domain - only imported by jobs/ and needs to be removed when jobs/ is refactored.
 - shared/handlers/templating.py -- no html in handlers.
+- RESTIC RUNNER might actually belong to jobs/
+- JOB-BASED REPO... these are not actually job-based, they are dests-based (nothing to do with jobs) and probably need some semantic cleanup to indicate that
+- 

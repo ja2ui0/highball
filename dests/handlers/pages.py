@@ -15,7 +15,7 @@ from config import BackupConfig
 from models.forms import safe_get_value, safe_get_list
 from dests.services.manage import create_destination_operations_service
 from dests.services.rsync import network_discovery_service, rsync_service
-from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service
+from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service, initialize_repository_for_job, check_repository_status_for_job
 from dests.schema import DESTINATION_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -254,52 +254,29 @@ class DestinationsHandler(BaseHandler):
 
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""
-        dest_type = job_config.get('dest_type')
+        # Delegate business logic to service
+        result = check_repository_status_for_job(job_name, self.backup_config)
         
-        if dest_type == 'restic':
-            return self._check_restic_repository_html(job_name, job_config)
-        else:
-            # Non-restic repositories - assume available for now
+        # Handler decides which template to render based on service result
+        if result.get('success'):
             return self._render_html('partials/repository_available.html', {
-                'job_name': job_name,
-                'job_type': dest_type
-            })
-
-    def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
-        """Check restic repository availability and return HTML response"""
-        dest_config = job_config.get('dest_config', {})
-        repo_uri = dest_config.get('repo_uri')
-        
-        if not repo_uri:
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Repository URI not configured'
-            })
-            
-        check_success, check_message = restic_service._quick_repository_check(repo_uri, dest_config)
-        
-        if check_success:
-            return self._render_html('partials/repository_available.html', {
-                'job_name': job_name,
-                'job_type': 'restic'
+                'job_name': result['job_name'],
+                'job_type': result['job_type']
             })
         else:
-            return self._send_repository_error_html(job_name, check_message)
-
-    def _send_repository_error_html(self, job_name: str, error_message: str) -> HTMLResponse:
-        """Send appropriate repository error HTMX partial based on error type"""
-        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
-            # Repository locked - render unlock interface
-            return self._render_html('partials/repository_locked_error.html', {
-                'job_name': job_name,
-                'error_message': error_message
-            })
-        else:
-            # Other error - render error template
-            return self._render_html('partials/repository_error.html', {
-                'job_name': job_name,
-                'error_type': 'connection_error',
-                'error_message': error_message or 'Unknown error'
-            })
+            # Determine which error template to use
+            error_type = result.get('error_type', 'connection_error')
+            if error_type == 'locked':
+                return self._render_html('partials/repository_locked_error.html', {
+                    'job_name': job_name,
+                    'error_message': result.get('error', 'Repository locked')
+                })
+            else:
+                return self._render_html('partials/repository_error.html', {
+                    'job_name': job_name,
+                    'error_type': error_type,
+                    'error_message': result.get('error', 'Unknown error')
+                })
 
     @handle_page_errors("Get repository info")
     def get_repository_info(self, job_name: str) -> JSONResponse:
@@ -328,7 +305,8 @@ class DestinationsHandler(BaseHandler):
 
     @handle_page_errors("Initialize repository")
     def init_repository(self, job_name: str) -> JSONResponse:
-        result = restic_api_service.init_repository(job_name)
+        # Delegate business logic to service
+        result = initialize_repository_for_job(job_name, self.backup_config)
         return JSONResponse(content=result)
 
 # Global handler instance

@@ -577,6 +577,136 @@ class DestinationOperationsService:
         
         return template_context
 
+    # =========================================================================
+    # FORM PROCESSING BUSINESS LOGIC - moved from handlers
+    # =========================================================================
+    
+    def validate_ssh_destination_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate SSH destination configuration - business logic moved from htmx handlers"""
+        hostname = safe_get_value(form_data, 'dest_hostname')
+        username = safe_get_value(form_data, 'dest_username')
+        path = safe_get_value(form_data, 'dest_path')
+        
+        # Business logic: delegate to proper destination validation service
+        validation_data = {'hostname': hostname, 'username': username, 'path': path}
+        
+        # Import service locally to avoid circular imports
+        from dests.services.rsync import rsync_service
+        result = rsync_service.validate_rsync_destination(validation_data)
+        
+        # Return structured data for handler to render
+        return result
+    
+    def validate_restic_destination_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate Restic destination configuration - business logic moved from htmx handlers"""
+        # Extract parameters using correct field names
+        repo_type = safe_get_value(form_data, 'restic_repo_type') or safe_get_value(form_data, 'repo_type')
+        password = safe_get_value(form_data, 'restic_password')
+        
+        # Schema-driven validation for required fields
+        from dests.schema import DESTINATION_TYPE_SCHEMAS
+        schema = DESTINATION_TYPE_SCHEMAS.get('restic', {})
+        required_fields = schema.get('required_fields', [])
+        
+        # Map form fields to config keys
+        field_values = {
+            'repo_type': repo_type,
+            'password': password
+        }
+        
+        for field in required_fields:
+            if field in field_values and not field_values[field]:
+                display_name = schema.get('display_name', 'Restic')
+                return {
+                    'success': False, 
+                    'error': f'{display_name} destination missing {field}'
+                }
+        
+        # Build URI from individual repository fields using existing URI builder
+        uri_result = self._build_restic_uri(repo_type, form_data)
+        
+        if not uri_result.get('valid'):
+            return {
+                'success': False, 
+                'error': uri_result.get('error', 'Invalid repository configuration')
+            }
+        
+        repo_uri = uri_result['uri']
+        
+        # Business logic: delegate to proper destination validation service
+        validation_data = {'repo_type': repo_type, 'repo_uri': repo_uri, 'restic_password': password}
+        
+        # Import service locally to avoid circular imports
+        from dests.services.restic import restic_service
+        result = restic_service.validate_restic_destination(validation_data)
+        
+        # Return structured data for handler to render
+        return result
+    
+    def validate_origin_repo_path_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate same-as-origin repository path - business logic moved from htmx handlers"""
+        # Extract repository path
+        repo_path = safe_get_value(form_data, 'origin_repo_path')
+        if not repo_path or not repo_path.strip():
+            return {'success': False, 'error': 'Please enter a repository path'}
+        
+        # Extract SSH configuration (required for same_as_origin)
+        hostname = safe_get_value(form_data, 'hostname')
+        username = safe_get_value(form_data, 'username')
+        
+        if not hostname or not username:
+            return {'success': False, 'error': 'SSH configuration required for same-as-origin repositories'}
+        
+        # Business logic: delegate to proper destination validation service
+        validation_data = {'hostname': hostname, 'username': username, 'path': repo_path}
+        
+        # Import service locally to avoid circular imports
+        from dests.services.rsync import rsync_service
+        result = rsync_service.validate_rsync_destination(validation_data)
+        
+        # Return structured data for handler to render
+        return result
+    
+    def generate_uri_preview(self, dest_type: str, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate URI preview for destination configuration - business logic moved from htmx handlers"""
+        if dest_type == 'restic':
+            # Check both job form field name (restic_repo_type) and destination form field name (repo_type)
+            repo_type = safe_get_value(form_data, 'restic_repo_type') or safe_get_value(form_data, 'repo_type')
+            
+            if not repo_type:
+                return {'uri': 'Select repository type to see URI preview'}
+            else:
+                # Use existing URI builder from service
+                uri_result = self._build_restic_uri(repo_type, form_data)
+                
+                if uri_result.get('valid'):
+                    # Mask password in display
+                    uri = uri_result['uri']
+                    if ':' in uri and '@' in uri:
+                        # Replace password with *** for display
+                        parts = uri.split('@')
+                        if len(parts) == 2:
+                            auth_part = parts[0]
+                            if ':' in auth_part:
+                                scheme_and_user = auth_part.rsplit(':', 1)[0]
+                                uri = f"{scheme_and_user}:***@{parts[1]}"
+                    
+                    return {'uri': uri}
+                else:
+                    return {'uri': uri_result.get('error', 'Invalid configuration')}
+        else:
+            # Use general URI builder for other destination types
+            uri_result = self.build_destination_uri(dest_type, form_data)
+            if uri_result['valid']:
+                return {'uri': uri_result['uri']}
+            else:
+                return {'uri': uri_result.get('error', 'Invalid configuration')}
+    
+    def parse_restic_destination_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse Restic config from form data - business logic moved from htmx handlers"""
+        restic_result = self.parse_restic_destination(form_data)
+        return restic_result
+
 
 # Export service instance for easy import
 def create_destination_operations_service(backup_config):
