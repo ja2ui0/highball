@@ -368,6 +368,214 @@ class DestinationOperationsService:
         """Check if destination exists"""
         existing_destinations = self.get_destinations()
         return dest_name in existing_destinations
+    
+    # =========================================================================
+    # BUSINESS LOGIC METHODS - moved from handlers
+    # =========================================================================
+    
+    def _get_default_port(self, dest_type: str) -> int:
+        """Get default port for destination type"""
+        defaults = {
+            'rsync': 22,
+            'rsyncd': 873,
+            'restic': 443
+        }
+        return defaults.get(dest_type, 22)
+    
+    def _flatten_dest_config_for_uri(self, dest_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Flatten nested destination config for URI generation"""
+        flat_data = {
+            'hostname': dest_config.get('hostname'),
+            'port': str(dest_config.get('port', '')),
+        }
+        
+        dest_type = dest_config.get('type')
+        if dest_type == 'rsync' and 'rsync' in dest_config:
+            flat_data.update({
+                'username': dest_config['rsync'].get('username'),
+                'path': dest_config['rsync'].get('path')
+            })
+        elif dest_type == 'rsyncd' and 'rsyncd' in dest_config:
+            flat_data.update(dest_config['rsyncd'])
+        elif dest_type == 'restic' and 'restic' in dest_config:
+            flat_data.update({
+                'repo_type': dest_config['restic'].get('type'),
+                'password': dest_config['restic'].get('password')
+            })
+        
+        return flat_data
+    
+    def _build_destination_uri(self, dest_config: Dict[str, Any]) -> str:
+        """Build destination URI based on type and configuration"""
+        dest_type = dest_config.get('type')
+        uri_result = self.build_destination_uri(dest_type, dest_config)
+        
+        if uri_result['valid']:
+            return uri_result['uri']
+        else:
+            return f"Error: {uri_result.get('error', 'URI generation failed')}"
+    
+    def add_destination_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add new destination from form data - contains all business logic"""
+        # Extract basic destination info using safe_get_value
+        dest_name = safe_get_value(form_data, 'dest_name', '').strip()
+        friendly_name = safe_get_value(form_data, 'friendly_name', '').strip()
+        dest_type = safe_get_value(form_data, 'dest_type', '')
+        hostname = safe_get_value(form_data, 'hostname', '').strip()
+        port = safe_get_value(form_data, 'port', '')
+        
+        # Validation
+        if not dest_name:
+            return {'success': False, 'error': 'Destination name is required'}
+            
+        if not dest_type:
+            return {'success': False, 'error': 'Destination type is required'}
+        
+        # Check if destination already exists
+        if self.destination_exists(dest_name):
+            return {'success': False, 'error': f'Destination "{dest_name}" already exists'}
+        
+        # Build nested destination config following example pattern
+        dest_config = {
+            'type': dest_type,
+            'uri': '',  # Will be generated
+            'hostname': hostname,
+            'port': int(port) if port else self._get_default_port(dest_type),
+            'friendly_name': friendly_name or dest_name
+        }
+        
+        # Add type-specific nested sections
+        if dest_type == 'rsync':
+            username = safe_get_value(form_data, 'username', '').strip()
+            path = safe_get_value(form_data, 'path', '').strip()
+            
+            if not username or not path:
+                return {'success': False, 'error': 'Username and path are required for rsync destinations'}
+            
+            dest_config['rsync'] = {
+                'username': username,
+                'path': path
+            }
+            
+        elif dest_type == 'rsyncd':
+            share = safe_get_value(form_data, 'share', '').strip()
+            
+            if not share:
+                return {'success': False, 'error': 'Share is required for rsyncd destinations'}
+            
+            rsyncd_config = {'share': share}
+            
+            # Optional fields
+            username = safe_get_value(form_data, 'username', '').strip()
+            password = safe_get_value(form_data, 'password', '').strip()
+            if username:
+                rsyncd_config['username'] = username
+            if password:
+                rsyncd_config['password'] = password
+                
+            dest_config['rsyncd'] = rsyncd_config
+            
+        elif dest_type == 'restic':
+            repo_type = safe_get_value(form_data, 'repo_type', '')
+            password = safe_get_value(form_data, 'password', '')
+            
+            if not repo_type or not password:
+                return {'success': False, 'error': 'Repository type and password are required for restic destinations'}
+            
+            dest_config['restic'] = {
+                'type': repo_type,
+                'password': password
+            }
+            
+            # Add repo type-specific nested config
+            if repo_type == 'rest':
+                rest_config = {}
+                # Add REST-specific fields as they're implemented
+                dest_config['restic']['rest'] = rest_config
+            # Other restic types can be added similarly
+        
+        # Generate URI using the nested structure
+        flat_data = self._flatten_dest_config_for_uri(dest_config)
+        dest_config['uri'] = self._build_destination_uri(flat_data)
+        
+        # Save destination
+        return self.save_destination(dest_name, dest_config)
+    
+    def update_destination_from_form(self, dest_name: str, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update existing destination from form data - contains all business logic"""
+        if not dest_name:
+            return {'success': False, 'error': 'Destination name is required'}
+        
+        # Get existing destination config to preserve type-specific settings
+        existing_dest = self.get_destination(dest_name)
+        if not existing_dest:
+            return {'success': False, 'error': f'Destination "{dest_name}" not found'}
+        
+        # Update config with form data (similar to add_destination logic)
+        updated_config = existing_dest.copy()
+        updated_config['friendly_name'] = safe_get_value(form_data, 'friendly_name', dest_name).strip()
+        updated_config['hostname'] = safe_get_value(form_data, 'hostname', '').strip()
+        port = safe_get_value(form_data, 'port', '')
+        if port:
+            updated_config['port'] = int(port)
+        
+        # Regenerate URI with updated config
+        flat_data = self._flatten_dest_config_for_uri(updated_config)
+        updated_config['uri'] = self._build_destination_uri(flat_data)
+        
+        # Save updated destination
+        return self.save_destination(dest_name, updated_config)
+    
+    def validate_destination_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate destination configuration from form data - contains all business logic"""
+        dest_type = safe_get_value(form_data, 'dest_type', '')
+        hostname = safe_get_value(form_data, 'hostname', '')
+        
+        if not dest_type or not hostname:
+            return {
+                'success': False,
+                'validation_message': 'Destination type and hostname are required for validation'
+            }
+        
+        # Import services locally to avoid circular imports
+        from dests.services.rsync import rsync_service
+        from dests.services.restic import restic_service
+        
+        # Test basic connectivity based on destination type using atomic services
+        if dest_type == 'rsync':
+            # Use superior rsync validation from atomic service (SSH + path writability)
+            result = rsync_service.validate_rsync_destination(form_data)
+            template_context = {
+                'success': result['success'],
+                'validation_message': result.get('message') or result.get('error', 'Unknown error')
+            }
+        elif dest_type == 'rsyncd':
+            # Use superior rsyncd validation from atomic service
+            result = rsync_service.validate_rsyncd_destination(form_data)
+            template_context = {
+                'success': result['success'],
+                'validation_message': result.get('message') or result.get('error', 'Unknown error')
+            }
+        elif dest_type == 'restic':
+            # Use superior restic validation from atomic service (real repository connectivity)
+            result = restic_service.validate_restic_destination(form_data)
+            template_context = {
+                'success': result['success'],
+                'validation_message': result.get('message', 'Unknown error')
+            }
+        else:
+            template_context = {
+                'success': False,
+                'validation_message': f'Validation not implemented for destination type: {dest_type}'
+            }
+        
+        # Generate URI preview
+        if template_context.get('success'):
+            uri_result = self.build_destination_uri(dest_type, form_data)
+            if uri_result['valid']:
+                template_context['uri_generated'] = uri_result['uri']
+        
+        return template_context
 
 
 # Export service instance for easy import

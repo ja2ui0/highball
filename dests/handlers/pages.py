@@ -191,252 +191,30 @@ class DestinationsHandler(BaseHandler):
 
 
     def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new destination"""
-        
-        # Extract basic destination info
-        dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
-        friendly_name = self._get_form_value(form_data, 'friendly_name', '').strip()
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        hostname = self._get_form_value(form_data, 'hostname', '').strip()
-        port = self._get_form_value(form_data, 'port', '')
-        
-        # Validation
-        if not dest_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination name is required'
-            }, status_code=400)
-            
-        if not dest_type:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination type is required'
-            }, status_code=400)
-        
-        # Check if destination already exists
-        if self.dest_operations.destination_exists(dest_name):
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Destination "{dest_name}" already exists'
-            }, status_code=400)
-        
-        # Build nested destination config following example pattern
-        dest_config = {
-            'type': dest_type,
-            'uri': '',  # Will be generated
-            'hostname': hostname,
-            'port': int(port) if port else self._get_default_port(dest_type),
-            'friendly_name': friendly_name or dest_name
-        }
-        
-        # Add type-specific nested sections
-        if dest_type == 'rsync':
-            username = self._get_form_value(form_data, 'username', '').strip()
-            path = self._get_form_value(form_data, 'path', '').strip()
-            
-            if not username or not path:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Username and path are required for rsync destinations'
-                }, status_code=400)
-            
-            dest_config['rsync'] = {
-                'username': username,
-                'path': path
-            }
-            
-        elif dest_type == 'rsyncd':
-            share = self._get_form_value(form_data, 'share', '').strip()
-            
-            if not share:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Share is required for rsyncd destinations'
-                }, status_code=400)
-            
-            rsyncd_config = {'share': share}
-            
-            # Optional fields
-            username = self._get_form_value(form_data, 'username', '').strip()
-            password = self._get_form_value(form_data, 'password', '').strip()
-            if username:
-                rsyncd_config['username'] = username
-            if password:
-                rsyncd_config['password'] = password
-                
-            dest_config['rsyncd'] = rsyncd_config
-            
-        elif dest_type == 'restic':
-            repo_type = self._get_form_value(form_data, 'repo_type', '')
-            password = self._get_form_value(form_data, 'password', '')
-            
-            if not repo_type or not password:
-                return JSONResponse(content={
-                    'success': False,
-                    'error': 'Repository type and password are required for restic destinations'
-                }, status_code=400)
-            
-            dest_config['restic'] = {
-                'type': repo_type,
-                'password': password
-            }
-            
-            # Add repo type-specific nested config
-            if repo_type == 'rest':
-                rest_config = {}
-                # Add REST-specific fields as they're implemented
-                dest_config['restic']['rest'] = rest_config
-            # Other restic types can be added similarly
-        
-        # Generate URI using the nested structure
-        flat_data = self._flatten_dest_config_for_uri(dest_config)
-        dest_config['uri'] = self._build_destination_uri(flat_data)
-        
-        # Save destination
-        result = self.dest_operations.save_destination(dest_name, dest_config)
+        """Add new destination - thin handler delegates to service"""
+        result = self.dest_operations.add_destination_from_form(form_data)
         
         if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
         else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=500)
+            return JSONResponse(content=result, status_code=400)
 
-    def _get_default_port(self, dest_type: str) -> int:
-        """Get default port for destination type"""
-        defaults = {
-            'rsync': 22,
-            'rsyncd': 873,
-            'restic': 443
-        }
-        return defaults.get(dest_type, 22)
-
-    def _flatten_dest_config_for_uri(self, dest_config):
-        """Flatten nested destination config for URI generation"""
-        flat_data = {
-            'hostname': dest_config.get('hostname'),
-            'port': str(dest_config.get('port', '')),
-        }
-        
-        dest_type = dest_config.get('type')
-        if dest_type == 'rsync' and 'rsync' in dest_config:
-            flat_data.update({
-                'username': dest_config['rsync'].get('username'),
-                'path': dest_config['rsync'].get('path')
-            })
-        elif dest_type == 'rsyncd' and 'rsyncd' in dest_config:
-            flat_data.update(dest_config['rsyncd'])
-        elif dest_type == 'restic' and 'restic' in dest_config:
-            flat_data.update({
-                'repo_type': dest_config['restic'].get('type'),
-                'password': dest_config['restic'].get('password')
-            })
-        
-        return flat_data
-
-    def _build_destination_uri(self, dest_config):
-        """Build destination URI based on type and configuration"""
-        # DestinationParser is now local to this module
-        
-        dest_type = dest_config.get('type')
-        uri_result = self.dest_operations.build_destination_uri(dest_type, dest_config)
-        
-        if uri_result['valid']:
-            return uri_result['uri']
-        else:
-            return f"Error: {uri_result.get('error', 'URI generation failed')}"
 
     def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save destination changes"""
-        
-        # Extract destination name from form
+        """Save destination changes - thin handler delegates to service"""
         dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
-        
-        if not dest_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Destination name is required'
-            }, status_code=400)
-        
-        # Get existing destination config to preserve type-specific settings
-        existing_dest = self.dest_operations.get_destination(dest_name)
-        if not existing_dest:
-            return JSONResponse(content={
-                'success': False,
-                'error': f'Destination "{dest_name}" not found'
-            }, status_code=404)
-        
-        # Update config with form data (similar to add_destination logic)
-        updated_config = existing_dest.copy()
-        updated_config['friendly_name'] = self._get_form_value(form_data, 'friendly_name', dest_name).strip()
-        updated_config['hostname'] = self._get_form_value(form_data, 'hostname', '').strip()
-        port = self._get_form_value(form_data, 'port', '')
-        if port:
-            updated_config['port'] = int(port)
-        
-        # Regenerate URI with updated config
-        flat_data = self._flatten_dest_config_for_uri(updated_config)
-        updated_config['uri'] = self._build_destination_uri(flat_data)
-        
-        # Save updated destination
-        result = self.dest_operations.save_destination(dest_name, updated_config)
+        result = self.dest_operations.update_destination_from_form(dest_name, form_data)
         
         if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
         else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=500)
+            status_code = 404 if 'not found' in result['error'].lower() else 400
+            return JSONResponse(content=result, status_code=status_code)
 
 
     def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Validate destination configuration"""
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        hostname = self._get_form_value(form_data, 'hostname', '')
-        
-        if not dest_type or not hostname:
-            template_context = {
-                'success': False,
-                'validation_message': 'Destination type and hostname are required for validation'
-            }
-        else:
-            # Test basic connectivity based on destination type using atomic services
-            if dest_type == 'rsync':
-                # Use superior rsync validation from atomic service (SSH + path writability)
-                result = rsync_service.validate_rsync_destination(form_data)
-                template_context = {
-                    'success': result['success'],
-                    'validation_message': result.get('message') or result.get('error', 'Unknown error')
-                }
-            elif dest_type == 'rsyncd':
-                # Use superior rsyncd validation from atomic service
-                result = rsync_service.validate_rsyncd_destination(form_data)
-                template_context = {
-                    'success': result['success'],
-                    'validation_message': result.get('message') or result.get('error', 'Unknown error')
-                }
-            elif dest_type == 'restic':
-                # Use superior restic validation from atomic service (real repository connectivity)
-                result = restic_service.validate_restic_destination(form_data)
-                template_context = {
-                    'success': result['success'],
-                    'validation_message': result.get('message', 'Unknown error')
-                }
-            else:
-                template_context = {
-                    'success': False,
-                    'validation_message': f'Validation not implemented for destination type: {dest_type}'
-                }
-        
-        # Generate URI preview
-        if template_context.get('success'):
-            # DestinationParser is now local to this module
-            uri_result = self.dest_operations.build_destination_uri(dest_type, form_data)
-            if uri_result['valid']:
-                template_context['uri_generated'] = uri_result['uri']
-        
+        """Validate destination configuration - thin handler delegates to service"""
+        template_context = self.dest_operations.validate_destination_from_form(form_data)
         return self._render_html('partials/destination_validation_result.html', template_context)
 
     def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
