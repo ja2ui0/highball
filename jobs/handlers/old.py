@@ -275,7 +275,7 @@ class AdminJobPreviewMethods:
     """Temporary admin methods for job preview functionality during revamp"""
     
     def __init__(self):
-        self.template_service = TemplateService()
+        self._init_template_service()
     
     
     async def preview_config_htmx(self, request) -> HTMLResponse:

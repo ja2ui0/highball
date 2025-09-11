@@ -34,7 +34,7 @@ class AdminHandler(BaseHandler):
     
     def __init__(self):
         self.backup_config = BackupConfig()
-        self.template_service = TemplateService(self.backup_config)
+        self._init_template_service(self.backup_config)
         self.admin_services = HighballServices()
     
 

@@ -1,14 +1,19 @@
 """
 Shared Base Handler
-Base class for handlers with common rendering and form parsing utilities
+Base class for handlers with common rendering, form parsing, and template utilities
 """
 
 from typing import Dict, Any
 from fastapi.responses import HTMLResponse
+from shared.handlers.templating import TemplateService
 
 
 class BaseHandler:
-    """Base class for handlers with shared rendering and form parsing helpers"""
+    """Base class for handlers with shared rendering, form parsing, and template helpers"""
+    
+    def _init_template_service(self, backup_config=None):
+        """Initialize template service with optional backup config"""
+        self.template_service = TemplateService(backup_config)
     
     def _render_html(self, template: str, context: dict) -> HTMLResponse:
         """Helper to render template and return HTMLResponse"""

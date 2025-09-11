@@ -29,8 +29,8 @@ class DestinationsHandler(BaseHandler):
     """Handle destinations management and validation"""
     
     def __init__(self):
-        self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        self._init_template_service()
         
         # Create destination operations service
         self.dest_operations = create_destination_operations_service(self.backup_config)

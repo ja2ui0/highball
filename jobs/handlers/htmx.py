@@ -109,8 +109,8 @@ class HTMXHandlers(BaseHandler):
     """HTMX endpoint handlers for jobs domain"""
     
     def __init__(self):
-        self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        self._init_template_service()
     
     def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
         """Render HTML template with data"""

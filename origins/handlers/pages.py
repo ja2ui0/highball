@@ -81,8 +81,8 @@ class OriginsHandler(BaseHandler):
     """Handle SSH origins management and validation"""
     
     def __init__(self):
-        self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        self._init_template_service()
         self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
     

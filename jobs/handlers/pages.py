@@ -118,8 +118,8 @@ class JobsHandler(BaseHandler):
     """Handle job management and inspection"""
     
     def __init__(self):
-        self.template_service = TemplateService()
         self.backup_config = BackupConfig()
+        self._init_template_service()
         
         # Initialize service orchestrators (moved from operations handler)
         from jobs.services.backup import BackupOrchestrationService
