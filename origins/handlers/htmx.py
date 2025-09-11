@@ -60,9 +60,6 @@ class HTMXHandlers(BaseHandler):
         # Delegate business logic to pages handler
         return origins_handler.save_ssh_origin(form_data)
 
-    def _get_form_value(self, form_data: Dict[str, Any], key: str, default: Any = None) -> Any:
-        """Helper to get form value with default"""
-        return form_data.get(key, default)
 
     # =========================================================================
     # VALIDATION HANDLERS

@@ -277,12 +277,6 @@ class AdminJobPreviewMethods:
     def __init__(self):
         self.template_service = TemplateService()
     
-    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
-        """Extract single value from form data"""
-        values = form_data.get(field_name, [])
-        if isinstance(values, list):
-            return values[0] if values else default
-        return values if values else default
     
     async def preview_config_htmx(self, request) -> HTMLResponse:
         """Generate and display job config preview - HTMX handler"""

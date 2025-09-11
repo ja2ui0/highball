@@ -11,6 +11,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
+from shared.handlers.base import BaseHandler
 from config import BackupConfig
 
 
@@ -104,7 +105,7 @@ def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> st
 # HTMX HANDLERS CLASS
 # =============================================================================
 
-class HTMXHandlers:
+class HTMXHandlers(BaseHandler):
     """HTMX endpoint handlers for jobs domain"""
     
     def __init__(self):

@@ -37,13 +37,6 @@ class AdminHandler(BaseHandler):
         self.template_service = TemplateService(self.backup_config)
         self.admin_services = HighballServices()
     
-    def _get_form_value(self, form_data: Dict[str, Any], field_name: str, default: str = '') -> str:
-        """Helper to get form value with default"""
-        value = form_data.get(field_name, default)
-        # Handle list format from HTMX form parsing
-        if isinstance(value, list) and len(value) > 0:
-            return value[0]
-        return value if isinstance(value, str) else default
 
     def _get_available_themes(self):
         """Get list of available theme files - delegate to admin service"""

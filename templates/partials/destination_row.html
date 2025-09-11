@@ -6,8 +6,7 @@
         <div class="action-buttons">
             <button onclick="editDestination('{{ destination.name }}')" 
                     class="button">Edit</button>
-            <button hx-post="/dests/delete" 
-                    hx-vals='{"name": "{{ destination.name }}"}'
+            <button hx-post="/dests/delete?name={{ destination.name }}"
                     hx-confirm="Are you sure you want to delete destination '{{ destination.friendly_name }}'? This action cannot be undone."
                     hx-on::after-request="window.location.reload()"
                     class="button button-danger">Delete</button>

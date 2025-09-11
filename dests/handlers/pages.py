@@ -152,12 +152,6 @@ class DestinationsHandler(BaseHandler):
     # DESTINATION FIELD RENDERING AND OPERATIONS
     # =============================================================================
 
-    def _get_form_value(self, form_data: Dict[str, Any], key: str, default: str = '') -> str:
-        """HTTP concern: extract single value from form data"""
-        value = form_data.get(key, default)
-        if isinstance(value, list) and len(value) > 0:
-            return str(value[0])
-        return str(value) if value else default
 
     def _render_validation_result(self, status: str, message: str) -> str:
         """Render validation result with consistent styling"""

@@ -230,9 +230,6 @@ class OriginsHandler(BaseHandler):
                 'error': result['error']
             }, status_code=500)
 
-    def _get_form_value(self, form_data: Dict[str, Any], key: str, default: Any = None) -> Any:
-        """Helper to get form value with default"""
-        return form_data.get(key, default)
 
     @handle_page_errors("SSH source validation")
     def validate_ssh_source(self, source: str) -> JSONResponse:
