@@ -1,98 +1,33 @@
 """
-Origins Page Handlers
-SSH host management, origin configuration, and capability validation
+Origins View Handlers (GET operations)
+SSH origins management pages and read-only operations
 """
 
 import logging
 import time
-from functools import wraps
-from typing import Dict, Any, Callable
+from typing import Dict, Any
 from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
-from dataclasses import dataclass
+from fastapi.responses import HTMLResponse, StreamingResponse
 import asyncio
 
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from config import BackupConfig
-from models.forms import safe_get_value
 from origins.services.manage import OriginOperationsService
 from origins.services.ssh import OriginSSHService
 
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# FORM PARSING MOVED TO origins/services/manage.py
-# =============================================================================
-
-@dataclass
-class HtmxFormData:
-    """Parsed HTMX form data with common headers"""
-    form_data: Dict[str, Any]
-    hx_request: bool
-    hx_target: str | None
-    hx_trigger: str | None
-    hx_current_url: str | None
-
-def parse_htmx_form(func: Callable) -> Callable:
-    """Decorator that parses HTMX form data and provides clean error responses"""
-    @wraps(func)
-    async def wrapper(self, request: Request, form_data: Dict[str, Any]) -> HTMLResponse:
-        try:
-            # Extract HTMX headers
-            hx_request = request.headers.get('HX-Request', 'false').lower() == 'true'
-            hx_target = request.headers.get('HX-Target')
-            hx_trigger = request.headers.get('HX-Trigger')
-            hx_current_url = request.headers.get('HX-Current-URL')
-            
-            # Create parsed form data object
-            parsed_form = HtmxFormData(
-                form_data=form_data,
-                hx_request=hx_request,
-                hx_target=hx_target,
-                hx_trigger=hx_trigger,
-                hx_current_url=hx_current_url
-            )
-            
-            # Call the actual handler with clean parsed data
-            html_response = await func(self, parsed_form)
-            
-            # Return HTMX-compatible HTML response
-            return HTMLResponse(content=html_response)
-            
-        except Exception as e:
-            logger.error(f"HTMX form processing failed in {func.__name__}: {e}")
-            # Return basic error HTML that works with any HTMX target
-            error_html = f'<div class="error">Form processing failed: {str(e)}</div>'
-            return HTMLResponse(content=error_html, status_code=500)
-    
-    return wrapper
-
-def get_form_value(form_data: Dict[str, Any], key: str, default: str = '') -> str:
-    """Extract single value from form data (works with FastAPI form parsing)"""
-    value_list = form_data.get(key, [default])
-    return value_list[0] if value_list else default
-
-
-
-class OriginsHandler(BaseHandler):
-    """Handle SSH origins management and validation"""
+class OriginsViewHandler(BaseHandler):
+    """Handle SSH origins read-only operations and page rendering"""
     
     def __init__(self):
         self.backup_config = BackupConfig()
         self._init_template_service()
         self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
-    
-    # =========================================================================
-    # SSH SOURCE VALIDATION RENDERING - moved to origins.services.ssh
-    # =========================================================================
-    
-    # =========================================================================
-    # PAGE HANDLERS
-    # =========================================================================
     
     @handle_page_errors("Show SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
@@ -163,113 +98,6 @@ class OriginsHandler(BaseHandler):
         }
         
         return self._render_html('partials/ssh_origin_form.html', form_data)
-
-    @handle_page_errors("Delete SSH origin")
-    def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
-        """Delete SSH origin"""
-        # Delegate business logic to origin service
-        result = self.origin_service.delete_origin_with_validation(origin_name)
-        
-        if result['success']:
-            return RedirectResponse(url='/origins', status_code=302)
-        else:
-            status_code = 400 if result['error'] == 'Origin name is required' else 500
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=status_code)
-
-    @handle_page_errors("Add SSH origin")
-    def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new SSH origin"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        
-        # Delegate business logic to origin service
-        result = self.origin_service.add_new_origin(origin_name, origin_config)
-        
-        if result['success']:
-            return RedirectResponse(url='/origins', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=400)
-
-    @handle_page_errors("Save SSH origin")
-    def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save SSH origin changes"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': origin_result['error']
-            }, status_code=400)
-        
-        origin_config = origin_result['origin_config']
-        origin_name = origin_config['origin_name']
-        original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
-        
-        # Delegate business logic to origin service
-        result = self.origin_service.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
-        
-        if result['success']:
-            return RedirectResponse(url='/origins', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=500)
-
-
-    @handle_page_errors("SSH source validation")
-    def validate_ssh_source(self, source: str) -> JSONResponse:
-        """Validate SSH source configuration"""
-        result = self.ssh_service.validate_origin_string(source)
-        return JSONResponse(content=result)
-
-    @handle_page_errors("SSH origin validation")
-    def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Push keys and validate SSH origin configuration with persistent session tracking"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
-        if not origin_result['valid']:
-            return JSONResponse(content=origin_result)
-        
-        origin_config = origin_result['origin_config']
-        edit_mode = 'original_origin_name' in form_data and form_data['original_origin_name']
-        
-        # Extract connection details (HTTP form parsing - presentation concern)
-        hostname = origin_config['ssh_hostname']
-        username = origin_config['ssh_username']  
-        password = form_data.get('ssh_password', '')
-        ssh_highball = form_data.get('ssh_highball') == 'on'
-        
-        try:
-            # Delegate business logic to service
-            session_id = self.ssh_service.create_validation_session(hostname, username, password, ssh_highball, edit_mode)
-            
-            # Return initial progress template
-            return self._render_html('partials/ssh_validation_progress.html', {
-                'session_id': session_id,
-                'initial_message': "Starting SSH validation workflow..."
-            })
-        except ValueError as e:
-            # Handle business validation errors
-            return self._render_html('partials/ssh_validation_result.html', {
-                'success': False,
-                'edit_mode': edit_mode,
-                'validation_message': str(e)
-            })
     
     @handle_page_errors("SSH progress polling")
     def get_ssh_progress(self, session_id: str) -> HTMLResponse:
@@ -370,17 +198,7 @@ class OriginsHandler(BaseHandler):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         })
-    
-    
-    
-    @handle_page_errors("Toggle SSH auth method")
-    def toggle_ssh_auth_method(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Toggle between Highball and user SSH authentication methods"""
-        ssh_highball = 'ssh_highball' in form_data
-        template_data = self.ssh_service.get_auth_method_template_data(ssh_highball)
-        return self._render_html(template_data['template'], template_data['context'])
-    
 
 
 # Global handler instance
-origins_handler = OriginsHandler()
+origins_view_handler = OriginsViewHandler()

@@ -12,8 +12,8 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Domain Handlers - Pure Switchboard Pattern
-from origins.handlers.pages import origins_handler
-from origins.handlers.htmx import origins_htmx
+from origins.handlers.views import origins_view_handler
+from origins.handlers.forms import origins_form_handler
 from dests.handlers.pages import destinations_handler
 from dests.handlers.htmx import destinations_htmx
 from jobs.handlers.pages import jobs_handler as job_pages
@@ -82,39 +82,39 @@ async def show_job_inspect(name: str = Query("")):
 
 @app.get("/origins", response_class=HTMLResponse)
 async def show_origins():
-    return origins_handler.show_ssh_origins()
+    return origins_view_handler.show_ssh_origins()
 
 @app.post("/origins/add")
 async def add_origin(request: Request):
-    return await origins_htmx.add_ssh_origin_htmx(request)
+    return await origins_form_handler.add_ssh_origin_htmx(request)
 
 @app.post("/origins/save")
 async def save_origin(request: Request):
-    return await origins_htmx.save_ssh_origin_htmx(request)
+    return await origins_form_handler.save_ssh_origin_htmx(request)
 
 @app.get("/origins/edit/{origin_name}")
 async def edit_origin(origin_name: str):
-    return origins_handler.edit_ssh_origin(origin_name)
+    return origins_view_handler.edit_ssh_origin(origin_name)
 
 @app.delete("/origins/{origin_name}")
 async def delete_origin(origin_name: str):
-    return origins_handler.delete_ssh_origin(origin_name)
+    return origins_form_handler.delete_ssh_origin(origin_name)
 
 @app.post("/origins/validate")
 async def validate_origin(request: Request):
-    return await origins_htmx.validate_ssh_origin_htmx(request)
+    return await origins_form_handler.validate_ssh_origin_htmx(request)
 
 @app.get("/origins/progress/{session_id}")
 async def get_origin_progress(session_id: str):
-    return origins_handler.get_ssh_progress(session_id)
+    return origins_view_handler.get_ssh_progress(session_id)
 
 @app.get("/origins/stream/{session_id}")
 async def stream_origin_progress(session_id: str, request: Request):
-    return await origins_handler.stream_ssh_progress(session_id, request)
+    return await origins_view_handler.stream_ssh_progress(session_id, request)
 
 @app.post("/htmx/toggle-auth-method")
 async def toggle_ssh_auth_method(request: Request):
-    return await origins_htmx.toggle_ssh_auth_method_htmx(request)
+    return await origins_form_handler.toggle_ssh_auth_method_htmx(request)
 
 # =============================================================================
 # DESTINATIONS
@@ -317,15 +317,15 @@ async def list_jobs():
 # Origins HTMX endpoints
 @app.post("/origins/validate-ssh-source")
 async def validate_ssh_source_endpoint(request: Request):
-    return await origins_htmx.validate_ssh_source_htmx(request)
+    return await origins_form_handler.validate_ssh_source_htmx(request)
 
 @app.post("/origins/source-fields")
 async def render_source_fields_endpoint(request: Request):
-    return await origins_htmx.render_source_fields_htmx(request)
+    return await origins_form_handler.render_source_fields_htmx(request)
 
 @app.post("/origins/preview-ssh-config")
 async def preview_ssh_config_endpoint(request: Request):
-    return await origins_htmx.preview_ssh_config_htmx(request)
+    return await origins_form_handler.preview_ssh_config_htmx(request)
 
 # Jobs HTMX endpoints
 @app.post("/jobs/validate-source-path")
