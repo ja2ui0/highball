@@ -1,45 +1,36 @@
 """
-Destinations Page Handlers
-Repository management, destination configuration, and validation
+Destinations Views (GET handlers)
+Handle destination listing, repository browsing, and read-only operations
 """
 
 import html
 import logging
 from typing import Dict, Any, Callable, List
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from config import BackupConfig
-from models.forms import safe_get_value, safe_get_list
 from dests.services.manage import create_destination_operations_service
-from dests.services.rsync import network_discovery_service, rsync_service
-from dests.services.restic import restic_service, ResticRepositoryTypeService, ResticRepositoryService, restic_api_service, initialize_repository_for_job, check_repository_status_for_job
+from dests.services.rsync import network_discovery_service
+from dests.services.restic import restic_api_service, check_repository_status_for_job
 from dests.schema import DESTINATION_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# DESTINATION FORM PARSER
-# =============================================================================
-
-class DestinationsHandler(BaseHandler):
-    """Handle destinations management and validation"""
+class DestinationsViews(BaseHandler):
+    """Handle destinations GET operations - read-only views"""
     
     def __init__(self):
-        self.backup_config = BackupConfig()
         self._init_template_service()
         
-        # Create destination operations service
-        self.dest_operations = create_destination_operations_service(self.backup_config)
-        
-        # Initialize network discovery service
+        # Services handle all config access - handlers delegate everything
+        self.dest_operations = create_destination_operations_service()
         self.network_discovery = network_discovery_service
     
     # =========================================================================
-    # DESTINATION VALIDATION RENDERING
+    # DESTINATION VALIDATION RENDERING - presentation logic stays in handlers
     # =========================================================================
     
     def render_ssh_dest_validation_status(self, result: Dict[str, Any]) -> str:
@@ -100,8 +91,28 @@ class DestinationsHandler(BaseHandler):
                                        message=message,
                                        details=details)
     
+    def _render_validation_result(self, status: str, message: str) -> str:
+        """Render validation result with consistent styling"""
+        
+        status_class = {
+            'success': 'success',
+            'error': 'error', 
+            'warning': 'warning'
+        }.get(status, 'info')
+        
+        status_label = {
+            'success': '[OK]',
+            'error': '[ERROR]',
+            'warning': '[WARN]'
+        }.get(status, '[INFO]')
+        
+        return self.template_service.render_template('partials/validation_result.html',
+                                                   status_class=status_class,
+                                                   status_label=status_label,
+                                                   message=html.escape(message))
+    
     # =========================================================================
-    # PAGE HANDLERS
+    # GET HANDLERS - read-only operations
     # =========================================================================
     
     @handle_page_errors("Show destinations")
@@ -148,90 +159,6 @@ class DestinationsHandler(BaseHandler):
         
         return self._render_html('pages/destinations.html', template_data)
 
-    # =============================================================================
-    # DESTINATION FIELD RENDERING AND OPERATIONS
-    # =============================================================================
-
-
-    def _render_validation_result(self, status: str, message: str) -> str:
-        """Render validation result with consistent styling"""
-        
-        status_class = {
-            'success': 'success',
-            'error': 'error', 
-            'warning': 'warning'
-        }.get(status, 'info')
-        
-        status_label = {
-            'success': '[OK]',
-            'error': '[ERROR]',
-            'warning': '[WARN]'
-        }.get(status, '[INFO]')
-        
-        return self.template_service.render_template('partials/validation_result.html',
-                                                   status_class=status_class,
-                                                   status_label=status_label,
-                                                   message=html.escape(message))
-
-    @handle_page_errors("Delete destination")
-    def delete_destination(self, dest_name: str) -> JSONResponse:
-        """Delete destination"""
-        
-        # Delegate to service
-        result = self.dest_operations.delete_destination(dest_name)
-        
-        if result['success']:
-            return RedirectResponse(url='/dests', status_code=302)
-        else:
-            status_code = 400 if 'required' in result.get('error', '') else 500
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=status_code)
-
-
-    def add_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Add new destination - thin handler delegates to service"""
-        result = self.dest_operations.add_destination_from_form(form_data)
-        
-        if result['success']:
-            return RedirectResponse(url='/dests', status_code=302)
-        else:
-            return JSONResponse(content=result, status_code=400)
-
-
-    def save_destination(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save destination changes - thin handler delegates to service"""
-        dest_name = self._get_form_value(form_data, 'dest_name', '').strip()
-        result = self.dest_operations.update_destination_from_form(dest_name, form_data)
-        
-        if result['success']:
-            return RedirectResponse(url='/dests', status_code=302)
-        else:
-            status_code = 404 if 'not found' in result['error'].lower() else 400
-            return JSONResponse(content=result, status_code=status_code)
-
-
-    def validate_destination(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Validate destination configuration - thin handler delegates to service"""
-        template_context = self.dest_operations.validate_destination_from_form(form_data)
-        return self._render_html('partials/destination_validation_result.html', template_context)
-
-    def destination_type_fields(self, form_data: Dict[str, Any]) -> HTMLResponse:
-        """Load destination type-specific fields (HTMX partial)"""
-        dest_type = self._get_form_value(form_data, 'dest_type', '')
-        
-        if dest_type == 'rsync':
-            template = 'partials/dest_rsync_fields.html'
-        elif dest_type == 'rsyncd':
-            template = 'partials/dest_rsyncd_fields.html'
-        elif dest_type == 'restic':
-            template = 'partials/dest_restic_fields.html'
-        else:
-            return HTMLResponse(content='')
-        
-        return self._render_html(template, {})
-    
     @handle_page_errors("Network scan")
     def scan_network_for_rsyncd(self, network_range: str) -> JSONResponse:
         """Scan network for rsyncd services"""
@@ -254,8 +181,8 @@ class DestinationsHandler(BaseHandler):
 
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""
-        # Delegate business logic to service
-        result = check_repository_status_for_job(job_name, self.backup_config)
+        # Delegate business logic to service (service handles config internally)
+        result = check_repository_status_for_job(job_name, self.dest_operations.backup_config)
         
         # Handler decides which template to render based on service result
         if result.get('success'):
@@ -303,11 +230,6 @@ class DestinationsHandler(BaseHandler):
         result = restic_api_service.browse_directory(job_name, snapshot_id, path)
         return JSONResponse(content=result)
 
-    @handle_page_errors("Initialize repository")
-    def init_repository(self, job_name: str) -> JSONResponse:
-        # Delegate business logic to service
-        result = initialize_repository_for_job(job_name, self.backup_config)
-        return JSONResponse(content=result)
 
 # Global handler instance
-destinations_handler = DestinationsHandler()
+destinations_views = DestinationsViews()

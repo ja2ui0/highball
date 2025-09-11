@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 # Domain Handlers - Pure Switchboard Pattern
 from origins.handlers.views import origins_view_handler
 from origins.handlers.forms import origins_form_handler
-from dests.handlers.pages import destinations_handler
-from dests.handlers.htmx import destinations_htmx
+from dests.handlers.views import destinations_views
+from dests.handlers.forms import destinations_forms
 from jobs.handlers.pages import jobs_handler as job_pages
 from jobs.handlers.htmx import htmx_handlers as job_htmx
 from admin.handlers.pages import admin_handler
@@ -122,27 +122,27 @@ async def toggle_ssh_auth_method(request: Request):
 
 @app.get("/dests", response_class=HTMLResponse)
 async def show_destinations():
-    return destinations_handler.show_destinations()
+    return destinations_views.show_destinations()
 
 @app.post("/dests/add")
 async def add_destination(request: Request):
-    return await destinations_htmx.add_destination_htmx(request)
+    return await destinations_forms.add_destination_htmx(request)
 
 @app.post("/dests/save")
 async def save_destination(request: Request):
-    return await destinations_htmx.save_destination_htmx(request)
+    return await destinations_forms.save_destination_htmx(request)
 
 @app.post("/dests/delete")
 async def delete_destination(name: str = Query("")):
-    return destinations_handler.delete_destination(name)
+    return destinations_forms.delete_destination(name)
 
 @app.post("/dests/validate")
 async def validate_destination(request: Request):
-    return await destinations_htmx.validate_destination_htmx(request)
+    return await destinations_forms.validate_destination_htmx(request)
 
 @app.post("/htmx/destination-type-fields")
 async def destination_type_fields(request: Request):
-    return await destinations_htmx.destination_type_fields_htmx(request)
+    return await destinations_forms.destination_type_fields_htmx(request)
 
 # =============================================================================
 # JOBS - CRUD OPERATIONS
@@ -202,15 +202,15 @@ async def check_repository_availability(job: str = Query("")):
 
 @app.get("/unlock-repository") 
 async def unlock_repository_get(job: str = Query("")):
-    return destinations_htmx.unlock_repository_htmx(job)
+    return destinations_forms.unlock_repository_htmx(job)
 
 @app.post("/unlock-repository")
 async def unlock_repository_post(request: Request):
-    return await destinations_htmx.unlock_repository_post_htmx(request)
+    return await destinations_forms.unlock_repository_post_htmx(request)
 
 @app.post("/initialize-restic-repo")
 async def initialize_restic_repo(request: Request):
-    return await destinations_htmx.initialize_restic_repo_htmx(request)
+    return await destinations_forms.initialize_restic_repo_htmx(request)
 
 # =============================================================================
 # ADMIN - CONFIG MANAGEMENT
@@ -279,28 +279,28 @@ async def toggle_password_visibility(request: Request):
 
 @app.get("/scan-network")
 async def scan_network_for_rsyncd(range: str = Query("192.168.1.0/24")):
-    return destinations_handler.scan_network_for_rsyncd(range)
+    return destinations_views.scan_network_for_rsyncd(range)
 
 
 @app.get("/restic-repo-info")
 async def get_repository_info(job: str = Query("")):
-    return destinations_handler.get_repository_info(job)
+    return destinations_views.get_repository_info(job)
 
 @app.get("/restic-snapshots")
 async def list_snapshots(job: str = Query("")):
-    return destinations_handler.list_snapshots(job)
+    return destinations_views.list_snapshots(job)
 
 @app.get("/restic-snapshot-stats")
 async def get_snapshot_stats(job: str = Query(""), snapshot: str = Query("")):
-    return destinations_handler.get_snapshot_stats(job, snapshot)
+    return destinations_views.get_snapshot_stats(job, snapshot)
 
 @app.get("/restic-browse")
 async def browse_directory(job: str = Query(""), snapshot: str = Query(""), path: str = Query("/")):
-    return destinations_handler.browse_directory(job, snapshot, path)
+    return destinations_views.browse_directory(job, snapshot, path)
 
-@app.get("/restic-init")
+@app.post("/restic-init")
 async def init_repository(job: str = Query("")):
-    return destinations_handler.init_repository(job)
+    return destinations_forms.initialize_repository_for_job(job)
 
 @app.get("/filesystem-browse")
 async def browse_filesystem(path: str = Query("/")):
@@ -371,47 +371,47 @@ async def handle_restore_dry_run_change(request: Request):
 # Destinations HTMX endpoints
 @app.post("/destinations/dest-fields")
 async def render_dest_fields_endpoint(request: Request):
-    return await destinations_htmx.render_dest_fields_htmx(request)
+    return await destinations_forms.render_dest_fields_htmx(request)
 
 @app.post("/destinations/restic-fields")
 async def render_restic_fields_endpoint(request: Request):
-    return await destinations_htmx.render_restic_fields_htmx(request)
+    return await destinations_forms.render_restic_fields_htmx(request)
 
 @app.post("/destinations/validate-ssh-dest")
 async def validate_ssh_dest_endpoint(request: Request):
-    return await destinations_htmx.validate_ssh_dest_htmx(request)
+    return await destinations_forms.validate_ssh_dest_htmx(request)
 
 @app.post("/destinations/validate-restic")
 async def validate_restic_endpoint(request: Request):
-    return await destinations_htmx.validate_restic_htmx(request)
+    return await destinations_forms.validate_restic_htmx(request)
 
 @app.post("/destinations/validate-origin-repo-path")
 async def validate_origin_repo_path_endpoint(request: Request):
-    return await destinations_htmx.validate_origin_repo_path_htmx(request)
+    return await destinations_forms.validate_origin_repo_path_htmx(request)
 
 @app.post("/dests/init-restic-repository")
 async def init_restic_repository(request: Request):
-    return await destinations_htmx.init_restic_repository_htmx(request)
+    return await destinations_forms.init_restic_repository_htmx(request)
 
 @app.post("/dests/maintenance-fields")
 async def render_maintenance_fields(request: Request):
-    return await destinations_htmx.render_maintenance_fields_htmx(request)
+    return await destinations_forms.render_maintenance_fields_htmx(request)
 
 @app.post("/dests/rsyncd-fields")
 async def render_rsyncd_fields(request: Request):
-    return await destinations_htmx.render_rsyncd_fields_htmx(request)
+    return await destinations_forms.render_rsyncd_fields_htmx(request)
 
 @app.post("/dests/maintenance-toggle")
 async def render_maintenance_toggle(request: Request):
-    return await destinations_htmx.render_maintenance_fields_htmx(request)
+    return await destinations_forms.render_maintenance_fields_htmx(request)
 
 @app.post("/dests/restic-repo-fields")
 async def render_restic_repo_fields(request: Request):
-    return await destinations_htmx.render_restic_repo_fields_htmx(request)
+    return await destinations_forms.render_restic_repo_fields_htmx(request)
 
 @app.post("/dests/restic-uri-preview")
 async def generate_restic_uri_preview(request: Request):
-    return await destinations_htmx.generate_restic_uri_preview_htmx(request)
+    return await destinations_forms.generate_restic_uri_preview_htmx(request)
 
 # =============================================================================
 # CORS & STATIC FILES

@@ -709,6 +709,9 @@ class DestinationOperationsService:
 
 
 # Export service instance for easy import
-def create_destination_operations_service(backup_config):
+def create_destination_operations_service(backup_config=None):
     """Factory function to create DestinationOperationsService instance"""
+    if backup_config is None:
+        from config import BackupConfig
+        backup_config = BackupConfig()
     return DestinationOperationsService(backup_config)
