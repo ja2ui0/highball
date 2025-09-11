@@ -33,7 +33,7 @@ class OriginsFormHandler(BaseHandler):
     @handle_page_errors("Delete SSH origin")
     def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
         """Delete SSH origin"""
-        # Delegate business logic to origin service
+        # Call origin service
         result = self.origin_service.delete_origin_with_validation(origin_name)
         
         if result['success']:
@@ -59,7 +59,7 @@ class OriginsFormHandler(BaseHandler):
         origin_config = origin_result['origin_config']
         origin_name = origin_config['origin_name']
         
-        # Delegate business logic to origin service
+        # Call origin service
         result = self.origin_service.add_new_origin(origin_name, origin_config)
         
         if result['success']:
@@ -85,7 +85,7 @@ class OriginsFormHandler(BaseHandler):
         origin_name = origin_config['origin_name']
         original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
         
-        # Delegate business logic to origin service
+        # Call origin service
         result = self.origin_service.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
         
         if result['success']:
@@ -120,7 +120,7 @@ class OriginsFormHandler(BaseHandler):
         ssh_highball = form_data.get('ssh_highball') == 'on'
         
         try:
-            # Delegate business logic to service
+            # Call SSH service
             session_id = self.ssh_service.create_validation_session(hostname, username, password, ssh_highball, edit_mode)
             
             # Return initial progress template
@@ -144,31 +144,31 @@ class OriginsFormHandler(BaseHandler):
         return self._render_html(template_data['template'], template_data['context'])
     
     # =========================================================================
-    # HTMX FORM HANDLERS - Direct business logic (no delegation)
+    # HTMX FORM HANDLERS - Parse form and call services
     # =========================================================================
 
     async def add_ssh_origin_htmx(self, request) -> JSONResponse:
-        """Add SSH origin with form parsing - direct business logic"""
+        """Add SSH origin with form parsing"""
         form_data = dict(await request.form())
         return self.add_ssh_origin(form_data)
 
     async def save_ssh_origin_htmx(self, request) -> JSONResponse:
-        """Save SSH origin with form parsing - direct business logic"""
+        """Save SSH origin with form parsing"""
         form_data = dict(await request.form())
         return self.save_ssh_origin(form_data)
 
     async def validate_ssh_origin_htmx(self, request) -> JSONResponse:
-        """Validate SSH origin with form parsing - direct business logic"""
+        """Validate SSH origin with form parsing"""
         form_data = dict(await request.form())
         return self.validate_ssh_origin(form_data)
 
     async def toggle_ssh_auth_method_htmx(self, request) -> HTMLResponse:
-        """Toggle SSH auth method with form parsing - direct business logic"""
+        """Toggle SSH auth method with form parsing"""
         form_data = dict(await request.form())
         return self.toggle_ssh_auth_method(form_data)
 
     async def validate_ssh_source_htmx(self, request) -> HTMLResponse:
-        """Validate SSH source configuration for HTMX forms - direct business logic"""
+        """Validate SSH source configuration for HTMX forms"""
         form = await request.form()
         form_data = {}
         for key, value in form.items():
