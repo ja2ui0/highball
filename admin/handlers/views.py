@@ -12,6 +12,7 @@ from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
 from admin.services.manage import create_admin_operations_service
+from admin.services.config import AdminConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,16 @@ class AdminViews(BaseHandler):
         # Initialize services - handlers delegate all operations  
         self.admin_services = HighballServices()
         self.admin_operations = create_admin_operations_service()
+        self.admin_config = AdminConfigService()
         
-        # Initialize template service with BackupConfig from service factory (same as old handler)
-        backup_config = self.admin_operations.backup_config
-        self._init_template_service(backup_config)
+        # Initialize template service with minimal config adapter
+        class ConfigAdapter:
+            def get_global_settings(self):
+                return self.admin_config.get_global_settings()
+        
+        config_adapter = ConfigAdapter()
+        config_adapter.admin_config = self.admin_config
+        self._init_template_service(config_adapter)
 
     def _get_available_themes(self):
         """Get list of available theme files - delegate to admin service"""
@@ -46,7 +53,7 @@ class AdminViews(BaseHandler):
         """Show configuration management interface"""
         
         # Get global settings from service (raw data)
-        global_settings = self.admin_operations.get_global_settings()
+        global_settings = self.admin_config.get_global_settings()
         
         # Presentation logic: Extract individual field values for template population
         default_schedule_times = global_settings.get('default_schedule_times', {})
@@ -81,22 +88,6 @@ class AdminViews(BaseHandler):
             
         return self._render_html('pages/config_manager.html', template_data)
 
-    @handle_page_errors("Raw config editor")
-    def show_raw_editor(self) -> HTMLResponse:
-        """Show raw configuration editor interface"""
-        
-        # Get data from services (raw data)
-        config_path = self.admin_operations.get_config_file_path()
-        raw_config = self.admin_services.read_raw_config(config_path)
-        
-        # Presentation logic: Build template data for display
-        template_data = {
-            'raw_config': raw_config,
-            'config_path': config_path,
-            'page_title': 'Raw Configuration Editor'
-        }
-        
-        return self._render_html('pages/config_editor.html', template_data)
 
     @handle_page_errors("Development logs")
     def show_dev_logs(self, log_type: str = 'app') -> HTMLResponse:

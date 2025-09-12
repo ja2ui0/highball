@@ -14,6 +14,7 @@ from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
 from admin.services.manage import create_admin_operations_service
 from admin.services.notifications import NotificationTestService
+from admin.services.config import AdminConfigService
 from admin.schema import PROVIDER_FIELD_SCHEMAS
 from admin.handlers.views import AdminViews
 
@@ -27,30 +28,25 @@ class AdminForms(BaseHandler):
         # Services handle all config access - handlers delegate everything
         self.admin_services = HighballServices()
         self.admin_operations = create_admin_operations_service()
+        self.admin_config = AdminConfigService()
         
-        # Initialize template service with BackupConfig from service factory (same as AdminViews)
-        backup_config = self.admin_operations.backup_config
-        self._init_template_service(backup_config)
+        # Initialize template service with minimal config adapter
+        class ConfigAdapter:
+            def get_global_settings(self):
+                return self.admin_config.get_global_settings()
+        
+        config_adapter = ConfigAdapter()
+        config_adapter.admin_config = self.admin_config
+        self._init_template_service(config_adapter)
 
     # =========================================================================
     # CONFIGURATION OPERATIONS
     # =========================================================================
 
-    def save_raw_config(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save raw configuration - delegates to service"""
-        result = self.admin_operations.save_raw_config_from_form(form_data)
-        
-        if result['success']:
-            return JSONResponse(content={'message': 'Configuration saved successfully'})
-        else:
-            return JSONResponse(
-                content={'error': result['error']}, 
-                status_code=400
-            )
 
     def save_structured_config(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save structured configuration - delegates to service"""
-        result = self.admin_operations.save_structured_config_from_form(form_data)
+        result = self.admin_config.save_structured_config_from_form(form_data)
         
         if result['success']:
             return JSONResponse(content={'message': 'Configuration saved successfully'})
@@ -62,7 +58,7 @@ class AdminForms(BaseHandler):
 
     def preview_config_changes(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Preview configuration changes - delegates to service"""
-        result = self.admin_operations.preview_config_changes_from_form(form_data)
+        result = self.admin_config.preview_config_changes_from_form(form_data)
         
         template_data = {
             'preview_yaml': result['yaml_content'],
@@ -75,11 +71,6 @@ class AdminForms(BaseHandler):
     # HTMX FORM OPERATIONS
     # =========================================================================
 
-    @handle_page_errors("Save raw config")
-    async def save_raw_config_htmx(self, request) -> JSONResponse:
-        """Save raw configuration with form parsing"""
-        form_data = dict(await request.form())
-        return self.save_raw_config(form_data)
 
     @handle_page_errors("Preview config changes")
     async def preview_config_changes_htmx(self, request) -> HTMLResponse:
@@ -97,11 +88,11 @@ class AdminForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service
-        result = self.admin_operations.add_notification_provider_from_form(form_data)
+        result = self.admin_config.add_notification_provider_from_form(form_data)
         
         if result['success']:
             # Return updated notification section showing new provider form
-            global_settings = self.admin_operations.get_global_settings()
+            global_settings = self.admin_config.get_global_settings()
             template_data = {
                 'global_settings': global_settings,
                 'provider_schemas': PROVIDER_FIELD_SCHEMAS
@@ -119,11 +110,11 @@ class AdminForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service  
-        result = self.admin_operations.remove_notification_provider_from_form(form_data)
+        result = self.admin_config.remove_notification_provider_from_form(form_data)
         
         if result['success']:
             # Return updated notification section 
-            global_settings = self.admin_operations.get_global_settings()
+            global_settings = self.admin_config.get_global_settings()
             template_data = {
                 'global_settings': global_settings,
                 'provider_schemas': PROVIDER_FIELD_SCHEMAS
@@ -167,7 +158,7 @@ class AdminForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service
-        result = self.admin_operations.save_structured_config_from_form(form_data)
+        result = self.admin_config.save_structured_config_from_form(form_data)
         
         if result['success']:
             template_data = {
@@ -238,7 +229,8 @@ class AdminForms(BaseHandler):
         """Handle queue settings form with form parsing"""
         form_data = dict(await request.form())
         
-        # Delegate business logic to service
+        # TODO: Implement update_queue_settings_from_form in AdminConfigService
+        # Queue settings UI exists (templates/partials/queue_settings.html) but backend method was never implemented
         result = self.admin_operations.update_queue_settings_from_form(form_data)
         
         if result['success']:

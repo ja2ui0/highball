@@ -65,9 +65,6 @@ async def show_edit_job_form(name: str = Query("")):
 async def show_config_manager():
     return admin_views.show_config_manager()
 
-@app.get("/config/raw", response_class=HTMLResponse)
-async def show_raw_editor():
-    return admin_views.show_raw_editor()
 
 @app.get("/dev", response_class=HTMLResponse)
 async def show_dev_logs(type: str = Query("app")):
@@ -225,9 +222,6 @@ async def preview_config_changes(request: Request):
 async def save_config(request: Request):
     return await admin_forms.save_structured_config_htmx(request)
 
-@app.post("/save-config/raw")
-async def save_raw_config(request: Request):
-    return await admin_forms.save_raw_config_htmx(request)
 
 @app.post("/change-theme")
 async def change_theme(request: Request):

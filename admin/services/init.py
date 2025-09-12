@@ -58,8 +58,16 @@ class HighballServices:
 
         # Initialize handlers
         from admin.services.notifications import NotificationTestService
+        from admin.services.config import AdminConfigService
         
-        self.notification_test = NotificationTestService(self.backup_config)
+        # Create config adapter for notification service
+        class ConfigAdapter:
+            def __init__(self):
+                self.admin_config = AdminConfigService()
+            def get_global_settings(self):
+                return self.admin_config.get_global_settings()
+        
+        self.notification_test = NotificationTestService(ConfigAdapter())
         
         self.handlers = {
             'job_scheduler': JobSchedulerHandler(self.scheduler_service),

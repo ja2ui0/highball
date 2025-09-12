@@ -17,8 +17,8 @@ class BackupConfig:
     def load_config(self):
         """Load config from new hierarchy: global settings + individual job files + secrets"""
         try:
-            # Load global settings from /config/local/local.yaml
-            global_settings = self._load_global_settings()
+            # Global settings moved to AdminConfigService - no longer loaded here
+            global_settings = {}
             
             # Load active jobs from /config/local/jobs/*.yaml
             backup_jobs = self._load_backup_jobs()
@@ -45,35 +45,6 @@ class BackupConfig:
             self._backup_malformed_config(f"Config hierarchy loading error: {str(e)}")
             return self._get_default_config()
     
-    def _load_global_settings(self):
-        """Load global settings from /config/local/local.yaml"""
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f:
-                    content = f.read().strip()
-                    
-                if not content:
-                    return self._get_default_config()['global_settings']
-                    
-                settings = yaml.safe_load(content)
-                
-                if settings is None or not isinstance(settings, dict):
-                    return self._get_default_config()['global_settings']
-                
-                # Load user-specific secrets from /config/local/secrets/local.env
-                secrets_file = "/config/local/secrets/local.env"
-                if os.path.exists(secrets_file):
-                    secrets = dotenv_values(secrets_file)
-                    settings = self._merge_secrets(settings, secrets)
-                
-                # Return only the global_settings section from local.yaml
-                return settings.get('global_settings', {})
-                
-            except Exception as e:
-                print(f"Warning: Error loading global settings: {str(e)}")
-                return self._get_default_config()['global_settings']
-        else:
-            return self._get_default_config()['global_settings']
     
     def _load_backup_jobs(self):
         """Load active jobs from /config/local/jobs/*.yaml with job-scoped secrets"""
@@ -222,6 +193,16 @@ class BackupConfig:
                 continue
         
         return destinations
+    
+    # =============================================================================
+    # TEMPORARY COMPATIBILITY METHODS - will be removed when all domains are refactored
+    # =============================================================================
+    
+    def get_global_settings(self):
+        """TEMP: Delegate to AdminConfigService for compatibility with unreformed domains"""
+        from admin.services.config import AdminConfigService
+        admin_config = AdminConfigService()
+        return admin_config.get_global_settings()
     
     def _merge_secrets(self, config, secrets):
         """Merge secrets into config by replacing ${VAR} placeholders - maintains job isolation"""
@@ -597,45 +578,8 @@ class BackupConfig:
             print(f"Error restoring job {job_name}: {str(e)}")
             return False
     
-    def get_global_settings(self):
-        """Get global settings with default structure - ALWAYS LOADS FROM DISK FOR EDITING"""
-        # CRITICAL: Reload from disk to get current values, not cached values
-        fresh_config = self._load_global_settings()
-        settings = fresh_config.copy()
-        
-        # Ensure notification key exists with empty dict as default
-        if 'notification' not in settings:
-            settings['notification'] = {}
-            
-        return settings
     
-    def update_global_settings(self, settings):
-        """Update global settings and save only global settings to local.yaml"""
-        if 'global_settings' not in self.config:
-            self.config['global_settings'] = {}
-        self.config['global_settings'].update(settings)
-        self._save_global_settings_only()
     
-    def _save_global_settings_only(self):
-        """Save only global settings to local.yaml (not domain configs)"""
-        # Load existing local.yaml to preserve any manual edits
-        if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
-                local_yaml = yaml.safe_load(f) or {}
-        else:
-            local_yaml = {}
-        
-        # Update only the global_settings section
-        local_yaml['global_settings'] = self.config.get('global_settings', {})
-        
-        # Ensure directory exists
-        config_dir = os.path.dirname(self.config_file)
-        if config_dir and not os.path.exists(config_dir):
-            os.makedirs(config_dir)
-        
-        # Save only global settings to local.yaml
-        with open(self.config_file, 'w') as f:
-            yaml.dump(local_yaml, f, default_flow_style=False, indent=2)
     
     def purge_job(self, job_name):
         """Permanently delete a job from deleted/ directories (irreversible)"""
