@@ -229,18 +229,16 @@ class AdminForms(BaseHandler):
         """Handle queue settings form with form parsing"""
         form_data = dict(await request.form())
         
-        # TODO: Implement update_queue_settings_from_form in AdminConfigService
-        # Queue settings UI exists (templates/partials/queue_settings.html) but backend method was never implemented
-        result = self.admin_operations.update_queue_settings_from_form(form_data)
+        # RESEARCH FINDINGS: Queue settings are per-provider, not global
+        # - Schema defines queue_enabled/queue_interval_minutes in sections.queue_settings for each provider 
+        # - UI renders these via notification_provider_dynamic.html processing sections array
+        # - But AdminConfigService._update_notification_settings() only processes top-level fields, not sections
+        # - This orphaned method should be removed - queue settings should be enhanced in existing provider processing
+        # TODO: Remove this handler and enhance _update_notification_settings() to process sections array
         
-        if result['success']:
-            return self._render_html('partials/success_message.html', {
-                'success_message': 'Queue settings updated successfully'
-            })
-        else:
-            return self._render_html('partials/error_message.html', {
-                'error_message': result['error']
-            })
+        return self._render_html('partials/error_message.html', {
+            'error_message': 'Queue settings are handled per-provider, not globally. This handler is deprecated.'
+        })
 
     @handle_page_errors("Render cron field")
     async def render_cron_field_htmx(self, request) -> HTMLResponse:
