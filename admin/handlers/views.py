@@ -11,7 +11,6 @@ from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
-from admin.services.manage import create_admin_operations_service
 from admin.services.config import AdminConfigService
 
 logger = logging.getLogger(__name__)
@@ -23,16 +22,16 @@ class AdminViews(BaseHandler):
     def __init__(self):
         # Initialize services - handlers delegate all operations  
         self.admin_services = HighballServices()
-        self.admin_operations = create_admin_operations_service()
         self.admin_config = AdminConfigService()
         
         # Initialize template service with minimal config adapter
         class ConfigAdapter:
+            def __init__(self, admin_config):
+                self.admin_config = admin_config
             def get_global_settings(self):
                 return self.admin_config.get_global_settings()
         
-        config_adapter = ConfigAdapter()
-        config_adapter.admin_config = self.admin_config
+        config_adapter = ConfigAdapter(self.admin_config)
         self._init_template_service(config_adapter)
 
     def _get_available_themes(self):

@@ -12,7 +12,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from admin.services.init import HighballServices
-from admin.services.manage import create_admin_operations_service
 from admin.services.notifications import NotificationTestService
 from admin.services.config import AdminConfigService
 from admin.schema import PROVIDER_FIELD_SCHEMAS
@@ -27,17 +26,27 @@ class AdminForms(BaseHandler):
     def __init__(self):
         # Services handle all config access - handlers delegate everything
         self.admin_services = HighballServices()
-        self.admin_operations = create_admin_operations_service()
         self.admin_config = AdminConfigService()
         
-        # Initialize template service with minimal config adapter
+        # Defer notification service initialization to avoid early dependencies
+        self._notification_test = None
+        
+        # Initialize template service with config adapter
         class ConfigAdapter:
+            def __init__(self, admin_config):
+                self.admin_config = admin_config
             def get_global_settings(self):
                 return self.admin_config.get_global_settings()
         
-        config_adapter = ConfigAdapter()
-        config_adapter.admin_config = self.admin_config
-        self._init_template_service(config_adapter)
+        self.config_adapter = ConfigAdapter(self.admin_config)
+        self._init_template_service(self.config_adapter)
+    
+    @property
+    def notification_test(self):
+        """Lazy initialization of notification test service"""
+        if self._notification_test is None:
+            self._notification_test = NotificationTestService(self.config_adapter)
+        return self._notification_test
 
     # =========================================================================
     # CONFIGURATION OPERATIONS
@@ -135,9 +144,9 @@ class AdminForms(BaseHandler):
         """Test Telegram notification with form parsing"""
         form_data = dict(await request.form())
         
-        # Delegate to admin operations service
+        # Delegate to notification test service
         test_message = form_data.get('test_message', 'Test notification from Highball')
-        result = self.admin_operations.test_telegram_notification(test_message)
+        result = self.notification_test.test_telegram_notification(test_message)
         
         return JSONResponse(content=result)
 
@@ -146,9 +155,9 @@ class AdminForms(BaseHandler):
         """Test email notification with form parsing"""
         form_data = dict(await request.form())
         
-        # Delegate to admin operations service
+        # Delegate to notification test service
         test_message = form_data.get('test_message', 'Test notification from Highball')
-        result = self.admin_operations.test_email_notification(test_message)
+        result = self.notification_test.test_email_notification(test_message)
         
         return JSONResponse(content=result)
 
