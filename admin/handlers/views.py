@@ -20,11 +20,13 @@ class AdminViews(BaseHandler):
     """Handle admin GET operations - read-only views"""
     
     def __init__(self):
-        self._init_template_service()
-        
-        # Services handle all config access - handlers delegate everything
+        # Initialize services - handlers delegate all operations  
         self.admin_services = HighballServices()
         self.admin_operations = create_admin_operations_service()
+        
+        # Initialize template service with BackupConfig from service factory (same as old handler)
+        backup_config = self.admin_operations.backup_config
+        self._init_template_service(backup_config)
 
     def _get_available_themes(self):
         """Get list of available theme files - delegate to admin service"""

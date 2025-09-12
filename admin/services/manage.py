@@ -50,8 +50,10 @@ class AdminOperationsService:
             # Get current configuration and update global settings
             global_settings = self.get_or_create_global_settings()
             
-            # Update basic settings using safe_get_value
-            global_settings['scheduler_timezone'] = safe_get_value(form_data, 'scheduler_timezone', 'UTC')
+            # Update basic settings only if provided in form
+            scheduler_timezone = safe_get_value(form_data, 'scheduler_timezone', '')
+            if scheduler_timezone:
+                global_settings['scheduler_timezone'] = scheduler_timezone
             
             # Update theme if provided
             theme = safe_get_value(form_data, 'theme', '')
@@ -87,8 +89,10 @@ class AdminOperationsService:
         preview_config = {'global_settings': current_config.get('global_settings', {}).copy()}
         global_settings = preview_config['global_settings']
         
-        # Basic settings
-        global_settings['scheduler_timezone'] = safe_get_value(form_data, 'scheduler_timezone', 'UTC')
+        # Basic settings - only update if provided in form
+        scheduler_timezone = safe_get_value(form_data, 'scheduler_timezone', '')
+        if scheduler_timezone:
+            global_settings['scheduler_timezone'] = scheduler_timezone
         theme = safe_get_value(form_data, 'theme', '')
         if theme:
             global_settings['theme'] = theme

@@ -17,11 +17,13 @@ class TemplateService:
         )
     
     def get_theme_css_path(self) -> str:
-        """Get the CSS path for the current theme"""
+        """Get the CSS path for the current theme - ALWAYS LOADS FROM DISK"""
         if not self.backup_config:
             return "/static/themes/dark.css"  # default fallback
         
-        theme = self.backup_config.config.get('global_settings', {}).get('theme', 'dark')
+        # CRITICAL: Use get_global_settings() which now loads fresh from disk
+        global_settings = self.backup_config.get_global_settings()
+        theme = global_settings.get('theme', 'dark')
         theme_path = f"/static/themes/{theme}.css"
         
         # Check if theme file exists, fallback to dark if not

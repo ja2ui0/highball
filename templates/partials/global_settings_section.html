@@ -10,7 +10,11 @@
     
     <div class="form-group">
         <label for="theme">Theme:</label>
-        <select id="theme" name="theme">
+        <select id="theme" name="theme"
+                hx-post="/change-theme"
+                hx-target="head"
+                hx-swap="innerHTML"
+                hx-include="this">
             {% for theme in available_themes %}
             <option value="{{ theme }}" {{ 'selected' if theme == current_theme else '' }}>
                 {{ theme.title() }}

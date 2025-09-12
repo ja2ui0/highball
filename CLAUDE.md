@@ -227,6 +227,21 @@ Claude code auto-appends after this line.
 - **WHY**: Users expect forms to show current disk values, not stale cached values
 - **NEVER AGAIN**: This issue was fixed before and regressed - config editing MUST always reflect disk state
 
+### 🚨 CRITICAL: NEVER IMPORT BackupConfig IN HANDLERS 🚨
+
+- **ABSOLUTE RULE**: HANDLERS NEVER IMPORT BackupConfig DIRECTLY
+- **ALL CONFIG ACCESS**: Must go through services - handlers only delegate
+- **SERVICES LAYER**: Services import BackupConfig, handlers call services
+- **VIOLATION**: `from config import BackupConfig` in ANY handler file is FORBIDDEN
+- **PATTERN**: Handler → Service → BackupConfig (never Handler → BackupConfig)
+
+### 🚨 CRITICAL: NO LOCAL IMPORTS IN HANDLERS 🚨
+
+- **ABSOLUTE RULE**: ALL IMPORTS IN HANDLERS MUST BE AT MODULE TOP LEVEL
+- **NO LOCAL IMPORTS**: Never import anything inside functions or methods in handlers
+- **NO APP IMPORTS**: Never import from `app.py` or router files in handlers
+- **CLEAN IMPORTS**: All handler imports must be at the top of the file
+
 ---
 
 - move @handle_page_errors to shared/    

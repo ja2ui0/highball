@@ -229,6 +229,10 @@ async def save_config(request: Request):
 async def save_raw_config(request: Request):
     return await admin_forms.save_raw_config_htmx(request)
 
+@app.post("/change-theme")
+async def change_theme(request: Request):
+    return await admin_forms.change_theme_htmx(request)
+
 
 # =============================================================================
 # ADMIN - NOTIFICATIONS

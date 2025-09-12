@@ -7,7 +7,7 @@ import html
 import logging
 from typing import Dict, Any
 from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
@@ -15,6 +15,7 @@ from admin.services.init import HighballServices
 from admin.services.manage import create_admin_operations_service
 from admin.services.notifications import NotificationTestService
 from admin.schema import PROVIDER_FIELD_SCHEMAS
+from admin.handlers.views import AdminViews
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,13 @@ class AdminForms(BaseHandler):
     """Handle admin POST operations - configuration updates and write operations"""
     
     def __init__(self):
-        self._init_template_service()
-        
         # Services handle all config access - handlers delegate everything
         self.admin_services = HighballServices()
         self.admin_operations = create_admin_operations_service()
+        
+        # Initialize template service with BackupConfig from service factory (same as AdminViews)
+        backup_config = self.admin_operations.backup_config
+        self._init_template_service(backup_config)
 
     # =========================================================================
     # CONFIGURATION OPERATIONS
@@ -71,12 +74,6 @@ class AdminForms(BaseHandler):
     # =========================================================================
     # HTMX FORM OPERATIONS
     # =========================================================================
-
-    @handle_page_errors("Save structured config")
-    async def save_structured_config_htmx(self, request) -> JSONResponse:
-        """Save structured configuration with form parsing"""
-        form_data = dict(await request.form())
-        return self.save_structured_config(form_data)
 
     @handle_page_errors("Save raw config")
     async def save_raw_config_htmx(self, request) -> JSONResponse:
@@ -166,14 +163,13 @@ class AdminForms(BaseHandler):
 
     @handle_page_errors("Save structured config")
     async def save_structured_config_htmx(self, request) -> HTMLResponse:
-        """Save structured configuration with form parsing - returns HTML feedback"""
+        """Save structured configuration with form parsing - returns full page HTML"""
         form_data = dict(await request.form())
         
         # Delegate business logic to service
         result = self.admin_operations.save_structured_config_from_form(form_data)
         
         if result['success']:
-            # Return success message as HTML
             template_data = {
                 'message': 'Configuration saved successfully',
                 'success': True
@@ -287,6 +283,15 @@ class AdminForms(BaseHandler):
         }
         
         return self._render_html('partials/password_field.html', template_data)
+
+    @handle_page_errors("Change theme")
+    async def change_theme_htmx(self, request) -> HTMLResponse:
+        """Change theme immediately without saving to config"""
+        form_data = dict(await request.form())
+        theme = form_data.get('theme', 'dark')
+        
+        template_data = {'theme': theme}
+        return self._render_html('partials/head_content.html', template_data)
 
 
 # Global handler instance
