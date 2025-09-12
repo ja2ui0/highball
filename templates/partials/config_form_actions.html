@@ -4,11 +4,20 @@
             hx-include="closest form"
             hx-target="#config-preview"
             hx-swap="innerHTML">Preview Changes</button>
-    <input type="submit" value="Save Configuration" class="button button-success">
+    <button type="button" class="button button-success"
+            hx-post="/save-config"
+            hx-include="closest form"
+            hx-target="#config-save-result"
+            hx-swap="innerHTML">Save Configuration</button>
     <a href="/" class="button">Cancel</a>
 </div>
 
 <!-- Preview Results Area -->
 <div id="config-preview" class="section-container" style="margin-top: 20px; display: none;">
     <!-- Preview content will be loaded here via HTMX -->
+</div>
+
+<!-- Save Results Area -->
+<div id="config-save-result" class="section-container" style="margin-top: 20px; display: none;">
+    <!-- Save feedback will be loaded here via HTMX -->
 </div>

@@ -1,3 +1,4 @@
+<div id="config-preview" class="section-container" style="margin-top: 20px; display: block !important;" hx-swap-oob="outerHTML:#config-preview">
 {% if success %}
 <div class="alert alert-info">
     <h3>Configuration Preview</h3>
@@ -9,10 +10,10 @@
 </div>
 
 <div style="margin-top: 15px;">
-    <button type="button" class="button button-success" onclick="document.querySelector('input[type=submit]').click();">
-        ✓ Looks Good - Save Configuration
-    </button>
-    <button type="button" class="button" onclick="document.getElementById('config-preview').style.display='none';">
+    <button type="button" class="button" 
+            hx-target="#config-preview"
+            hx-swap="innerHTML"
+            hx-post="/hide-preview">
         Hide Preview
     </button>
 </div>
@@ -23,8 +24,4 @@
     <p>{{ error_message }}</p>
 </div>
 {% endif %}
-
-<script>
-// Show the preview container when content is loaded
-document.getElementById('config-preview').style.display = 'block';
-</script>
+</div>

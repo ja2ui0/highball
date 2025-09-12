@@ -18,7 +18,8 @@ from dests.handlers.views import destinations_views
 from dests.handlers.forms import destinations_forms
 from jobs.handlers.pages import jobs_handler as job_pages
 from jobs.handlers.htmx import htmx_handlers as job_htmx
-from admin.handlers.pages import admin_handler
+from admin.handlers.views import admin_views
+from admin.handlers.forms import admin_forms
 
 # Services
 from admin.services.init import HighballServices
@@ -62,15 +63,15 @@ async def show_edit_job_form(name: str = Query("")):
 
 @app.get("/config", response_class=HTMLResponse)
 async def show_config_manager():
-    return admin_handler.show_config_manager()
+    return admin_views.show_config_manager()
 
 @app.get("/config/raw", response_class=HTMLResponse)
 async def show_raw_editor():
-    return admin_handler.show_raw_editor()
+    return admin_views.show_raw_editor()
 
 @app.get("/dev", response_class=HTMLResponse)
 async def show_dev_logs(type: str = Query("app")):
-    return admin_handler.show_dev_logs(type)
+    return admin_views.show_dev_logs(type)
 
 @app.get("/inspect", response_class=HTMLResponse)
 async def show_job_inspect(name: str = Query("")):
@@ -218,15 +219,15 @@ async def initialize_restic_repo(request: Request):
 
 @app.post("/preview-config-changes")
 async def preview_config_changes(request: Request):
-    return await admin_handler.preview_config_changes_htmx(request)
+    return await admin_forms.preview_config_changes_htmx(request)
 
 @app.post("/save-config")
 async def save_config(request: Request):
-    return await admin_handler.save_structured_config_htmx(request)
+    return await admin_forms.save_structured_config_htmx(request)
 
 @app.post("/save-config/raw")
 async def save_raw_config(request: Request):
-    return await admin_handler.save_raw_config_htmx(request)
+    return await admin_forms.save_raw_config_htmx(request)
 
 
 # =============================================================================
@@ -235,23 +236,27 @@ async def save_raw_config(request: Request):
 
 @app.post("/admin/add-global-notification-provider")
 async def add_global_notification_provider(request: Request):
-    return await admin_handler.add_global_notification_provider_htmx(request)
+    return await admin_forms.add_global_notification_provider_htmx(request)
 
 @app.post("/admin/remove-global-notification-provider")
 async def remove_global_notification_provider(request: Request):
-    return await admin_handler.remove_global_notification_provider_htmx(request)
+    return await admin_forms.remove_global_notification_provider_htmx(request)
 
 @app.post("/test-telegram-notification")
 async def test_telegram_notification(request: Request):
-    return await admin_handler.test_telegram_notification_htmx(request)
+    return await admin_forms.test_telegram_notification_htmx(request)
 
 @app.post("/test-email-notification")
 async def test_email_notification(request: Request):
-    return await admin_handler.test_email_notification_htmx(request)
+    return await admin_forms.test_email_notification_htmx(request)
+
+@app.post("/hide-preview")
+async def hide_preview(request: Request):
+    return await admin_forms.hide_preview_htmx(request)
 
 @app.post("/admin/queue-settings")
 async def handle_queue_settings(request: Request):
-    return await admin_handler.handle_queue_settings_htmx(request)
+    return await admin_forms.handle_queue_settings_htmx(request)
 
 # =============================================================================
 # ADMIN - SYSTEM MANAGEMENT
@@ -259,19 +264,19 @@ async def handle_queue_settings(request: Request):
 
 @app.post("/admin/clear-logs")
 async def clear_logs(request: Request):
-    return await admin_handler.clear_logs_htmx(request)
+    return await admin_forms.clear_logs_htmx(request)
 
 @app.post("/admin/refresh-logs")
 async def refresh_logs(request: Request):
-    return await admin_handler.refresh_logs_htmx(request)
+    return await admin_forms.refresh_logs_htmx(request)
 
 @app.post("/admin/cron-field")
 async def render_cron_field(request: Request):
-    return await admin_handler.render_cron_field_htmx(request)
+    return await admin_forms.render_cron_field_htmx(request)
 
 @app.post("/admin/toggle-password-visibility")
 async def toggle_password_visibility(request: Request):
-    return await admin_handler.toggle_password_visibility_htmx(request)
+    return await admin_forms.toggle_password_visibility_htmx(request)
 
 # =============================================================================
 # LEGACY API ENDPOINTS (To be migrated in Phase 2)
@@ -419,7 +424,7 @@ async def generate_restic_uri_preview(request: Request):
 
 @app.options("/api/{path:path}")
 async def handle_options(path: str):
-    return admin_handler.handle_options()
+    return admin_views.handle_options()
 
 @app.get("/favicon.ico")
 async def favicon():

@@ -27,7 +27,7 @@
         <button type="button" class="button button-danger" 
                 hx-post="/admin/remove-global-notification-provider"
                 hx-vals='{"provider": "{{ provider }}"}'
-                hx-target="#notification-providers"
+                hx-target="#notification-section"
                 hx-swap="outerHTML"
                 hx-confirm="Are you sure you want to remove {{ schema.display_name }} notifications? This will delete all configuration.">
             Remove {{ schema.display_name }} Provider

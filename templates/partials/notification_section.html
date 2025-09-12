@@ -1,4 +1,4 @@
-<div class="section-container">
+<div class="section-container" id="notification-section">
     <h2 class="section-header">Notification Settings</h2>
     
     <!-- Configured Providers (dynamically iterate through existing providers) -->
@@ -10,24 +10,31 @@
     {% endif %}
     {% endfor %}
     
-    <!-- Add Provider Dropdown (only show unconfigured providers) -->
+    <!-- Add Provider Dropdown (only show if there are unconfigured providers) -->
+    {% set available_providers = [] %}
+    {% for provider_name in provider_schemas.keys() %}
+        {% if provider_name not in global_settings.notification or not global_settings.notification[provider_name] %}
+            {% set _ = available_providers.append(provider_name) %}
+        {% endif %}
+    {% endfor %}
+    
+    {% if available_providers %}
     <div id="notification-providers">
         <h3>Add Notification Provider</h3>
         <div class="form-group">
             <label for="add_provider">Select Provider:</label>
             <select id="add_provider" name="add_provider"
                     hx-post="/admin/add-global-notification-provider"
-                    hx-target="#notification-providers"
+                    hx-target="#notification-section"
                     hx-swap="outerHTML"
                     hx-trigger="change[target.value != '']">
                 <option value="">Choose a provider to configure...</option>
-                {% for provider_name in provider_schemas.keys() %}
-                {% if provider_name not in global_settings.notification or not global_settings.notification[provider_name] %}
+                {% for provider_name in available_providers %}
                 <option value="{{ provider_name }}">{{ provider_schemas[provider_name].display_name }}</option>
-                {% endif %}
                 {% endfor %}
             </select>
             <div class="help-text">Each provider can only be configured once</div>
         </div>
     </div>
+    {% endif %}
 </div>

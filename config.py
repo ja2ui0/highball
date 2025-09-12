@@ -598,8 +598,10 @@ class BackupConfig:
             return False
     
     def get_global_settings(self):
-        """Get global settings with default structure"""
-        settings = self.config.get('global_settings', {})
+        """Get global settings with default structure - ALWAYS LOADS FROM DISK FOR EDITING"""
+        # CRITICAL: Reload from disk to get current values, not cached values
+        fresh_config = self._load_global_settings()
+        settings = fresh_config.copy()
         
         # Ensure notification key exists with empty dict as default
         if 'notification' not in settings:

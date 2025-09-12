@@ -219,6 +219,14 @@ Claude code auto-appends after this line.
 - **Pattern**: Jobs handlers should become pure HTTP orchestration like destinations handlers    
 - **Services**: Enhance `JobOperationsService` to handle all config reads, not just writes
 
+### 🚨 CRITICAL: NO CONFIG CACHING FOR EDITING 🚨
+
+- **RULE**: HIGHBALL NEVER CACHES CONFIGS for editing operations
+- **REQUIREMENT**: When pulling config for ANY editing form in ANY domain, ALWAYS get fresh values from disk  
+- **IMPLEMENTATION**: `config.py::get_global_settings()` now calls `_load_global_settings()` to reload from disk
+- **WHY**: Users expect forms to show current disk values, not stale cached values
+- **NEVER AGAIN**: This issue was fixed before and regressed - config editing MUST always reflect disk state
+
 ---
 
 - move @handle_page_errors to shared/    
@@ -233,6 +241,7 @@ Claude code auto-appends after this line.
     ...why are there duplicate init/unlock methods and why is Internal Server Error ok?
 - dests/services/kinds.py is deprecated within its domain - only imported by jobs/ and needs to be removed when jobs/ is refactored.
 - shared/handlers/templating.py -- no html in handlers.
-- RESTIC RUNNER might actually belong to jobs/
-- JOB-BASED REPO... these are not actually job-based, they are dests-based (nothing to do with jobs) and probably need some semantic cleanup to indicate that
-- 
+- dests: RESTIC RUNNER might actually belong to jobs/
+- dests: JOB-BASED REPO... these are not actually job-based, they are dests-based (nothing to do with jobs) and probably need some semantic cleanup to indicate that
+- parameterless factory method for BackupConfig in manage.py - should this be shared?
+- why is admin views handler getting the config path when it should be getting a yaml payload from manage.py through config.py and not doing CRUD in a passthrough fashion (which is what it looks like is happening)
