@@ -959,3 +959,73 @@ class SnapshotIntrospectionService:
                         paths.append(top_level)
         
         return sorted(paths)
+
+
+# =============================================================================
+# FORM-BASED RESTORE OPERATIONS - business logic moved from handlers
+# =============================================================================
+
+class RestoreOperationsService:
+    """Service for restore operations from form submissions"""
+
+    def __init__(self):
+        from jobs.services.config import JobConfigService
+        self.job_config = JobConfigService()
+
+    def process_restore_request_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process restore request from form - business logic moved verbatim from handler"""
+        job_name = form_data.get('job_name', [''])[0]
+        snapshot_id = form_data.get('snapshot_id', [''])[0]
+        target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
+        dry_run = 'dry_run' in form_data
+
+        if not job_name:
+            return {
+                'success': False,
+                'error': 'Job name is required'
+            }
+
+        if not snapshot_id:
+            return {
+                'success': False,
+                'error': 'Snapshot ID is required'
+            }
+
+        jobs = self.job_config.get_backup_jobs()
+        if job_name not in jobs:
+            return {
+                'success': False,
+                'error': f"Job '{job_name}' not found"
+            }
+
+        job_config = jobs[job_name]
+
+        # Only support Restic restores for now
+        if job_config.get('dest_type') != 'restic':
+            return {
+                'success': False,
+                'error': 'Restore only supported for Restic repositories'
+            }
+
+        # Build restore request
+        restore_request = {
+            'job_name': job_name,
+            'job_config': job_config,
+            'snapshot_id': snapshot_id,
+            'target_type': target_type,
+            'dry_run': dry_run
+        }
+
+        # Add include patterns if specified
+        include_patterns = form_data.get('include_patterns', [''])
+        if include_patterns[0]:
+            restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
+
+        # Execute restore (using operations handler implementation)
+        result = self._execute_restore(restore_request)
+        return result
+
+    def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute restore operation - delegate to RestoreService - moved verbatim from handler"""
+        restore_service = RestoreService()
+        return restore_service.execute_restore_sync(restore_request)

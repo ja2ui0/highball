@@ -33,43 +33,6 @@ logger = logging.getLogger(__name__)
 # JOB FORM PARSERS
 # =============================================================================
 
-class SourcePathsParser:
-    """Parse multi-path source configurations"""
-    
-    @staticmethod
-    def parse_multi_path_options(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse multi-path source options from form data"""
-        source_paths = safe_get_list(form_data, 'source_path[]')
-        source_includes = safe_get_list(form_data, 'source_includes[]') 
-        source_excludes = safe_get_list(form_data, 'source_excludes[]')
-        
-        if not source_paths:
-            return {'valid': False, 'error': 'At least one source path is required'}
-        
-        # Build source paths array with per-path includes/excludes
-        parsed_paths = []
-        for i, path in enumerate(source_paths):
-            path = path.strip()
-            if not path:
-                continue  # Skip empty paths instead of failing
-            
-            # Get includes/excludes for this path (or empty if not provided)
-            includes_text = source_includes[i] if i < len(source_includes) else ''
-            excludes_text = source_excludes[i] if i < len(source_excludes) else ''
-            
-            path_config = {
-                'path': path,
-                'includes': parse_lines(includes_text),
-                'excludes': parse_lines(excludes_text)
-            }
-            parsed_paths.append(path_config)
-        
-        # Ensure we have at least one valid path after filtering empty ones
-        if not parsed_paths:
-            return {'valid': False, 'error': 'At least one source path is required'}
-        
-        return {'valid': True, 'source_paths': parsed_paths}
-
 
 class NotificationParser:
     """Parse notification provider configurations"""
@@ -510,36 +473,15 @@ class JobsHandler(BaseHandler):
 
     @handle_page_errors("Save job")
     def save_backup_job(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Save backup job from form submission"""
-        job_parser = JobFormParser()
-        
-        # Parse job form data using unified parser
-        job_result = job_parser.parse_job_form(form_data)
-        
-        if not job_result['valid']:
-            return JSONResponse(content={
-                'success': False,
-                'error': job_result['error']
-            }, status_code=400)
-        
-        # Build and save job configuration
-        job_name = job_result['job_name']
-        job_config = self._build_job_config_from_result(job_result)
-        
-        # Save via service
-        success = self.job_config.save_job(job_name, job_config)
-        if success:
-            result = {'success': True, 'message': f"Job '{job_name}' saved successfully"}
+        """Save backup job from form submission - thin handler, delegates to service"""
+        # Delegate business logic to service
+        result = self.job_config.save_backup_job_from_form(form_data)
+
+        # Handle presentation concern - return appropriate response type
+        if result['type'] == 'redirect':
+            return RedirectResponse(url=result['url'], status_code=result['status_code'])
         else:
-            result = {'success': False, 'error': 'Failed to save job configuration'}
-        
-        if result['success']:
-            return RedirectResponse(url='/dashboard', status_code=302)
-        else:
-            return JSONResponse(content={
-                'success': False,
-                'error': result['error']
-            }, status_code=500)
+            return JSONResponse(content=result['content'], status_code=result['status_code'])
 
     @handle_page_errors("Delete job")
     def delete_backup_job(self, job_name: str) -> JSONResponse:
@@ -615,51 +557,21 @@ class JobsHandler(BaseHandler):
 
     @handle_page_errors("Path validation")
     def validate_source_paths(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Validate source paths from form"""
-        # Parse source paths from form
-        # SourcePathsParser is now local to this module  
-        paths_result = SourcePathsParser.parse_multi_path_options(form_data)
-        
-        if not paths_result['valid']:
-            return JSONResponse(content=paths_result)
-        
-        # Build SSH configuration and validate paths
-        source_type = form_data.get('source_type', ['local'])[0]
-        ssh_config = self._build_ssh_config_from_form(form_data) if source_type == 'ssh' else {}
-        validation_results = self._validate_individual_paths(source_type, paths_result['source_paths'], ssh_config)
-        
-        return JSONResponse(content={
-            'valid': True,
-            'results': validation_results
-        })
+        """Validate source paths from form - thin handler, delegates to service"""
+        # Delegate business logic to service
+        result = self.job_config.validate_source_paths_from_form(form_data)
+        return JSONResponse(content=result)
 
-    def _build_ssh_config_from_form(self, form_data: Dict[str, Any]) -> Dict[str, str]:
-        """Build SSH configuration from form data"""
-        hostname = form_data.get('hostname', [''])[0]
-        username = form_data.get('username', [''])[0]
-        return {'hostname': hostname, 'username': username}
+    @handle_page_errors("Process restore")
+    def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
+        """Process restore request from form - thin handler, delegates to service"""
+        from jobs.services.restore import RestoreOperationsService
+        # Delegate business logic to service
+        restore_ops = RestoreOperationsService()
+        result = restore_ops.process_restore_request_from_form(form_data)
+        return JSONResponse(content=result)
 
-    def _validate_individual_paths(self, source_type: str, source_paths: List[Dict[str, Any]], ssh_config: Dict[str, str]) -> List[Dict[str, Any]]:
-        """Validate each individual source path"""
-        validation_service = ValidationService()
-        
-        validation_results = []
-        for path_config in source_paths:
-            if source_type == 'ssh':
-                result = validation_service.validate_source_path(ssh_config, path_config['path'])
-            else:
-                result = validation_service.validate_source_path({}, path_config['path'])
-            
-            validation_results.append({
-                'path': path_config['path'],
-                'valid': result['valid'],
-                'error': result.get('error'),
-                'permissions': result.get('permissions')
-            })
-        
-        return validation_results
-    
-    
+
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
         """Check repository availability and return appropriate HTMX HTML response"""
         dest_type = job_config.get('dest_type')

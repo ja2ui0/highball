@@ -195,27 +195,35 @@ class HTMXHandlers(BaseHandler):
     
     @handle_page_errors("Save backup job")
     async def save_backup_job_htmx(self, request) -> JSONResponse:
-        """Save backup job with form parsing - pure switchboard compliance"""
+        """Save backup job with form parsing - calls service directly"""
         form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic via pages handler
-        return jobs_handler.save_backup_job(form_data)
+
+        # Call service directly
+        result = self.job_config.save_backup_job_from_form(form_data)
+        if result['type'] == 'redirect':
+            return RedirectResponse(url=result['url'], status_code=result['status_code'])
+        else:
+            return JSONResponse(content=result['content'], status_code=result['status_code'])
 
     @handle_page_errors("Validate source paths")
     async def validate_source_paths_htmx(self, request) -> JSONResponse:
-        """Validate source paths with form parsing - pure switchboard compliance"""
+        """Validate source paths with form parsing - calls service directly"""
         form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic via pages handler
-        return jobs_handler.validate_source_paths(form_data)
+
+        # Call service directly
+        result = self.job_config.validate_source_paths_from_form(form_data)
+        return JSONResponse(content=result)
 
     @handle_page_errors("Process restore request")
     async def process_restore_request_htmx(self, request) -> JSONResponse:
-        """Process restore request with form parsing - pure switchboard compliance"""
+        """Process restore request with form parsing - calls service directly"""
         form_data = await parse_htmx_form(request)
-        
-        # Call existing business logic via pages handler
-        return jobs_handler.process_restore_request(form_data)
+
+        # Call service directly
+        from jobs.services.restore import RestoreOperationsService
+        restore_ops = RestoreOperationsService()
+        result = restore_ops.process_restore_request_from_form(form_data)
+        return JSONResponse(content=result)
 
     @handle_page_errors("Schedule job")
     async def schedule_job_htmx(self, request) -> JSONResponse:
