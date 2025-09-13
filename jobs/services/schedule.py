@@ -87,21 +87,25 @@ class SchedulerManager:
 
 class ScheduleLoader:
     """Schedule loading - ONLY handles config parsing and job bootstrap"""
-    
+
     def __init__(self, scheduler_manager: SchedulerManager):
         self.scheduler_manager = scheduler_manager
+        from shared.services.config import ConfigReader
+        from jobs.services.config import JobConfigService
+        self.config_reader = ConfigReader()
+        self.job_config = JobConfigService()
     
-    def resolve_cron_string(self, schedule: str, backup_config) -> str | None:
+    def resolve_cron_string(self, schedule: str) -> str | None:
         """Loading concern: resolve schedule string to cron expression using configurable times"""
         schedule = (schedule or "").strip().lower()
         if not schedule or schedule == "manual":
             return None
-        
+
         # Get configurable schedule times from global settings
-        global_settings = backup_config.config.get("global_settings", {})
+        global_settings = self.config_reader.get_global_settings()
         default_times = global_settings.get("default_schedule_times", {
             "hourly": "0 * * * *",
-            "daily": "0 3 * * *", 
+            "daily": "0 3 * * *",
             "weekly": "0 3 * * 0",
             "monthly": "0 3 1 * *"
         })
@@ -114,23 +118,23 @@ class ScheduleLoader:
             return schedule
         return None
 
-    def bootstrap_schedules(self, backup_config) -> int:
+    def bootstrap_schedules(self) -> int:
         """Loading concern: register all enabled jobs that have non-manual schedule"""
         from jobs.services.manage import JobManagementService
-        
-        jobs = backup_config.config.get("backup_jobs", {}) or {}
-        global_settings = backup_config.config.get("global_settings", {}) or {}
+
+        jobs = self.job_config.get_backup_jobs()
+        global_settings = self.config_reader.get_global_settings()
         timezone = global_settings.get("scheduler_timezone", "UTC")
         default_dry = bool(global_settings.get("default_dry_run_on_schedule", True))
 
-        job_management = JobManagementService(backup_config)
+        job_management = JobManagementService()
 
         scheduled = 0
         for name, conf in jobs.items():
             if not conf.get("enabled", False):
                 continue
 
-            cron_str = self.resolve_cron_string(conf.get("schedule", "manual"), backup_config)
+            cron_str = self.resolve_cron_string(conf.get("schedule", "manual"))
             if not cron_str:
                 continue
 
@@ -254,13 +258,13 @@ class SchedulingService:
         return self.scheduler_manager.shutdown()
     
     # **LOADING DELEGATION** - Pure delegation to loading concern
-    def bootstrap_schedules(self, backup_config) -> int:
+    def bootstrap_schedules(self) -> int:
         """Delegation: bootstrap schedules from config"""
-        return self.schedule_loader.bootstrap_schedules(backup_config)
+        return self.schedule_loader.bootstrap_schedules()
     
-    def resolve_cron_string(self, schedule: str, backup_config) -> str | None:
+    def resolve_cron_string(self, schedule: str) -> str | None:
         """Delegation: resolve schedule string"""
-        return self.schedule_loader.resolve_cron_string(schedule, backup_config)
+        return self.schedule_loader.resolve_cron_string(schedule)
 
 
 # Legacy compatibility instances

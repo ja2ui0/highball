@@ -17,14 +17,12 @@ from shared.handlers.templating import TemplateService
 from jobs.services.schedule import SchedulingService
 from jobs.services.define import JobFormDataBuilder
 from shared.handlers.errors import handle_service_errors
-from config import BackupConfig
 
 
 class HighballServices:
     """Container for shared application services"""
     
     def __init__(self):
-        self.backup_config = None
         self.template_service = None
         self.scheduler_service = None
         self.handlers = None
@@ -32,13 +30,15 @@ class HighballServices:
     
     def initialize(self):
         """Initialize all services once at startup"""
-        if self.backup_config is not None:
+        if self.template_service is not None:
             return  # Already initialized
-            
+
+        # Ensure global settings exist
+        from shared.services.config import ConfigIOService
+        ConfigIOService.ensure_global_settings_exist()
+
         # Core services
-        config_path = os.environ.get('CONFIG_PATH', '/config/local/local.yaml')
-        self.backup_config = BackupConfig(config_path)
-        self.template_service = TemplateService(self.backup_config)
+        self.template_service = TemplateService()
         self.scheduler_service = SchedulingService()
         self.job_form_builder = JobFormDataBuilder()
 
@@ -51,7 +51,7 @@ class HighballServices:
 
         # Register schedules (do not bring down UI if this fails)
         try:
-            count = self.scheduler_service.bootstrap_schedules(self.backup_config)
+            count = self.scheduler_service.bootstrap_schedules()
             print(f"Scheduled {count} backup job(s) from config.")
         except Exception as e:
             print(f"[SCHEDULER] disabled at startup: {e}")
@@ -167,11 +167,11 @@ class HighballServices:
         return yaml.dump(config_dict, default_flow_style=False, indent=2)
     
     @handle_service_errors("Preview config changes")
-    def preview_config_changes(self, form_data: Dict[str, Any], backup_config: BackupConfig) -> Dict[str, Any]:
+    def preview_config_changes(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate preview of configuration changes from form data"""
         # Load raw YAML from config/local/local.yaml only (not concatenated config)
         import os
-        config_file = backup_config.config_file
+        config_file = "/config/local/local.yaml"
         
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:

@@ -14,7 +14,7 @@ from shared.handlers.base import BaseHandler
 from shared.services.config import ConfigReader
 from dests.services.config import DestConfigService
 from dests.services.rsync import network_discovery_service
-from dests.services.restic import restic_api_service
+from dests.services.restic import restic_repository_info_service
 from dests.schema import DESTINATION_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -186,29 +186,20 @@ class DestinationsViews(BaseHandler):
     # This method accessed jobs domain data and should be moved to jobs handlers
 
     @handle_page_errors("Get repository info")
-    def get_repository_info(self, job_name: str) -> JSONResponse:
+    def get_repository_info(self, dest_name: str) -> JSONResponse:
         """Get repository information with proper response formatting"""
         
         # Call service (returns plain data with success/error structure)
-        result = restic_api_service.get_repository_info(job_name)
+        result = restic_repository_info_service.get_repository_info(dest_name)
         
         # Service already returns the correct structure, just wrap in JSONResponse
         return JSONResponse(content=result)
 
-    @handle_page_errors("List snapshots")
-    def list_snapshots(self, job_name: str) -> JSONResponse:
-        result = restic_api_service.list_snapshots(job_name)
-        return JSONResponse(content=result)
-
-    @handle_page_errors("Get snapshot stats")
-    def get_snapshot_stats(self, job_name: str, snapshot_id: str) -> JSONResponse:
-        result = restic_api_service.get_snapshot_stats(job_name, snapshot_id)
-        return JSONResponse(content=result)
-
-    @handle_page_errors("Browse directory")
-    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/') -> JSONResponse:
-        result = restic_api_service.browse_directory(job_name, snapshot_id, path)
-        return JSONResponse(content=result)
+    # REMOVED: Job-scoped snapshot operations moved to jobs domain
+    # - list_snapshots() -> jobs.services.restic.ResticJobSnapshots.list_snapshots()
+    # - get_snapshot_stats() -> jobs.services.restic.ResticJobSnapshots.get_snapshot_stats()
+    # - browse_directory() -> jobs.services.restic.ResticJobSnapshots.browse_directory()
+    # These methods access job configs and apply host+path filtering
 
 
 # Global handler instance

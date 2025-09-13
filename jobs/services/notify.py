@@ -554,9 +554,10 @@ class NotificationService:
 
 class NotificationFormDataBuilder:
     """Service for building notification form data structures"""
-    
-    def __init__(self, backup_config):
-        self.backup_config = backup_config
+
+    def __init__(self):
+        from shared.services.config import ConfigReader
+        self.config_reader = ConfigReader()
     
     def build_notification_context(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -571,7 +572,7 @@ class NotificationFormDataBuilder:
         from admin.schema import PROVIDER_FIELD_SCHEMAS
         
         # Get global notification settings from config
-        global_settings = self.backup_config.get_global_settings()
+        global_settings = self.config_reader.get_global_settings()
         global_notification = global_settings.get('notification', {})
         
         # Build form data for each provider

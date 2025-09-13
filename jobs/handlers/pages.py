@@ -125,9 +125,6 @@ class JobsHandler(BaseHandler):
 
         # Initialize service orchestrators (moved from operations handler)
         from jobs.services.manage import JobOperationsService
-        # Note: Some services still need BackupConfig for non-config operations during transition
-        from config import BackupConfig
-        self.backup_config = BackupConfig()
         self.job_operations = JobOperationsService()
     
     # =========================================================================
@@ -232,7 +229,7 @@ class JobsHandler(BaseHandler):
         
         # Get job status information
         from jobs.services.manage import JobManagementService
-        job_management = JobManagementService(self.backup_config)
+        job_management = JobManagementService()
         
         job_list = []
         for job_name, job_config in jobs.items():
@@ -443,7 +440,7 @@ class JobsHandler(BaseHandler):
     def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build notification form data structure (delegated to service)"""
         from jobs.services.notify import NotificationFormDataBuilder
-        builder = NotificationFormDataBuilder(self.backup_config)
+        builder = NotificationFormDataBuilder()
         return builder.build_notification_context(existing_notifications)
         
     def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -472,7 +469,7 @@ class JobsHandler(BaseHandler):
         
         # Get job status and logs
         from jobs.services.manage import JobManagementService
-        job_management = JobManagementService(self.backup_config)
+        job_management = JobManagementService()
         status_info = job_management.get_status(job_name)
         recent_logs = job_management.get_log_entries(job_name, max_lines=100)
         
@@ -877,7 +874,7 @@ class JobsHandler(BaseHandler):
         scheduler_service = SchedulingService()
         
         # Bootstrap all schedules (this will include the requested job if it's enabled and scheduled)
-        scheduled_count = scheduler_service.bootstrap_schedules(self.backup_config)
+        scheduled_count = scheduler_service.bootstrap_schedules()
         
         job_name = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name'), list) else form_data.get('job_name', '')
         

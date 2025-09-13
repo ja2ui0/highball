@@ -152,12 +152,58 @@ class ConfigIOService:
         """Load secrets from .env file"""
         if not os.path.exists(path):
             return {}
-        
+
         try:
             return dotenv_values(path)
         except Exception as e:
             print(f"Warning: Error loading secrets from {path}: {str(e)}")
             return {}
+
+    @staticmethod
+    def ensure_global_settings_exist() -> bool:
+        """Ensure global settings file exists with default structure"""
+        config_file = "/config/local/local.yaml"
+
+        if os.path.exists(config_file):
+            return True
+
+        try:
+            # Ensure directory exists
+            config_dir = os.path.dirname(config_file)
+            if config_dir and not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+
+            # Create default global settings structure
+            default_config = {
+                'global_settings': {
+                    "scheduler_timezone": "UTC",
+                    "theme": "dark",
+                    "default_schedule_times": {
+                        "hourly": "0 * * * *",
+                        "daily": "0 3 * * *",
+                        "weekly": "0 3 * * 0",
+                        "monthly": "0 3 1 * *"
+                    },
+                    "enable_conflict_avoidance": True,
+                    "conflict_check_interval": 300,
+                    "delay_notification_threshold": 300,
+                    "notification": {
+                        "telegram": {"enabled": False, "token": "", "chat_id": ""},
+                        "email": {"enabled": False, "smtp_server": "", "smtp_port": 587, "use_tls": True, "use_ssl": False, "from_email": "", "to_email": "", "username": "", "password": ""}
+                    },
+                    "maintenance": {
+                        "discard_schedule": "0 3 * * *",
+                        "check_schedule": "0 2 * * 0",
+                        "retention_policy": {"keep_last": 7, "keep_hourly": 6, "keep_daily": 7, "keep_weekly": 4, "keep_monthly": 6, "keep_yearly": 0},
+                        "check_config": {"read_data_subset": "5%"}
+                    }
+                }
+            }
+
+            return ConfigIOService.save_yaml_atomic(config_file, default_config)
+        except Exception as e:
+            print(f"Error creating default global settings: {str(e)}")
+            return False
 
 
 # =============================================================================
@@ -353,3 +399,80 @@ class ConfigReader:
     def _merge_secrets(self, config: Dict[str, Any], secrets: Dict[str, str]) -> Dict[str, Any]:
         """Merge secrets into config by replacing ${VAR} placeholders - delegated to shared service"""
         return self.io.merge_secrets(config, secrets)
+
+    # =============================================================================
+    # JOBS DOMAIN READ METHODS - moved verbatim from jobs/services/config.py
+    # =============================================================================
+
+    def get_backup_jobs(self) -> Dict[str, Any]:
+        """Get all backup jobs - read directly from disk for real-time updates"""
+        return self._load_backup_jobs()
+
+    def get_backup_job(self, job_name: str) -> Optional[Dict[str, Any]]:
+        """Get specific backup job - read directly from disk"""
+        jobs = self._load_backup_jobs()
+        return jobs.get(job_name)
+
+    def get_deleted_jobs(self) -> Dict[str, Any]:
+        """Get all deleted jobs"""
+        return self._load_deleted_jobs()
+
+    def _load_backup_jobs(self) -> Dict[str, Any]:
+        """Load active jobs from /config/local/jobs/*.yaml"""
+        jobs = {}
+        jobs_dir = "/config/local/jobs"
+
+        if not os.path.exists(jobs_dir):
+            return jobs
+
+        # Find all .yaml files in jobs directory (not in deleted subdirectory)
+        job_files = glob.glob(os.path.join(jobs_dir, "*.yaml"))
+
+        for job_file in job_files:
+            job_name = os.path.splitext(os.path.basename(job_file))[0]
+
+            try:
+                # Load job config using shared service
+                job_config = self.io.load_yaml(job_file)
+
+                if job_config is None:
+                    print(f"Warning: Empty job config for {job_name}")
+                    continue
+
+                jobs[job_name] = job_config
+
+            except Exception as e:
+                print(f"Warning: Error loading job {job_name}: {str(e)}")
+                continue
+
+        return jobs
+
+    def _load_deleted_jobs(self) -> Dict[str, Any]:
+        """Load deleted jobs from /config/local/jobs/deleted/*.yaml"""
+        deleted_jobs = {}
+        deleted_dir = "/config/local/jobs/deleted"
+
+        if not os.path.exists(deleted_dir):
+            return deleted_jobs
+
+        # Find all .yaml files in deleted directory
+        deleted_files = glob.glob(os.path.join(deleted_dir, "*.yaml"))
+
+        for deleted_file in deleted_files:
+            job_name = os.path.splitext(os.path.basename(deleted_file))[0]
+
+            try:
+                # Load deleted job config
+                job_config = self.io.load_yaml(deleted_file)
+
+                if job_config is None:
+                    print(f"Warning: Empty deleted job config for {job_name}")
+                    continue
+
+                deleted_jobs[job_name] = job_config
+
+            except Exception as e:
+                print(f"Warning: Error loading deleted job {job_name}: {str(e)}")
+                continue
+
+        return deleted_jobs

@@ -19,7 +19,6 @@ from shared.services.exec import ResticExecutionService
 from shared.services.exec import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 from shared.handlers.errors import handle_service_errors
-from config import BackupConfig
 from dests.services.config import DestConfigService
 
 logger = logging.getLogger(__name__)
@@ -1080,98 +1079,42 @@ class ResticMaintenanceService:
 # RESTIC API SERVICE - JSON API wrappers moved from handlers/api.py
 # =============================================================================
 
-class ResticAPIService:
-    """JSON API wrappers for Restic operations - moved from handlers/api.py"""
-    
-    def __init__(self, backup_config):
-        self.backup_config = backup_config
-        self.restic_service = ResticRepositoryService()
+class ResticRepositoryInfoService:
+    """Repository information service - destination-scoped only"""
+
+    def __init__(self):
         self.content_analyzer = ResticContentAnalyzer()
-    
-    def _validate_job(self, job_name: str):
-        """Common job validation logic"""
-        if not job_name:
-            return None, {'success': False, 'error': 'Job name is required'}
-        
-        jobs = self.backup_config.get_backup_jobs()
-        if job_name not in jobs:
-            return None, {'success': False, 'error': f"Job '{job_name}' not found"}
-        
-        return jobs[job_name], None
-    
+        from dests.services.config import DestConfigService
+        self.dest_config = DestConfigService()
+
     @handle_service_errors("Get repository info")
-    def get_repository_info(self, job_name: str):
+    def get_repository_info(self, dest_name: str):
         """Get Restic repository information - returns plain data"""
-        job_config, error = self._validate_job(job_name)
-        if error:
-            return error
-        
-        dest_config = job_config.get('dest_config', {})
-        # Use the correct method on the content analyzer
-        analysis_result = self.content_analyzer.analyze_repository_content(dest_config, job_name)
+        if not dest_name:
+            return {'success': False, 'error': 'Destination name is required'}
+
+        dest_config = self.dest_config.config_reader.get_destination(dest_name)
+        if not dest_config:
+            return {'success': False, 'error': f"Destination '{dest_name}' not found"}
+
+        # Repository analysis without job context (repo-wide info)
+        analysis_result = self.content_analyzer.analyze_repository_content(dest_config, None)
         return analysis_result
     
-    @handle_service_errors("List snapshots")
-    def list_snapshots(self, job_name: str):
-        """List snapshots for a job"""
-        job_config, error = self._validate_job(job_name)
-        if error:
-            return error
-        
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        filters = {'job_name': job_name}
-        
-        from jobs.services.backup import backup_service
-        result = backup_service.list_snapshots(dest_config, filters, source_config)
-        return result
-    
-    @handle_service_errors("Get snapshot stats")
-    def get_snapshot_stats(self, job_name: str, snapshot_id: str):
-        """Get statistics for a specific snapshot"""
-        if not snapshot_id:
-            return {'success': False, 'error': 'Snapshot ID is required'}
-        
-        job_config, error = self._validate_job(job_name)
-        if error:
-            return error
-        
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
-        from jobs.services.backup import backup_service
-        result = backup_service.get_snapshot_statistics(dest_config, snapshot_id, source_config)
-        return result
-    
-    @handle_service_errors("Browse directory")
-    def browse_directory(self, job_name: str, snapshot_id: str, path: str = '/'):
-        """Browse directory contents in a snapshot"""
-        if not snapshot_id:
-            return {'success': False, 'error': 'Snapshot ID is required'}
-        
-        job_config, error = self._validate_job(job_name)
-        if error:
-            return error
-        
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
-        from jobs.services.backup import backup_service
-        result = backup_service.browse_snapshot_directory(dest_config, snapshot_id, path, source_config)
-        return result
     
     @handle_service_errors("Initialize repository")
-    def init_repository(self, job_name: str):
-        """Initialize Restic repository for a job"""
-        job_config, error = self._validate_job(job_name)
-        if error:
-            return error
-        
-        dest_config = job_config.get('dest_config', {})
-        source_config = job_config.get('source_config', {})
-        
+    def init_repository(self, dest_name: str):
+        """Initialize Restic repository for a destination"""
+        if not dest_name:
+            return {'success': False, 'error': 'Destination name is required'}
+
+        dest_config = self.dest_config.config_reader.get_destination(dest_name)
+        if not dest_config:
+            return {'success': False, 'error': f"Destination '{dest_name}' not found"}
+
+        # Repository initialization doesn't need source_config - it's repo-wide
         from jobs.services.backup import backup_service
-        result = backup_service.initialize_repository(dest_config, source_config)
+        result = backup_service.initialize_repository(dest_config, None)
         return result
     
     @handle_service_errors("Initialize restic repo")
@@ -1220,8 +1163,4 @@ class ResticRepositoryTypeService:
 # Export the services
 restic_service = ResticRepositoryService()
 restic_repository_type_service = ResticRepositoryTypeService()
-
-# Export API service - requires BackupConfig
-from config import BackupConfig
-_backup_config = BackupConfig()
-restic_api_service = ResticAPIService(_backup_config)
+restic_repository_info_service = ResticRepositoryInfoService()
