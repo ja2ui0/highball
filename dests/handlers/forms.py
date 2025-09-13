@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from shared.services.config import ConfigReader
 from dests.services.config import DestConfigService
 from dests.services.restic import ResticRepositoryTypeService, ResticRepositoryService, unlock_repository, initialize_repository
 from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
@@ -24,9 +25,10 @@ class DestinationsForms(BaseHandler):
     
     def __init__(self):
         self._init_template_service()
-        
-        # Services handle all config access - handlers delegate everything  
+
+        # Services handle all config access - handlers delegate everything
         self.dest_config = DestConfigService()
+        self.config_reader = ConfigReader()
 
     # =========================================================================
     # DESTINATION CRUD OPERATIONS
@@ -366,7 +368,7 @@ class DestinationsForms(BaseHandler):
         if not dest_name:
             result = {'success': False, 'error': 'Destination name is required for repository initialization'}
         else:
-            dest_config = self.dest_config.get_destination(dest_name)
+            dest_config = self.config_reader.get_destination(dest_name)
             if dest_config:
                 result = initialize_repository(dest_config)
             else:
@@ -400,7 +402,7 @@ class DestinationsForms(BaseHandler):
         if not dest_name:
             result = {'success': False, 'error': 'Destination name is required for repository unlock'}
         else:
-            dest_config = self.dest_config.get_destination(dest_name)
+            dest_config = self.config_reader.get_destination(dest_name)
             if dest_config:
                 result = unlock_repository(dest_config)
             else:
@@ -442,7 +444,7 @@ class DestinationsForms(BaseHandler):
         if not dest_name:
             result = {'success': False, 'error': 'Destination name is required for repository initialization'}
         else:
-            dest_config = self.dest_config.get_destination(dest_name)
+            dest_config = self.config_reader.get_destination(dest_name)
             if dest_config:
                 result = initialize_repository(dest_config)
             else:

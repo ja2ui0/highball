@@ -12,7 +12,7 @@ import copy
 from typing import Dict, Any, Optional
 from dotenv import dotenv_values
 
-from shared.services.config import ConfigIOService
+from shared.services.config import ConfigIOService, ConfigReader
 from models.forms import safe_get_value
 
 
@@ -21,15 +21,7 @@ class DestConfigService:
     
     def __init__(self):
         self.shared = ConfigIOService()
-    
-    def get_destinations(self) -> Dict[str, Any]:
-        """Get all destinations - read directly from disk for real-time updates"""
-        return self._load_destinations()
-    
-    def get_destination(self, dest_name: str) -> Optional[Dict[str, Any]]:
-        """Get specific destination - read directly from disk"""
-        destinations = self._load_destinations()
-        return destinations.get(dest_name)
+        self.config_reader = ConfigReader()
     
     def save_destination(self, dest_name: str, dest_config: Dict[str, Any]) -> Dict[str, Any]:
         """Save destination configuration to persistent storage"""
@@ -83,41 +75,6 @@ class DestConfigService:
             print(f"Error deleting destination {dest_name}: {str(e)}")
             return False
     
-    def _load_destinations(self) -> Dict[str, Any]:
-        """Load destinations from /config/local/dests/*.yaml with destination-scoped secrets"""
-        destinations = {}
-        dests_dir = "/config/local/dests"
-        
-        if not os.path.exists(dests_dir):
-            return destinations
-            
-        # Find all .yaml files in destinations directory
-        dest_files = glob.glob(os.path.join(dests_dir, "*.yaml"))
-        
-        for dest_file in dest_files:
-            dest_name = os.path.splitext(os.path.basename(dest_file))[0]
-            
-            try:
-                # Load destination config using shared service
-                dest_config = self.shared.load_yaml(dest_file)
-                
-                if dest_config is None:
-                    print(f"Warning: Empty destination config for {dest_name}")
-                    continue
-                
-                # Load destination-specific secrets if they exist (scoped per destination)
-                secrets_file = f"/config/local/secrets/dests/{dest_name}.env"
-                if os.path.exists(secrets_file):
-                    secrets = dotenv_values(secrets_file)
-                    dest_config = self._merge_secrets(dest_config, secrets)
-                
-                destinations[dest_name] = dest_config
-                
-            except Exception as e:
-                print(f"Warning: Error loading destination {dest_name}: {str(e)}")
-                continue
-        
-        return destinations
     
     def _extract_secrets_from_dest_config(self, dest_config: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
         """Extract secrets from nested destination config - keep secrets support for REST, S3, rsyncd"""
@@ -193,9 +150,6 @@ class DestConfigService:
             if os.path.exists(secrets_file):
                 os.remove(secrets_file)
     
-    def _merge_secrets(self, config: Dict[str, Any], secrets: Dict[str, str]) -> Dict[str, Any]:
-        """Merge secrets into config by replacing ${VAR} placeholders - delegated to shared service"""
-        return self.shared.merge_secrets(config, secrets)
     
     # =========================================================================
     # BUSINESS LOGIC AND FORM PARSING - moved from manage.py
@@ -203,7 +157,7 @@ class DestConfigService:
     
     def destination_exists(self, dest_name: str) -> bool:
         """Check if destination exists"""
-        existing_destinations = self.get_destinations()
+        existing_destinations = self.config_reader.get_destinations()
         return dest_name in existing_destinations
     
     def save_destination_with_validation(self, dest_name: str, dest_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -541,7 +495,7 @@ class DestConfigService:
             return {'success': False, 'error': 'Destination name is required'}
         
         # Get existing destination config to preserve type-specific settings
-        existing_dest = self.get_destination(dest_name)
+        existing_dest = self.config_reader.get_destination(dest_name)
         if not existing_dest:
             return {'success': False, 'error': f'Destination "{dest_name}" not found'}
         

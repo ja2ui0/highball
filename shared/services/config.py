@@ -298,3 +298,60 @@ class ConfigReader:
                 continue
 
         return origins
+
+    # =============================================================================
+    # DESTINATIONS DOMAIN READ METHODS - moved verbatim from dests/services/config.py
+    # =============================================================================
+
+    def get_destinations(self) -> Dict[str, Any]:
+        """Get all destinations - read directly from disk for real-time updates"""
+        return self._load_destinations()
+
+    def get_destination(self, dest_name: str) -> Optional[Dict[str, Any]]:
+        """Get specific destination - read directly from disk"""
+        destinations = self._load_destinations()
+        return destinations.get(dest_name)
+
+    def _load_destinations(self) -> Dict[str, Any]:
+        """Load destinations from /config/local/dests/*.yaml with destination-scoped secrets"""
+        import os
+        import glob
+        from dotenv import dotenv_values
+
+        destinations = {}
+        dests_dir = "/config/local/dests"
+
+        if not os.path.exists(dests_dir):
+            return destinations
+
+        # Find all .yaml files in destinations directory
+        dest_files = glob.glob(os.path.join(dests_dir, "*.yaml"))
+
+        for dest_file in dest_files:
+            dest_name = os.path.splitext(os.path.basename(dest_file))[0]
+
+            try:
+                # Load destination config using shared service
+                dest_config = self.io.load_yaml(dest_file)
+
+                if dest_config is None:
+                    print(f"Warning: Empty destination config for {dest_name}")
+                    continue
+
+                # Load destination-specific secrets if they exist (scoped per destination)
+                secrets_file = f"/config/local/secrets/dests/{dest_name}.env"
+                if os.path.exists(secrets_file):
+                    secrets = dotenv_values(secrets_file)
+                    dest_config = self._merge_secrets(dest_config, secrets)
+
+                destinations[dest_name] = dest_config
+
+            except Exception as e:
+                print(f"Warning: Error loading destination {dest_name}: {str(e)}")
+                continue
+
+        return destinations
+
+    def _merge_secrets(self, config: Dict[str, Any], secrets: Dict[str, str]) -> Dict[str, Any]:
+        """Merge secrets into config by replacing ${VAR} placeholders - delegated to shared service"""
+        return self.io.merge_secrets(config, secrets)

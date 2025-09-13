@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from shared.services.config import ConfigReader
 from dests.services.config import DestConfigService
 from dests.services.rsync import network_discovery_service
 from dests.services.restic import restic_api_service
@@ -24,9 +25,10 @@ class DestinationsViews(BaseHandler):
     
     def __init__(self):
         self._init_template_service()
-        
+
         # Services handle all config access - handlers delegate everything
         self.dest_config = DestConfigService()
+        self.config_reader = ConfigReader()
         self.network_discovery = network_discovery_service
     
     # =========================================================================
@@ -118,7 +120,7 @@ class DestinationsViews(BaseHandler):
     @handle_page_errors("Show destinations")
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
-        destinations = self.dest_config.get_destinations()
+        destinations = self.config_reader.get_destinations()
         # TODO: Remove global_settings dependency or handle differently
         global_settings = {}
         
