@@ -264,53 +264,12 @@ class JobsHandler(BaseHandler):
 
 
     def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
-        """Check repository availability and return appropriate HTMX HTML response"""
-        dest_type = job_config.get('dest_type')
-        
-        if dest_type == 'restic':
-            return self._check_restic_repository_html(job_name, job_config)
-        else:
-            # Non-restic repositories - assume available for now
-            return self._render_html('partials/repository_available.html', {
-                'job_name': job_name,
-                'job_type': dest_type
-            })
-    
-    def _check_restic_repository_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
-        """Check restic repository availability and return HTML response"""
-        dest_config = job_config.get('dest_config', {})
-        repo_uri = dest_config.get('repo_uri')
-        
-        if not repo_uri:
-            return self._render_html('partials/error_message.html', {
-                'error_message': 'Repository URI not configured'
-            })
-            
-        check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
-        
-        if check_success:
-            return self._render_html('partials/repository_available.html', {
-                'job_name': job_name,
-                'job_type': 'restic'
-            })
-        else:
-            return self._send_repository_error_html(job_name, check_message)
-    
-    def _send_repository_error_html(self, job_name: str, error_message: str) -> HTMLResponse:
-        """Send appropriate repository error HTMX partial based on error type"""
-        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
-            # Repository locked - render unlock interface
-            return self._render_html('partials/repository_locked_error.html', {
-                'job_name': job_name,
-                'error_message': error_message
-            })
-        else:
-            # Other error - render error template
-            return self._render_html('partials/repository_error.html', {
-                'job_name': job_name,
-                'error_type': 'connection_error',
-                'error_message': error_message or 'Unknown error'
-            })
+        """Check repository availability and return appropriate HTMX HTML response - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        response_data = display_builder.check_repository_status_and_build_response(job_name, job_config)
+
+        return self._render_html(response_data['template'], response_data['data'])
 
 
 
@@ -371,22 +330,11 @@ class JobsHandler(BaseHandler):
     
     @handle_page_errors("Schedule job direct")
     def schedule_job_direct(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Schedule a job for execution - using functional SchedulingService"""
-        
-        # Use the functional scheduling service that already exists
+        """Schedule a job for execution - thin wrapper"""
+        from jobs.services.schedule import SchedulingService
         scheduler_service = SchedulingService()
-        
-        # Bootstrap all schedules (this will include the requested job if it's enabled and scheduled)
-        scheduled_count = scheduler_service.bootstrap_schedules()
-        
-        job_name = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name'), list) else form_data.get('job_name', '')
-        
-        return JSONResponse(content={
-            'success': True,
-            'message': f'Scheduler refreshed. {scheduled_count} jobs scheduled total.',
-            'job_name': job_name,
-            'scheduled_count': scheduled_count
-        })
+        result = scheduler_service.schedule_job_from_form(form_data)
+        return JSONResponse(content=result)
 
     @handle_page_errors("List scheduler jobs")
     def list_scheduler_jobs(self) -> JSONResponse:

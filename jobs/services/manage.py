@@ -431,3 +431,8 @@ class JobOperationsService:
     # =========================================================================
     # NON-CONFIG OPERATIONS ONLY - config CRUD moved to jobs/services/config.py
     # =========================================================================
+
+    def serialize_job_config(self, job_config: Dict[str, Any]) -> str:
+        """Serialize job configuration to JSON string for change detection"""
+        import json
+        return json.dumps(job_config, sort_keys=True)

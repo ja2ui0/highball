@@ -266,6 +266,21 @@ class SchedulingService:
         """Delegation: resolve schedule string"""
         return self.schedule_loader.resolve_cron_string(schedule)
 
+    def schedule_job_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Schedule job from form data - business logic moved from handler"""
+        # Parse job name from form data with complex conditional logic
+        job_name = form_data.get('job_name', [''])[0] if isinstance(form_data.get('job_name'), list) else form_data.get('job_name', '')
+
+        # Bootstrap all schedules (this will include the requested job if it's enabled and scheduled)
+        scheduled_count = self.bootstrap_schedules()
+
+        return {
+            'success': True,
+            'message': f'Scheduler refreshed. {scheduled_count} jobs scheduled total.',
+            'job_name': job_name,
+            'scheduled_count': scheduled_count
+        }
+
 
 # Legacy compatibility instances
 scheduler_service = SchedulingService()

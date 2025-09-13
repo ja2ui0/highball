@@ -666,6 +666,71 @@ class JobDisplayBuilder:
 
         return form_data
 
+    def check_repository_status_and_build_response(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Check repository availability and build response data - business logic moved from handler"""
+        dest_type = job_config.get('dest_type')
+
+        if dest_type == 'restic':
+            return self._check_restic_repository_status(job_name, job_config)
+        else:
+            # Non-restic repositories - assume available for now
+            return {
+                'template': 'partials/repository_available.html',
+                'data': {
+                    'job_name': job_name,
+                    'job_type': dest_type
+                }
+            }
+
+    def _check_restic_repository_status(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Check restic repository status - business logic moved from handler"""
+        dest_config = job_config.get('dest_config', {})
+        repo_uri = dest_config.get('repo_uri')
+
+        if not repo_uri:
+            return {
+                'template': 'partials/error_message.html',
+                'data': {
+                    'error_message': 'Repository URI not configured'
+                }
+            }
+
+        from jobs.services.backup import backup_service
+        check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
+
+        if check_success:
+            return {
+                'template': 'partials/repository_available.html',
+                'data': {
+                    'job_name': job_name,
+                    'job_type': 'restic'
+                }
+            }
+        else:
+            return self._build_repository_error_response(job_name, check_message)
+
+    def _build_repository_error_response(self, job_name: str, error_message: str) -> Dict[str, Any]:
+        """Build repository error response data - business logic moved from handler"""
+        if error_message and ('locked by' in error_message.lower() or 'repository is already locked' in error_message.lower()):
+            # Repository locked - render unlock interface
+            return {
+                'template': 'partials/repository_locked_error.html',
+                'data': {
+                    'job_name': job_name,
+                    'error_message': error_message
+                }
+            }
+        else:
+            # Other error - render error template
+            return {
+                'template': 'partials/repository_error.html',
+                'data': {
+                    'job_name': job_name,
+                    'error_type': 'connection_error',
+                    'error_message': error_message or 'Unknown error'
+                }
+            }
+
 
 # =============================================================================
 # **NOTIFICATION FORM BUILDING** - Notification form HTML and data building moved from handlers
