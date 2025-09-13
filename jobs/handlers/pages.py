@@ -53,37 +53,10 @@ class JobsHandler(BaseHandler):
     # =========================================================================
     
     def render_source_path_validation_status(self, result: Dict[str, Any]) -> str:
-        """Render source path validation status (basic validation, no special SSH details)"""
-        return self._render_validation_status_template(result, [])
-    
-    def _render_validation_status_template(self, result: Dict[str, Any], details: List[str]) -> str:
-        """Render validation status using template with consistent formatting"""
-        # Determine status class and label
-        if result.get('valid', False):
-            status_class = 'success'
-            status_label = '[OK]'
-        else:
-            status_class = 'error'
-            status_label = '[ERROR]'
-        
-        # Build message from details or error
-        if details:
-            # Pass details as a list for proper formatting in template
-            message = None
-        else:
-            # Use appropriate message based on validation result
-            if result.get('valid', False):
-                message = result.get('message', 'Validation successful')
-            else:
-                message = result.get('error', 'Validation failed')
-            details = None
-        
-        # Use Jinja2 template to render the result
-        return self.template_service.render_template('partials/validation_result.html', 
-                                   status_class=status_class,
-                                   status_label=status_label,
-                                   message=message,
-                                   details=details)
+        """Render source path validation status - thin wrapper"""
+        from jobs.services.validate import ValidationRenderingService
+        renderer = ValidationRenderingService(self.template_service)
+        return renderer.render_source_path_validation_status(result)
     
     # =========================================================================
     # JOB ROW BUILDING (moved from services/template.py)
@@ -107,49 +80,18 @@ class JobsHandler(BaseHandler):
     
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
-        """Show main dashboard with job list"""
-        jobs = self.job_config.get_backup_jobs()
-        global_settings = self.config_reader.get_global_settings()
-        
-        # Get job status information
-        job_management = JobManagementService()
-        
-        job_list = []
-        for job_name, job_config in jobs.items():
-            # Use enabled/disabled status like original, not execution status
-            enabled = job_config.get('enabled', True)
-            status = "enabled" if enabled else "disabled"
-            status_class = "status-success" if enabled else "status-error"
-            
-            # Build display strings with type prefixes like original
-            source_display = self._build_source_display_with_type(job_config)
-            dest_display = self._build_dest_display_with_type(job_config)
-            
-            job_display = {
-                'name': job_name,
-                'source_display': source_display,
-                'dest_display': dest_display,
-                'status': status.capitalize(),
-                'status_class': status_class,
-                'schedule': job_config.get('schedule', 'manual')
-            }
-            job_list.append(job_display)
-        
-        # Sort jobs by name
-        job_list.sort(key=lambda j: j['name'])
-        
-        # Build job and deleted job HTML using local methods (moved from template service)
-        job_rows = self._build_job_rows(job_list)
-        deleted_jobs = self.job_config.get_deleted_jobs()
-        deleted_job_rows = self._build_deleted_job_rows(deleted_jobs)
-        
+        """Show main dashboard with job list - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        dashboard_data = display_builder.build_dashboard_display_data()
+
         template_data = {
-            'job_rows': job_rows,
-            'deleted_job_rows': deleted_job_rows,
-            'global_settings': global_settings,
+            'job_rows': dashboard_data['job_rows'],
+            'deleted_job_rows': dashboard_data['deleted_job_rows'],
+            'global_settings': dashboard_data['global_settings'],
             'page_title': 'Dashboard'
         }
-        
+
         return self._render_html('pages/dashboard.html', template_data)
 
     def _build_source_display_with_type(self, job_config):
@@ -166,130 +108,58 @@ class JobsHandler(BaseHandler):
 
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
-        """Show add job form"""
-        job_form_builder = JobFormDataBuilder()
-        
-        form_data = job_form_builder.build_empty_form_data()
-        form_data['page_title'] = 'Add Job'
-        form_data['form_title'] = 'Add New Backup Job'
-        form_data['submit_button_text'] = 'Create Job'
-        
-        # Add available destination types
-        destination_service = DestinationTypeService()
-        form_data['available_destination_types'] = destination_service.get_available_destination_types()
-        
-        # Add notification configuration
-        form_data.update(self._build_notification_form_data([]))
-        
-        # Add schedule configuration
-        form_data.update(self._build_schedule_form_data({}))
-        
+        """Show add job form - thin wrapper"""
+        # Delegate to define service for complete form building
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        form_data = display_builder.build_add_job_form_data()
+
         return self._render_html('pages/job_form.html', form_data)
 
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, job_name: str) -> HTMLResponse:
-        """Show edit job form"""
-        job_form_builder = JobFormDataBuilder()
-        
+        """Show edit job form - thin wrapper"""
         if not job_name:
             return self._render_error('partials/error_page.html', {
-                'error_message': "Job name is required", 
+                'error_message': "Job name is required",
                 'page_title': "Error"
             }, 400)
-        
-        jobs = self.job_config.get_backup_jobs()
-        if job_name not in jobs:
+
+        # Delegate to define service for complete form building
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        result = display_builder.build_edit_job_form_data(job_name)
+
+        if not result['found']:
             return self._render_error('partials/error_page.html', {
-                'error_message': f"Job '{job_name}' not found", 
+                'error_message': result['error'],
                 'page_title': "Error"
             }, 404)
-        
-        job_config = jobs[job_name]
-        form_data = job_form_builder.build_form_data_from_job(job_name, job_config)
-        form_data['page_title'] = f'Edit Job: {job_name}'
-        form_data['form_title'] = f'Edit Backup Job: {job_name}'
-        form_data['submit_button_text'] = 'Commit Changes'
-        form_data['form_has_changes'] = False  # Initially no changes
-        
-        # Store original config for change detection (as JSON string)
-        form_data['original_job_config'] = self.job_operations.serialize_job_config(job_config)
-        
-        # Add available destination types (could be context-aware based on source)
-        source_config = job_config.get('source_config', {})
-        destination_service = DestinationTypeService()
-        form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
-        
-        # Pre-select source and destination types for edit mode
-        source_type = job_config.get('source_type', 'local')
-        form_data['selected_source_type'] = source_type
-        form_data['source_local_selected'] = (source_type == 'local')
-        form_data['source_ssh_selected'] = (source_type == 'ssh')
-        form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
-        
-        # Build source fields HTML using template builder
-        template_builder = JobFormTemplateBuilder(self.template_service)
-        form_data['source_fields_html'] = template_builder.build_source_fields_html(source_type, source_config)
-        
-        # Build destination fields HTML using template builder
-        dest_type = job_config.get('dest_type', 'local')
-        dest_config = job_config.get('dest_config', {})
-        form_data['dest_fields_html'] = template_builder.build_destination_fields_html(dest_type, dest_config, form_data)
-        
-        # Add notification configuration
-        existing_notifications = job_config.get('notifications', [])
-        form_data.update(self._build_notification_form_data(existing_notifications))
-        
-        # Add schedule configuration
-        form_data.update(self._build_schedule_form_data(job_config))
-        
-        return self._render_html('pages/job_form.html', form_data)
 
-    def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Build notification form data structure (delegated to service)"""
-        builder = NotificationFormDataBuilder()
-        return builder.build_notification_context(existing_notifications)
-        
-    def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build schedule form data structure (delegated to service)"""
-        builder = ScheduleFormDataBuilder()
-        return builder.build_schedule_context(job_config)
+        return self._render_html('pages/job_form.html', result['form_data'])
+
 
     @handle_page_errors("Job inspect")
     def show_job_inspect(self, job_name: str = "") -> HTMLResponse:
-        """Show job inspection page"""
+        """Show job inspection page - thin wrapper"""
         if not job_name:
             return self._render_error('partials/error_page.html', {
-                'error_message': "Job name is required", 
+                'error_message': "Job name is required",
                 'page_title': "Error"
             }, 400)
-        
-        jobs = self.job_config.get_backup_jobs()
-        if job_name not in jobs:
+
+        # Delegate to define service for complete inspection data building
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        result = display_builder.build_job_inspect_data(job_name)
+
+        if not result['found']:
             return self._render_error('partials/error_page.html', {
-                'error_message': f"Job '{job_name}' not found", 
+                'error_message': result['error'],
                 'page_title': "Error"
             }, 404)
-        
-        job_config = jobs[job_name]
-        
-        # Get job status and logs
-        job_management = JobManagementService()
-        status_info = job_management.get_status(job_name)
-        recent_logs = job_management.get_log_entries(job_name, max_lines=100)
-        
-        # Format log content as string
-        job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
-        
-        template_data = {
-            'job_name': job_name,
-            'job_type': job_config.get('dest_type', 'unknown'),
-            'last_run': status_info.get('last_updated', 'Never'), 
-            'status': status_info.get('status', 'No runs'),
-            'message': status_info.get('details', 'No message'),
-            'job_log_content': job_log_content
-        }
-        
-        return self._render_html('pages/job_inspect.html', template_data)
+
+        return self._render_html('pages/job_inspect.html', result['template_data'])
 
 
     @handle_page_errors("Save job")

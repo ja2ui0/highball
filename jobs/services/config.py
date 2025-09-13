@@ -367,6 +367,7 @@ class JobConfigService:
             return [providers] if providers else []
         return [p for p in providers if p]  # Filter out empty strings
 
+
     def validate_source_path_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate source path with robust permission checking for HTMX forms - moved verbatim from handler"""
         from models.forms import safe_get_value, safe_get_list

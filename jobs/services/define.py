@@ -342,6 +342,8 @@ class JobDisplayBuilder:
 
     def __init__(self, template_service):
         self.template_service = template_service
+        from shared.services.config import ConfigReader
+        self.config_reader = ConfigReader()
 
     def build_job_rows(self, jobs):
         """Build job table rows from job data - moved verbatim from handler"""
@@ -475,6 +477,194 @@ class JobDisplayBuilder:
                 return f"restic: {repo_type}"
 
         return f"{dest_type}: Unknown configuration"
+
+    def build_dashboard_display_data(self) -> Dict[str, Any]:
+        """Build complete dashboard display data - business logic moved from handler"""
+        from shared.services.config import ConfigReader
+        config_reader = ConfigReader()
+
+        # Get data directly using ConfigReader
+        jobs = config_reader.get_backup_jobs()
+        deleted_jobs = config_reader.get_deleted_jobs()
+
+        # Build job list for display
+        job_list = []
+        for job_name, job_config in jobs.items():
+            # Use enabled/disabled status like original, not execution status
+            enabled = job_config.get('enabled', True)
+            status = "enabled" if enabled else "disabled"
+            status_class = "status-success" if enabled else "status-error"
+
+            # Build display strings with type prefixes
+            source_display = self.build_source_display_with_type(job_config)
+            dest_display = self.build_dest_display_with_type(job_config)
+
+            job_display = {
+                'name': job_name,
+                'source_display': source_display,
+                'dest_display': dest_display,
+                'status': status.capitalize(),
+                'status_class': status_class,
+                'schedule': job_config.get('schedule', 'manual')
+            }
+            job_list.append(job_display)
+
+        # Sort jobs by name
+        job_list.sort(key=lambda j: j['name'])
+
+        # Build HTML rows
+        job_rows = self.build_job_rows(job_list)
+        deleted_job_rows = self.build_deleted_job_rows(deleted_jobs)
+
+        return {
+            'job_list': job_list,
+            'jobs': jobs,
+            'deleted_jobs': deleted_jobs,
+            'job_count': len(jobs),
+            'deleted_count': len(deleted_jobs),
+            'global_settings': config_reader.get_global_settings(),
+            'job_rows': job_rows,
+            'deleted_job_rows': deleted_job_rows
+        }
+
+    def build_edit_job_form_data(self, job_name: str) -> Dict[str, Any]:
+        """Build edit job form data with complete business logic - moved from handler"""
+        from shared.services.config import ConfigReader
+        from jobs.services.define import JobFormDataBuilder
+        from jobs.services.manage import JobOperationsService
+        from dests.services.kinds import DestinationTypeService
+
+        config_reader = ConfigReader()
+        jobs = config_reader.get_backup_jobs()
+
+        if job_name not in jobs:
+            return {
+                'found': False,
+                'error': f"Job '{job_name}' not found"
+            }
+
+        job_config = jobs[job_name]
+        job_form_builder = JobFormDataBuilder()
+        form_data = job_form_builder.build_form_data_from_job(job_name, job_config)
+
+        # Add edit-specific metadata
+        form_data['page_title'] = f'Edit Job: {job_name}'
+        form_data['form_title'] = f'Edit Backup Job: {job_name}'
+        form_data['submit_button_text'] = 'Commit Changes'
+        form_data['form_has_changes'] = False
+
+        # Store original config for change detection
+        job_operations = JobOperationsService()
+        form_data['original_job_config'] = job_operations.serialize_job_config(job_config)
+
+        # Add available destination types
+        source_config = job_config.get('source_config', {})
+        destination_service = DestinationTypeService()
+        form_data['available_destination_types'] = destination_service.get_available_destination_types(source_config)
+
+        # Pre-select source and destination types for edit mode
+        source_type = job_config.get('source_type', 'local')
+        form_data['selected_source_type'] = source_type
+        form_data['source_local_selected'] = (source_type == 'local')
+        form_data['source_ssh_selected'] = (source_type == 'ssh')
+        form_data['selected_dest_type'] = job_config.get('dest_type', 'local')
+
+        # Build source and destination fields HTML using template builder
+        from jobs.services.define import JobFormTemplateBuilder
+        template_builder = JobFormTemplateBuilder(self.template_service)
+        form_data['source_fields_html'] = template_builder.build_source_fields_html(source_type, source_config)
+
+        dest_type = job_config.get('dest_type', 'local')
+        dest_config = job_config.get('dest_config', {})
+        form_data['dest_fields_html'] = template_builder.build_destination_fields_html(dest_type, dest_config, form_data)
+
+        # Add notification and schedule form data
+        existing_notifications = job_config.get('notifications', [])
+        form_data.update(self._build_notification_form_data_helper(existing_notifications))
+        form_data.update(self._build_schedule_form_data_helper(job_config))
+
+        return {
+            'found': True,
+            'form_data': form_data
+        }
+
+    def _build_notification_form_data_helper(self, existing_notifications):
+        """Helper for notification form data building"""
+        from jobs.services.notify import NotificationFormDataBuilder
+        builder = NotificationFormDataBuilder()
+        return builder.build_notification_context(existing_notifications)
+
+    def _build_schedule_form_data_helper(self, job_config):
+        """Helper for schedule form data building"""
+        from jobs.services.schedule import ScheduleFormDataBuilder
+        builder = ScheduleFormDataBuilder()
+        return builder.build_schedule_context(job_config)
+
+    def build_job_inspect_data(self, job_name: str) -> Dict[str, Any]:
+        """Build job inspection data with complete business logic - moved from handler"""
+        from shared.services.config import ConfigReader
+        from jobs.services.manage import JobManagementService
+
+        config_reader = ConfigReader()
+        jobs = config_reader.get_backup_jobs()
+
+        if job_name not in jobs:
+            return {
+                'found': False,
+                'error': f"Job '{job_name}' not found"
+            }
+
+        job_config = jobs[job_name]
+
+        # Get job status and logs
+        job_management = JobManagementService()
+        status_info = job_management.get_status(job_name)
+        recent_logs = job_management.get_log_entries(job_name, max_lines=100)
+
+        # Format log content as string
+        job_log_content = '\n'.join(recent_logs) if recent_logs else f'No log file yet for job "{job_name}". Job has not been executed (test or run) since creation.'
+
+        return {
+            'found': True,
+            'job_name': job_name,
+            'job_type': job_config.get('dest_type', 'unknown'),
+            'last_run': status_info.get('last_updated', 'Never'),
+            'status': status_info.get('status', 'No runs'),
+            'message': status_info.get('details', 'No message'),
+            'job_log_content': job_log_content
+        }
+
+    def build_add_job_form_data(self) -> Dict[str, Any]:
+        """Build add job form data - business logic moved from handler"""
+        job_form_builder = JobFormDataBuilder()
+
+        form_data = job_form_builder.build_empty_form_data()
+        form_data['page_title'] = 'Add Job'
+        form_data['form_title'] = 'Add New Backup Job'
+        form_data['submit_button_text'] = 'Create Job'
+
+        # Add available destination types
+        from dests.services.kinds import DestinationTypeService
+        destination_service = DestinationTypeService()
+        form_data['available_destination_types'] = destination_service.get_available_destination_types()
+
+        # Add notification configuration - provide data for template to render
+        from jobs.services.define import NotificationFormBuilder
+        notification_form_builder = NotificationFormBuilder(self.template_service, self.config_reader)
+
+        # Get available providers list for template
+        enabled_providers = notification_form_builder.get_enabled_global_providers()
+
+        # Add notification form data
+        form_data.update(self._build_notification_form_data_helper([]))
+        form_data['available_options'] = enabled_providers  # For template to render options
+        form_data['existing_notification_providers_html'] = ""  # No existing for new job
+        form_data['add_provider_class'] = ""  # Show the add provider section
+
+        # Add schedule configuration
+        form_data.update(self._build_schedule_form_data_helper({}))
+
+        return form_data
 
 
 # =============================================================================
@@ -638,3 +828,41 @@ class NotificationFormBuilder:
         if isinstance(providers, str):
             return [providers] if providers else []
         return [p for p in providers if p]  # Filter out empty strings
+
+    def get_job_config_for_repository_check(self, job_name: str) -> Dict[str, Any]:
+        """Get job configuration for repository availability check - business logic moved from handler"""
+        jobs = self.config_reader.get_backup_jobs()
+        if job_name not in jobs:
+            return {
+                'found': False,
+                'error': f"Job '{job_name}' not found"
+            }
+
+        return {
+            'found': True,
+            'job_config': jobs[job_name]
+        }
+
+    def build_notification_providers_html(self, existing_notifications: List = None) -> Dict[str, Any]:
+        """Build notification providers HTML - business logic moved from handler"""
+        if existing_notifications is None:
+            existing_notifications = []
+
+        # Get available providers from global config
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.config_reader)
+        available_providers = form_builder.get_enabled_global_providers()
+
+        # Build provider configurations HTML
+        provider_html = ""
+        for i, provider in enumerate(existing_notifications):
+            provider_html += form_builder.render_notification_provider(provider, i)
+
+        # Build provider selection dropdown HTML
+        form_builder.configured_providers = []  # Initialize for rendering
+        selection_html = form_builder.render_provider_selection(available_providers)
+
+        return {
+            'provider_html': provider_html,
+            'selection_html': selection_html
+        }

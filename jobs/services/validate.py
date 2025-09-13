@@ -830,5 +830,49 @@ class ValidationService:
         else:
             return {'valid': True, 'message': 'Path is RO (backup only - no restore to source)'}
 
+# =============================================================================
+# VALIDATION RENDERING SERVICE - Business logic for validation display moved from handlers
+# =============================================================================
+
+class ValidationRenderingService:
+    """Service for handling validation result rendering business logic - moved verbatim from handler"""
+
+    def __init__(self, template_service):
+        self.template_service = template_service
+
+    def render_source_path_validation_status(self, result: Dict[str, Any]) -> str:
+        """Render source path validation status (basic validation, no special SSH details) - moved verbatim from handler"""
+        return self._render_validation_status_template(result, [])
+
+    def _render_validation_status_template(self, result: Dict[str, Any], details: List[str]) -> str:
+        """Render validation status using template with consistent formatting - moved verbatim from handler"""
+        # Determine status class and label
+        if result.get('valid', False):
+            status_class = 'success'
+            status_label = '[OK]'
+        else:
+            status_class = 'error'
+            status_label = '[ERROR]'
+
+        # Build message from details or error
+        if details:
+            # Pass details as a list for proper formatting in template
+            message = None
+        else:
+            # Use appropriate message based on validation result
+            if result.get('valid', False):
+                message = result.get('message', 'Validation successful')
+            else:
+                message = result.get('error', 'Validation failed')
+            details = None
+
+        # Use Jinja2 template to render the result
+        return self.template_service.render_template('partials/validation_result.html',
+                                   status_class=status_class,
+                                   status_label=status_label,
+                                   message=message,
+                                   details=details)
+
+
 # Export the unified service as the main interface
 validation_service = ValidationService()

@@ -44,12 +44,11 @@ origins/           # handlers/, services/, schema.py
 dests/             # handlers/, services/, schema.py
 jobs/              # handlers/, services/, schema.py
 admin/             # handlers/, services/, schema.py
-shared/            # handlers/ (templating, response helpers)
+shared/            # handlers/ (templating, helpers, config IO)
                    # services/ (exec, ssh, common)
 templates/         # schema-driven, HTMX
 static/            # CSS, JavaScript, themes
 config/            # local/{jobs,dests,origins,secrets}, local.yaml
-config.py          # CRUD for config/
 ```
 
 ---

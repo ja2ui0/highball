@@ -281,25 +281,24 @@ class HTMXHandlers(BaseHandler):
     
     @handle_page_errors("Check repository availability")
     def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository availability check"""
-        
+        """HTMX endpoint for repository availability check - thin wrapper"""
         if not job_name:
             html_response = self.template_service.render_template('partials/error_message.html',
                                                                error_message='Job name is required')
             return HTMLResponse(content=html_response)
-        
-        # Delegate to jobs_handler for repository operations
-        
-        # Get and validate job configuration
-        jobs = self.job_config.get_backup_jobs()
-        if job_name not in jobs:
+
+        # Delegate to define service for job config lookup
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        result = display_builder.get_job_config_for_repository_check(job_name)
+
+        if not result['found']:
             html_response = self.template_service.render_template('partials/error_message.html',
-                                                               error_message=f"Job '{job_name}' not found")
+                                                               error_message=result['error'])
             return HTMLResponse(content=html_response)
-        
-        job_config = jobs[job_name]
-        # Perform repository availability check and return response
-        return jobs_handler._check_and_respond_repository_status_html(job_name, job_config)
+
+        # Delegate to pages handler for repository operations
+        return jobs_handler._check_and_respond_repository_status_html(job_name, result['job_config'])
     
     # =========================================================================
     # NOTIFICATION HTMX HANDLERS
@@ -335,27 +334,17 @@ class HTMXHandlers(BaseHandler):
 
     @handle_page_errors("Render notification providers")
     async def render_notification_providers_htmx(self, request) -> HTMLResponse:
-        """Render notification providers section for job configuration HTMX forms"""
+        """Render notification providers section for job configuration HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # Delegate to jobs_handler helper methods
-        
-        # Get available providers from global config
-        available_providers = jobs_handler._get_enabled_global_providers()
-        existing_notifications = []  # Parse from form if editing
-        
-        # Build provider configurations
-        provider_html = ""
-        for i, provider in enumerate(existing_notifications):
-            provider_html += jobs_handler._render_notification_provider(provider, i)
-        
-        # Build provider selection dropdown
-        jobs_handler.configured_providers = []  # Initialize for rendering
-        selection_html = jobs_handler._render_provider_selection(available_providers)
-        
+
+        # Delegate to define service for HTML building
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        result = display_builder.build_notification_providers_html([])  # Empty for new forms
+
         html_response = self.template_service.render_template('partials/notification_providers_section.html',
-                                                            provider_html=provider_html,
-                                                            selection_html=selection_html)
+                                                            provider_html=result['provider_html'],
+                                                            selection_html=result['selection_html'])
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Add notification provider")

@@ -610,7 +610,15 @@ class NotificationFormDataBuilder:
                             notification_data[field_name] = selected_option or field_info.get('default', '')
                         else:
                             notification_data[field_name] = field_value
-        
+
+        # Add available providers list for the dropdown
+        enabled_providers = []
+        for provider, config in global_notification.items():
+            if isinstance(config, dict) and config.get('enabled', False):
+                enabled_providers.append(provider)
+
+        notification_data['available_options'] = enabled_providers
+
         return notification_data
 
 
