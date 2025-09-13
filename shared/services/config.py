@@ -7,6 +7,7 @@ import os
 import yaml
 import tempfile
 import shutil
+import glob
 from typing import Dict, Any, Optional
 from datetime import datetime
 from dotenv import dotenv_values
@@ -267,9 +268,6 @@ class ConfigReader:
 
     def _load_ssh_origins(self) -> Dict[str, Any]:
         """Load SSH origins from /config/local/origins/*.yaml - no secrets for origins"""
-        import os
-        import glob
-
         origins = {}
         origins_dir = "/config/local/origins"
 
@@ -284,7 +282,7 @@ class ConfigReader:
 
             try:
                 # Load origin config using shared service
-                origin_config = ConfigIOService.load_yaml(origin_file)
+                origin_config = self.io.load_yaml(origin_file)
 
                 if origin_config is None:
                     print(f"Warning: Empty origin config for {origin_name}")
