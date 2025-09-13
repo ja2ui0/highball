@@ -12,24 +12,16 @@ import io
 import re
 from typing import Dict, Any, Optional
 
-from shared.services.config import ConfigIOService
+from shared.services.config import ConfigIOService, ConfigReader
 from models.forms import safe_get_value
 
 
 class OriginConfigService:
     """Handle origin configuration CRUD operations"""
-    
+
     def __init__(self):
         self.shared = ConfigIOService()
-    
-    def get_ssh_origins(self) -> Dict[str, Any]:
-        """Get all SSH origins - read directly from disk for real-time updates"""
-        return self._load_ssh_origins()
-    
-    def get_ssh_origin(self, origin_name: str) -> Optional[Dict[str, Any]]:
-        """Get specific SSH origin - read directly from disk"""
-        origins = self._load_ssh_origins()
-        return origins.get(origin_name)
+        self.config_reader = ConfigReader()
     
     def save_origin(self, origin_name: str, origin_config: Dict[str, Any]) -> bool:
         """Save an SSH origin - origins use only Highball SSH keys (no secrets)"""
@@ -82,36 +74,6 @@ class OriginConfigService:
             print(f"Error generating preview for origin {origin_name}: {str(e)}")
             return f"# Error generating preview: {str(e)}"
     
-    def _load_ssh_origins(self) -> Dict[str, Any]:
-        """Load SSH origins from /config/local/origins/*.yaml - no secrets for origins"""
-        origins = {}
-        origins_dir = "/config/local/origins"
-        
-        if not os.path.exists(origins_dir):
-            return origins
-            
-        # Find all .yaml files in origins directory
-        origin_files = glob.glob(os.path.join(origins_dir, "*.yaml"))
-        
-        for origin_file in origin_files:
-            origin_name = os.path.splitext(os.path.basename(origin_file))[0]
-            
-            try:
-                # Load origin config using shared service
-                origin_config = self.shared.load_yaml(origin_file)
-                
-                if origin_config is None:
-                    print(f"Warning: Empty origin config for {origin_name}")
-                    continue
-                
-                # No secrets handling for origins - they use only Highball SSH keys
-                origins[origin_name] = origin_config
-                
-            except Exception as e:
-                print(f"Warning: Error loading origin {origin_name}: {str(e)}")
-                continue
-        
-        return origins
     
     def _extract_clean_origin_config(self, origin_config: Dict[str, Any]) -> Dict[str, Any]:
         """Clean origin config - remove transient fields (no secrets for origins)"""
@@ -219,7 +181,7 @@ class OriginConfigService:
     
     def origin_exists(self, origin_name: str) -> bool:
         """Check if origin already exists"""
-        existing_origins = self.get_ssh_origins()
+        existing_origins = self.config_reader.get_ssh_origins()
         return origin_name in existing_origins
     
     def save_origin_with_rename_handling(self, origin_name: str, origin_config: Dict[str, Any], original_origin_name: str = '') -> Dict[str, Any]:

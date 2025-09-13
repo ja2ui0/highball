@@ -13,6 +13,7 @@ import asyncio
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from shared.services.config import ConfigReader
 from origins.services.config import OriginConfigService
 from origins.services.ssh import OriginSSHService
 
@@ -24,13 +25,14 @@ class OriginsViewHandler(BaseHandler):
     
     def __init__(self):
         self.origin_config = OriginConfigService()
+        self.config_reader = ConfigReader()
         self._init_template_service()
         self.ssh_service = OriginSSHService()
     
     @handle_page_errors("Show SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
         """Show SSH origins management page"""
-        origins = self.origin_config.get_ssh_origins()
+        origins = self.config_reader.get_ssh_origins()
         # TODO: Remove global_settings dependency or get from admin config service
         global_settings = {}
         
@@ -76,7 +78,7 @@ class OriginsViewHandler(BaseHandler):
     @handle_page_errors("Edit SSH origin")
     def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
         """Load SSH origin for editing"""
-        origin_config = self.origin_config.get_ssh_origin(origin_name)
+        origin_config = self.config_reader.get_ssh_origin(origin_name)
         
         if not origin_config:
             # Return empty form if origin not found

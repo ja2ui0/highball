@@ -251,3 +251,50 @@ class ConfigReader:
                 }
             }
         }
+
+    # =============================================================================
+    # ORIGINS DOMAIN READ METHODS - moved verbatim from origins/services/config.py
+    # =============================================================================
+
+    def get_ssh_origins(self) -> Dict[str, Any]:
+        """Get all SSH origins - read directly from disk for real-time updates"""
+        return self._load_ssh_origins()
+
+    def get_ssh_origin(self, origin_name: str) -> Optional[Dict[str, Any]]:
+        """Get specific SSH origin - read directly from disk"""
+        origins = self._load_ssh_origins()
+        return origins.get(origin_name)
+
+    def _load_ssh_origins(self) -> Dict[str, Any]:
+        """Load SSH origins from /config/local/origins/*.yaml - no secrets for origins"""
+        import os
+        import glob
+
+        origins = {}
+        origins_dir = "/config/local/origins"
+
+        if not os.path.exists(origins_dir):
+            return origins
+
+        # Find all .yaml files in origins directory
+        origin_files = glob.glob(os.path.join(origins_dir, "*.yaml"))
+
+        for origin_file in origin_files:
+            origin_name = os.path.splitext(os.path.basename(origin_file))[0]
+
+            try:
+                # Load origin config using shared service
+                origin_config = ConfigIOService.load_yaml(origin_file)
+
+                if origin_config is None:
+                    print(f"Warning: Empty origin config for {origin_name}")
+                    continue
+
+                # No secrets handling for origins - they use only Highball SSH keys
+                origins[origin_name] = origin_config
+
+            except Exception as e:
+                print(f"Warning: Error loading origin {origin_name}: {str(e)}")
+                continue
+
+        return origins
