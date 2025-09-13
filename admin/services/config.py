@@ -6,7 +6,7 @@ Handles CRUD operations for global settings (/config/local/local.yaml)
 import os
 import yaml
 from typing import Dict, Any
-from shared.services.config import ConfigIOService
+from shared.services.config import ConfigIOService, ConfigReader
 from admin.schema import PROVIDER_FIELD_SCHEMAS
 from models.forms import safe_get_value
 
@@ -16,22 +16,11 @@ class AdminConfigService:
     
     def __init__(self):
         self.config_file = "/config/local/local.yaml"
+        self.config_reader = ConfigReader()
     
     # =============================================================================
     # GLOBAL SETTINGS CRUD METHODS - moved from root config.py
     # =============================================================================
-    
-    def get_global_settings(self) -> Dict[str, Any]:
-        """Get global settings with default structure - ALWAYS LOADS FROM DISK FOR EDITING"""
-        # CRITICAL: Reload from disk to get current values, not cached values
-        fresh_config = self._load_global_settings()
-        settings = fresh_config.copy()
-        
-        # Ensure notification key exists with empty dict as default
-        if 'notification' not in settings:
-            settings['notification'] = {}
-            
-        return settings
     
     def update_global_settings(self, settings: Dict[str, Any]) -> bool:
         """Update global settings and save only global settings to local.yaml"""
@@ -43,73 +32,7 @@ class AdminConfigService:
         
         # Save only global settings to local.yaml
         return ConfigIOService.save_yaml_atomic(self.config_file, local_yaml)
-    
-    def _load_global_settings(self) -> Dict[str, Any]:
-        """Load global settings from /config/local/local.yaml"""
-        local_yaml = ConfigIOService.load_yaml(self.config_file)
-        
-        if local_yaml is None:
-            return self._get_default_global_settings()
-        
-        # Load user-specific secrets from /config/local/secrets/local.env
-        secrets_file = "/config/local/secrets/local.env"
-        secrets = ConfigIOService.load_secrets(secrets_file)
-        
-        if secrets:
-            local_yaml = ConfigIOService.merge_secrets(local_yaml, secrets)
-        
-        # Return only the global_settings section from local.yaml
-        return local_yaml.get('global_settings', self._get_default_global_settings())
-    
-    def _get_default_global_settings(self) -> Dict[str, Any]:
-        """Return default global settings structure"""
-        return {
-            "scheduler_timezone": "UTC",
-            "theme": "dark",  # default theme (dark, light, gruvbox, etc.)
-            "default_schedule_times": {
-                "hourly": "0 * * * *",     # top of every hour
-                "daily": "0 3 * * *",      # 3am daily
-                "weekly": "0 3 * * 0",     # 3am Sundays
-                "monthly": "0 3 1 * *"     # 3am first of month
-            },
-            "enable_conflict_avoidance": True,  # wait for conflicting jobs before running
-            "conflict_check_interval": 300,     # seconds between conflict checks (5 minutes)
-            "delay_notification_threshold": 300,  # seconds delay before sending notification (5 minutes)
-            "notification": {
-                "telegram": {
-                    "enabled": False,          # enable/disable telegram notifications globally
-                    "token": "",               # Bot token from @BotFather
-                    "chat_id": ""              # Chat ID for notifications
-                },
-                "email": {
-                    "enabled": False,          # enable/disable email notifications globally
-                    "smtp_server": "",         # e.g. smtp.gmail.com
-                    "smtp_port": 587,          # 587 for TLS, 465 for SSL, 25 for plain
-                    "use_tls": True,           # use TLS encryption
-                    "use_ssl": False,          # use SSL encryption (alternative to TLS)
-                    "from_email": "",          # sender email address
-                    "to_email": "",            # recipient email address  
-                    "username": "",            # SMTP authentication username
-                    "password": ""             # SMTP authentication password
-                }
-            },
-            "maintenance": {
-                "discard_schedule": "0 3 * * *",         # daily at 3am - combines forget+prune operations
-                "check_schedule": "0 2 * * 0",           # weekly Sunday 2am (staggered from backups)
-                "retention_policy": {
-                    "keep_last": 7,        # always keep last 7 snapshots regardless of age
-                    "keep_hourly": 6,      # keep 6 most recent hourly snapshots (6 hours coverage)
-                    "keep_daily": 7,       # keep 7 most recent daily snapshots (1 week coverage)
-                    "keep_weekly": 4,      # keep 4 most recent weekly snapshots (1 month coverage)
-                    "keep_monthly": 6,     # keep 6 most recent monthly snapshots (6 months coverage)
-                    "keep_yearly": 0       # disable yearly retention by default
-                },
-                "check_config": {
-                    "read_data_subset": "5%"   # balance integrity vs performance
-                }
-            }
-        }
-    
+
     # =============================================================================
     # BUSINESS LOGIC METHODS - moved from manage.py
     # =============================================================================
@@ -118,7 +41,7 @@ class AdminConfigService:
         """Save structured configuration from form data - contains all business logic"""
         try:
             # Get current configuration and update global settings
-            global_settings = self.get_global_settings()
+            global_settings = self.config_reader.get_global_settings()
             
             # Update basic settings only if provided in form
             scheduler_timezone = safe_get_value(form_data, 'scheduler_timezone', '')
@@ -158,7 +81,7 @@ class AdminConfigService:
     def preview_config_changes_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Preview configuration changes without saving - contains all business logic"""
         # Start with current configuration to preserve existing notification settings
-        current_config = {'global_settings': self.get_global_settings().copy()}
+        current_config = {'global_settings': self.config_reader.get_global_settings().copy()}
         preview_config = current_config.copy()
         global_settings = preview_config['global_settings']
         
@@ -201,7 +124,7 @@ class AdminConfigService:
                 return {'success': False, 'error': 'Invalid provider selection'}
             
             # Get current config and add empty provider section
-            global_settings = self.get_global_settings()
+            global_settings = self.config_reader.get_global_settings()
             notification_config = global_settings.setdefault('notification', {})
             
             # Add provider with default settings
@@ -242,7 +165,7 @@ class AdminConfigService:
                 return {'success': False, 'error': 'Invalid provider'}
             
             # Get current config and remove provider section
-            global_settings = self.get_global_settings()
+            global_settings = self.config_reader.get_global_settings()
             notification_config = global_settings.get('notification', {})
             
             if provider in notification_config:

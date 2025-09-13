@@ -18,6 +18,45 @@ from shared.handlers.errors import handle_service_errors
 
 logger = logging.getLogger(__name__)
 
+
+def check_repository_status_for_job(job_name: str, backup_config) -> Dict[str, Any]:
+    """Check repository status for a job - moved from dests domain (domain violation fix)"""
+    if not job_name:
+        return {'success': False, 'error': 'Job name is required'}
+    
+    jobs = backup_config.get_backup_jobs()
+    if job_name not in jobs:
+        return {'success': False, 'error': f'Job "{job_name}" not found'}
+    
+    job_config = jobs[job_name]
+    dest_type = job_config.get('dest_type')
+    
+    if dest_type == 'restic':
+        dest_config = job_config.get('dest_config', {})
+        repo_uri = dest_config.get('repo_uri')
+        
+        if not repo_uri:
+            return {'success': False, 'error': 'Repository URI not configured'}
+        
+        # Quick repository check - import locally to avoid circular dependency
+        from dests.services.restic import restic_service
+        check_success, check_message = restic_service._quick_repository_check(repo_uri, dest_config)
+        
+        if check_success:
+            return {'success': True, 'status': 'available', 'job_name': job_name, 'job_type': 'restic'}
+        else:
+            # Determine error type for appropriate response
+            is_locked = check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower())
+            return {
+                'success': False, 
+                'error': check_message or 'Unknown error',
+                'error_type': 'locked' if is_locked else 'connection_error',
+                'job_name': job_name
+            }
+    else:
+        # Non-restic repositories - assume available for now
+        return {'success': True, 'status': 'available', 'job_name': job_name, 'job_type': dest_type}
+
 # Using shared error decorator - handle_service_errors imported above
 
 # =============================================================================

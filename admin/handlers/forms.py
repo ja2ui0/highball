@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from shared.services.config import ConfigReader
 from admin.services.init import HighballServices
 from admin.services.notifications import NotificationTestService
 from admin.services.config import AdminConfigService
@@ -27,18 +28,19 @@ class AdminForms(BaseHandler):
         # Services handle all config access - handlers delegate everything
         self.admin_services = HighballServices()
         self.admin_config = AdminConfigService()
-        
+        self.config_reader = ConfigReader()
+
         # Defer notification service initialization to avoid early dependencies
         self._notification_test = None
-        
+
         # Initialize template service with config adapter
         class ConfigAdapter:
-            def __init__(self, admin_config):
-                self.admin_config = admin_config
+            def __init__(self, config_reader):
+                self.config_reader = config_reader
             def get_global_settings(self):
-                return self.admin_config.get_global_settings()
-        
-        self.config_adapter = ConfigAdapter(self.admin_config)
+                return self.config_reader.get_global_settings()
+
+        self.config_adapter = ConfigAdapter(self.config_reader)
         self._init_template_service(self.config_adapter)
     
     @property
@@ -101,7 +103,7 @@ class AdminForms(BaseHandler):
         
         if result['success']:
             # Return updated notification section showing new provider form
-            global_settings = self.admin_config.get_global_settings()
+            global_settings = self.config_reader.get_global_settings()
             template_data = {
                 'global_settings': global_settings,
                 'provider_schemas': PROVIDER_FIELD_SCHEMAS
@@ -123,7 +125,7 @@ class AdminForms(BaseHandler):
         
         if result['success']:
             # Return updated notification section 
-            global_settings = self.admin_config.get_global_settings()
+            global_settings = self.config_reader.get_global_settings()
             template_data = {
                 'global_settings': global_settings,
                 'provider_schemas': PROVIDER_FIELD_SCHEMAS

@@ -11,7 +11,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from config import BackupConfig
+from jobs.services.config import JobConfigService
+from shared.services.config import ConfigReader
 from models.forms import safe_get_value, safe_get_list, parse_lines
 
 logger = logging.getLogger(__name__)
@@ -118,16 +119,16 @@ class JobsHandler(BaseHandler):
     """Handle job management and inspection"""
     
     def __init__(self):
-        self.backup_config = BackupConfig()
+        self.job_config = JobConfigService()
+        self.config_reader = ConfigReader()
         self._init_template_service()
-        
+
         # Initialize service orchestrators (moved from operations handler)
-        from jobs.services.backup import BackupOrchestrationService
-        from jobs.services.validate import ValidationService
         from jobs.services.manage import JobOperationsService
-        self.backup_orchestration = BackupOrchestrationService(self.backup_config)
-        self.validation_service = ValidationService(self.backup_config)
-        self.job_operations = JobOperationsService(self.backup_config)
+        # Note: Some services still need BackupConfig for non-config operations during transition
+        from config import BackupConfig
+        self.backup_config = BackupConfig()
+        self.job_operations = JobOperationsService()
     
     # =========================================================================
     # VALIDATION RENDERING (moved from services/template.py)
@@ -226,8 +227,8 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Dashboard")
     def show_dashboard(self) -> HTMLResponse:
         """Show main dashboard with job list"""
-        jobs = self.job_operations.get_backup_jobs()
-        global_settings = self.job_operations.get_global_settings()
+        jobs = self.job_config.get_backup_jobs()
+        global_settings = self.config_reader.get_global_settings()
         
         # Get job status information
         from jobs.services.manage import JobManagementService
@@ -259,7 +260,7 @@ class JobsHandler(BaseHandler):
         
         # Build job and deleted job HTML using local methods (moved from template service)
         job_rows = self._build_job_rows(job_list)
-        deleted_jobs = self.job_operations.get_deleted_jobs()
+        deleted_jobs = self.job_config.get_deleted_jobs()
         deleted_job_rows = self._build_deleted_job_rows(deleted_jobs)
         
         template_data = {
@@ -392,7 +393,7 @@ class JobsHandler(BaseHandler):
                 'page_title': "Error"
             }, 400)
         
-        jobs = self.job_operations.get_backup_jobs()
+        jobs = self.job_config.get_backup_jobs()
         if job_name not in jobs:
             return self._render_error('partials/error_page.html', {
                 'error_message': f"Job '{job_name}' not found", 
@@ -460,7 +461,7 @@ class JobsHandler(BaseHandler):
                 'page_title': "Error"
             }, 400)
         
-        jobs = self.job_operations.get_backup_jobs()
+        jobs = self.job_config.get_backup_jobs()
         if job_name not in jobs:
             return self._render_error('partials/error_page.html', {
                 'error_message': f"Job '{job_name}' not found", 
@@ -528,7 +529,11 @@ class JobsHandler(BaseHandler):
         job_config = self._build_job_config_from_result(job_result)
         
         # Save via service
-        result = self.job_operations.save_job(job_name, job_config)
+        success = self.job_config.save_job(job_name, job_config)
+        if success:
+            result = {'success': True, 'message': f"Job '{job_name}' saved successfully"}
+        else:
+            result = {'success': False, 'error': 'Failed to save job configuration'}
         
         if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
@@ -548,7 +553,11 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        result = self.job_operations.delete_job(job_name)
+        success = self.job_config.delete_backup_job(job_name)
+        if success:
+            result = {'success': True, 'message': f"Job '{job_name}' deleted successfully"}
+        else:
+            result = {'success': False, 'error': f"Failed to delete job '{job_name}'"}
         
         if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
@@ -568,7 +577,11 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        result = self.job_operations.purge_job(job_name)
+        success = self.job_config.purge_job(job_name)
+        if success:
+            result = {'success': True, 'message': f"Job '{job_name}' permanently purged"}
+        else:
+            result = {'success': False, 'error': f"Failed to purge job '{job_name}'"}
         
         if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
@@ -588,7 +601,11 @@ class JobsHandler(BaseHandler):
                 'error': 'Job name is required'
             }, status_code=400)
         
-        result = self.job_operations.restore_job(job_name)
+        success = self.job_config.restore_deleted_job(job_name)
+        if success:
+            result = {'success': True, 'message': f"Job '{job_name}' restored successfully"}
+        else:
+            result = {'success': False, 'error': f"Failed to restore job '{job_name}'"}
         
         if result['success']:
             return RedirectResponse(url='/dashboard', status_code=302)
@@ -703,7 +720,7 @@ class JobsHandler(BaseHandler):
 
     def _get_enabled_global_providers(self):
         """Get list of globally enabled notification providers"""
-        global_settings = self.job_operations.get_global_settings()
+        global_settings = self.config_reader.get_global_settings()
         notification_config = global_settings.get('notification', {})
         
         enabled_providers = []
@@ -797,7 +814,7 @@ class JobsHandler(BaseHandler):
                 'error': 'Snapshot ID is required'
             })
         
-        jobs = self.job_operations.get_backup_jobs()
+        jobs = self.job_config.get_backup_jobs()
         if job_name not in jobs:
             return JSONResponse(content={
                 'success': False,

@@ -58,15 +58,15 @@ class HighballServices:
 
         # Initialize handlers
         from admin.services.notifications import NotificationTestService
-        from admin.services.config import AdminConfigService
-        
+        from shared.services.config import ConfigReader
+
         # Create config adapter for notification service
         class ConfigAdapter:
             def __init__(self):
-                self.admin_config = AdminConfigService()
+                self.config_reader = ConfigReader()
             def get_global_settings(self):
-                return self.admin_config.get_global_settings()
-        
+                return self.config_reader.get_global_settings()
+
         self.notification_test = NotificationTestService(ConfigAdapter())
         
         self.handlers = {

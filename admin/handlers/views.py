@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
+from shared.services.config import ConfigReader
 from admin.services.init import HighballServices
 from admin.services.config import AdminConfigService
 
@@ -20,18 +21,19 @@ class AdminViews(BaseHandler):
     """Handle admin GET operations - read-only views"""
     
     def __init__(self):
-        # Initialize services - handlers delegate all operations  
+        # Initialize services - handlers delegate all operations
         self.admin_services = HighballServices()
         self.admin_config = AdminConfigService()
-        
+        self.config_reader = ConfigReader()
+
         # Initialize template service with minimal config adapter
         class ConfigAdapter:
-            def __init__(self, admin_config):
-                self.admin_config = admin_config
+            def __init__(self, config_reader):
+                self.config_reader = config_reader
             def get_global_settings(self):
-                return self.admin_config.get_global_settings()
+                return self.config_reader.get_global_settings()
         
-        config_adapter = ConfigAdapter(self.admin_config)
+        config_adapter = ConfigAdapter(self.config_reader)
         self._init_template_service(config_adapter)
 
     def _get_available_themes(self):
@@ -52,7 +54,7 @@ class AdminViews(BaseHandler):
         """Show configuration management interface"""
         
         # Get global settings from service (raw data)
-        global_settings = self.admin_config.get_global_settings()
+        global_settings = self.config_reader.get_global_settings()
         
         # Presentation logic: Extract individual field values for template population
         default_schedule_times = global_settings.get('default_schedule_times', {})

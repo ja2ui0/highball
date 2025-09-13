@@ -423,83 +423,11 @@ class SystemLoggingService:
 
 
 class JobOperationsService:
-    """Service for job CRUD operations and lifecycle management"""
-    
-    def __init__(self, backup_config):
-        self.backup_config = backup_config
+    """Service for non-config job operations (logging, validation, process management)"""
+
+    def __init__(self):
+        pass
     
     # =========================================================================
-    # CONFIG ACCESS METHODS - handlers should use these instead of direct access
+    # NON-CONFIG OPERATIONS ONLY - config CRUD moved to jobs/services/config.py
     # =========================================================================
-    
-    def get_backup_jobs(self) -> Dict[str, Any]:
-        """Get all backup jobs - handlers should call this instead of backup_config.get_backup_jobs()"""
-        return self.backup_config.get_backup_jobs()
-    
-    def get_global_settings(self) -> Dict[str, Any]:
-        """Get global settings - handlers should call this instead of backup_config.get_global_settings()"""
-        return self.backup_config.get_global_settings()
-    
-    def get_deleted_jobs(self) -> Dict[str, Any]:
-        """Get deleted jobs - handlers should call this instead of backup_config.config.get('deleted_jobs')"""
-        return self.backup_config.config.get('deleted_jobs', {})
-    
-    @handle_service_errors("Save job")
-    def save_job(self, job_name: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Save job configuration to persistent storage"""
-        if not job_name:
-            return {'success': False, 'error': 'Job name is required'}
-        
-        if not job_config:
-            return {'success': False, 'error': 'Job configuration is required'}
-        
-        success = self.backup_config.save_job(job_name, job_config)
-        
-        if success:
-            return {'success': True, 'message': f"Job '{job_name}' saved successfully"}
-        else:
-            return {'success': False, 'error': 'Failed to save job configuration'}
-    
-    @handle_service_errors("Delete job")
-    def delete_job(self, job_name: str) -> Dict[str, Any]:
-        """Move job to deleted jobs (soft delete)"""
-        if not job_name:
-            return {'success': False, 'error': 'Job name is required'}
-        
-        success = self.backup_config.delete_backup_job(job_name)
-        
-        if success:
-            return {'success': True, 'message': f"Job '{job_name}' deleted successfully"}
-        else:
-            return {'success': False, 'error': f"Failed to delete job '{job_name}'"}
-    
-    @handle_service_errors("Purge job")
-    def purge_job(self, job_name: str) -> Dict[str, Any]:
-        """Permanently remove job from deleted jobs (hard delete)"""
-        if not job_name:
-            return {'success': False, 'error': 'Job name is required'}
-        
-        success = self.backup_config.purge_job(job_name)
-        
-        if success:
-            return {'success': True, 'message': f"Job '{job_name}' permanently purged"}
-        else:
-            return {'success': False, 'error': f"Failed to purge job '{job_name}'"}
-    
-    @handle_service_errors("Restore job")
-    def restore_job(self, job_name: str) -> Dict[str, Any]:
-        """Restore job from deleted jobs back to active jobs"""
-        if not job_name:
-            return {'success': False, 'error': 'Job name is required'}
-        
-        success = self.backup_config.restore_deleted_job(job_name)
-        
-        if success:
-            return {'success': True, 'message': f"Job '{job_name}' restored successfully"}
-        else:
-            return {'success': False, 'error': f"Failed to restore job '{job_name}'"}
-    
-    @handle_service_errors("Serialize job config")
-    def serialize_job_config(self, job_config: Dict[str, Any]) -> str:
-        """Serialize job configuration to JSON string for change detection"""
-        return json.dumps(job_config, sort_keys=True)
