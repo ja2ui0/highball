@@ -131,54 +131,24 @@ class HTMXHandlers(BaseHandler):
     
     @handle_page_errors("Validate source path")
     async def validate_source_path_htmx(self, request) -> HTMLResponse:
-        """Validate source path with robust permission checking for HTMX forms"""
+        """Validate source path with robust permission checking for HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # Extract path from array format
-        path_array = form_data.get('source_path[]', [])
-        path_index = int(get_form_value(form_data, 'path_index', '0'))
-        path = path_array[path_index] if path_index < len(path_array) else ''
-        
-        if not path or not path.strip():
-            result = {'valid': False, 'error': 'Please enter a path'}
-            html_response = jobs_handler.render_source_path_validation_status(result)
-            return HTMLResponse(content=html_response)
-        
-        # Extract source configuration
-        source_type = get_form_value(form_data, 'source_type')
-        hostname = get_form_value(form_data, 'hostname')
-        username = get_form_value(form_data, 'username')
-        
-        # Validate based on source type (robust handling from working version)
-        if source_type == 'ssh':
-            result = jobs_handler.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
-        elif source_type == 'local':
-            result = jobs_handler.validation_service.validate_source_path_for_backup_local(path)
-        else:
-            result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
-        
+
+        # Delegate to service
+        result = self.job_config.validate_source_path_from_form(form_data)
         html_response = jobs_handler.render_source_path_validation_status(result)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Add source path")
     async def add_source_path_htmx(self, request) -> HTMLResponse:
-        """Add a new source path entry for HTMX forms"""
+        """Add a new source path entry for HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # Get path count from JavaScript via hx-vals
-        path_count = int(get_form_value(form_data, 'path_count', '0'))
-        new_path_index = path_count  # Next sequential index
-        
-        # Create new empty path data
-        path_data = {'path': '', 'includes': [], 'excludes': []}
-        source_paths = ['', '']  # Always show remove button for new paths
-        
-        # Return just the new path entry wrapped in its container
-        html_response = self.template_service.render_template('partials/source_path_entry_container.html',
-                                                           path_index=new_path_index,
-                                                           path_data=path_data,
-                                                           source_paths=source_paths,
-                                                           source_path_schema=SOURCE_PATH_SCHEMA)
+
+        # Delegate to service
+        template_data = self.job_config.add_source_path_entry_data(form_data)
+
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/source_path_entry_container.html', **template_data)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Remove source path")
@@ -239,110 +209,44 @@ class HTMXHandlers(BaseHandler):
     
     @handle_page_errors("Handle restore target change")
     async def handle_restore_target_change_htmx(self, request) -> HTMLResponse:
-        """Handle restore target change and check overwrites - HTMX handler"""
+        """Handle restore target change and check overwrites - thin wrapper"""
         form_data = await parse_htmx_form(request)
 
-        # Business logic (preserve original implementation)
-        # HTTP concern: extract parameters
-        job_name = get_form_value(form_data, 'job_name')
-        restore_target = get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = get_form_value(form_data, 'dry_run') == 'on'
-        selected_paths = form_data.get('selected_paths', [])
-        
-        # Business logic concern: check for overwrites using restore service
-        restore_service = RestoreService()
-        
-        # Get job config for source details
-        jobs = self.job_config.get_backup_jobs()
-        job_config = jobs.get(job_name, {})
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'local')
-        
-        has_overwrites = restore_service.check_restore_overwrites(
-            restore_target, source_type, source_config, selected_paths
-        )
-        
-        # Template concern: use template service to render partial
-        template_vars = {
-            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
-            'RESTORE_TARGET': restore_target,
-            'DRY_RUN': 'true' if dry_run else 'false',
-            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-        }
-        
-        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
+        # Delegate to service
+        from jobs.services.restore import RestoreOperationsService
+        restore_ops = RestoreOperationsService()
+        template_vars = restore_ops.handle_restore_target_change_from_form(form_data)
 
-        # Return HTMLResponse wrapper
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Handle restore dry run change")
     async def handle_restore_dry_run_change_htmx(self, request) -> HTMLResponse:
-        """Handle dry run toggle and update warning - HTMX handler"""
+        """Handle dry run toggle and update warning - thin wrapper"""
         form_data = await parse_htmx_form(request)
 
-        # Business logic (preserve original implementation)
-        # HTTP concern: extract parameters  
-        job_name = get_form_value(form_data, 'job_name')
-        restore_target = get_form_value(form_data, 'restore_target', 'highball')
-        dry_run = get_form_value(form_data, 'dry_run') == 'on'
-        selected_paths = form_data.get('selected_paths', [])
-        
-        # Business logic concern: check for overwrites using restore service
-        restore_service = RestoreService()
-        
-        # Get job config for source details  
-        jobs = self.job_config.get_backup_jobs()
-        job_config = jobs.get(job_name, {})
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'local')
-        
-        has_overwrites = restore_service.check_restore_overwrites(
-            restore_target, source_type, source_config, selected_paths
-        )
-        
-        # Template concern: use template service to render partial
-        template_vars = {
-            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
-            'RESTORE_TARGET': restore_target,
-            'DRY_RUN': 'true' if dry_run else 'false',
-            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-        }
-        
-        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
+        # Delegate to service
+        from jobs.services.restore import RestoreOperationsService
+        restore_ops = RestoreOperationsService()
+        template_vars = restore_ops.handle_restore_dry_run_change_from_form(form_data)
 
-        # Return HTMLResponse wrapper  
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Check restore overwrites")
     async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
-        """Check restore overwrites for HTMX forms"""
+        """Check restore overwrites for HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # HTTP concern: extract parameters
-        job_name = get_form_value(form_data, 'job_name')
-        restore_target = get_form_value(form_data, 'restore_target', 'highball')
-        select_all = get_form_value(form_data, 'select_all') == 'on'
-        selected_paths = form_data.get('selected_paths', [])
-        
-        # Business logic concern: delegate to restore service
-        restore_service = RestoreService()
-        
-        # Get job config for source details
-        jobs = self.job_config.get_backup_jobs()
-        job_config = jobs.get(job_name, {})
-        source_config = job_config.get('source_config', {})
-        source_type = job_config.get('source_type', 'local')
-        
-        has_overwrites = restore_service.check_restore_overwrites(
-            restore_target, source_type, source_config, selected_paths, select_all
-        )
-        
-        # Template concern: pass data to Jinja2 template for conditional rendering
-        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
-        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html',
-                                                            has_overwrites=has_overwrites,
-                                                            target_text=target_text,
-                                                            dry_run=False)
+
+        # Delegate to service
+        from jobs.services.restore import RestoreOperationsService
+        restore_ops = RestoreOperationsService()
+        template_data = restore_ops.check_restore_overwrites_from_form(form_data)
+
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_data)
         return HTMLResponse(content=html_response)
     
     # =========================================================================
@@ -403,30 +307,30 @@ class HTMXHandlers(BaseHandler):
     
     @handle_page_errors("Toggle success message")
     async def toggle_success_message_htmx(self, request) -> HTMLResponse:
-        """Toggle success message field visibility for job notification configuration"""
+        """Toggle success message field visibility for job notification configuration - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # Check if checkbox is checked
-        enabled = 'notify_on_success[]' in form_data
-        success_message = get_form_value(form_data, 'notification_success_messages[]')
-        
-        html_response = self.template_service.render_template('partials/notification_success_message.html',
-                                                            enabled=enabled,
-                                                            success_message=success_message)
+
+        # Delegate to service
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
+        template_data = form_builder.toggle_success_message_from_form(form_data)
+
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/notification_success_message.html', **template_data)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Toggle failure message")
     async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
-        """Toggle failure message field visibility for job notification configuration"""
+        """Toggle failure message field visibility for job notification configuration - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        # Check if checkbox is checked
-        enabled = 'notify_on_failure[]' in form_data
-        failure_message = get_form_value(form_data, 'notification_failure_messages[]')
-        
-        html_response = self.template_service.render_template('partials/notification_failure_message.html',
-                                                            enabled=enabled,
-                                                            failure_message=failure_message)
+
+        # Delegate to service
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
+        template_data = form_builder.toggle_failure_message_from_form(form_data)
+
+        # Return rendered template
+        html_response = self.template_service.render_template('partials/notification_failure_message.html', **template_data)
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Render notification providers")
@@ -456,74 +360,39 @@ class HTMXHandlers(BaseHandler):
 
     @handle_page_errors("Add notification provider")
     async def add_notification_provider_htmx(self, request) -> HTMLResponse:
-        """Add a new notification provider to job configuration for HTMX forms"""
+        """Add a new notification provider to job configuration for HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        provider_name = get_form_value(form_data, 'provider')
-        if not provider_name:
+
+        # Delegate to service
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
+        result = form_builder.add_notification_provider_from_form(form_data)
+
+        if not result['success']:
             html_response = self.template_service.render_template('partials/error_message.html',
-                                                               message="Invalid provider selection")
+                                                               message=result['error'])
             return HTMLResponse(content=html_response)
-        
-        # Delegate to jobs_handler for complex provider operations
-        
-        # Generate unique ID
-        timestamp = int(time.time() * 1000)
-        provider_id = f"notification_{provider_name}_{timestamp}"
-        
-        new_provider_html = jobs_handler._render_notification_provider({
-            'provider': provider_name,
-            'notify_on_success': False,
-            'notify_on_failure': True,  # Default to True for failures
-            'notify_on_maintenance_failure': False,
-            'success_message': '',
-            'failure_message': ''
-        }, timestamp, provider_id)
-        
-        # Get currently configured providers from form data
-        current_providers = jobs_handler._get_form_providers(form_data)
-        current_providers.append(provider_name)
-        
-        # Update dropdown with remaining providers
-        available_providers = jobs_handler._get_enabled_global_providers()
-        jobs_handler.configured_providers = current_providers  # Update state
-        updated_selection = jobs_handler._render_provider_selection(available_providers)
-        
+
+        # Return rendered template
         html_response = self.template_service.render_template('partials/notification_provider_added_response.html',
-                                                            new_provider_html=new_provider_html,
-                                                            updated_selection_html=updated_selection)
+                                                            new_provider_html=result['new_provider_html'],
+                                                            updated_selection_html=result['updated_selection_html'])
         return HTMLResponse(content=html_response)
 
     @handle_page_errors("Remove notification provider")
     async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
-        """Remove a notification provider from job configuration for HTMX forms"""
+        """Remove a notification provider from job configuration for HTMX forms - thin wrapper"""
         form_data = await parse_htmx_form(request)
-        
-        provider_id = get_form_value(form_data, 'provider_id')
-        
-        # Delegate to jobs_handler for provider operations
-        
-        # Extract provider name from ID (format: notification_{provider}_{timestamp})
-        provider_name = None
-        if provider_id and '_' in provider_id:
-            parts = provider_id.split('_')
-            if len(parts) >= 2:
-                provider_name = parts[1]
-        
-        # Get current providers from form and remove this one
-        current_providers = jobs_handler._get_form_providers(form_data)
-        if provider_name and provider_name in current_providers:
-            current_providers.remove(provider_name)
-        
-        # Update state and render dropdown
-        jobs_handler.configured_providers = current_providers
-        available_providers = jobs_handler._get_enabled_global_providers()
-        updated_selection = jobs_handler._render_provider_selection(available_providers)
-        
-        # Return response that removes provider config and updates dropdown
+
+        # Delegate to service
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
+        result = form_builder.remove_notification_provider_from_form(form_data)
+
+        # Return rendered template
         html_response = self.template_service.render_template('partials/notification_provider_removed_response.html',
-                                                            provider_id=provider_id,
-                                                            updated_selection_html=updated_selection)
+                                                            provider_id=result['provider_id'],
+                                                            updated_selection_html=result['updated_selection_html'])
         return HTMLResponse(content=html_response)
 
 

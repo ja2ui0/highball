@@ -18,6 +18,60 @@ from models.forms import safe_get_value, safe_get_list, parse_lines
 # JOB FORM PARSERS - moved from handlers
 # =============================================================================
 
+class NotificationParser:
+    """Parse notification provider configurations - moved verbatim from handler"""
+
+    @staticmethod
+    def parse_notification_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse notification configuration from form data"""
+        # Get notification form arrays
+        providers = safe_get_list(form_data, 'notification_providers[]')
+        notify_success_flags = safe_get_list(form_data, 'notify_on_success[]')
+        success_messages = safe_get_list(form_data, 'notification_success_messages[]')
+        notify_failure_flags = safe_get_list(form_data, 'notify_on_failure[]')
+        failure_messages = safe_get_list(form_data, 'notification_failure_messages[]')
+        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_on_maintenance_failure[]')
+
+        notifications = []
+
+        # Process each provider configuration
+        for i, provider in enumerate(providers):
+            if not provider:  # Skip empty providers
+                continue
+
+            # Get corresponding values for this provider (with safe indexing)
+            notify_success = i < len(notify_success_flags) and notify_success_flags[i] == 'on'
+            success_message = success_messages[i] if i < len(success_messages) else ''
+            notify_failure = i < len(notify_failure_flags) and notify_failure_flags[i] == 'on'
+            failure_message = failure_messages[i] if i < len(failure_messages) else ''
+            notify_maintenance_failure = i < len(notify_maintenance_failure_flags) and notify_maintenance_failure_flags[i] == 'on'
+
+            # Validate - at least one notification type must be enabled
+            if not notify_success and not notify_failure:
+                return {
+                    'valid': False,
+                    'error': f'Provider {provider}: At least one notification type (success or failure) must be enabled'
+                }
+
+            # Build notification config
+            notification_config = {
+                'provider': provider,
+                'notify_on_success': notify_success,
+                'notify_on_failure': notify_failure,
+                'notify_on_maintenance_failure': notify_maintenance_failure
+            }
+
+            # Add custom messages if provided
+            if notify_success and success_message.strip():
+                notification_config['success_message'] = success_message.strip()
+            if notify_failure and failure_message.strip():
+                notification_config['failure_message'] = failure_message.strip()
+
+            notifications.append(notification_config)
+
+        return {'valid': True, 'notifications': notifications}
+
+
 class SourcePathsParser:
     """Parse multi-path source configurations - moved verbatim from handler"""
 
@@ -304,5 +358,64 @@ class JobConfigService:
             })
 
         return validation_results
+
+    def _get_form_providers(self, form_data):
+        """Get currently configured providers from form data - moved verbatim from handler"""
+        providers = form_data.get('notification_providers[]', [])
+        # Handle both single string and list formats
+        if isinstance(providers, str):
+            return [providers] if providers else []
+        return [p for p in providers if p]  # Filter out empty strings
+
+    def validate_source_path_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate source path with robust permission checking for HTMX forms - moved verbatim from handler"""
+        from models.forms import safe_get_value, safe_get_list
+
+        # Extract path from array format
+        path_array = form_data.get('source_path[]', [])
+        path_index = int(safe_get_value(form_data, 'path_index', '0'))
+        path = path_array[path_index] if path_index < len(path_array) else ''
+
+        if not path or not path.strip():
+            result = {'valid': False, 'error': 'Please enter a path'}
+            return result
+
+        # Extract source configuration
+        source_type = safe_get_value(form_data, 'source_type')
+        hostname = safe_get_value(form_data, 'hostname')
+        username = safe_get_value(form_data, 'username')
+
+        # Validate based on source type (robust handling from working version)
+        from jobs.services.validate import ValidationService
+        validation_service = ValidationService()
+
+        if source_type == 'ssh':
+            result = validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
+        elif source_type == 'local':
+            result = validation_service.validate_source_path_for_backup_local(path)
+        else:
+            result = {'valid': False, 'error': 'Please select a source type (Local Path or SSH Remote)'}
+
+        return result
+
+    def add_source_path_entry_data(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a new source path entry for HTMX forms - moved verbatim from handler"""
+        from models.forms import safe_get_value
+        from origins.schema import SOURCE_PATH_SCHEMA
+
+        # Get path count from JavaScript via hx-vals
+        path_count = int(safe_get_value(form_data, 'path_count', '0'))
+        new_path_index = path_count  # Next sequential index
+
+        # Create new empty path data
+        path_data = {'path': '', 'includes': [], 'excludes': []}
+        source_paths = ['', '']  # Always show remove button for new paths
+
+        return {
+            'path_index': new_path_index,
+            'path_data': path_data,
+            'source_paths': source_paths,
+            'source_path_schema': SOURCE_PATH_SCHEMA
+        }
 
 

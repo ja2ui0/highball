@@ -34,58 +34,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class NotificationParser:
-    """Parse notification provider configurations"""
-    
-    @staticmethod
-    def parse_notification_config(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse notification configuration from form data"""
-        # Get notification form arrays
-        providers = safe_get_list(form_data, 'notification_providers[]')
-        notify_success_flags = safe_get_list(form_data, 'notify_on_success[]')
-        success_messages = safe_get_list(form_data, 'notification_success_messages[]')
-        notify_failure_flags = safe_get_list(form_data, 'notify_on_failure[]')
-        failure_messages = safe_get_list(form_data, 'notification_failure_messages[]')
-        notify_maintenance_failure_flags = safe_get_list(form_data, 'notify_on_maintenance_failure[]')
-        
-        notifications = []
-        
-        # Process each provider configuration
-        for i, provider in enumerate(providers):
-            if not provider:  # Skip empty providers
-                continue
-                
-            # Get corresponding values for this provider (with safe indexing)
-            notify_success = i < len(notify_success_flags) and notify_success_flags[i] == 'on'
-            success_message = success_messages[i] if i < len(success_messages) else ''
-            notify_failure = i < len(notify_failure_flags) and notify_failure_flags[i] == 'on'
-            failure_message = failure_messages[i] if i < len(failure_messages) else ''
-            notify_maintenance_failure = i < len(notify_maintenance_failure_flags) and notify_maintenance_failure_flags[i] == 'on'
-            
-            # Validate - at least one notification type must be enabled
-            if not notify_success and not notify_failure:
-                return {
-                    'valid': False, 
-                    'error': f'Provider {provider}: At least one notification type (success or failure) must be enabled'
-                }
-            
-            # Build notification config
-            notification_config = {
-                'provider': provider,
-                'notify_on_success': notify_success,
-                'notify_on_failure': notify_failure,
-                'notify_on_maintenance_failure': notify_maintenance_failure
-            }
-            
-            # Add custom messages if provided
-            if notify_success and success_message.strip():
-                notification_config['success_message'] = success_message.strip()
-            if notify_failure and failure_message.strip():
-                notification_config['failure_message'] = failure_message.strip()
-            
-            notifications.append(notification_config)
-        
-        return {'valid': True, 'notifications': notifications}
 
 
 
@@ -142,53 +90,16 @@ class JobsHandler(BaseHandler):
     # =========================================================================
     
     def _build_job_rows(self, jobs):
-        """Build job table rows from job data"""
-        if not jobs:
-            return self.template_service.load_template('partials/empty_job_rows.html')
-        
-        rows = []
-        for job in jobs:
-            row_html = self.template_service.render_template('partials/job_row.html',
-                job_name=job['name'],
-                source_display=job['source_display'],
-                dest_display=job['dest_display'], 
-                status_class=job['status_class'],
-                status_text=job['status'],
-                schedule=job['schedule']
-            )
-            rows.append(row_html)
-        
-        return '\n'.join(rows)
-    
+        """Build job table rows from job data - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        return display_builder.build_job_rows(jobs)
+
     def _build_deleted_job_rows(self, deleted_jobs):
-        """Build deleted job table rows from deleted jobs data"""
-        if not deleted_jobs:
-            return self.template_service.load_template('partials/empty_deleted_rows.html')
-        
-        rows = []
-        for job_name, job_config in deleted_jobs.items():
-            # Build source and destination displays same way as active jobs
-            source_display = self._build_source_display_with_type(job_config)
-            dest_display = self._build_dest_display_with_type(job_config)
-            
-            # Format deleted_at timestamp (break into date and time)
-            deleted_at_raw = job_config.get('deleted_at', 'Unknown')
-            if deleted_at_raw != 'Unknown' and ' ' in deleted_at_raw:
-                # Split "2025-08-20 14:30:45" into "2025-08-20\n14:30:45"
-                date_part, time_part = deleted_at_raw.split(' ', 1)
-                deleted_at = f"{date_part}\n{time_part}"
-            else:
-                deleted_at = deleted_at_raw
-            
-            row_html = self.template_service.render_template('partials/deleted_job_row.html',
-                job_name=job_name,
-                source_display=source_display,
-                dest_display=dest_display,
-                deleted_at=deleted_at
-            )
-            rows.append(row_html)
-        
-        return '\n'.join(rows)
+        """Build deleted job table rows from deleted jobs data - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        return display_builder.build_deleted_job_rows(deleted_jobs)
     
     # =========================================================================
     # PAGE HANDLERS
@@ -242,88 +153,16 @@ class JobsHandler(BaseHandler):
         return self._render_html('pages/dashboard.html', template_data)
 
     def _build_source_display_with_type(self, job_config):
-        """Build source display string with type prefix"""
-        source_type = job_config.get('source_type', 'local')
-        source_config = job_config.get('source_config', {})
-        
-        if source_type == 'local':
-            # Local source - show paths
-            source_paths = source_config.get('source_paths', [])
-            if source_paths:
-                first_path = source_paths[0]
-                if isinstance(first_path, dict):
-                    path_display = first_path.get('path', 'Unknown')
-                else:
-                    path_display = str(first_path)
-                
-                if len(source_paths) > 1:
-                    path_display += f" (+{len(source_paths)-1})"
-            else:
-                path_display = "No paths configured"
-            return f"local: {path_display}"
-            
-        elif source_type == 'ssh':
-            # SSH source - show hostname and paths
-            hostname = source_config.get('hostname', 'unknown')
-            username = source_config.get('username', 'unknown')
-            source_paths = source_config.get('source_paths', [])
-            
-            if source_paths:
-                first_path = source_paths[0]
-                if isinstance(first_path, dict):
-                    path_display = first_path.get('path', 'Unknown')
-                else:
-                    path_display = str(first_path)
-                
-                if len(source_paths) > 1:
-                    path_display += f" (+{len(source_paths)-1})"
-            else:
-                path_display = "No paths configured"
-            
-            return f"ssh: {username}@{hostname}:{path_display}"
-        
-        return f"{source_type}: Unknown configuration"
-    
+        """Build source display string with type prefix - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        return display_builder.build_source_display_with_type(job_config)
+
     def _build_dest_display_with_type(self, job_config):
-        """Build destination display string with type prefix"""
-        dest_type = job_config.get('dest_type', 'local')
-        dest_config = job_config.get('dest_config', {})
-        
-        if dest_type == 'local':
-            path = dest_config.get('path', 'Unknown')
-            return f"local: {path}"
-            
-        elif dest_type == 'ssh':
-            hostname = dest_config.get('hostname', 'unknown')
-            path = dest_config.get('path', 'unknown')
-            return f"ssh: {hostname}:{path}"
-            
-        elif dest_type == 'rsyncd':
-            hostname = dest_config.get('hostname', 'unknown')
-            share = dest_config.get('share', 'unknown')
-            return f"rsyncd: {hostname}::{share}"
-            
-        elif dest_type == 'restic':
-            repo_type = dest_config.get('repo_type', 'local')
-            repo_uri = dest_config.get('repo_uri', 'Unknown')
-            
-            # Show just the repo type and a simplified URI
-            if repo_type == 'local':
-                return f"restic: local:{repo_uri}"
-            elif repo_type == 'rest':
-                return f"restic: rest-server"
-            elif repo_type == 's3':
-                return f"restic: s3-bucket"
-            elif repo_type == 'sftp':
-                return f"restic: sftp"
-            elif repo_type == 'rclone':
-                return f"restic: rclone"
-            elif repo_type == 'same_as_origin':
-                return f"restic: same-as-origin"
-            else:
-                return f"restic: {repo_type}"
-        
-        return f"{dest_type}: Unknown configuration"
+        """Build destination display string with type prefix - thin wrapper"""
+        from jobs.services.define import JobDisplayBuilder
+        display_builder = JobDisplayBuilder(self.template_service)
+        return display_builder.build_dest_display_with_type(job_config)
 
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
@@ -452,24 +291,6 @@ class JobsHandler(BaseHandler):
         
         return self._render_html('pages/job_inspect.html', template_data)
 
-    def _build_job_config_from_result(self, job_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Build job configuration from parsed form result"""
-        job_config = {
-            'source_type': job_result['source_type'],
-            'source_config': job_result['source_config'],
-            'dest_type': job_result['dest_type'],
-            'dest_config': job_result['dest_config'],
-            'schedule': job_result['schedule'],
-            'enabled': job_result['enabled'],
-            'respect_conflicts': job_result['respect_conflicts'],
-            'notifications': job_result['notifications']
-        }
-        
-        # Add maintenance config if present
-        if 'maintenance_config' in job_result:
-            job_config['maintenance_config'] = job_result['maintenance_config']
-            
-        return job_config
 
     @handle_page_errors("Save job")
     def save_backup_job(self, form_data: Dict[str, Any]) -> JSONResponse:
@@ -627,61 +448,29 @@ class JobsHandler(BaseHandler):
 
 
     def _get_enabled_global_providers(self):
-        """Get list of globally enabled notification providers"""
-        global_settings = self.config_reader.get_global_settings()
-        notification_config = global_settings.get('notification', {})
-        
-        enabled_providers = []
-        for provider, config in notification_config.items():
-            if isinstance(config, dict) and config.get('enabled', False):
-                enabled_providers.append(provider)
-        
-        return enabled_providers
+        """Get list of globally enabled notification providers - thin wrapper"""
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.config_reader)
+        return form_builder.get_enabled_global_providers()
 
     def _render_notification_provider(self, config, index, provider_id=None):
-        """Render a single notification provider configuration"""
-        provider_name = config.get('provider', '')
-        display_name = provider_name.capitalize()
-        
-        if not provider_id:
-            provider_id = f"notification_{provider_name}_{index}"
-        
-        notify_on_success = config.get('notify_on_success', False)
-        success_message = html.escape(config.get('success_message', ''))
-        
-        notify_on_failure = config.get('notify_on_failure', False)
-        failure_message = html.escape(config.get('failure_message', ''))
-        
-        notify_on_maintenance_failure = config.get('notify_on_maintenance_failure', False)
-        
-        return self.template_service.render_template('partials/notification_provider_config.html',
-                                                   provider_id=provider_id,
-                                                   provider_name=provider_name,
-                                                   display_name=display_name,
-                                                   notify_on_success=notify_on_success,
-                                                   success_message=success_message,
-                                                   notify_on_failure=notify_on_failure,
-                                                   failure_message=failure_message,
-                                                   notify_on_maintenance_failure=notify_on_maintenance_failure)
+        """Render a single notification provider configuration - thin wrapper"""
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.config_reader)
+        return form_builder.render_notification_provider(config, index, provider_id)
 
     def _render_provider_selection(self, available_providers):
-        """Render provider selection dropdown"""
-        # Filter out configured providers
+        """Render provider selection dropdown - thin wrapper"""
+        from jobs.services.define import NotificationFormBuilder
+        form_builder = NotificationFormBuilder(self.template_service, self.config_reader)
         if not hasattr(self, 'configured_providers'):
             self.configured_providers = []
-        available_options = [p for p in available_providers if p not in self.configured_providers]
-        
-        return self.template_service.render_template('partials/provider_selection_dropdown.html',
-                                                   available_options=available_options)
-
+        form_builder.configured_providers = self.configured_providers
+        return form_builder.render_provider_selection(available_providers)
 
     def _get_form_providers(self, form_data):
-        """Get currently configured providers from form data"""
-        providers = form_data.get('notification_providers[]', [])
-        # Handle both single string and list formats
-        if isinstance(providers, str):
-            return [providers] if providers else []
-        return [p for p in providers if p]  # Filter out empty strings
+        """Get currently configured providers from form data - thin wrapper"""
+        return self.job_config._get_form_providers(form_data)
 
 
 
@@ -700,67 +489,6 @@ class JobsHandler(BaseHandler):
         return JSONResponse(content=result)
 
 
-    @handle_page_errors("Process restore")
-    def process_restore_request(self, form_data: Dict[str, Any]) -> JSONResponse:
-        """Process restore request from form - moved from operations handler"""
-        job_name = form_data.get('job_name', [''])[0]
-        snapshot_id = form_data.get('snapshot_id', [''])[0]
-        target_type = form_data.get('target_type', ['safe'])[0]  # safe or source
-        dry_run = 'dry_run' in form_data
-        
-        if not job_name:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Job name is required'
-            })
-        
-        if not snapshot_id:
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Snapshot ID is required'
-            })
-        
-        jobs = self.job_config.get_backup_jobs()
-        if job_name not in jobs:
-            return JSONResponse(content={
-                'success': False,
-                'error': f"Job '{job_name}' not found"
-            })
-        
-        job_config = jobs[job_name]
-        
-        # Only support Restic restores for now
-        if job_config.get('dest_type') != 'restic':
-            return JSONResponse(content={
-                'success': False,
-                'error': 'Restore only supported for Restic repositories'
-            })
-        
-        # Build restore request
-        restore_request = {
-            'job_name': job_name,
-            'job_config': job_config,
-            'snapshot_id': snapshot_id,
-            'target_type': target_type,
-            'dry_run': dry_run
-        }
-        
-        # Add include patterns if specified
-        include_patterns = form_data.get('include_patterns', [''])
-        if include_patterns[0]:
-            restore_request['include_patterns'] = [p.strip() for p in include_patterns[0].split('\n') if p.strip()]
-        
-        # Execute restore (using operations handler implementation)
-        result = self._execute_restore(restore_request)
-        return JSONResponse(content=result)
-
-    def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute restore operation - delegate to RestoreService"""
-        restore_service = RestoreService()
-        return restore_service.execute_restore_sync(restore_request)
-
-
-    
     # =============================================================================
     # DIRECT ORCHESTRATION METHODS (moved from operations handler)
     # =============================================================================

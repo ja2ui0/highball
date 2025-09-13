@@ -1029,3 +1029,96 @@ class RestoreOperationsService:
         """Execute restore operation - delegate to RestoreService - moved verbatim from handler"""
         restore_service = RestoreService()
         return restore_service.execute_restore_sync(restore_request)
+
+    def check_restore_overwrites_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Check restore overwrites for HTMX forms - moved verbatim from handler"""
+        from models.forms import safe_get_value
+
+        # HTTP concern: extract parameters
+        job_name = safe_get_value(form_data, 'job_name')
+        restore_target = safe_get_value(form_data, 'restore_target', 'highball')
+        select_all = safe_get_value(form_data, 'select_all') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+
+        # Business logic concern: delegate to restore service
+        restore_service = RestoreService()
+
+        # Get job config for source details
+        jobs = self.job_config.get_backup_jobs()
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths, select_all
+        )
+
+        # Template concern: return data for template rendering
+        target_text = "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        return {
+            'has_overwrites': has_overwrites,
+            'target_text': target_text,
+            'dry_run': False
+        }
+
+    def handle_restore_target_change_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle restore target change and check overwrites - moved verbatim from handler"""
+        from models.forms import safe_get_value
+
+        # HTTP concern: extract parameters
+        job_name = safe_get_value(form_data, 'job_name')
+        restore_target = safe_get_value(form_data, 'restore_target', 'highball')
+        dry_run = safe_get_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+
+        # Business logic concern: check for overwrites using restore service
+        restore_service = RestoreService()
+
+        # Get job config for source details
+        jobs = self.job_config.get_backup_jobs()
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+
+        # Template concern: return data for template rendering
+        return {
+            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
+            'RESTORE_TARGET': restore_target,
+            'DRY_RUN': 'true' if dry_run else 'false',
+            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        }
+
+    def handle_restore_dry_run_change_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle dry run toggle and update warning - moved verbatim from handler"""
+        from models.forms import safe_get_value
+
+        # HTTP concern: extract parameters
+        job_name = safe_get_value(form_data, 'job_name')
+        restore_target = safe_get_value(form_data, 'restore_target', 'highball')
+        dry_run = safe_get_value(form_data, 'dry_run') == 'on'
+        selected_paths = form_data.get('selected_paths', [])
+
+        # Business logic concern: check for overwrites using restore service
+        restore_service = RestoreService()
+
+        # Get job config for source details
+        jobs = self.job_config.get_backup_jobs()
+        job_config = jobs.get(job_name, {})
+        source_config = job_config.get('source_config', {})
+        source_type = job_config.get('source_type', 'local')
+
+        has_overwrites = restore_service.check_restore_overwrites(
+            restore_target, source_type, source_config, selected_paths
+        )
+
+        # Template concern: return data for template rendering
+        return {
+            'HAS_OVERWRITES': 'true' if has_overwrites else 'false',
+            'RESTORE_TARGET': restore_target,
+            'DRY_RUN': 'true' if dry_run else 'false',
+            'TARGET_TEXT': "Highball's /restore directory" if restore_target == 'highball' else "the original source location"
+        }
