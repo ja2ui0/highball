@@ -3,6 +3,7 @@ Jobs Page Handlers
 Job management, inspection, and execution monitoring
 """
 
+import html
 import logging
 from typing import Dict, Any, Callable, List
 from pathlib import Path
@@ -12,7 +13,17 @@ from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from jobs.services.config import JobConfigService
+from jobs.services.manage import JobOperationsService, JobManagementService
+from jobs.services.define import JobFormDataBuilder, JobFormTemplateBuilder
+from jobs.services.notify import NotificationFormDataBuilder
+from jobs.services.schedule import ScheduleFormDataBuilder
 from shared.services.config import ConfigReader
+from dests.services.kinds import DestinationTypeService
+from jobs.handlers.old import JobFormParser
+from jobs.services.validate import ValidationService
+from jobs.services.backup import backup_service
+from jobs.services.restore import RestoreService
+from jobs.services.schedule import SchedulingService, JobSchedulerHandler
 from models.forms import safe_get_value, safe_get_list, parse_lines
 
 logger = logging.getLogger(__name__)
@@ -124,7 +135,6 @@ class JobsHandler(BaseHandler):
         self._init_template_service()
 
         # Initialize service orchestrators (moved from operations handler)
-        from jobs.services.manage import JobOperationsService
         self.job_operations = JobOperationsService()
     
     # =========================================================================
@@ -228,7 +238,6 @@ class JobsHandler(BaseHandler):
         global_settings = self.config_reader.get_global_settings()
         
         # Get job status information
-        from jobs.services.manage import JobManagementService
         job_management = JobManagementService()
         
         job_list = []
@@ -356,8 +365,6 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Add job form")
     def show_add_job_form(self) -> HTMLResponse:
         """Show add job form"""
-        from jobs.services.define import JobFormDataBuilder
-        from dests.services.kinds import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         form_data = job_form_builder.build_empty_form_data()
@@ -380,8 +387,6 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Edit job form")
     def show_edit_job_form(self, job_name: str) -> HTMLResponse:
         """Show edit job form"""
-        from jobs.services.define import JobFormDataBuilder, JobFormTemplateBuilder
-        from dests.services.kinds import DestinationTypeService
         job_form_builder = JobFormDataBuilder()
         
         if not job_name:
@@ -439,13 +444,11 @@ class JobsHandler(BaseHandler):
 
     def _build_notification_form_data(self, existing_notifications: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build notification form data structure (delegated to service)"""
-        from jobs.services.notify import NotificationFormDataBuilder
         builder = NotificationFormDataBuilder()
         return builder.build_notification_context(existing_notifications)
         
     def _build_schedule_form_data(self, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Build schedule form data structure (delegated to service)"""
-        from jobs.services.schedule import ScheduleFormDataBuilder
         builder = ScheduleFormDataBuilder()
         return builder.build_schedule_context(job_config)
 
@@ -468,7 +471,6 @@ class JobsHandler(BaseHandler):
         job_config = jobs[job_name]
         
         # Get job status and logs
-        from jobs.services.manage import JobManagementService
         job_management = JobManagementService()
         status_info = job_management.get_status(job_name)
         recent_logs = job_management.get_log_entries(job_name, max_lines=100)
@@ -509,7 +511,6 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Save job")
     def save_backup_job(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save backup job from form submission"""
-        from jobs.handlers.old import JobFormParser
         job_parser = JobFormParser()
         
         # Parse job form data using unified parser
@@ -640,7 +641,6 @@ class JobsHandler(BaseHandler):
 
     def _validate_individual_paths(self, source_type: str, source_paths: List[Dict[str, Any]], ssh_config: Dict[str, str]) -> List[Dict[str, Any]]:
         """Validate each individual source path"""
-        from jobs.services.validate import ValidationService
         validation_service = ValidationService()
         
         validation_results = []
@@ -683,7 +683,6 @@ class JobsHandler(BaseHandler):
                 'error_message': 'Repository URI not configured'
             })
             
-        from jobs.services.backup import backup_service
         check_success, check_message = backup_service.repository_service._quick_repository_check(repo_uri, dest_config)
         
         if check_success:
@@ -729,7 +728,6 @@ class JobsHandler(BaseHandler):
 
     def _render_notification_provider(self, config, index, provider_id=None):
         """Render a single notification provider configuration"""
-        import html
         provider_name = config.get('provider', '')
         display_name = provider_name.capitalize()
         
@@ -785,7 +783,6 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Browse filesystem")
     def browse_filesystem(self, path: str = '/') -> JSONResponse:
         """Browse local filesystem for path selection - delegate to restore service"""
-        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         result = restore_service.browse_filesystem_path(path)
         return JSONResponse(content=result)
@@ -847,7 +844,6 @@ class JobsHandler(BaseHandler):
 
     def _execute_restore(self, restore_request: Dict[str, Any]) -> Dict[str, Any]:
         """Execute restore operation - delegate to RestoreService"""
-        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         return restore_service.execute_restore_sync(restore_request)
 
@@ -860,15 +856,12 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("Run backup direct")
     def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration - moved from operations handler"""
-        from fastapi.responses import JSONResponse
         result = self.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
     @handle_page_errors("Schedule job direct")
     def schedule_job_direct(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Schedule a job for execution - using functional SchedulingService"""
-        from fastapi.responses import JSONResponse
-        from jobs.services.schedule import SchedulingService
         
         # Use the functional scheduling service that already exists
         scheduler_service = SchedulingService()
@@ -888,7 +881,6 @@ class JobsHandler(BaseHandler):
     @handle_page_errors("List scheduler jobs")
     def list_scheduler_jobs(self) -> JSONResponse:
         """List APScheduler internal jobs - DEBUG/ADMIN endpoint"""
-        from jobs.services.schedule import JobSchedulerHandler, SchedulingService
         scheduler_service = SchedulingService()
         job_scheduler = JobSchedulerHandler(scheduler_service)
         result = job_scheduler.list_jobs()
