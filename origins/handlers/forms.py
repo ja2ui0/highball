@@ -12,9 +12,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from config import BackupConfig
+from origins.services.config import OriginConfigService
 from models.forms import safe_get_value
-from origins.services.manage import OriginOperationsService
 from origins.services.ssh import OriginSSHService
 from origins.schema import SOURCE_TYPE_SCHEMAS
 
@@ -25,16 +24,15 @@ class OriginsFormHandler(BaseHandler):
     """Handle SSH origins form operations and validation"""
     
     def __init__(self):
-        self.backup_config = BackupConfig()
+        self.origin_config = OriginConfigService()
         self._init_template_service()
-        self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
     
     @handle_page_errors("Delete SSH origin")
     def delete_ssh_origin(self, origin_name: str) -> JSONResponse:
         """Delete SSH origin"""
-        # Call origin service
-        result = self.origin_service.delete_origin_with_validation(origin_name)
+        # Delete origin using config service
+        result = self.origin_config.delete_origin_with_validation(origin_name)
         
         if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
@@ -48,8 +46,8 @@ class OriginsFormHandler(BaseHandler):
     @handle_page_errors("Add SSH origin")
     def add_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Add new SSH origin"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
+        # Parse origin form data using config service
+        origin_result = self.origin_config.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -59,8 +57,8 @@ class OriginsFormHandler(BaseHandler):
         origin_config = origin_result['origin_config']
         origin_name = origin_config['origin_name']
         
-        # Call origin service
-        result = self.origin_service.add_new_origin(origin_name, origin_config)
+        # Add origin using config service
+        result = self.origin_config.add_new_origin(origin_name, origin_config)
         
         if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
@@ -73,8 +71,8 @@ class OriginsFormHandler(BaseHandler):
     @handle_page_errors("Save SSH origin")
     def save_ssh_origin(self, form_data: Dict[str, Any]) -> JSONResponse:
         """Save SSH origin changes"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
+        # Parse origin form data using config service
+        origin_result = self.origin_config.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content={
                 'success': False,
@@ -85,8 +83,8 @@ class OriginsFormHandler(BaseHandler):
         origin_name = origin_config['origin_name']
         original_origin_name = self._get_form_value(form_data, 'original_origin_name', '')
         
-        # Call origin service
-        result = self.origin_service.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
+        # Save origin using config service
+        result = self.origin_config.save_origin_with_rename_handling(origin_name, origin_config, original_origin_name)
         
         if result['success']:
             return RedirectResponse(url='/origins', status_code=302)
@@ -105,8 +103,8 @@ class OriginsFormHandler(BaseHandler):
     @handle_page_errors("SSH origin validation")
     def validate_ssh_origin(self, form_data: Dict[str, Any]) -> HTMLResponse:
         """Push keys and validate SSH origin configuration with persistent session tracking"""
-        # Parse origin form data (no password required for save operations)
-        origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
+        # Parse origin form data using config service
+        origin_result = self.origin_config.parse_origin_form(form_data, require_password=False)
         if not origin_result['valid']:
             return JSONResponse(content=origin_result)
         
@@ -286,8 +284,8 @@ class OriginsFormHandler(BaseHandler):
                                                                    origin_name=origin_name or "unknown")
                 return HTMLResponse(content=html_response)
             
-            # Parse form data using the same parser as save operations
-            origin_result = self.origin_service.parse_origin_form(form_data, require_password=False)
+            # Parse form data using config service
+            origin_result = self.origin_config.parse_origin_form(form_data, require_password=False)
             if not origin_result['valid']:
                 html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                    preview_content=f"# Error: {origin_result['error']}",
@@ -297,8 +295,8 @@ class OriginsFormHandler(BaseHandler):
             origin_config = origin_result['origin_config']
             origin_name = origin_config['origin_name']
             
-            # Generate YAML using the same code path as config.py save operation
-            yaml_content = self.origin_service.preview_origin_yaml(origin_name, origin_config)
+            # Generate YAML preview using config service
+            yaml_content = self.origin_config.preview_origin_yaml(origin_name, origin_config)
             
             html_response = self.template_service.render_template('partials/ssh_config_preview.html',
                                                                preview_content=yaml_content,

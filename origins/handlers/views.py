@@ -13,8 +13,7 @@ import asyncio
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from config import BackupConfig
-from origins.services.manage import OriginOperationsService
+from origins.services.config import OriginConfigService
 from origins.services.ssh import OriginSSHService
 
 logger = logging.getLogger(__name__)
@@ -24,16 +23,16 @@ class OriginsViewHandler(BaseHandler):
     """Handle SSH origins read-only operations and page rendering"""
     
     def __init__(self):
-        self.backup_config = BackupConfig()
+        self.origin_config = OriginConfigService()
         self._init_template_service()
-        self.origin_service = OriginOperationsService(self.backup_config)
         self.ssh_service = OriginSSHService()
     
     @handle_page_errors("Show SSH origins")
     def show_ssh_origins(self) -> HTMLResponse:
         """Show SSH origins management page"""
-        origins = self.origin_service.get_origins()
-        global_settings = self.origin_service.get_global_settings()
+        origins = self.origin_config.get_ssh_origins()
+        # TODO: Remove global_settings dependency or get from admin config service
+        global_settings = {}
         
         # Build origin display list
         origin_list = []
@@ -77,7 +76,7 @@ class OriginsViewHandler(BaseHandler):
     @handle_page_errors("Edit SSH origin")
     def edit_ssh_origin(self, origin_name: str) -> HTMLResponse:
         """Load SSH origin for editing"""
-        origin_config = self.origin_service.get_origin(origin_name)
+        origin_config = self.origin_config.get_ssh_origin(origin_name)
         
         if not origin_config:
             # Return empty form if origin not found
