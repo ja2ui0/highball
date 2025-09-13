@@ -13,6 +13,7 @@ from shared.handlers.base import BaseHandler
 from shared.services.config import ConfigReader
 from admin.services.init import HighballServices
 from admin.services.config import AdminConfigService
+from admin.schema import PROVIDER_FIELD_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,7 @@ class AdminViews(BaseHandler):
         # Get available themes for display
         available_themes = self._get_available_themes()
         current_theme = global_settings.get('theme', 'dark')
-        
-        from admin.schema import PROVIDER_FIELD_SCHEMAS
-        
+
         # Presentation logic: Build template data for display
         template_data = {
             # Keep global_settings for partials that use it

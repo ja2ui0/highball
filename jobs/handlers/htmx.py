@@ -5,6 +5,7 @@ Contains all HTMX endpoint handlers and form parsing utilities.
 Handlers are organized by functional area for easy navigation.
 """
 
+import time
 from typing import Dict, Any, List, Union, Callable
 from functools import wraps
 from fastapi import Request
@@ -13,6 +14,10 @@ from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
 from jobs.services.config import JobConfigService
+from jobs.services.manage import JobOperationsService
+from jobs.handlers.pages import jobs_handler
+from origins.schema import SOURCE_PATH_SCHEMA
+from jobs.services.restore import RestoreService
 
 
 
@@ -113,7 +118,6 @@ class HTMXHandlers(BaseHandler):
         self._init_template_service()
 
         # Initialize services for non-config operations
-        from jobs.services.manage import JobOperationsService
         self.job_operations = JobOperationsService()
     
     def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
@@ -128,8 +132,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Validate source path")
     async def validate_source_path_htmx(self, request) -> HTMLResponse:
         """Validate source path with robust permission checking for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         # Extract path from array format
@@ -139,7 +141,6 @@ class HTMXHandlers(BaseHandler):
         
         if not path or not path.strip():
             result = {'valid': False, 'error': 'Please enter a path'}
-            from jobs.handlers.pages import jobs_handler
             html_response = jobs_handler.render_source_path_validation_status(result)
             return HTMLResponse(content=html_response)
         
@@ -149,7 +150,6 @@ class HTMXHandlers(BaseHandler):
         username = get_form_value(form_data, 'username')
         
         # Validate based on source type (robust handling from working version)
-        from jobs.handlers.pages import jobs_handler
         if source_type == 'ssh':
             result = jobs_handler.validation_service.validate_source_path_for_backup_ssh(hostname, username, path)
         elif source_type == 'local':
@@ -163,11 +163,7 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Add source path")
     async def add_source_path_htmx(self, request) -> HTMLResponse:
         """Add a new source path entry for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
-        
-        from origins.schema import SOURCE_PATH_SCHEMA
         
         # Get path count from JavaScript via hx-vals
         path_count = int(get_form_value(form_data, 'path_count', '0'))
@@ -200,45 +196,33 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Save backup job")
     async def save_backup_job_htmx(self, request) -> JSONResponse:
         """Save backup job with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form
-        
         form_data = await parse_htmx_form(request)
         
         # Call existing business logic via pages handler
-        from jobs.handlers.pages import jobs_handler
         return jobs_handler.save_backup_job(form_data)
 
     @handle_page_errors("Validate source paths")
     async def validate_source_paths_htmx(self, request) -> JSONResponse:
         """Validate source paths with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form
-        
         form_data = await parse_htmx_form(request)
         
         # Call existing business logic via pages handler
-        from jobs.handlers.pages import jobs_handler
         return jobs_handler.validate_source_paths(form_data)
 
     @handle_page_errors("Process restore request")
     async def process_restore_request_htmx(self, request) -> JSONResponse:
         """Process restore request with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form
-        
         form_data = await parse_htmx_form(request)
         
-        # Call existing business logic via pages handler  
-        from jobs.handlers.pages import jobs_handler
+        # Call existing business logic via pages handler
         return jobs_handler.process_restore_request(form_data)
 
     @handle_page_errors("Schedule job")
     async def schedule_job_htmx(self, request) -> JSONResponse:
         """Schedule job with form parsing - pure switchboard compliance"""
-        from jobs.handlers.htmx import parse_htmx_form
-        
         form_data = await parse_htmx_form(request)
         
         # Call existing business logic via pages handler
-        from jobs.handlers.pages import jobs_handler
         return jobs_handler.schedule_job_direct(form_data)
     
     # =========================================================================
@@ -248,8 +232,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Handle restore target change")
     async def handle_restore_target_change_htmx(self, request) -> HTMLResponse:
         """Handle restore target change and check overwrites - HTMX handler"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
 
         # Business logic (preserve original implementation)
@@ -260,7 +242,6 @@ class HTMXHandlers(BaseHandler):
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
-        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details
@@ -289,8 +270,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Handle restore dry run change")
     async def handle_restore_dry_run_change_htmx(self, request) -> HTMLResponse:
         """Handle dry run toggle and update warning - HTMX handler"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
 
         # Business logic (preserve original implementation)
@@ -301,7 +280,6 @@ class HTMXHandlers(BaseHandler):
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: check for overwrites using restore service
-        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details  
@@ -330,8 +308,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Check restore overwrites")
     async def check_restore_overwrites_htmx(self, request) -> HTMLResponse:
         """Check restore overwrites for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         # HTTP concern: extract parameters
@@ -341,7 +317,6 @@ class HTMXHandlers(BaseHandler):
         selected_paths = form_data.get('selected_paths', [])
         
         # Business logic concern: delegate to restore service
-        from jobs.services.restore import RestoreService
         restore_service = RestoreService()
         
         # Get job config for source details
@@ -369,8 +344,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Run backup")
     async def run_backup_htmx(self, request) -> JSONResponse:
         """Run backup job with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
-        
         form = await request.form()
         job_name = form.get('job_name', '')
         
@@ -380,7 +353,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Dry run backup")
     async def dry_run_backup_htmx(self, request) -> JSONResponse:
         """Dry run backup job with form parsing - pure switchboard compliance"""
-        from fastapi.responses import JSONResponse
         
         form = await request.form()
         job_name = form.get('job_name', '')
@@ -390,10 +362,8 @@ class HTMXHandlers(BaseHandler):
     
     def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration - moved from operations handler"""
-        from fastapi.responses import JSONResponse
         
         # Need to get backup orchestration from pages handler for now
-        from jobs.handlers.pages import jobs_handler
         result = jobs_handler.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
@@ -407,7 +377,6 @@ class HTMXHandlers(BaseHandler):
             return HTMLResponse(content=html_response)
         
         # Delegate to jobs_handler for repository operations
-        from jobs.handlers.pages import jobs_handler
         
         # Get and validate job configuration
         jobs = self.job_config.get_backup_jobs()
@@ -427,8 +396,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Toggle success message")
     async def toggle_success_message_htmx(self, request) -> HTMLResponse:
         """Toggle success message field visibility for job notification configuration"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         # Check if checkbox is checked
@@ -443,8 +410,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Toggle failure message")
     async def toggle_failure_message_htmx(self, request) -> HTMLResponse:
         """Toggle failure message field visibility for job notification configuration"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         # Check if checkbox is checked
@@ -459,12 +424,9 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Render notification providers")
     async def render_notification_providers_htmx(self, request) -> HTMLResponse:
         """Render notification providers section for job configuration HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         # Delegate to jobs_handler helper methods
-        from jobs.handlers.pages import jobs_handler
         
         # Get available providers from global config
         available_providers = jobs_handler._get_enabled_global_providers()
@@ -487,8 +449,6 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Add notification provider")
     async def add_notification_provider_htmx(self, request) -> HTMLResponse:
         """Add a new notification provider to job configuration for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         provider_name = get_form_value(form_data, 'provider')
@@ -498,10 +458,8 @@ class HTMXHandlers(BaseHandler):
             return HTMLResponse(content=html_response)
         
         # Delegate to jobs_handler for complex provider operations
-        from jobs.handlers.pages import jobs_handler
         
         # Generate unique ID
-        import time
         timestamp = int(time.time() * 1000)
         provider_id = f"notification_{provider_name}_{timestamp}"
         
@@ -531,14 +489,11 @@ class HTMXHandlers(BaseHandler):
     @handle_page_errors("Remove notification provider")
     async def remove_notification_provider_htmx(self, request) -> HTMLResponse:
         """Remove a notification provider from job configuration for HTMX forms"""
-        from jobs.handlers.htmx import parse_htmx_form, get_form_value
-        
         form_data = await parse_htmx_form(request)
         
         provider_id = get_form_value(form_data, 'provider_id')
         
         # Delegate to jobs_handler for provider operations
-        from jobs.handlers.pages import jobs_handler
         
         # Extract provider name from ID (format: notification_{provider}_{timestamp})
         provider_name = None
