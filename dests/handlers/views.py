@@ -11,9 +11,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from shared.handlers.templating import TemplateService
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from dests.services.manage import create_destination_operations_service
+from dests.services.config import DestConfigService
 from dests.services.rsync import network_discovery_service
-from dests.services.restic import restic_api_service, check_repository_status_for_job
+from dests.services.restic import restic_api_service
 from dests.schema import DESTINATION_TYPE_SCHEMAS
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class DestinationsViews(BaseHandler):
         self._init_template_service()
         
         # Services handle all config access - handlers delegate everything
-        self.dest_operations = create_destination_operations_service()
+        self.dest_config = DestConfigService()
         self.network_discovery = network_discovery_service
     
     # =========================================================================
@@ -118,8 +118,9 @@ class DestinationsViews(BaseHandler):
     @handle_page_errors("Show destinations")
     def show_destinations(self) -> HTMLResponse:
         """Show destinations management page"""
-        destinations = self.dest_operations.get_destinations()
-        global_settings = self.dest_operations.get_global_settings()
+        destinations = self.dest_config.get_destinations()
+        # TODO: Remove global_settings dependency or handle differently
+        global_settings = {}
         
         # Build destination display list
         dest_list = []
@@ -179,31 +180,8 @@ class DestinationsViews(BaseHandler):
                 'error': result['error']
             }, status_code=status_code)
 
-    def _check_and_respond_repository_status_html(self, job_name: str, job_config: Dict[str, Any]) -> HTMLResponse:
-        """Check repository availability and return appropriate HTMX HTML response"""
-        # Delegate business logic to service (service handles config internally)
-        result = check_repository_status_for_job(job_name, self.dest_operations.backup_config)
-        
-        # Handler decides which template to render based on service result
-        if result.get('success'):
-            return self._render_html('partials/repository_available.html', {
-                'job_name': result['job_name'],
-                'job_type': result['job_type']
-            })
-        else:
-            # Determine which error template to use
-            error_type = result.get('error_type', 'connection_error')
-            if error_type == 'locked':
-                return self._render_html('partials/repository_locked_error.html', {
-                    'job_name': job_name,
-                    'error_message': result.get('error', 'Repository locked')
-                })
-            else:
-                return self._render_html('partials/repository_error.html', {
-                    'job_name': job_name,
-                    'error_type': error_type,
-                    'error_message': result.get('error', 'Unknown error')
-                })
+    # REMOVED: _check_and_respond_repository_status_html - cross-domain violation
+    # This method accessed jobs domain data and should be moved to jobs handlers
 
     @handle_page_errors("Get repository info")
     def get_repository_info(self, job_name: str) -> JSONResponse:

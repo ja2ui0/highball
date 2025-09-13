@@ -20,7 +20,7 @@ from shared.services.exec import ResticArgumentBuilder
 from dests.schema import RESTIC_REPOSITORY_TYPE_SCHEMAS
 from shared.handlers.errors import handle_service_errors
 from config import BackupConfig
-from dests.services.manage import create_destination_operations_service
+from dests.services.config import DestConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -657,9 +657,8 @@ class ResticRepositoryService:
         
         # Build basic repository URI from form data (simplified version)
         try:
-            backup_config = BackupConfig()
-            parser = create_destination_operations_service(backup_config)
-            uri_result = parser._build_restic_uri(repo_type, form_data)
+            config_service = DestConfigService()
+            uri_result = config_service._build_restic_uri(repo_type, form_data)
             
             if not uri_result.get('valid'):
                 return {
@@ -813,85 +812,47 @@ class ResticContentAnalyzer:
 # JOB-BASED REPOSITORY OPERATIONS - moved from handlers
 # =========================================================================
 
-def initialize_repository_for_job(job_name: str, backup_config) -> Dict[str, Any]:
-    """Initialize repository for a job - business logic moved from handlers"""
-    if not job_name:
-        return {'success': False, 'error': 'Job name is required'}
+def initialize_repository(dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Initialize restic repository - destinations domain logic"""
+    if not dest_config:
+        return {'success': False, 'error': 'Destination configuration is required'}
     
-    jobs = backup_config.get_backup_jobs()
-    if job_name not in jobs:
-        return {'success': False, 'error': f'Job "{job_name}" not found'}
-    
-    job_config = jobs[job_name]
-    dest_type = job_config.get('dest_type')
-    
+    dest_type = dest_config.get('type')
     if dest_type != 'restic':
         return {'success': False, 'error': 'Repository initialization only supported for restic destinations'}
     
-    dest_config = job_config.get('dest_config', {})
-    source_config = job_config.get('source_config', {})
+    restic_config = dest_config.get('restic', {})
+    if not restic_config:
+        return {'success': False, 'error': 'Restic configuration missing from destination'}
+    
+    # Default empty source config if not provided
+    if source_config is None:
+        source_config = {}
     
     # Delegate to existing repository service
     repo_service = ResticRepositoryService()
     return repo_service.initialize_repository(dest_config, source_config)
 
-def unlock_repository_for_job(job_name: str, backup_config) -> Dict[str, Any]:
-    """Unlock repository for a job - business logic moved from handlers"""
-    if not job_name:
-        return {'success': False, 'error': 'Job name is required'}
+def unlock_repository(dest_config: Dict[str, Any], source_config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Unlock restic repository - destinations domain logic"""
+    if not dest_config:
+        return {'success': False, 'error': 'Destination configuration is required'}
     
-    jobs = backup_config.get_backup_jobs()
-    if job_name not in jobs:
-        return {'success': False, 'error': f'Job "{job_name}" not found'}
-    
-    job_config = jobs[job_name]
-    dest_type = job_config.get('dest_type')
-    
+    dest_type = dest_config.get('type')
     if dest_type != 'restic':
         return {'success': False, 'error': 'Repository unlock only supported for restic destinations'}
     
-    dest_config = job_config.get('dest_config', {})
-    source_config = job_config.get('source_config', {})
+    restic_config = dest_config.get('restic', {})
+    if not restic_config:
+        return {'success': False, 'error': 'Restic configuration missing from destination'}
+    
+    # Default empty source config if not provided
+    if source_config is None:
+        source_config = {}
     
     # Use the global restic_service instance
     return restic_service.unlock_repository(dest_config, source_config)
 
-def check_repository_status_for_job(job_name: str, backup_config) -> Dict[str, Any]:
-    """Check repository status for a job - business logic moved from handlers"""
-    if not job_name:
-        return {'success': False, 'error': 'Job name is required'}
-    
-    jobs = backup_config.get_backup_jobs()
-    if job_name not in jobs:
-        return {'success': False, 'error': f'Job "{job_name}" not found'}
-    
-    job_config = jobs[job_name]
-    dest_type = job_config.get('dest_type')
-    
-    if dest_type == 'restic':
-        dest_config = job_config.get('dest_config', {})
-        repo_uri = dest_config.get('repo_uri')
-        
-        if not repo_uri:
-            return {'success': False, 'error': 'Repository URI not configured'}
-        
-        # Quick repository check using global service instance
-        check_success, check_message = restic_service._quick_repository_check(repo_uri, dest_config)
-        
-        if check_success:
-            return {'success': True, 'status': 'available', 'job_name': job_name, 'job_type': 'restic'}
-        else:
-            # Determine error type for appropriate response
-            is_locked = check_message and ('locked by' in check_message.lower() or 'repository is already locked' in check_message.lower())
-            return {
-                'success': False, 
-                'error': check_message or 'Unknown error',
-                'error_type': 'locked' if is_locked else 'connection_error',
-                'job_name': job_name
-            }
-    else:
-        # Non-restic repositories - assume available for now
-        return {'success': True, 'status': 'available', 'job_name': job_name, 'job_type': dest_type}
 
 
 # =============================================================================
@@ -1216,9 +1177,8 @@ class ResticAPIService:
     @handle_service_errors("Initialize restic repo")
     def initialize_restic_repo(self, form_data: Dict[str, Any]):
         """Initialize Restic repository from form data"""
-        backup_config = BackupConfig()
-        parser = create_destination_operations_service(backup_config)
-        restic_result = parser.parse_restic_destination(form_data)
+        config_service = DestConfigService()
+        restic_result = config_service.parse_restic_destination(form_data)
         
         if not restic_result['valid']:
             return {'success': False, 'error': restic_result['error']}

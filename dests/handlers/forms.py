@@ -11,8 +11,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from shared.handlers.errors import handle_page_errors
 from shared.handlers.base import BaseHandler
-from dests.services.manage import create_destination_operations_service
-from dests.services.restic import ResticRepositoryTypeService, ResticRepositoryService, unlock_repository_for_job, initialize_repository_for_job
+from dests.services.config import DestConfigService
+from dests.services.restic import ResticRepositoryTypeService, ResticRepositoryService, unlock_repository, initialize_repository
 from dests.schema import MAINTENANCE_MODE_SCHEMAS, RESTIC_REPOSITORY_TYPE_SCHEMAS, DESTINATION_TYPE_SCHEMAS
 
 # Import views for template rendering (presentation logic)
@@ -26,7 +26,7 @@ class DestinationsForms(BaseHandler):
         self._init_template_service()
         
         # Services handle all config access - handlers delegate everything  
-        self.dest_operations = create_destination_operations_service()
+        self.dest_config = DestConfigService()
 
     # =========================================================================
     # DESTINATION CRUD OPERATIONS
@@ -39,7 +39,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate to service business logic
-        result = self.dest_operations.add_destination_from_form(form_data)
+        result = self.dest_config.add_destination_from_form(form_data)
         
         if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
@@ -53,7 +53,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate to service business logic
-        result = self.dest_operations.save_destination(form_data)
+        result = self.dest_config.save_destination_with_validation(form_data)
         
         if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
@@ -66,7 +66,7 @@ class DestinationsForms(BaseHandler):
         """Delete destination"""
         
         # Delegate to service
-        result = self.dest_operations.delete_destination(dest_name)
+        result = self.dest_config.delete_destination_with_validation(dest_name)
         
         if result['success']:
             return RedirectResponse(url='/dests', status_code=302)
@@ -88,7 +88,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate to service business logic  
-        template_context = self.dest_operations.validate_destination_from_form(form_data)
+        template_context = self.dest_config.validate_destination_from_form(form_data)
         return self._render_html('partials/destination_validation_result.html', template_context)
 
     @handle_page_errors("Validate SSH destination")
@@ -98,7 +98,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service
-        result = self.dest_operations.validate_ssh_destination_from_form(form_data)
+        result = self.dest_config.validate_ssh_destination_from_form(form_data)
         
         # Handler renders appropriate template based on service result
         html_response = destinations_views.render_ssh_dest_validation_status(result)
@@ -111,7 +111,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service
-        result = self.dest_operations.validate_restic_destination_from_form(form_data)
+        result = self.dest_config.validate_restic_destination_from_form(form_data)
         
         # Handler renders appropriate template based on service result
         html_response = destinations_views.render_restic_validation_status(result)
@@ -124,7 +124,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
         
         # Delegate business logic to service
-        result = self.dest_operations.validate_origin_repo_path_from_form(form_data)
+        result = self.dest_config.validate_origin_repo_path_from_form(form_data)
         
         # Handler renders appropriate template based on service result
         html_response = destinations_views.render_origin_repo_path_validation_status(result)
@@ -330,7 +330,7 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
 
         # Delegate business logic to service
-        restic_result = self.dest_operations.parse_restic_destination_from_form(form_data)
+        restic_result = self.dest_config.parse_restic_destination_from_form(form_data)
         
         if not restic_result['valid']:
             html_response = destinations_views._render_validation_result("error", restic_result['error'])
@@ -361,7 +361,16 @@ class DestinationsForms(BaseHandler):
                 form_data[key] = [value]
         
         # Delegate to service business logic
-        result = initialize_repository_for_job(form_data.get('job', [''])[0], self.dest_operations.backup_config)
+        # Get destination name from form and initialize repository using destinations domain only
+        dest_name = form_data.get('dest_name', [''])[0] if form_data.get('dest_name') else ''
+        if not dest_name:
+            result = {'success': False, 'error': 'Destination name is required for repository initialization'}
+        else:
+            dest_config = self.dest_config.get_destination(dest_name)
+            if dest_config:
+                result = initialize_repository(dest_config)
+            else:
+                result = {'success': False, 'error': f'Destination "{dest_name}" not found'}
         return JSONResponse(content=result)
     
     @handle_page_errors("Repository unlock")
@@ -378,23 +387,32 @@ class DestinationsForms(BaseHandler):
         else:
             job_name = ''
         
-        # Call existing business logic
-        return self.unlock_repository_htmx(job_name)
+        # Extract dest_name from form data instead of using job_name
+        form_data = dict(await request.form())
+        dest_name = form_data.get('dest_name', '')
+        return self.unlock_repository_htmx(dest_name)
     
     @handle_page_errors("Repository unlock")
-    def unlock_repository_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository unlock - business logic calls destinations service"""
+    def unlock_repository_htmx(self, dest_name: str) -> HTMLResponse:
+        """HTMX endpoint for repository unlock - destinations domain only"""
         
-        # Delegate business logic to service
-        result = unlock_repository_for_job(job_name, self.dest_operations.backup_config)
+        # Get destination config and unlock repository
+        if not dest_name:
+            result = {'success': False, 'error': 'Destination name is required for repository unlock'}
+        else:
+            dest_config = self.dest_config.get_destination(dest_name)
+            if dest_config:
+                result = unlock_repository(dest_config)
+            else:
+                result = {'success': False, 'error': f'Destination "{dest_name}" not found'}
         
         if result.get('success'):
-            # Unlock successful - automatically retry availability check
-            return destinations_views._check_and_respond_repository_status_html(job_name, {})
+            # Unlock successful
+            return self._render_html('partials/repository_unlock_success.html', {'dest_name': dest_name})
         else:
             # Unlock failed - show appropriate error template
             return self._render_html('partials/repository_error.html', {
-                'job_name': job_name,
+                'dest_name': dest_name,
                 'error_type': 'unlock_failed',
                 'error_message': result.get('error', 'Unlock failed')
             })
@@ -410,16 +428,25 @@ class DestinationsForms(BaseHandler):
         form_data = dict(await request.form())
 
         # Delegate business logic to service
-        result = self.dest_operations.generate_uri_preview('restic', form_data)
+        result = self.dest_config.generate_uri_preview('restic', form_data)
         
         # Handler renders template with service result
         html_response = self.template_service.render_template('partials/uri_preview.html', uri=result['uri'])
         return HTMLResponse(content=html_response)
 
-    def initialize_repository_for_job(self, job_name: str) -> JSONResponse:
-        """Initialize repository for a job - delegates to service"""
-        # Delegate business logic to service
-        result = initialize_repository_for_job(job_name, self.dest_operations.backup_config)
+    async def initialize_repository_htmx(self, request) -> JSONResponse:
+        """Initialize repository - destinations domain only"""
+        # Parse form data and initialize repository
+        form_data = dict(await request.form())
+        dest_name = form_data.get('dest_name', '')
+        if not dest_name:
+            result = {'success': False, 'error': 'Destination name is required for repository initialization'}
+        else:
+            dest_config = self.dest_config.get_destination(dest_name)
+            if dest_config:
+                result = initialize_repository(dest_config)
+            else:
+                result = {'success': False, 'error': f'Destination "{dest_name}" not found'}
         return JSONResponse(content=result)
 
 
