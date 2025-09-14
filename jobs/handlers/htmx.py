@@ -17,7 +17,8 @@ from jobs.services.config import JobConfigService
 from jobs.services.manage import JobOperationsService
 from jobs.handlers.pages import jobs_handler
 from origins.schema import SOURCE_PATH_SCHEMA
-from jobs.services.restore import RestoreService
+from jobs.services.restore import RestoreService, RestoreOperationsService
+from jobs.services.define import JobDisplayBuilder, NotificationFormBuilder
 
 
 
@@ -119,6 +120,11 @@ class HTMXHandlers(BaseHandler):
 
         # Initialize services for non-config operations
         self.job_operations = JobOperationsService()
+
+        # Initialize display and form services with template service
+        self.display_builder = JobDisplayBuilder(self.template_service)
+        self.notification_form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
+        self.restore_ops = RestoreOperationsService()
     
     def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
         """Render HTML template with data"""
@@ -190,9 +196,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Call service directly
-        from jobs.services.restore import RestoreOperationsService
-        restore_ops = RestoreOperationsService()
-        result = restore_ops.process_restore_request_from_form(form_data)
+        result = self.restore_ops.process_restore_request_from_form(form_data)
         return JSONResponse(content=result)
 
     @handle_page_errors("Schedule job")
@@ -213,9 +217,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.restore import RestoreOperationsService
-        restore_ops = RestoreOperationsService()
-        template_vars = restore_ops.handle_restore_target_change_from_form(form_data)
+        template_vars = self.restore_ops.handle_restore_target_change_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
@@ -227,9 +229,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.restore import RestoreOperationsService
-        restore_ops = RestoreOperationsService()
-        template_vars = restore_ops.handle_restore_dry_run_change_from_form(form_data)
+        template_vars = self.restore_ops.handle_restore_dry_run_change_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_vars)
@@ -241,9 +241,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.restore import RestoreOperationsService
-        restore_ops = RestoreOperationsService()
-        template_data = restore_ops.check_restore_overwrites_from_form(form_data)
+        template_data = self.restore_ops.check_restore_overwrites_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/restore_overwrite_warning.html', **template_data)
@@ -275,30 +273,47 @@ class HTMXHandlers(BaseHandler):
     def run_backup_job_direct(self, job_name: str, dry_run: bool = False) -> JSONResponse:
         """Execute backup job with full orchestration - moved from operations handler"""
         
-        # Need to get backup orchestration from pages handler for now
+        # Call backup orchestration via pages handler
         result = jobs_handler.backup_orchestration.run_backup_job(job_name, dry_run)
         return JSONResponse(content=result)
     
     @handle_page_errors("Check repository availability")
     def check_repository_availability_htmx(self, job_name: str) -> HTMLResponse:
-        """HTMX endpoint for repository availability check - thin wrapper"""
+        """HTMX endpoint for repository availability check - simplified"""
         if not job_name:
             html_response = self.template_service.render_template('partials/error_message.html',
                                                                error_message='Job name is required')
             return HTMLResponse(content=html_response)
 
-        # Delegate to define service for job config lookup
-        from jobs.services.define import JobDisplayBuilder
-        display_builder = JobDisplayBuilder(self.template_service)
-        result = display_builder.get_job_config_for_repository_check(job_name)
-
+        # Get job config to find destination
+        result = self.display_builder.get_job_config_for_repository_check(job_name)
         if not result['found']:
             html_response = self.template_service.render_template('partials/error_message.html',
                                                                error_message=result['error'])
             return HTMLResponse(content=html_response)
 
-        # Delegate to pages handler for repository operations
-        return jobs_handler._check_and_respond_repository_status_html(job_name, result['job_config'])
+        # Use ConfigReader to check if destination exists
+        from shared.services.config import ConfigReader
+        config_reader = ConfigReader()
+        destinations = config_reader.get_destinations()
+
+        job_config = result['job_config']
+        dest_name = job_config.get('destination')
+
+        if dest_name and dest_name in destinations:
+            dest_config = destinations[dest_name]
+            if dest_config.get('repo_type'):  # Restic destination
+                status_message = f"Repository '{dest_name}' is available"
+                html_response = self.template_service.render_template('partials/success_message.html',
+                                                                   success_message=status_message)
+            else:
+                html_response = self.template_service.render_template('partials/error_message.html',
+                                                                   error_message='Destination is not a restic repository')
+        else:
+            html_response = self.template_service.render_template('partials/error_message.html',
+                                                               error_message=f'Destination "{dest_name}" not found')
+
+        return HTMLResponse(content=html_response)
     
     # =========================================================================
     # NOTIFICATION HTMX HANDLERS
@@ -310,9 +325,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.define import NotificationFormBuilder
-        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
-        template_data = form_builder.toggle_success_message_from_form(form_data)
+        template_data = self.notification_form_builder.toggle_success_message_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/notification_success_message.html', **template_data)
@@ -324,9 +337,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.define import NotificationFormBuilder
-        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
-        template_data = form_builder.toggle_failure_message_from_form(form_data)
+        template_data = self.notification_form_builder.toggle_failure_message_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/notification_failure_message.html', **template_data)
@@ -338,9 +349,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to define service for HTML building
-        from jobs.services.define import JobDisplayBuilder
-        display_builder = JobDisplayBuilder(self.template_service)
-        result = display_builder.build_notification_providers_html([])  # Empty for new forms
+        result = self.display_builder.build_notification_providers_html([])  # Empty for new forms
 
         html_response = self.template_service.render_template('partials/notification_providers_section.html',
                                                             provider_html=result['provider_html'],
@@ -353,9 +362,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.define import NotificationFormBuilder
-        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
-        result = form_builder.add_notification_provider_from_form(form_data)
+        result = self.notification_form_builder.add_notification_provider_from_form(form_data)
 
         if not result['success']:
             html_response = self.template_service.render_template('partials/error_message.html',
@@ -374,9 +381,7 @@ class HTMXHandlers(BaseHandler):
         form_data = await parse_htmx_form(request)
 
         # Delegate to service
-        from jobs.services.define import NotificationFormBuilder
-        form_builder = NotificationFormBuilder(self.template_service, self.job_config.config_reader)
-        result = form_builder.remove_notification_provider_from_form(form_data)
+        result = self.notification_form_builder.remove_notification_provider_from_form(form_data)
 
         # Return rendered template
         html_response = self.template_service.render_template('partials/notification_provider_removed_response.html',

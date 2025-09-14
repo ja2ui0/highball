@@ -244,6 +244,97 @@ class JobConfigService:
         return self.config_reader.get_deleted_jobs()
 
     # =========================================================================
+    # RESPONSE ORCHESTRATION - business logic moved from handlers
+    # =========================================================================
+
+    def delete_backup_job_with_response(self, job_name: str) -> Dict[str, Any]:
+        """Delete backup job and return appropriate response data"""
+        if not job_name:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': 'Job name is required'
+                },
+                'status_code': 400
+            }
+
+        success = self.delete_backup_job(job_name)
+        if success:
+            return {
+                'type': 'redirect',
+                'url': '/dashboard',
+                'status_code': 302
+            }
+        else:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': f"Failed to delete job '{job_name}'"
+                },
+                'status_code': 500
+            }
+
+    def purge_backup_job_with_response(self, job_name: str) -> Dict[str, Any]:
+        """Purge backup job and return appropriate response data"""
+        if not job_name:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': 'Job name is required'
+                },
+                'status_code': 400
+            }
+
+        success = self.purge_job(job_name)
+        if success:
+            return {
+                'type': 'redirect',
+                'url': '/dashboard',
+                'status_code': 302
+            }
+        else:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': f"Failed to purge job '{job_name}'"
+                },
+                'status_code': 500
+            }
+
+    def restore_backup_job_with_response(self, job_name: str) -> Dict[str, Any]:
+        """Restore backup job and return appropriate response data"""
+        if not job_name:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': 'Job name is required'
+                },
+                'status_code': 400
+            }
+
+        success = self.restore_deleted_job(job_name)
+        if success:
+            return {
+                'type': 'redirect',
+                'url': '/dashboard',
+                'status_code': 302
+            }
+        else:
+            return {
+                'type': 'json',
+                'content': {
+                    'success': False,
+                    'error': f"Failed to restore job '{job_name}'"
+                },
+                'status_code': 500
+            }
+
+    # =========================================================================
     # FORM-BASED JOB OPERATIONS - business logic moved from handlers
     # =========================================================================
 
