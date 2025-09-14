@@ -13,7 +13,7 @@ from shared.handlers.base import BaseHandler
 from shared.services.config import ConfigReader
 from admin.services.init import HighballServices
 from admin.services.config import AdminConfigService
-from admin.schema import PROVIDER_FIELD_SCHEMAS
+from admin.data.constants import PROVIDER_FIELD_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ class AdminViews(BaseHandler):
 
     def _get_available_themes(self):
         """Get list of available theme files - delegate to admin service"""
-        return self.admin_services.get_available_themes()
+        theme_result = self.admin_services.get_available_themes()
+        return theme_result.themes
 
     def _get_system_logs(self, log_type: str, lines: int = 100) -> List[str]:
         """Get system log entries based on type - presentation logic"""

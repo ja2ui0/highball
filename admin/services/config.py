@@ -7,7 +7,11 @@ import os
 import yaml
 from typing import Dict, Any
 from shared.services.config import ConfigIOService, ConfigReader
-from admin.schema import PROVIDER_FIELD_SCHEMAS
+from admin.data.constants import PROVIDER_FIELD_SCHEMAS
+from admin.data.models import (
+    ConfigSaveResult, ConfigPreviewResult, ProviderOperationResult,
+    GlobalSettings, TelegramConfig, EmailConfig
+)
 from models.forms import safe_get_value
 
 
@@ -37,7 +41,7 @@ class AdminConfigService:
     # BUSINESS LOGIC METHODS - moved from manage.py
     # =============================================================================
     
-    def save_structured_config_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def save_structured_config_from_form(self, form_data: Dict[str, Any]) -> ConfigSaveResult:
         """Save structured configuration from form data - contains all business logic"""
         try:
             # Get current configuration and update global settings
@@ -64,21 +68,21 @@ class AdminConfigService:
             default_schedule_times['weekly'] = safe_get_value(form_data, 'weekly_default', '0 3 * * 0')
             default_schedule_times['monthly'] = safe_get_value(form_data, 'monthly_default', '0 3 1 * *')
             
-            # Notification settings
-            self._update_notification_settings(global_settings, form_data)
+            # Notification settings with validation
+            self._update_notification_settings_with_validation(global_settings, form_data)
             
             # Save only global settings to local.yaml (not domain configs)
             success = self.update_global_settings(global_settings)
             
             if success:
-                return {'success': True, 'message': 'Configuration saved successfully'}
+                return ConfigSaveResult(success=True)
             else:
-                return {'success': False, 'error': 'Failed to save configuration to disk'}
+                return ConfigSaveResult(success=False, error='Failed to save configuration to disk')
             
         except Exception as e:
-            return {'success': False, 'error': f'Configuration save failed: {str(e)}'}
+            return ConfigSaveResult(success=False, error=f'Configuration save failed: {str(e)}')
     
-    def preview_config_changes_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def preview_config_changes_from_form(self, form_data: Dict[str, Any]) -> ConfigPreviewResult:
         """Preview configuration changes without saving - contains all business logic"""
         # Start with current configuration to preserve existing notification settings
         current_config = {'global_settings': self.config_reader.get_global_settings().copy()}
@@ -105,23 +109,22 @@ class AdminConfigService:
         default_schedule_times['monthly'] = safe_get_value(form_data, 'monthly_default', '0 3 1 * *')
         
         # Notification settings (preview only - preserve existing settings)
-        self._update_notification_settings(global_settings, form_data)
+        self._update_notification_settings_with_validation(global_settings, form_data)
         
         # Convert to YAML for display
         yaml_content = yaml.dump(preview_config, default_flow_style=False, sort_keys=False)
         
-        return {
-            'success': True,
-            'yaml_content': yaml_content,
-            'preview_config': preview_config
-        }
+        return ConfigPreviewResult(
+            success=True,
+            preview_content=yaml_content
+        )
     
-    def add_notification_provider_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def add_notification_provider_from_form(self, form_data: Dict[str, Any]) -> ProviderOperationResult:
         """Add a new notification provider to configuration"""
         try:
             provider = safe_get_value(form_data, 'add_provider')
             if not provider or provider not in ['telegram', 'email']:
-                return {'success': False, 'error': 'Invalid provider selection'}
+                return ProviderOperationResult(success=False, error='Invalid provider selection')
             
             # Get current config and add empty provider section
             global_settings = self.config_reader.get_global_settings()
@@ -150,19 +153,19 @@ class AdminConfigService:
             success = self.update_global_settings(global_settings)
             
             if success:
-                return {'success': True, 'provider': provider}
+                return ProviderOperationResult(success=True, provider=provider)
             else:
-                return {'success': False, 'error': 'Failed to save provider configuration'}
+                return ProviderOperationResult(success=False, error='Failed to save provider configuration')
             
         except Exception as e:
-            return {'success': False, 'error': f'Add provider failed: {str(e)}'}
+            return ProviderOperationResult(success=False, error=f'Add provider failed: {str(e)}')
 
-    def remove_notification_provider_from_form(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def remove_notification_provider_from_form(self, form_data: Dict[str, Any]) -> ProviderOperationResult:
         """Remove a notification provider from configuration"""
         try:
             provider = safe_get_value(form_data, 'provider')
             if not provider or provider not in ['telegram', 'email']:
-                return {'success': False, 'error': 'Invalid provider'}
+                return ProviderOperationResult(success=False, error='Invalid provider')
             
             # Get current config and remove provider section
             global_settings = self.config_reader.get_global_settings()
@@ -175,14 +178,14 @@ class AdminConfigService:
                 success = self.update_global_settings(global_settings)
                 
                 if success:
-                    return {'success': True, 'provider': provider}
+                    return ProviderOperationResult(success=True, provider=provider)
                 else:
-                    return {'success': False, 'error': 'Failed to save configuration changes'}
+                    return ProviderOperationResult(success=False, error='Failed to save configuration changes')
             else:
-                return {'success': False, 'error': f'{provider} provider not found'}
+                return ProviderOperationResult(success=False, error=f'{provider} provider not found')
                 
         except Exception as e:
-            return {'success': False, 'error': f'Remove provider failed: {str(e)}'}
+            return ProviderOperationResult(success=False, error=f'Remove provider failed: {str(e)}')
     
     def _update_notification_settings(self, global_settings: dict, form_data: Dict[str, Any]):
         """Update notification settings from form data"""
@@ -225,3 +228,30 @@ class AdminConfigService:
         else:
             # Handle text, password, number fields
             provider_config[field_info['name']] = safe_get_value(form_data, field_name, field_info.get('default', ''))
+
+    def _update_notification_settings_with_validation(self, global_settings: dict, form_data: Dict[str, Any]):
+        """Update notification settings with Pydantic validation"""
+        notification_config = global_settings.setdefault('notification', {})
+
+        # Process each provider with validation
+        for provider_name in ['telegram', 'email']:
+            provider_fields = {key.replace(f'{provider_name}_', ''): value
+                             for key, value in form_data.items()
+                             if key.startswith(f'{provider_name}_')}
+
+            if provider_fields:
+                try:
+                    # Validate using Pydantic models
+                    if provider_name == 'telegram':
+                        validated_config = TelegramConfig.model_validate(provider_fields)
+                    elif provider_name == 'email':
+                        validated_config = EmailConfig.model_validate(provider_fields)
+                    else:
+                        continue
+
+                    # Store validated config as dict
+                    notification_config[provider_name] = validated_config.model_dump()
+
+                except Exception as validation_error:
+                    # If validation fails, raise with clear error
+                    raise ValueError(f"{provider_name.title()} configuration invalid: {str(validation_error)}")

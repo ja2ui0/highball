@@ -10,7 +10,6 @@ Schemas for global system configuration, notification providers, and administrat
 PROVIDER_FIELD_SCHEMAS = {
     'telegram': {
         'display_name': 'Telegram',
-        'required_fields': ['token', 'chat_id'],
         'fields': [
             {
                 'name': 'enabled',
@@ -24,7 +23,6 @@ PROVIDER_FIELD_SCHEMAS = {
                 'label': 'Bot Token',
                 'help': 'Get from @BotFather on Telegram',
                 'placeholder': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz',
-                'required': True
             },
             {
                 'name': 'chat_id', 
@@ -32,7 +30,6 @@ PROVIDER_FIELD_SCHEMAS = {
                 'label': 'Chat ID',
                 'help': 'Chat or group ID where notifications will be sent',
                 'placeholder': '-1001234567890',
-                'required': True
             }
         ],
         'sections': [
@@ -52,8 +49,6 @@ PROVIDER_FIELD_SCHEMAS = {
                         'label': 'Minimum time between messages (minutes)',
                         'help': 'Messages will be batched and sent no more frequently than this interval',
                         'placeholder': '5',
-                        'min': 1,
-                        'max': 1440
                     }
                 ]
             }
@@ -61,7 +56,6 @@ PROVIDER_FIELD_SCHEMAS = {
     },
     'email': {
         'display_name': 'Email',
-        'required_fields': ['smtp_server', 'smtp_port', 'from_email', 'to_email'],
         'fields': [
             {
                 'name': 'enabled',
@@ -80,16 +74,14 @@ PROVIDER_FIELD_SCHEMAS = {
                         'type': 'text',
                         'label': 'SMTP Server',
                         'placeholder': 'smtp.gmail.com',
-                        'required': True
-                    },
+                            },
                     {
                         'name': 'smtp_port',
                         'type': 'number',
                         'label': 'SMTP Port',
                         'help': '587 for TLS, 465 for SSL, 25 for plain',
                         'placeholder': '587',
-                        'required': True
-                    },
+                            },
                     {
                         'name': 'encryption',
                         'type': 'select',
@@ -107,15 +99,13 @@ PROVIDER_FIELD_SCHEMAS = {
                         'type': 'email',
                         'label': 'From Email',
                         'placeholder': 'backup@yourcompany.com',
-                        'required': True
-                    },
+                            },
                     {
                         'name': 'to_email',
                         'type': 'email', 
                         'label': 'To Email',
                         'placeholder': 'admin@yourcompany.com',
-                        'required': True
-                    },
+                            },
                     {
                         'name': 'username',
                         'type': 'text',
@@ -148,8 +138,6 @@ PROVIDER_FIELD_SCHEMAS = {
                         'label': 'Minimum time between messages (minutes)',
                         'help': 'Messages will be batched and sent no more frequently than this interval',
                         'placeholder': '15',
-                        'min': 1,
-                        'max': 1440
                     }
                 ]
             }

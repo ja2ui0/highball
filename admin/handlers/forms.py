@@ -15,7 +15,7 @@ from shared.services.config import ConfigReader
 from admin.services.init import HighballServices
 from admin.services.notifications import NotificationTestService
 from admin.services.config import AdminConfigService
-from admin.schema import PROVIDER_FIELD_SCHEMAS
+from admin.data.constants import PROVIDER_FIELD_SCHEMAS
 from admin.handlers.views import AdminViews
 
 logger = logging.getLogger(__name__)
@@ -59,11 +59,11 @@ class AdminForms(BaseHandler):
         """Save structured configuration - delegates to service"""
         result = self.admin_config.save_structured_config_from_form(form_data)
         
-        if result['success']:
+        if result.success:
             return JSONResponse(content={'message': 'Configuration saved successfully'})
         else:
             return JSONResponse(
-                content={'error': result['error']}, 
+                content={'error': result.error},
                 status_code=400
             )
 
@@ -72,8 +72,8 @@ class AdminForms(BaseHandler):
         result = self.admin_config.preview_config_changes_from_form(form_data)
         
         template_data = {
-            'preview_yaml': result['yaml_content'],
-            'success': result['success']
+            'preview_yaml': result.preview_content,
+            'success': result.success
         }
         
         return self._render_html('partials/config_preview.html', template_data)
@@ -101,7 +101,7 @@ class AdminForms(BaseHandler):
         # Delegate business logic to service
         result = self.admin_config.add_notification_provider_from_form(form_data)
         
-        if result['success']:
+        if result.success:
             # Return updated notification section showing new provider form
             global_settings = self.config_reader.get_global_settings()
             template_data = {
@@ -112,7 +112,7 @@ class AdminForms(BaseHandler):
         else:
             # Return error message
             return self._render_html('partials/error_message.html', {
-                'error_message': result['error']
+                'error_message': result.error
             })
 
     @handle_page_errors("Remove notification provider")
@@ -123,8 +123,8 @@ class AdminForms(BaseHandler):
         # Delegate business logic to service  
         result = self.admin_config.remove_notification_provider_from_form(form_data)
         
-        if result['success']:
-            # Return updated notification section 
+        if result.success:
+            # Return updated notification section
             global_settings = self.config_reader.get_global_settings()
             template_data = {
                 'global_settings': global_settings,
@@ -134,7 +134,7 @@ class AdminForms(BaseHandler):
         else:
             # Return error message
             return self._render_html('partials/error_message.html', {
-                'error_message': result['error']
+                'error_message': result.error
             })
 
     # =========================================================================
@@ -171,16 +171,16 @@ class AdminForms(BaseHandler):
         # Delegate business logic to service
         result = self.admin_config.save_structured_config_from_form(form_data)
         
-        if result['success']:
+        if result.success:
             template_data = {
                 'message': 'Configuration saved successfully',
                 'success': True
             }
             return self._render_html('partials/config_save_result.html', template_data)
         else:
-            # Return error message as HTML  
+            # Return error message as HTML
             template_data = {
-                'message': result.get('error', 'Configuration save failed'),
+                'message': result.error or 'Configuration save failed',
                 'success': False
             }
             return self._render_html('partials/config_save_result.html', template_data)

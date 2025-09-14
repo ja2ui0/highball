@@ -11,6 +11,7 @@ import stat
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+from admin.data.models import RawConfigSaveResult, ConfigPreviewResult, ThemeListResult
 
 from jobs.services.schedule import JobSchedulerHandler
 from shared.handlers.templating import TemplateService
@@ -121,18 +122,18 @@ class HighballServices:
             os.chmod(known_hosts_path, 0o644)
     
     @handle_service_errors("Get available themes")
-    def get_available_themes(self) -> List[str]:
+    def get_available_themes(self) -> ThemeListResult:
         """Get list of available theme files from static/themes directory"""
         themes_dir = Path('static/themes')
         if not themes_dir.exists():
-            return ['dark', 'light']  # Fallback themes
-        
+            return ThemeListResult(themes=['dark', 'light'])  # Fallback themes
+
         themes = []
         for theme_file in themes_dir.glob('*.css'):
             theme_name = theme_file.stem
             themes.append(theme_name)
-        
-        return sorted(themes)
+
+        return ThemeListResult(themes=sorted(themes))
     
     @handle_service_errors("Read raw config")
     def read_raw_config(self, config_path: str) -> str:
@@ -144,22 +145,22 @@ class HighballServices:
             return f.read()
     
     @handle_service_errors("Save raw config")
-    def save_raw_config(self, raw_config: str, config_path: str) -> Dict[str, Any]:
+    def save_raw_config(self, raw_config: str, config_path: str) -> RawConfigSaveResult:
         """Validate and save raw YAML configuration"""
         # Validate YAML syntax
         try:
             yaml.safe_load(raw_config)
         except yaml.YAMLError as e:
-            return {
-                'success': False,
-                'error': f'Invalid YAML syntax: {str(e)}'
-            }
+            return RawConfigSaveResult(
+                success=False,
+                error=f'Invalid YAML syntax: {str(e)}'
+            )
         
         # Save to file
         with open(config_path, 'w') as f:
             f.write(raw_config)
         
-        return {'success': True}
+        return RawConfigSaveResult(success=True)
     
     @handle_service_errors("Generate config YAML")
     def generate_config_yaml(self, config_dict: Dict[str, Any]) -> str:
@@ -167,7 +168,7 @@ class HighballServices:
         return yaml.dump(config_dict, default_flow_style=False, indent=2)
     
     @handle_service_errors("Preview config changes")
-    def preview_config_changes(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    def preview_config_changes(self, form_data: Dict[str, Any]) -> ConfigPreviewResult:
         """Generate preview of configuration changes from form data"""
         # Load raw YAML from config/local/local.yaml only (not concatenated config)
         import os
@@ -211,8 +212,8 @@ class HighballServices:
         preview_structure = {'global_settings': preview_global_settings}
         yaml_content = self.generate_config_yaml(preview_structure)
         
-        return {
-            'success': True,
-            'preview_content': yaml_content
-        }
+        return ConfigPreviewResult(
+            success=True,
+            preview_content=yaml_content
+        )
     

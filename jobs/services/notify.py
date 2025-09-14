@@ -73,7 +73,7 @@ class NotificationConfig(BaseModel):
     failure_message: str = ""
 
 # Import schemas from admin pillar
-from admin.schema import PROVIDER_FIELD_SCHEMAS
+from admin.data.constants import PROVIDER_FIELD_SCHEMAS
 
 # =============================================================================
 # NOTIFICATION PROVIDER FACTORY
@@ -569,7 +569,7 @@ class NotificationFormDataBuilder:
         Returns:
             Dict containing notification form fields for all providers
         """
-        from admin.schema import PROVIDER_FIELD_SCHEMAS
+        from admin.data.constants import PROVIDER_FIELD_SCHEMAS
         
         # Get global notification settings from config
         global_settings = self.config_reader.get_global_settings()
