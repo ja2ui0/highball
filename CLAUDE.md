@@ -259,3 +259,4 @@ Claude code auto-appends after this line.
 - dests: JOB-BASED REPO... these are not actually job-based, they are dests-based (nothing to do with jobs) and probably need some semantic cleanup to indicate that
 - parameterless factory method for BackupConfig in manage.py - should this be shared?
 - why is admin views handler getting the config path when it should be getting a yaml payload from manage.py through config.py and not doing CRUD in a passthrough fashion (which is what it looks like is happening)
+- how do pydantic models differ from schema? can they be used symbiotically in a way to support DRY? do they need to coexist? if so, should they be moved as complementary pairs into a subfolder for each domain?

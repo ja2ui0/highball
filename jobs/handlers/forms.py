@@ -40,7 +40,7 @@ class JobFormsHandler(BaseHandler):
 
     def _render_html(self, template_path: str, data: Dict[str, Any]) -> HTMLResponse:
         """Render HTML template response"""
-        html_response = self.template_service.render_template(template_path, data)
+        html_response = self.template_service.render_template(template_path, **data)
         return HTMLResponse(content=html_response)
 
     # =========================================================================
@@ -123,35 +123,25 @@ class JobFormsHandler(BaseHandler):
         result = self.job_config.validate_source_paths_from_form(form_data)
         return JSONResponse(content=result)
 
-    async def validate_source_path(self, request: Request) -> HTMLResponse:
+    async def validate_source_path(self, request: Request) -> JSONResponse:
         """Validate individual source path - HTMX endpoint"""
         form_data = await parse_htmx_form(request)
-        result = self.job_config.validate_individual_source_path(form_data)
-        html_response = self.display_builder.render_source_path_validation_status(result)
-        return HTMLResponse(content=html_response)
+        result = self.job_config.validate_source_path_from_form(form_data)
+        return JSONResponse(content=result)
 
     # =========================================================================
     # SOURCE PATH MANAGEMENT
     # =========================================================================
 
     async def add_source_path(self, request: Request) -> HTMLResponse:
-        """Add source path to job configuration - HTMX endpoint"""
+        """Add a new source path entry for HTMX forms - matches original working implementation"""
         form_data = await parse_htmx_form(request)
 
-        # Get the new path and current paths
-        new_path = get_form_value(form_data, 'new_source_path')
-        current_paths = form_data.get('source_paths', [])
-        if isinstance(current_paths, str):
-            current_paths = [current_paths] if current_paths else []
+        # Delegate to service (same as original)
+        template_data = self.job_config.add_source_path_entry_data(form_data)
 
-        # Add new path if not empty and not duplicate
-        if new_path and new_path not in current_paths:
-            current_paths.append(new_path)
-
-        # Render updated path list
-        return self._render_html('partials/source_path_list.html', {
-            'source_paths': current_paths
-        })
+        # Return rendered template (same as original)
+        return self._render_html('partials/source_path_entry_container.html', template_data)
 
     async def remove_source_path(self, request: Request) -> HTMLResponse:
         """Remove source path from job configuration - HTMX endpoint"""
